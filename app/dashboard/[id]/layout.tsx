@@ -38,9 +38,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             <aside className="w-64 border-r border-slate-800 bg-[#020617] flex flex-col fixed inset-y-0 h-full z-50">
                 <div className="p-6">
                     <div className="flex items-center gap-3 mb-10 pl-2">
-                        <div className="w-8 h-8 bg-sky-600 rounded flex items-center justify-center font-bold text-white text-sm">
-                            RL
-                        </div>
+                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 rounded object-contain" />
                         <span className="text-lg font-bold tracking-tight text-white">Ro-Link</span>
                     </div>
 

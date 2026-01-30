@@ -79,9 +79,12 @@ export default function Dashboard() {
         <div className="min-h-screen bg-[#020617] text-slate-200 p-8 sm:p-12">
             <div className="max-w-7xl mx-auto">
                 <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-12 border-b border-slate-800 pb-10 gap-6">
-                    <div>
-                        <h1 className="text-3xl font-bold text-white tracking-tight">Your Servers</h1>
-                        <p className="text-slate-500 text-sm font-medium mt-1">Select a server to manage.</p>
+                    <div className="flex items-center gap-4">
+                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-12 h-12 rounded-xl object-contain shadow-lg border border-white/5 bg-slate-900/50 p-1" />
+                        <div>
+                            <h1 className="text-3xl font-bold text-white tracking-tight">Your Servers</h1>
+                            <p className="text-slate-500 text-sm font-medium mt-1">Select a server to manage.</p>
+                        </div>
                     </div>
                     <div className="flex items-center gap-4 bg-slate-900/50 p-3 rounded-xl border border-slate-800 shadow-sm backdrop-blur-sm">
                         <img src={session?.user?.image || ''} alt="" className="w-10 h-10 rounded-lg border border-slate-700" />

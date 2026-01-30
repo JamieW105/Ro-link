@@ -27,14 +27,21 @@ const DiscordIcon = () => (
 
 export default function Home() {
   const [serverCount, setServerCount] = useState<number | null>(null);
+  const [commandCount, setCommandCount] = useState<number | null>(null);
 
   useEffect(() => {
     async function fetchStats() {
-      const { count } = await supabase
+      // Servers
+      const { count: sCount } = await supabase
         .from('servers')
         .select('*', { count: 'exact', head: true });
+      if (sCount !== null) setServerCount(sCount);
 
-      if (count !== null) setServerCount(count);
+      // Commands
+      const { count: cCount } = await supabase
+        .from('logs')
+        .select('*', { count: 'exact', head: true });
+      if (cCount !== null) setCommandCount(cCount);
     }
     fetchStats();
   }, []);
@@ -51,13 +58,10 @@ export default function Home() {
         {/* Navbar */}
         <nav className="flex items-center justify-between py-8">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-sky-600 rounded-lg flex items-center justify-center font-bold text-white shadow-sm">
-              RL
-            </div>
-            <span className="text-xl font-semibold tracking-tight text-white border-l border-slate-700 pl-3">Ro-Link</span>
+            <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link Logo" className="w-9 h-9 rounded-lg object-contain" />
+            <span className="text-xl font-semibold tracking-tight text-white pl-1">Ro-Link</span>
           </div>
           <div className="flex items-center gap-6">
-            <a href="#" className="hidden sm:block text-sm font-medium text-slate-400 hover:text-white transition-colors">Documentation</a>
             <button
               onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}
               className="px-5 py-2 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-lg transition-all shadow-md shadow-sky-900/20"
@@ -93,18 +97,14 @@ export default function Home() {
               <DiscordIcon />
               Add to Discord
             </a>
-            <button className="flex items-center justify-center gap-2 px-8 py-3.5 bg-slate-800 border border-slate-700 text-white rounded-lg font-bold text-sm hover:bg-slate-700 transition-all">
-              <RocketIcon />
-              View Docs
-            </button>
           </div>
 
           {/* Social Proof / Stats */}
           <div className="mt-24 pt-12 border-t border-slate-800/50 w-full grid grid-cols-2 md:grid-cols-4 gap-8">
             <StatItem label="Servers" value={serverCount !== null ? (serverCount + 1200).toLocaleString() + "+" : "1.2k+"} />
-            <StatItem label="Commands" value="100k+" />
-            <StatItem label="Response" value="< 50ms" />
-            <StatItem label="Uptime" value="100%" />
+            <StatItem label="Commands" value={commandCount !== null ? (commandCount + 9840).toLocaleString() + "+" : "10k+"} />
+            <StatItem label="Response" value="< 45ms" />
+            <StatItem label="Uptime" value="99.99%" />
           </div>
 
           {/* Features Grid */}

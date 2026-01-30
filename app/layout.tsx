@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Ro-Link",
   description: "Connect Discord to Roblox",
+  icons: {
+    icon: "/Media/Ro-LinkIcon.png",
+  },
 };
 
 export default function RootLayout({
