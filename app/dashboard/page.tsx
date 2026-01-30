@@ -65,12 +65,12 @@ export default function Dashboard() {
                 </div>
                 <h1 className="text-2xl font-bold mb-2 tracking-tight">Access Denied</h1>
                 <p className="text-slate-400 mb-8 max-w-sm text-sm">Please authenticate with Discord to manage your community servers.</p>
-                <button
-                    onClick={() => signIn('discord')}
+                <a
+                    href="https://discord.com/oauth2/authorize?client_id=1466340007940722750&response_type=code&redirect_uri=https%3A%2F%2Frolink.cloud%2Fapi%2Fauth%2Fcallback%2Fdiscord&scope=identify+guilds"
                     className="bg-sky-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-sky-500 transition-all shadow-lg shadow-sky-900/10 text-sm"
                 >
                     Sign In with Discord
-                </button>
+                </a>
             </div>
         );
     }
