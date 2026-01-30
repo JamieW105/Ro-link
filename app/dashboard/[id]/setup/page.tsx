@@ -164,6 +164,10 @@ function RoLink:Execute(cmd)
 				end)
 			end
 		end)
+	elseif cmd.command == "UPDATE" then
+		for _, player in ipairs(Players:GetPlayers()) do
+			player:Kick("Server is updating. Please rejoin in a moment!")
+		end
 	end
 end
 

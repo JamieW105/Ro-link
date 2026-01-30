@@ -62,6 +62,10 @@ const commands = [
                 required: true,
             }
         ]
+    },
+    {
+        name: 'update',
+        description: 'Send a global update signal to all Roblox servers (restarts them)',
     }
 ];
 
@@ -148,6 +152,22 @@ client.on('interactionCreate', async interaction => {
         }
 
         await interaction.reply(`🔓 **Unbanned** \`${targetUser}\` from Roblox. Command sent to game servers.`);
+    } else if (commandName === 'update') {
+        const { error } = await supabase
+            .from('command_queue')
+            .insert([{
+                server_id: interaction.guildId,
+                command: 'UPDATE',
+                args: { moderator: interaction.user.tag },
+                status: 'PENDING'
+            }]);
+
+        if (error) {
+            console.error(error);
+            return interaction.reply({ content: '❌ Failed to queue update command.', ephemeral: true });
+        }
+
+        await interaction.reply(`🚀 **Update Signal Sent**! All game servers will restart shortly.`);
     }
 });
 

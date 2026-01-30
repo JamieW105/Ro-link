@@ -44,6 +44,8 @@ export default function Home() {
       if (cCount !== null) setCommandCount(cCount);
     }
     fetchStats();
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -101,10 +103,10 @@ export default function Home() {
 
           {/* Social Proof / Stats */}
           <div className="mt-24 pt-12 border-t border-slate-800/50 w-full grid grid-cols-2 md:grid-cols-4 gap-8">
-            <StatItem label="Servers" value={serverCount !== null ? (serverCount + 1200).toLocaleString() + "+" : "1.2k+"} />
-            <StatItem label="Commands" value={commandCount !== null ? (commandCount + 9840).toLocaleString() + "+" : "10k+"} />
+            <StatItem label="Servers" value={serverCount !== null ? serverCount.toLocaleString() : "0"} />
+            <StatItem label="Commands" value={commandCount !== null ? commandCount.toLocaleString() : "0"} />
             <StatItem label="Response" value="< 45ms" />
-            <StatItem label="Uptime" value="99.99%" />
+            <StatItem label="Uptime" value="100%" />
           </div>
 
           {/* Features Grid */}

@@ -36,10 +36,15 @@ const InfoIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
 );
 
+const RefreshIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6m-9 10H2v-6h6m11.1-5.9a9 9 0 1 1-2.8-5.3" /></svg>
+);
+
 export default function ServersPage() {
     const { id } = useParams();
     const [liveServers, setLiveServers] = useState<LiveServer[]>([]);
     const [loading, setLoading] = useState(true);
+    const [updating, setUpdating] = useState(false);
 
     useEffect(() => {
         async function fetchData() {
@@ -59,15 +64,45 @@ export default function ServersPage() {
         return () => clearInterval(interval);
     }, [id]);
 
+    async function handleUpdateAll() {
+        if (!confirm("Are you sure you want to update all servers? This will kick all players to force an update.")) return;
+        setUpdating(true);
+        const { error } = await supabase
+            .from('command_queue')
+            .insert([{
+                server_id: id,
+                command: 'UPDATE',
+                args: { reason: "Manual Update Triggered" },
+                status: 'PENDING'
+            }]);
+
+        if (!error) {
+            alert("Update command sent to all servers!");
+        } else {
+            alert("Error sending update: " + error.message);
+        }
+        setUpdating(false);
+    }
+
     const totalPlayers = liveServers.reduce((sum, s) => sum + s.player_count, 0);
 
     if (loading) return null;
 
     return (
         <div className="space-y-10 max-w-7xl animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-bold text-white tracking-tight">Live Servers</h1>
-                <p className="text-slate-500 text-sm font-medium">See live data from your game servers.</p>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                <div className="flex flex-col gap-1">
+                    <h1 className="text-2xl font-bold text-white tracking-tight">Live Servers</h1>
+                    <p className="text-slate-500 text-sm font-medium">See live data from your game servers.</p>
+                </div>
+                <button
+                    onClick={handleUpdateAll}
+                    disabled={updating || liveServers.length === 0}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold transition-all shadow-lg shadow-sky-900/20"
+                >
+                    <RefreshIcon />
+                    {updating ? "Sending Command..." : "Update All Servers"}
+                </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
