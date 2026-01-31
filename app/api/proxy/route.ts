@@ -30,7 +30,7 @@ export async function GET(req: Request) {
             headers['x-api-key'] = apiKey;
         }
 
-        const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${username}&limit=1`, {
+        const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${username}&limit=10`, {
             headers
         });
 

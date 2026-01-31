@@ -242,7 +242,7 @@ export async function POST(req: Request) {
                 if (server?.open_cloud_key) headers['x-api-key'] = server.open_cloud_key;
 
                 // Fetch data for the embed (Official Roblox API)
-                const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${username}&limit=1`, {
+                const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${username}&limit=10`, {
                     headers
                 });
 
