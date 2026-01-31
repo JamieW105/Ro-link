@@ -40,6 +40,7 @@ export default function PlayerLookup() {
     const [query, setQuery] = useState("");
     const [player, setPlayer] = useState<RobloxPlayer | null>(null);
     const [presence, setPresence] = useState<{ inGame: boolean, jobId?: string } | null>(null);
+    const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -51,6 +52,7 @@ export default function PlayerLookup() {
         setError(null);
         setPlayer(null);
         setPresence(null);
+        setLogs([]);
 
         try {
             const res = await fetch(`/api/proxy?username=${query}&serverId=${id}`);
@@ -59,14 +61,14 @@ export default function PlayerLookup() {
             if (!res.ok) throw new Error(data.error || 'Failed to find player');
             setPlayer(data);
 
-            // Check Presence in Live Servers
-            const { data: servers } = await supabase
-                .from('live_servers')
-                .select('id, players')
-                .eq('server_id', id);
+            // Fetch Presence and Logs in Parallel
+            const [serversRes, logsRes] = await Promise.all([
+                supabase.from('live_servers').select('id, players').eq('server_id', id),
+                supabase.from('logs').select('*').eq('server_id', id).eq('target', data.username).order('created_at', { ascending: false })
+            ]);
 
-            if (servers) {
-                const activeServer = servers.find((s: any) =>
+            if (serversRes.data) {
+                const activeServer = serversRes.data.find((s: any) =>
                     s.players?.some((p: string) => p.toLowerCase() === data.username.toLowerCase())
                 );
                 if (activeServer) {
@@ -74,6 +76,10 @@ export default function PlayerLookup() {
                 } else {
                     setPresence({ inGame: false });
                 }
+            }
+
+            if (logsRes.data) {
+                setLogs(logsRes.data);
             }
         } catch (err: any) {
             setError(err.message);
@@ -141,6 +147,10 @@ export default function PlayerLookup() {
                 target: player.username,
                 moderator: 'Web Admin'
             }]);
+
+            // Re-fetch logs
+            const { data } = await supabase.from('logs').select('*').eq('server_id', id).eq('target', player.username).order('created_at', { ascending: false });
+            if (data) setLogs(data);
         }
         setActionLoading(false);
     }
@@ -186,7 +196,7 @@ export default function PlayerLookup() {
             {player && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Player Card */}
-                    <div className="lg:col-span-1 border border-slate-800 bg-[#020617] rounded-2xl overflow-hidden shadow-2xl">
+                    <div className="lg:col-span-1 border border-slate-800 bg-[#020617] rounded-2xl overflow-hidden shadow-2xl h-fit">
                         <div className={`h-24 bg-gradient-to-r ${player.isBanned ? 'from-red-600 to-rose-900' : 'from-sky-600 to-indigo-600'}`}></div>
                         <div className="px-8 pb-8 -mt-12 text-center">
                             <div className="inline-block p-1.5 bg-[#020617] rounded-full mb-4">
@@ -259,6 +269,37 @@ export default function PlayerLookup() {
                                     </p>
                                 </div>
                             </div>
+                        </div>
+
+                        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8 backdrop-blur-md">
+                            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-3">
+                                <div className="p-2 bg-amber-600/10 rounded-lg text-amber-500 border border-amber-500/10">
+                                    <ShieldIcon />
+                                </div>
+                                Moderation History
+                            </h3>
+                            {logs.length > 0 ? (
+                                <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                                    {logs.map((log) => (
+                                        <div key={log.id} className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4 flex items-center justify-between group hover:bg-slate-800/50 transition-all">
+                                            <div className="flex items-center gap-4">
+                                                <div className={`w-2 h-2 rounded-full ${log.action === 'BAN' ? 'bg-red-500' : log.action === 'KICK' ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
+                                                <div>
+                                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">{log.action}</span>
+                                                    <p className="text-[11px] text-slate-500 mt-1 font-medium">By {log.moderator} • {new Date(log.created_at).toLocaleDateString()}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-[9px] font-mono text-slate-600 uppercase tracking-widest">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="py-8 text-center border-2 border-dashed border-slate-800 rounded-xl">
+                                    <p className="text-xs font-bold text-slate-600 uppercase tracking-widest italic">No prior history found.</p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8 backdrop-blur-md">

@@ -250,10 +250,9 @@ export async function POST(req: Request) {
 
                 const userId = searchData.data[0].id;
 
-                const [profileRes, thumbRes, serversRes] = await Promise.all([
+                const [profileRes, thumbRes] = await Promise.all([
                     fetch(`https://users.roblox.com/v1/users/${userId}`),
-                    fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`),
-                    supabase.from('live_servers').select('players').eq('server_id', guild_id)
+                    fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`)
                 ]);
 
                 if (!profileRes.ok) {
@@ -264,10 +263,20 @@ export async function POST(req: Request) {
                 const thumb = await thumbRes.json();
                 const avatarUrl = thumb.data?.[0]?.imageUrl || '';
 
-                // Safe check for serversRes.data
+                // Fetch Presence and Logs now that we have the exact name
+                const [serversRes, logsRes] = await Promise.all([
+                    supabase.from('live_servers').select('players').eq('server_id', guild_id),
+                    supabase.from('logs').select('action, moderator, created_at').eq('server_id', guild_id).eq('target', profile.name).order('created_at', { ascending: false }).limit(3)
+                ]);
+
                 const activeServer = serversRes.data?.find((s: any) =>
                     Array.isArray(s.players) && s.players.some((p: string) => p.toLowerCase() === profile.name.toLowerCase())
                 );
+
+                const logs = logsRes.data || [];
+                const logField = logs.length > 0
+                    ? logs.map(l => `• **${l.action}** by ${l.moderator.split('#')[0]} (<t:${Math.floor(new Date(l.created_at).getTime() / 1000)}:R>)`).join('\n')
+                    : '*No previous moderation.*';
 
                 return NextResponse.json({
                     type: 4,
@@ -279,7 +288,8 @@ export async function POST(req: Request) {
                             fields: [
                                 { name: 'Username', value: `\`${profile.name}\``, inline: true },
                                 { name: 'User ID', value: `\`${userId}\``, inline: true },
-                                { name: 'Status', value: activeServer ? '🟢 **In-Game**' : '⚪ Offline', inline: true }
+                                { name: 'Status', value: activeServer ? '🟢 **In-Game**' : '⚪ Offline', inline: true },
+                                { name: '📜 Moderation History (Recent)', value: logField, inline: false }
                             ],
                             footer: { text: 'Ro-Link Dashboard Integration' }
                         }],
