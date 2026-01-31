@@ -147,18 +147,22 @@ export async function POST(req: Request) {
 
                 const [profileRes, thumbRes, serversRes] = await Promise.all([
                     fetch(`https://users.roproxy.com/v1/users/${userId}`),
-                    fetch(`https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`),
+                    fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`),
                     supabase.from('live_servers').select('players').eq('server_id', guild_id)
                 ]);
 
-                if (!profileRes.ok || !thumbRes.ok) {
-                    return NextResponse.json({ type: 4, data: { content: `❌ Failed to fetch detailed player info from Roblox.` } });
+                if (!profileRes.ok) {
+                    return NextResponse.json({ type: 4, data: { content: `❌ Failed to fetch detailed player info from Roblox (${profileRes.status}).` } });
                 }
 
                 const profile = await profileRes.json();
                 const thumb = await thumbRes.json();
                 const avatarUrl = thumb.data?.[0]?.imageUrl || '';
-                const activeServer = serversRes.data?.find((s: any) => s.players?.includes(profile.name));
+
+                // Safe check for serversRes.data
+                const activeServer = serversRes.data?.find((s: any) =>
+                    Array.isArray(s.players) && s.players.some((p: string) => p.toLowerCase() === profile.name.toLowerCase())
+                );
 
                 return NextResponse.json({
                     type: 4,

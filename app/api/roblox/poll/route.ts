@@ -22,15 +22,28 @@ export async function POST(req: Request) {
 
         // 2. Update Live Server Status if provided
         if (jobId) {
-            await supabase
-                .from('live_servers')
-                .upsert({
-                    id: jobId,
-                    server_id: server.id,
-                    player_count: playerCount || 0,
-                    players: players || [], // Store the names of players in the server
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'id' });
+            try {
+                await supabase
+                    .from('live_servers')
+                    .upsert({
+                        id: jobId,
+                        server_id: server.id,
+                        player_count: playerCount || 0,
+                        players: players || [], // Store the names of players in the server
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'id' });
+            } catch (upsertError) {
+                console.error('[POLL ERROR] Upsert failed (check if players column exists):', upsertError);
+                // Fallback: try without players column if it fails
+                await supabase
+                    .from('live_servers')
+                    .upsert({
+                        id: jobId,
+                        server_id: server.id,
+                        player_count: playerCount || 0,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'id' });
+            }
 
             // Cleanup stale servers (older than 5 minutes)
             const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
