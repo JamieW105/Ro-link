@@ -6,10 +6,7 @@ export const runtime = 'edge';
 
 // Pure JS hex to Uint8Array (Safe for Edge)
 function hexToUint8(hex: string) {
-    if (!hex) return new Uint8Array(0);
-    const matches = hex.match(/.{1,2}/g);
-    if (!matches) return new Uint8Array(0);
-    return new Uint8Array(matches.map(byte => parseInt(byte, 16)));
+    return new Uint8Array(hex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
 }
 
 async function verifyDiscordRequest(request: Request) {
@@ -17,36 +14,24 @@ async function verifyDiscordRequest(request: Request) {
     const timestamp = request.headers.get('x-signature-timestamp');
     const publicKey = process.env.DISCORD_PUBLIC_KEY;
 
-    if (!publicKey) {
-        console.error('CRITICAL: DISCORD_PUBLIC_KEY is missing from environment variables!');
-        return { isValid: false };
-    }
-
-    if (!signature || !timestamp) {
-        console.log('Verification failed: Missing signature or timestamp');
+    if (!signature || !timestamp || !publicKey) {
+        console.error('Missing headers or Public Key');
         return { isValid: false };
     }
 
     try {
-        const body = await request.clone().arrayBuffer();
+        const body = await request.text();
         const encoder = new TextEncoder();
-        const timestampData = encoder.encode(timestamp);
-        const bodyData = new Uint8Array(body);
-
-        const message = new Uint8Array(timestampData.length + bodyData.length);
-        message.set(timestampData);
-        message.set(bodyData, timestampData.length);
-
         const isValid = nacl.sign.detached.verify(
-            message,
+            encoder.encode(timestamp + body),
             hexToUint8(signature),
             hexToUint8(publicKey)
         );
 
-        console.log(`Verification result: ${isValid}`);
-        return { isValid, body: new TextDecoder().decode(bodyData) };
+        console.log(`Verify: ${isValid} | TS: ${timestamp} | Sig: ${signature.substring(0, 5)}...`);
+        return { isValid, body };
     } catch (e) {
-        console.error('Verification error:', e);
+        console.error('Error during verification:', e);
         return { isValid: false };
     }
 }
