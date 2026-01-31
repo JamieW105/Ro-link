@@ -132,11 +132,11 @@ async function updateStatus() {
     ];
 
     try {
-        // Using the raw Discord API as requested
+        // Using the raw Discord API with an Application Bearer Token
         const response = await fetch(`https://discord.com/api/v10/applications/${process.env.DISCORD_CLIENT_ID}`, {
             method: 'PATCH',
             headers: {
-                'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                'Authorization': `Bearer ${process.env.DISCORD_BEARER_TOKEN}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
