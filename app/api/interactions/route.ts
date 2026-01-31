@@ -4,49 +4,43 @@ import { supabase } from '@/lib/supabase';
 
 export const runtime = 'edge';
 
-// Helper to convert hex string to Uint8Array
-function hexToUint8Array(hex: string) {
-    const arr = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) {
-        arr[i / 2] = parseInt(hex.substring(i, i + 2), 16);
-    }
-    return arr;
-}
-
 // Verify the interaction from Discord
-async function verifyDiscordRequest(request: Request, body: string) {
+async function verifyDiscordRequest(request: Request) {
     const signature = request.headers.get('x-signature-ed25519');
     const timestamp = request.headers.get('x-signature-timestamp');
     const publicKey = process.env.DISCORD_PUBLIC_KEY;
 
-    if (!signature || !timestamp || !publicKey) {
-        console.error('Missing signature headers or Public Key');
-        return false;
-    }
+    if (!signature || !timestamp || !publicKey) return { isValid: false };
 
     try {
-        const encoder = new TextEncoder();
-        return nacl.sign.detached.verify(
-            encoder.encode(timestamp + body),
-            hexToUint8Array(signature),
-            hexToUint8Array(publicKey)
+        const body = await request.clone().arrayBuffer();
+        const timestampData = new TextEncoder().encode(timestamp);
+        const bodyData = new Uint8Array(body);
+
+        const message = new Uint8Array(timestampData.length + bodyData.length);
+        message.set(timestampData);
+        message.set(bodyData, timestampData.length);
+
+        const isValid = nacl.sign.detached.verify(
+            message,
+            Uint8Array.from(Buffer.from(signature, 'hex')),
+            Uint8Array.from(Buffer.from(publicKey, 'hex'))
         );
+
+        return { isValid, body: new TextDecoder().decode(bodyData) };
     } catch (e) {
-        console.error('Signature verification error:', e);
-        return false;
+        return { isValid: false };
     }
 }
 
 export async function POST(req: Request) {
-    const bodyText = await req.text();
+    const { isValid, body } = await verifyDiscordRequest(req);
 
-    // 1. Verify Request
-    const isValid = await verifyDiscordRequest(req, bodyText);
-    if (!isValid) {
+    if (!isValid || !body) {
         return new NextResponse('Invalid request signature', { status: 401 });
     }
 
-    const interaction = JSON.parse(bodyText);
+    const interaction = JSON.parse(body);
 
     // 2. Handle PING (Discord verification)
     if (interaction.type === 1) {
