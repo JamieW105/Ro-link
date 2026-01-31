@@ -6,26 +6,27 @@ export const authOptions = {
         DiscordProvider({
             clientId: process.env.DISCORD_CLIENT_ID!,
             clientSecret: process.env.DISCORD_CLIENT_SECRET!,
-            authorization: { params: { scope: 'identify guilds' } }, // We need 'guilds' scope to list servers
+            authorization: { params: { scope: 'identify guilds' } },
         }),
     ],
     callbacks: {
-        async jwt({ token, account, profile }: any) {
-            // Persist the OAuth access_token to the token right after signin
+        async jwt({ token, account }: any) {
             if (account) {
                 token.accessToken = account.access_token
             }
             return token
         },
-        async session({ session, token, user }: any) {
-            // Send properties to the client, like an access_token from a provider.
+        async session({ session, token }: any) {
             session.accessToken = token.accessToken
             return session
         }
     },
-    secret: process.env.AUTH_SECRET,
+    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+    // Add debugging in development
+    debug: process.env.NODE_ENV === 'development',
 }
 
 const handler = NextAuth(authOptions)
 
 export { handler as GET, handler as POST }
+
