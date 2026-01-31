@@ -108,6 +108,15 @@ export async function POST(req: Request) {
             else if (name === 'kick') message = `🥾 **Kicked** \`${targetUser}\` from Roblox server.`;
             else if (name === 'unban') message = `🔓 **Unbanned** \`${targetUser}\` from Roblox.`;
             else if (name === 'update') message = `🚀 **Update Signal Sent**! All game servers will restart shortly.`;
+            else if (name === 'shutdown') message = `🛑 **SHUTDOWN SIGNAL SENT**! All active game servers are closing.`;
+            else if (name === 'ping') {
+                const timestamp = Number(BigInt(interaction.id) >> 22n) + 1420070400000;
+                const latency = Math.abs(Date.now() - timestamp);
+                return NextResponse.json({
+                    type: 4,
+                    data: { content: `🏓 **Pong!**\nLatency: \`${latency}ms\`\nInstance: \`Vercel Edge (Australia/Sydney)\`` }
+                });
+            }
 
             return NextResponse.json({
                 type: 4,

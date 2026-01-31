@@ -66,6 +66,14 @@ const commands = [
     {
         name: 'update',
         description: 'Send a global update signal to all Roblox servers (restarts them)',
+    },
+    {
+        name: 'shutdown',
+        description: 'Immediately shut down all active game servers',
+    },
+    {
+        name: 'ping',
+        description: 'Check the bot response time and connection status',
     }
 ];
 
@@ -168,6 +176,25 @@ client.on('interactionCreate', async interaction => {
         }
 
         await interaction.reply(`🚀 **Update Signal Sent**! All game servers will restart shortly.`);
+    } else if (commandName === 'shutdown') {
+        const { error } = await supabase
+            .from('command_queue')
+            .insert([{
+                server_id: interaction.guildId,
+                command: 'SHUTDOWN',
+                args: { moderator: interaction.user.tag },
+                status: 'PENDING'
+            }]);
+
+        if (error) {
+            console.error(error);
+            return interaction.reply({ content: '❌ Failed to queue shutdown command.', ephemeral: true });
+        }
+
+        await interaction.reply(`🛑 **SHUTDOWN SIGNAL SENT**! All active game servers are closing.`);
+    } else if (commandName === 'ping') {
+        const latency = Math.abs(Date.now() - interaction.createdTimestamp);
+        await interaction.reply(`🏓 **Pong!** \nLatency: \`${latency}ms\`\nStatus: \`Online (Vercel Integration Active)\``);
     }
 });
 
