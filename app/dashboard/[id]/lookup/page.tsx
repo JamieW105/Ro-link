@@ -53,7 +53,7 @@ export default function PlayerLookup() {
         setPresence(null);
 
         try {
-            const res = await fetch(`/api/roblox/proxy?username=${query}`);
+            const res = await fetch(`/api/proxy?username=${query}`);
             const data = await res.json();
 
             if (!res.ok) throw new Error(data.error || 'Failed to find player');
