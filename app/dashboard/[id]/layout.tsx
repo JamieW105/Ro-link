@@ -42,10 +42,10 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             {/* Sidebar */}
             <aside className="w-64 border-r border-slate-800 bg-[#020617] flex flex-col fixed inset-y-0 h-full z-50">
                 <div className="p-6">
-                    <div className="flex items-center gap-3 mb-10 pl-2">
+                    <Link href="/dashboard" className="flex items-center gap-3 mb-10 pl-2 hover:opacity-80 transition-opacity cursor-pointer">
                         <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 rounded object-contain" />
                         <span className="text-lg font-bold tracking-tight text-white">Ro-Link</span>
-                    </div>
+                    </Link>
 
                     <nav className="space-y-1">
                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 ml-2">Main Menu</p>
