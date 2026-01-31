@@ -112,18 +112,18 @@ async function refreshCommands() {
 let statusIndex = 0;
 
 async function syncStats() {
-    const guildCount = client.guilds.cache.size;
+    let serverCount = client.guilds.cache.size;
     try {
         await supabase
             .from('bot_stats')
-            .upsert({ id: 'global', guild_count: guildCount, updated_at: new Date() });
+            .upsert({ id: 'global', guild_count: serverCount, updated_at: new Date() });
     } catch (e) {
-        console.error('[STATS] Failed to sync guild count to Supabase:', e.message);
+        console.error('[STATS] Failed to sync server count:', e.message);
     }
 }
 
 function updateStatus() {
-    const serverCount = client.guilds.cache.size;
+    let serverCount = client.guilds.cache.size;
     const supportUrl = "https://discord.gg/C3n4nAwYMw";
 
     const statuses = [
@@ -137,7 +137,10 @@ function updateStatus() {
 }
 
 client.once('ready', () => {
-    console.log(`✅ Logged in as ${client.user.tag}! Bot is online.`);
+    console.log(`✅ Logged in as ${client.user.tag}!`);
+    let serverCount = client.guilds.cache.size;
+    console.log(`The bot is in ${serverCount} servers.`);
+
     updateStatus();
     refreshCommands();
     setInterval(updateStatus, 15000); // Cycle every 15 seconds

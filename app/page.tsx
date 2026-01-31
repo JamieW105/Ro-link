@@ -31,7 +31,7 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchStats() {
-      // Real-time Bot Server Count (from bot_stats table updated by the bot)
+      // Real-time Bot Server Count (Initial Fetch)
       const { data: bStats } = await supabase
         .from('bot_stats')
         .select('guild_count')
@@ -45,9 +45,31 @@ export default function Home() {
         .select('*', { count: 'exact', head: true });
       if (cCount !== null) setCommandCount(cCount);
     }
+
     fetchStats();
-    const interval = setInterval(fetchStats, 30000);
-    return () => clearInterval(interval);
+
+    // 1. Subscribe to Realtime Updates (Based off the bot's sync)
+    const channel = supabase
+      .channel('bot_stats_realtime')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'bot_stats',
+        filter: 'id=eq.global'
+      }, (payload) => {
+        if (payload.new && payload.new.guild_count !== undefined) {
+          setServerCount(payload.new.guild_count);
+        }
+      })
+      .subscribe();
+
+    // 2. Fallback Polling (Every 60s)
+    const interval = setInterval(fetchStats, 60000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
   }, []);
 
   return (
