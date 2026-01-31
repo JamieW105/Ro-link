@@ -7,7 +7,7 @@ export async function POST(req: Request) {
         if (!authHeader) return NextResponse.json({ error: 'No API Key' }, { status: 401 });
 
         const apiKey = authHeader.replace('Bearer ', '');
-        const { jobId, playerCount, players } = await req.json().catch(() => ({}));
+        const { jobId, playerCount, players, status } = await req.json().catch(() => ({}));
 
         // 1. Validate API Key and get Server ID
         const { data: server, error: serverError } = await supabase
@@ -20,38 +20,47 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Invalid API Key' }, { status: 401 });
         }
 
-        // 2. Update Live Server Status if provided
+        // 2. Handle Shutdown (Explicit via status or implicit via 0 players)
         if (jobId) {
-            try {
+            if (status === 'SHUTDOWN' || playerCount === 0) {
+                // Immediate removal
                 await supabase
                     .from('live_servers')
-                    .upsert({
-                        id: jobId,
-                        server_id: server.id,
-                        player_count: playerCount || 0,
-                        players: players || [], // Store the names of players in the server
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'id' });
-            } catch (upsertError) {
-                console.error('[POLL ERROR] Upsert failed (check if players column exists):', upsertError);
-                // Fallback: try without players column if it fails
-                await supabase
-                    .from('live_servers')
-                    .upsert({
-                        id: jobId,
-                        server_id: server.id,
-                        player_count: playerCount || 0,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'id' });
+                    .delete()
+                    .eq('id', jobId);
+
+                console.log(`[POLL] Server ${jobId} removed (Status: ${status || '0 Players'}).`);
+            } else {
+                // Normal update
+                try {
+                    await supabase
+                        .from('live_servers')
+                        .upsert({
+                            id: jobId,
+                            server_id: server.id,
+                            player_count: playerCount || 0,
+                            players: players || [],
+                            updated_at: new Date().toISOString()
+                        }, { onConflict: 'id' });
+                } catch (upsertError) {
+                    await supabase
+                        .from('live_servers')
+                        .upsert({
+                            id: jobId,
+                            server_id: server.id,
+                            player_count: playerCount || 0,
+                            updated_at: new Date().toISOString()
+                        }, { onConflict: 'id' });
+                }
             }
 
-            // Cleanup stale servers (older than 5 minutes)
-            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+            // Periodic Cleanup: Remove any servers that haven't polled in 2 minutes
+            const staleTime = new Date(Date.now() - 2 * 60 * 1000).toISOString();
             await supabase
                 .from('live_servers')
                 .delete()
                 .eq('server_id', server.id)
-                .lt('updated_at', fiveMinutesAgo);
+                .lt('updated_at', staleTime);
         }
 
         // 3. Fetch Pending Commands
