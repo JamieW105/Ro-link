@@ -69,7 +69,15 @@ const commands = [
     },
     {
         name: 'shutdown',
-        description: 'Immediately shut down all active game servers',
+        description: 'Immediately shut down game servers',
+        options: [
+            {
+                name: 'job_id',
+                description: 'The specific Roblox JobId to shut down (Leave empty for ALL servers)',
+                type: 3, // STRING
+                required: false,
+            }
+        ]
     },
     {
         name: 'ping',
@@ -177,12 +185,13 @@ client.on('interactionCreate', async interaction => {
 
         await interaction.reply(`🚀 **Update Signal Sent**! All game servers will restart shortly.`);
     } else if (commandName === 'shutdown') {
+        const jobId = interaction.options.getString('job_id');
         const { error } = await supabase
             .from('command_queue')
             .insert([{
                 server_id: interaction.guildId,
                 command: 'SHUTDOWN',
-                args: { moderator: interaction.user.tag },
+                args: { job_id: jobId, moderator: interaction.user.tag },
                 status: 'PENDING'
             }]);
 
@@ -191,7 +200,8 @@ client.on('interactionCreate', async interaction => {
             return interaction.reply({ content: '❌ Failed to queue shutdown command.', ephemeral: true });
         }
 
-        await interaction.reply(`🛑 **SHUTDOWN SIGNAL SENT**! All active game servers are closing.`);
+        const targetMsg = jobId ? `server \`${jobId}\`` : 'all active game servers';
+        await interaction.reply(`🛑 **SHUTDOWN SIGNAL SENT**! Closing ${targetMsg}.`);
     } else if (commandName === 'ping') {
         const latency = Math.abs(Date.now() - interaction.createdTimestamp);
         await interaction.reply(`🏓 **Pong!** \nLatency: \`${latency}ms\`\nStatus: \`Online (Vercel Integration Active)\``);

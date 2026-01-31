@@ -78,13 +78,14 @@ export async function POST(req: Request) {
             }
 
             const targetUser = options?.find((o: any) => o.name === 'username')?.value;
+            const jobId = options?.find((o: any) => o.name === 'job_id')?.value;
             const reason = options?.find((o: any) => o.name === 'reason')?.value || 'No reason provided';
 
             // Add to Command Queue
             const { error } = await supabase.from('command_queue').insert([{
                 server_id: guild_id,
                 command: name.toUpperCase(),
-                args: { username: targetUser, reason: reason, moderator: userTag },
+                args: { username: targetUser, job_id: jobId, reason: reason, moderator: userTag },
                 status: 'PENDING'
             }]);
 
@@ -99,7 +100,7 @@ export async function POST(req: Request) {
             await supabase.from('logs').insert([{
                 server_id: guild_id,
                 action: name.toUpperCase(),
-                target: targetUser || 'ALL',
+                target: targetUser || jobId || 'ALL',
                 moderator: userTag
             }]);
 
@@ -108,7 +109,10 @@ export async function POST(req: Request) {
             else if (name === 'kick') message = `🥾 **Kicked** \`${targetUser}\` from Roblox server.`;
             else if (name === 'unban') message = `🔓 **Unbanned** \`${targetUser}\` from Roblox.`;
             else if (name === 'update') message = `🚀 **Update Signal Sent**! All game servers will restart shortly.`;
-            else if (name === 'shutdown') message = `🛑 **SHUTDOWN SIGNAL SENT**! All active game servers are closing.`;
+            else if (name === 'shutdown') {
+                const targetMsg = jobId ? `server \`${jobId}\`` : 'all active game servers';
+                message = `🛑 **SHUTDOWN SIGNAL SENT**! Closing ${targetMsg}.`;
+            }
             else if (name === 'ping') {
                 const timestamp = Number(BigInt(interaction.id) >> 22n) + 1420070400000;
                 const latency = Math.abs(Date.now() - timestamp);

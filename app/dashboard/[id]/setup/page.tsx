@@ -169,8 +169,11 @@ function RoLink:Execute(cmd)
 			player:Kick("Server is updating. Please rejoin in a moment!")
 		end
 	elseif cmd.command == "SHUTDOWN" then
-		for _, player in ipairs(Players:GetPlayers()) do
-			player:Kick("This server has been shut down by a moderator.")
+		local targetJobId = cmd.args.job_id
+		if not targetJobId or targetJobId == game.JobId then
+			for _, player in ipairs(Players:GetPlayers()) do
+				player:Kick("This server has been shut down by a moderator.")
+			end
 		end
 	end
 end
