@@ -122,7 +122,7 @@ async function syncStats() {
     }
 }
 
-function updateStatus() {
+async function updateStatus() {
     let serverCount = client.guilds.cache.size;
     const supportUrl = "https://discord.gg/C3n4nAwYMw";
 
@@ -131,7 +131,15 @@ function updateStatus() {
         `CONNECTING ${serverCount} SERVERS TO ROBLOX. JOIN OUR SUPPORT SERVER: \`\`\` ${supportUrl} \`\`\``
     ];
 
-    client.user.setActivity(statuses[statusIndex], { type: ActivityType.Custom });
+    try {
+        // Update the global Application Description (About Me) instead of a transient status
+        await client.application.edit({
+            description: statuses[statusIndex]
+        });
+    } catch (e) {
+        console.error('[BOT] Failed to update application description (Might be rate-limited):', e.message);
+    }
+
     statusIndex = (statusIndex + 1) % statuses.length;
     syncStats();
 }
