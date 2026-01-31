@@ -109,17 +109,26 @@ async function refreshCommands() {
     }
 }
 
-client.once('ready', () => {
-    console.log(`Logged in as ${client.user.tag}!`);
-    updateStatus();
-    refreshCommands();
-    setInterval(updateStatus, 600000);
-});
-
+let statusIndex = 0;
 function updateStatus() {
     const serverCount = client.guilds.cache.size;
-    client.user.setActivity(`Connecting ${serverCount} servers to Roblox`, { type: ActivityType.Custom });
+    const supportUrl = "https://discord.gg/C3n4nAwYMw";
+
+    const statuses = [
+        `CONNECTING YOUR ROBLOX GAME TO DISCORD. JOIN OUR SUPPORT SERVER: \`\`\` ${supportUrl} \`\`\``,
+        `CONNECTING ${serverCount} SERVERS TO ROBLOX. JOIN OUR SUPPORT SERVER: \`\`\` ${supportUrl} \`\`\``
+    ];
+
+    client.user.setActivity(statuses[statusIndex], { type: ActivityType.Custom });
+    statusIndex = (statusIndex + 1) % statuses.length;
 }
+
+client.once('ready', () => {
+    console.log(`✅ Logged in as ${client.user.tag}! Bot is online.`);
+    updateStatus();
+    refreshCommands();
+    setInterval(updateStatus, 15000); // Cycle every 15 seconds
+});
 
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
@@ -332,10 +341,6 @@ client.on('interactionCreate', async interaction => {
     }]);
 
     await interaction.editReply(`✅ **${action.toUpperCase()}** command queued for \`${username}\`.`);
-});
-
-client.once('ready', () => {
-    console.log(`✅ Logged in as ${client.user.tag}! Bot is online.`);
 });
 
 client.login(process.env.DISCORD_TOKEN);
