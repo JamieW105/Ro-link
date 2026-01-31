@@ -130,6 +130,13 @@ export async function POST(req: Request) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
                 });
+
+                if (!searchRes.ok) {
+                    const errorText = await searchRes.text();
+                    console.error('[ROBLOX API ERROR]', searchRes.status, errorText);
+                    return NextResponse.json({ type: 4, data: { content: `❌ Roblox API returned an error (${searchRes.status}).` } });
+                }
+
                 const searchData = await searchRes.json();
                 if (!searchData.data?.[0]) {
                     return NextResponse.json({ type: 4, data: { content: `❌ Player \`${username}\` not found.` } });
@@ -143,6 +150,10 @@ export async function POST(req: Request) {
                     fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`),
                     supabase.from('live_servers').select('players').eq('server_id', guild_id)
                 ]);
+
+                if (!profileRes.ok || !thumbRes.ok) {
+                    return NextResponse.json({ type: 4, data: { content: `❌ Failed to fetch detailed player info from Roblox.` } });
+                }
 
                 const profile = await profileRes.json();
                 const thumb = await thumbRes.json();
