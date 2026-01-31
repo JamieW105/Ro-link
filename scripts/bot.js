@@ -186,6 +186,22 @@ client.on('interactionCreate', async interaction => {
             });
         }
 
+        // Check if already setup
+        const { data: existingServer } = await supabase
+            .from('servers')
+            .select('*')
+            .eq('id', guildId)
+            .maybeSingle();
+
+        if (existingServer) {
+            const embeds = getSetupEmbeds(guildId, existingServer.api_key);
+            return interaction.reply({
+                content: 'ℹ️ **This server is already set up!** Here are your integration details:',
+                embeds: embeds,
+                ephemeral: true
+            });
+        }
+
         const modal = new ModalBuilder()
             .setCustomId('setup_modal')
             .setTitle('Ro-Link Server Setup');
@@ -358,7 +374,7 @@ client.on('interactionCreate', async interaction => {
             const [serversRes, logsRes, serverDataRes] = await Promise.all([
                 supabase.from('live_servers').select('id, players').eq('server_id', interaction.guildId),
                 supabase.from('logs').select('action, moderator, created_at').eq('server_id', interaction.guildId).eq('target', profile.name).order('created_at', { ascending: false }).limit(5),
-                supabase.from('servers').select('place_id').eq('id', interaction.guildId).single()
+                supabase.from('servers').select('linked_place_id').eq('id', interaction.guildId).single()
             ]);
 
             const activeServer = serversRes.data?.find((s) =>
@@ -405,11 +421,11 @@ client.on('interactionCreate', async interaction => {
                     .setStyle(ButtonStyle.Link)
             );
 
-            if (activeServer && serverInfo?.place_id) {
+            if (activeServer && serverInfo?.linked_place_id) {
                 row.addComponents(
                     new ButtonBuilder()
                         .setLabel('Join Server')
-                        .setURL(`roblox://placeId=${serverInfo.place_id}&gameInstanceId=${activeServer.id}`)
+                        .setURL(`roblox://placeId=${serverInfo.linked_place_id}&gameInstanceId=${activeServer.id}`)
                         .setStyle(ButtonStyle.Link)
                 );
             }
@@ -491,7 +507,7 @@ client.on('interactionCreate', async interaction => {
             .from('servers')
             .upsert({
                 id: interaction.guildId,
-                place_id: placeId,
+                linked_place_id: placeId,
                 universe_id: universeId,
                 open_cloud_key: openCloudKey,
                 api_key: generatedKey
@@ -501,21 +517,100 @@ client.on('interactionCreate', async interaction => {
             return interaction.editReply(`❌ Setup failed: ${dbError.message}`);
         }
 
-        const embed = new EmbedBuilder()
-            .setTitle('✅ Ro-Link Setup Complete')
-            .setColor('#10b981')
-            .setDescription('Your server has been successfully configured via Discord!')
-            .addFields(
-                { name: 'Security Key', value: `\`${generatedKey}\`` },
-                { name: 'Place ID', value: `\`${placeId}\``, inline: true },
-                { name: 'Universe ID', value: `\`${universeId}\``, inline: true },
-                { name: 'Dashboard', value: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${interaction.guildId}` }
-            )
-            .setFooter({ text: 'Keep your Security Key private!' })
-            .setTimestamp();
-
-        await interaction.editReply({ embeds: [embed] });
+        const embeds = getSetupEmbeds(interaction.guildId, generatedKey);
+        await interaction.editReply({
+            content: '✅ **Setup Successful!** Please follow the instructions below to complete the integration:',
+            embeds: embeds
+        });
     }
 });
+
+// Helper for Setup Instructions
+function getSetupEmbeds(guildId, apiKey) {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+
+    const embed1 = new EmbedBuilder()
+        .setTitle('🛠️ Studio Setup Instructions')
+        .setColor('#0ea5e9')
+        .addFields(
+            { name: '1. ModuleScript', value: "Create a `ModuleScript` in `ReplicatedStorage` named `RoLink`." },
+            { name: '2. Paste Code', value: "Copy the code from the next message/box and paste it into that script." },
+            { name: '3. Starter Script', value: "Create a `Script` in `ServerScriptService` with:\n```lua\nlocal RoLink = require(game.ReplicatedStorage:WaitForChild('RoLink'))\nRoLink:Initialize()\n```" },
+            { name: '4. Permissions', value: "Enable **HTTP Requests** and **API Services** in Game Settings." },
+            { name: 'Dashboard', value: `${baseUrl}/dashboard/${guildId}` }
+        );
+
+    const luaCode = `-- RoLink Core Bridge
+local RoLink = {}
+local Http = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local MS = game:GetService("MessagingService")
+
+local URL = "${baseUrl}"
+local KEY = "${apiKey}"
+local POLL_INTERVAL = 5
+
+function RoLink:Initialize()
+	task.spawn(function()
+		pcall(function()
+			MS:SubscribeAsync("AdminActions", function(msg)
+				local d = msg.Data
+				if typeof(d) == "string" then d = Http:JSONDecode(d) end
+				self:Execute(d)
+			end)
+		end)
+	end)
+	task.spawn(function()
+		while true do
+			local id = game.JobId ~= "" and game.JobId or "STUDIO"
+			local s, r = pcall(function()
+				return Http:RequestAsync({
+					Url = URL .. "/api/roblox/poll",
+					Method = "POST",
+					Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. KEY },
+					Body = Http:JSONEncode({ jobId = id, playerCount = #Players:GetPlayers(), players = (function() local l = {} for _, p in ipairs(Players:GetPlayers()) do table.insert(l, p.Name) end return l end)() })
+				})
+			end)
+			if s and r.StatusCode == 200 then
+				local d = Http:JSONDecode(r.Body)
+				for _, c in ipairs(d.commands or {}) do self:Execute(c) end
+			end
+			task.wait(POLL_INTERVAL)
+		end
+	end)
+end
+
+function RoLink:Execute(cmd)
+	local u, r = cmd.args.username, cmd.args.reason or "No reason"
+	if cmd.command == "KICK" then
+		local p = Players:FindFirstChild(u) if p then p:Kick(r) end
+	elseif cmd.command == "BAN" then
+		task.spawn(function()
+			local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(u) end)
+			if s and uid then pcall(function() Players:BanAsync({UserIds={uid},Duration=-1,DisplayReason=r,PrivateReason="RoLink"}) end) end
+		end)
+	elseif cmd.command == "UNBAN" then
+		task.spawn(function()
+			local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(u) end)
+			if s and uid then pcall(function() Players:UnbanAsync({UserIds={uid}}) end) end
+		end)
+	elseif cmd.command == "UPDATE" then
+		for _, p in ipairs(Players:GetPlayers()) do p:Kick("Updating...") end
+	elseif cmd.command == "SHUTDOWN" then
+		if not cmd.args.job_id or cmd.args.job_id == game.JobId then
+			for _, p in ipairs(Players:GetPlayers()) do p:Kick("Shutdown.") end
+		end
+	end
+end
+return RoLink`;
+
+    const embed2 = new EmbedBuilder()
+        .setTitle('📄 Core Bridge Code (RoLink Module)')
+        .setColor('#10b981')
+        .setDescription('```lua\n' + luaCode + '\n```')
+        .setFooter({ text: 'Keep your Security Key private!' });
+
+    return [embed1, embed2];
+}
 
 client.login(process.env.DISCORD_TOKEN);

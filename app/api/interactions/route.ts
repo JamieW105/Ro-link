@@ -98,6 +98,24 @@ export async function POST(req: Request) {
                     });
                 }
 
+                // Check if already setup
+                const { data: existingServer } = await supabase
+                    .from('servers')
+                    .select('*')
+                    .eq('id', guild_id)
+                    .maybeSingle();
+
+                if (existingServer) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: {
+                            content: 'ℹ️ **This server is already set up!** Here are your integration details:',
+                            embeds: getSetupEmbeds(guild_id, existingServer.api_key),
+                            flags: 64
+                        }
+                    });
+                }
+
                 // Return Modal
                 return NextResponse.json({
                     type: 9,
@@ -391,12 +409,12 @@ export async function POST(req: Request) {
                     ]
                 };
 
-                if (activeServer && server?.place_id) {
+                if (activeServer && server?.linked_place_id) {
                     actionRow1.components.push({
                         type: 2,
                         label: 'Join Server',
                         style: 5,
-                        url: `roblox://placeId=${server.place_id}&gameInstanceId=${activeServer.id}`
+                        url: `roblox://placeId=${server.linked_place_id}&gameInstanceId=${activeServer.id}`
                     });
                 }
                 components.push(actionRow1);
@@ -515,19 +533,8 @@ export async function POST(req: Request) {
                 return NextResponse.json({
                     type: 4,
                     data: {
-                        embeds: [{
-                            title: '✅ Ro-Link Setup Complete',
-                            color: 1095921,
-                            description: 'Your server has been successfully configured via Discord!',
-                            fields: [
-                                { name: 'Security Key', value: `\`${generatedKey}\`` },
-                                { name: 'Place ID', value: `\`${placeId}\``, inline: true },
-                                { name: 'Universe ID', value: `\`${universeId}\``, inline: true },
-                                { name: 'Dashboard', value: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guild_id}` }
-                            ],
-                            footer: { text: 'Keep your Security Key private!' },
-                            timestamp: new Date().toISOString()
-                        }],
+                        content: '✅ **Setup Successful!** Please follow the instructions below to complete the integration:',
+                        embeds: getSetupEmbeds(guild_id, generatedKey),
                         flags: 64
                     }
                 });
@@ -539,6 +546,97 @@ export async function POST(req: Request) {
         console.error('Interaction error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
+}
+
+// Helper for Setup Instructions
+function getSetupEmbeds(guildId: string, apiKey: string) {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+
+    return [
+        {
+            title: '🛠️ Studio Setup Instructions',
+            color: 959977,
+            fields: [
+                { name: '1. ModuleScript', value: "Create a `ModuleScript` in `ReplicatedStorage` named `RoLink`." },
+                { name: '2. Paste Code', value: "Copy the code from the next box and paste it into that script." },
+                { name: '3. Starter Script', value: "Create a `Script` in `ServerScriptService` with:\n```lua\nlocal RoLink = require(game.ReplicatedStorage:WaitForChild('RoLink'))\nRoLink:Initialize()\n```" },
+                { name: '4. Permissions', value: "Enable **HTTP Requests** and **API Services** in Game Settings." },
+                { name: 'Dashboard', value: `${baseUrl}/dashboard/${guildId}` }
+            ]
+        },
+        {
+            title: '📄 Core Bridge Code (RoLink Module)',
+            color: 1095921,
+            description: '```lua\n' + getLuaCode(baseUrl, apiKey) + '\n```',
+            footer: { text: 'Keep your Security Key private!' }
+        }
+    ];
+}
+
+function getLuaCode(baseUrl: string, apiKey: string) {
+    return `-- RoLink Core Bridge
+local RoLink = {}
+local Http = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local MS = game:GetService("MessagingService")
+
+local URL = "${baseUrl}"
+local KEY = "${apiKey}"
+local POLL_INTERVAL = 5
+
+function RoLink:Initialize()
+	task.spawn(function()
+		pcall(function()
+			MS:SubscribeAsync("AdminActions", function(msg)
+				local d = msg.Data
+				if typeof(d) == "string" then d = Http:JSONDecode(d) end
+				self:Execute(d)
+			end)
+		end)
+	end)
+	task.spawn(function()
+		while true do
+			local id = game.JobId ~= "" and game.JobId or "STUDIO"
+			local s, r = pcall(function()
+				return Http:RequestAsync({
+					Url = URL .. "/api/roblox/poll",
+					Method = "POST",
+					Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. KEY },
+					Body = Http:JSONEncode({ jobId = id, playerCount = #Players:GetPlayers(), players = (function() local l = {} for _, p in ipairs(Players:GetPlayers()) do table.insert(l, p.Name) end return l end)() })
+				})
+			end)
+			if s and r.StatusCode == 200 then
+				local d = Http:JSONDecode(r.Body)
+				for _, c in ipairs(d.commands or {}) do self:Execute(c) end
+			end
+			task.wait(POLL_INTERVAL)
+		end
+	end)
+end
+
+function RoLink:Execute(cmd)
+	local u, r = cmd.args.username, cmd.args.reason or "No reason"
+	if cmd.command == "KICK" then
+		local p = Players:FindFirstChild(u) if p then p:Kick(r) end
+	elseif cmd.command == "BAN" then
+		task.spawn(function()
+			local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(u) end)
+			if s and uid then pcall(function() Players:BanAsync({UserIds={uid},Duration=-1,DisplayReason=r,PrivateReason="RoLink"}) end) end
+		end)
+	elseif cmd.command == "UNBAN" then
+		task.spawn(function()
+			local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(u) end)
+			if s and uid then pcall(function() Players:UnbanAsync({UserIds={uid}}) end) end
+		end)
+	elseif cmd.command == "UPDATE" then
+		for _, p in ipairs(Players:GetPlayers()) do p:Kick("Updating...") end
+	elseif cmd.command == "SHUTDOWN" then
+		if not cmd.args.job_id or cmd.args.job_id == game.JobId then
+			for _, p in ipairs(Players:GetPlayers()) do p:Kick("Shutdown.") end
+		end
+	end
+end
+return RoLink`;
 }
 
 export async function GET() {
