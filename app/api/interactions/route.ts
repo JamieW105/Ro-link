@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import nacl from 'tweetnacl';
 import { supabase } from '@/lib/supabase';
+import { sendRobloxMessage } from '@/lib/roblox';
 
 export const runtime = 'edge';
+
+// ... (hexToUint8 and verifyDiscordRequest functions) ...
 
 function hexToUint8(hex: string) {
     const cleanHex = hex.trim();
@@ -53,16 +56,8 @@ export async function POST(req: Request) {
 
         // Helper to trigger Messaging Service
         const triggerMessaging = async (command: string, args: any) => {
-            try {
-                const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.rolink.cloud';
-                await fetch(`${baseUrl}/api/roblox/message`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ serverId: guild_id, command, args })
-                });
-            } catch (e) {
-                console.error('Failed to trigger Messaging Service:', e);
-            }
+            if (!guild_id) return;
+            await sendRobloxMessage(guild_id, command, args);
         };
 
         // 2. Handle PING
@@ -242,12 +237,13 @@ export async function POST(req: Request) {
             else if (name === 'lookup') {
                 const username = options.find((o: any) => o.name === 'username').value;
 
+                // Headers for Roblox API
+                const headers: any = { 'User-Agent': 'Mozilla/5.0' };
+                if (server?.open_cloud_key) headers['x-api-key'] = server.open_cloud_key;
+
                 // Fetch data for the embed (Official Roblox API)
                 const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${username}&limit=1`, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0',
-                        ...(server?.open_cloud_key ? { 'x-api-key': server.open_cloud_key } : {})
-                    }
+                    headers
                 });
 
                 if (!searchRes.ok) {
@@ -264,8 +260,8 @@ export async function POST(req: Request) {
                 const userId = searchData.data[0].id;
 
                 const [profileRes, thumbRes] = await Promise.all([
-                    fetch(`https://users.roblox.com/v1/users/${userId}`),
-                    fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`)
+                    fetch(`https://users.roblox.com/v1/users/${userId}`, { headers }),
+                    fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`, { headers })
                 ]);
 
                 if (!profileRes.ok) {
