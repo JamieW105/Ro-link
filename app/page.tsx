@@ -64,6 +64,9 @@ export default function Home() {
             <span className="text-xl font-semibold tracking-tight text-white pl-1">Ro-Link</span>
           </div>
           <div className="flex items-center gap-6">
+            <a href="/docs" className="text-sm font-semibold text-slate-400 hover:text-white transition-colors">
+              Documentation
+            </a>
             <button
               onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}
               className="px-5 py-2 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-lg transition-all shadow-md shadow-sky-900/20"
