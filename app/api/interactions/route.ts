@@ -6,7 +6,10 @@ export const runtime = 'edge';
 
 // Pure JS hex to Uint8Array (Safe for Edge)
 function hexToUint8(hex: string) {
-    return new Uint8Array(hex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+    if (!hex) return new Uint8Array(0);
+    const matches = hex.match(/.{1,2}/g);
+    if (!matches) return new Uint8Array(0);
+    return new Uint8Array(matches.map(byte => parseInt(byte, 16)));
 }
 
 async function verifyDiscordRequest(request: Request) {
@@ -14,7 +17,15 @@ async function verifyDiscordRequest(request: Request) {
     const timestamp = request.headers.get('x-signature-timestamp');
     const publicKey = process.env.DISCORD_PUBLIC_KEY;
 
-    if (!signature || !timestamp || !publicKey) return { isValid: false };
+    if (!publicKey) {
+        console.error('CRITICAL: DISCORD_PUBLIC_KEY is missing from environment variables!');
+        return { isValid: false };
+    }
+
+    if (!signature || !timestamp) {
+        console.log('Verification failed: Missing signature or timestamp');
+        return { isValid: false };
+    }
 
     try {
         const body = await request.clone().arrayBuffer();
@@ -32,8 +43,10 @@ async function verifyDiscordRequest(request: Request) {
             hexToUint8(publicKey)
         );
 
+        console.log(`Verification result: ${isValid}`);
         return { isValid, body: new TextDecoder().decode(bodyData) };
     } catch (e) {
+        console.error('Verification error:', e);
         return { isValid: false };
     }
 }
