@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import nacl from 'tweetnacl';
 import { supabase } from '@/lib/supabase';
 
+export const runtime = 'edge';
+
 // Helper to convert hex string to Uint8Array
 function hexToUint8Array(hex: string) {
     const arr = new Uint8Array(hex.length / 2);
