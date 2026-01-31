@@ -499,7 +499,7 @@ export async function POST(req: Request) {
                     .from('servers')
                     .upsert({
                         id: guild_id,
-                        place_id: placeId,
+                        linked_place_id: placeId,
                         universe_id: universeId,
                         open_cloud_key: openCloudKey,
                         api_key: generatedKey
