@@ -35,7 +35,7 @@ export default function DocsPage() {
                             Via Browser URL
                         </h4>
                         <ol className="list-decimal list-inside space-y-3 text-sm text-slate-300 ml-2">
-                            <li>Open your game on the <span className="text-sky-400">Roblox Website</span>.</li>
+                            <li>Open your game on the <a href="https://www.roblox.com/games" target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline">Roblox Website</a>.</li>
                             <li>Look at the URL in your browser's address bar.</li>
                             <li>The number following <code className="bg-slate-800 px-2 py-0.5 rounded text-sky-500">/games/</code> is your Place ID.</li>
                         </ol>
@@ -61,7 +61,7 @@ export default function DocsPage() {
                             Via Creator Dashboard
                         </h4>
                         <ol className="list-decimal list-inside space-y-3 text-sm text-slate-300 ml-2">
-                            <li>Go to the <span className="text-sky-400">Roblox Creator Dashboard</span>.</li>
+                            <li>Go to your <a href="https://create.roblox.com/dashboard/creations" target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline">Creator Dashboard</a>.</li>
                             <li>Select your **Experience**.</li>
                             <li>While on the "Overview" or "Dashboard" page, look at the URL.</li>
                             <li>The number following <code className="bg-slate-800 px-2 py-0.5 rounded text-sky-500">/experiences/</code> is your Universe ID.</li>
@@ -86,7 +86,7 @@ export default function DocsPage() {
                         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                             <h4 className="text-white font-bold mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">Step 1: Create Key</h4>
                             <ul className="space-y-3 text-sm text-slate-300 list-disc list-inside">
-                                <li>Navigate to **Creator Dashboard {'>'} Credentials {'>'} API Keys**.</li>
+                                <li>Navigate to the <a href="https://create.roblox.com/dashboard/credentials?activeTab=ApiKeys" target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline font-bold">API Keys Page</a>.</li>
                                 <li>Click **Create API Key**.</li>
                                 <li>Set a name (e.g., "Ro-Link Admin").</li>
                             </ul>
