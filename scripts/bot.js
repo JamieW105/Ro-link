@@ -132,12 +132,26 @@ async function updateStatus() {
     ];
 
     try {
-        // Update the global Application Description (About Me) instead of a transient status
-        await client.application.edit({
-            description: statuses[statusIndex]
+        // Using the raw Discord API as requested
+        const response = await fetch(`https://discord.com/api/v10/applications/${process.env.DISCORD_CLIENT_ID}`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                description: statuses[statusIndex]
+            })
         });
+
+        if (!response.ok) {
+            const err = await response.text();
+            console.error(`[BOT] API Error: ${response.status} - ${err}`);
+        } else {
+            console.log(`[BOT] Description updated: Page ${statusIndex + 1}`);
+        }
     } catch (e) {
-        console.error('[BOT] Failed to update application description (Might be rate-limited):', e.message);
+        console.error('[BOT] Failed to patch application description:', e.message);
     }
 
     statusIndex = (statusIndex + 1) % statuses.length;
