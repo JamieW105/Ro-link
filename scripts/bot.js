@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, ActivityType, REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType, REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: '.env.local' });
 
@@ -98,26 +98,6 @@ const commands = [
     {
         name: 'setup',
         description: 'Initializes Ro-Link for this server (Owner Only)',
-        options: [
-            {
-                name: 'place_id',
-                description: 'The Roblox Place ID',
-                type: 3, // STRING
-                required: true,
-            },
-            {
-                name: 'universe_id',
-                description: 'The Roblox Universe ID',
-                type: 3, // STRING
-                required: true,
-            },
-            {
-                name: 'api_key',
-                description: 'Roblox Open Cloud API Key',
-                type: 3, // STRING
-                required: true,
-            }
-        ]
     }
 ];
 
@@ -206,41 +186,38 @@ client.on('interactionCreate', async interaction => {
             });
         }
 
-        const placeId = interaction.options.getString('place_id');
-        const universeId = interaction.options.getString('universe_id');
-        const openCloudKey = interaction.options.getString('api_key');
-        const generatedKey = 'rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        const modal = new ModalBuilder()
+            .setCustomId('setup_modal')
+            .setTitle('Ro-Link Server Setup');
 
-        await interaction.deferReply({ ephemeral: true });
+        const placeIdInput = new TextInputBuilder()
+            .setCustomId('place_id')
+            .setLabel("Roblox Place ID")
+            .setPlaceholder('Enter your Place ID (e.g. 123456789)')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
 
-        const { error: dbError } = await supabase
-            .from('servers')
-            .upsert({
-                id: guildId,
-                place_id: placeId,
-                universe_id: universeId,
-                open_cloud_key: openCloudKey,
-                api_key: generatedKey
-            });
+        const universeIdInput = new TextInputBuilder()
+            .setCustomId('universe_id')
+            .setLabel("Roblox Universe ID")
+            .setPlaceholder('Enter your Universe ID')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
 
-        if (dbError) {
-            return interaction.editReply(`❌ Setup failed: ${dbError.message}`);
-        }
+        const apiKeyInput = new TextInputBuilder()
+            .setCustomId('api_key')
+            .setLabel("Open Cloud API Key")
+            .setPlaceholder('Enter your Roblox API Key (Hidden)')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true);
 
-        const embed = new EmbedBuilder()
-            .setTitle('✅ Ro-Link Setup Complete')
-            .setColor('#10b981')
-            .setDescription('Your server has been successfully configured via Discord!')
-            .addFields(
-                { name: 'Security Key', value: `\`${generatedKey}\`` },
-                { name: 'Place ID', value: `\`${placeId}\``, inline: true },
-                { name: 'Universe ID', value: `\`${universeId}\``, inline: true },
-                { name: 'Dashboard', value: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guildId}` }
-            )
-            .setFooter({ text: 'Keep your Security Key private!' })
-            .setTimestamp();
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(placeIdInput),
+            new ActionRowBuilder().addComponents(universeIdInput),
+            new ActionRowBuilder().addComponents(apiKeyInput)
+        );
 
-        return interaction.editReply({ embeds: [embed] });
+        return await interaction.showModal(modal);
     }
 
     // 2. Handle Ping (Public)
@@ -496,6 +473,49 @@ client.on('interactionCreate', async interaction => {
     }]);
 
     await interaction.editReply(`✅ **${action.toUpperCase()}** command queued for \`${username}\`.`);
+});
+
+// Handle Modal Submissions
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isModalSubmit()) return;
+
+    if (interaction.customId === 'setup_modal') {
+        const placeId = interaction.fields.getTextInputValue('place_id');
+        const universeId = interaction.fields.getTextInputValue('universe_id');
+        const openCloudKey = interaction.fields.getTextInputValue('api_key');
+        const generatedKey = 'rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
+        await interaction.deferReply({ ephemeral: true });
+
+        const { error: dbError } = await supabase
+            .from('servers')
+            .upsert({
+                id: interaction.guildId,
+                place_id: placeId,
+                universe_id: universeId,
+                open_cloud_key: openCloudKey,
+                api_key: generatedKey
+            });
+
+        if (dbError) {
+            return interaction.editReply(`❌ Setup failed: ${dbError.message}`);
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('✅ Ro-Link Setup Complete')
+            .setColor('#10b981')
+            .setDescription('Your server has been successfully configured via Discord!')
+            .addFields(
+                { name: 'Security Key', value: `\`${generatedKey}\`` },
+                { name: 'Place ID', value: `\`${placeId}\``, inline: true },
+                { name: 'Universe ID', value: `\`${universeId}\``, inline: true },
+                { name: 'Dashboard', value: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${interaction.guildId}` }
+            )
+            .setFooter({ text: 'Keep your Security Key private!' })
+            .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+    }
 });
 
 client.login(process.env.DISCORD_TOKEN);

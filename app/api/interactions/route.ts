@@ -98,45 +98,47 @@ export async function POST(req: Request) {
                     });
                 }
 
-                const placeId = options?.find((o: any) => o.name === 'place_id')?.value;
-                const universeId = options?.find((o: any) => o.name === 'universe_id')?.value;
-                const openCloudKey = options?.find((o: any) => o.name === 'api_key')?.value;
-                const generatedKey = 'rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-
-                const { error: dbError } = await supabase
-                    .from('servers')
-                    .upsert({
-                        id: guild_id,
-                        place_id: placeId,
-                        universe_id: universeId,
-                        open_cloud_key: openCloudKey,
-                        api_key: generatedKey
-                    });
-
-                if (dbError) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: `❌ Setup failed: ${dbError.message}`, flags: 64 }
-                    });
-                }
-
+                // Return Modal
                 return NextResponse.json({
-                    type: 4,
+                    type: 9,
                     data: {
-                        embeds: [{
-                            title: '✅ Ro-Link Setup Complete',
-                            color: 1095921,
-                            description: 'Your server has been successfully configured via Discord!',
-                            fields: [
-                                { name: 'Security Key', value: `\`${generatedKey}\`` },
-                                { name: 'Place ID', value: `\`${placeId}\``, inline: true },
-                                { name: 'Universe ID', value: `\`${universeId}\``, inline: true },
-                                { name: 'Dashboard', value: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guild_id}` }
-                            ],
-                            footer: { text: 'Keep your Security Key private!' },
-                            timestamp: new Date().toISOString()
-                        }],
-                        flags: 64
+                        title: 'Ro-Link Server Setup',
+                        custom_id: 'setup_modal',
+                        components: [
+                            {
+                                type: 1,
+                                components: [{
+                                    type: 4,
+                                    custom_id: 'place_id',
+                                    label: 'Roblox Place ID',
+                                    style: 1,
+                                    placeholder: 'Enter your Roblox Place ID (e.g. 123456789)',
+                                    required: true
+                                }]
+                            },
+                            {
+                                type: 1,
+                                components: [{
+                                    type: 4,
+                                    custom_id: 'universe_id',
+                                    label: 'Roblox Universe ID',
+                                    style: 1,
+                                    placeholder: 'Enter your Roblox Universe ID',
+                                    required: true
+                                }]
+                            },
+                            {
+                                type: 1,
+                                components: [{
+                                    type: 4,
+                                    custom_id: 'api_key',
+                                    label: 'Roblox Open Cloud API Key',
+                                    style: 2,
+                                    placeholder: 'Paste your API Key here (Secure)',
+                                    required: true
+                                }]
+                            }
+                        ]
                     }
                 });
             }
@@ -476,6 +478,60 @@ export async function POST(req: Request) {
                 type: 4,
                 data: { content: `✅ **${action.toUpperCase()}** command queued for \`${username}\`.`, flags: 64 }
             });
+        }
+
+        // Handle Modal Submissions (Vercel)
+        if (type === 5) {
+            const { custom_id, components: modalComponents } = interaction.data;
+
+            if (custom_id === 'setup_modal') {
+                const getField = (id: string) => {
+                    const row = modalComponents.find((c: any) => c.components.some((ic: any) => ic.custom_id === id));
+                    return row ? row.components.find((ic: any) => ic.custom_id === id).value : '';
+                };
+
+                const placeId = getField('place_id');
+                const universeId = getField('universe_id');
+                const openCloudKey = getField('api_key');
+                const generatedKey = 'rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
+                const { error: dbError } = await supabase
+                    .from('servers')
+                    .upsert({
+                        id: guild_id,
+                        place_id: placeId,
+                        universe_id: universeId,
+                        open_cloud_key: openCloudKey,
+                        api_key: generatedKey
+                    });
+
+                if (dbError) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ Setup failed: ${dbError.message}`, flags: 64 }
+                    });
+                }
+
+                return NextResponse.json({
+                    type: 4,
+                    data: {
+                        embeds: [{
+                            title: '✅ Ro-Link Setup Complete',
+                            color: 1095921,
+                            description: 'Your server has been successfully configured via Discord!',
+                            fields: [
+                                { name: 'Security Key', value: `\`${generatedKey}\`` },
+                                { name: 'Place ID', value: `\`${placeId}\``, inline: true },
+                                { name: 'Universe ID', value: `\`${universeId}\``, inline: true },
+                                { name: 'Dashboard', value: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guild_id}` }
+                            ],
+                            footer: { text: 'Keep your Security Key private!' },
+                            timestamp: new Date().toISOString()
+                        }],
+                        flags: 64
+                    }
+                });
+            }
         }
 
         return NextResponse.json({ error: 'Unknown interaction type' }, { status: 400 });
