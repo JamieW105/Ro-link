@@ -47,18 +47,18 @@ export async function POST(req: Request) {
         }
 
         const interaction = JSON.parse(body);
+        const { type, guild_id, member, user: interactionUser } = interaction;
+        const user = interactionUser || member?.user;
+        const userTag = user ? `${user.username}${user.discriminator !== '0' ? '#' + user.discriminator : ''}` : 'Unknown';
 
         // 2. Handle PING
-        if (interaction.type === 1) {
+        if (type === 1) {
             return NextResponse.json({ type: 1 });
         }
 
         // 3. Handle Application Commands
-        if (interaction.type === 2) {
+        if (type === 2) {
             const { name, options } = interaction.data;
-            const { guild_id, member, user: interactionUser } = interaction;
-            const user = interactionUser || member?.user;
-            const userTag = user ? `${user.username}#${user.discriminator}` : 'Unknown';
 
             // Check if server is setup
             const { data: server } = await supabase
@@ -121,10 +121,87 @@ export async function POST(req: Request) {
                     data: { content: `🏓 **Pong!**\nLatency: \`${latency}ms\`\nInstance: \`Vercel Edge (Australia/Sydney)\`` }
                 });
             }
+            else if (name === 'lookup') {
+                const username = options.find((o: any) => o.name === 'username').value;
+
+                // Fetch data for the embed
+                const searchRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
+                });
+                const searchData = await searchRes.json();
+                if (!searchData.data?.[0]) {
+                    return NextResponse.json({ type: 4, data: { content: `❌ Player \`${username}\` not found.` } });
+                }
+
+                const user = searchData.data[0];
+                const userId = user.id;
+
+                const [profileRes, thumbRes, serversRes] = await Promise.all([
+                    fetch(`https://users.roblox.com/v1/users/${userId}`),
+                    fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`),
+                    supabase.from('live_servers').select('players').eq('server_id', guild_id)
+                ]);
+
+                const profile = await profileRes.json();
+                const thumb = await thumbRes.json();
+                const avatarUrl = thumb.data?.[0]?.imageUrl || '';
+                const activeServer = serversRes.data?.find((s: any) => s.players?.includes(profile.name));
+
+                return NextResponse.json({
+                    type: 4,
+                    data: {
+                        embeds: [{
+                            title: `Player Lookup: ${profile.displayName}`,
+                            color: activeServer ? 1095921 : profile.isBanned ? 15681348 : 959977,
+                            thumbnail: { url: avatarUrl },
+                            fields: [
+                                { name: 'Username', value: `\`${profile.name}\``, inline: true },
+                                { name: 'User ID', value: `\`${userId}\``, inline: true },
+                                { name: 'Status', value: activeServer ? '🟢 **In-Game**' : '⚪ Offline', inline: true }
+                            ],
+                            footer: { text: 'Ro-Link Dashboard Integration' }
+                        }],
+                        components: [{
+                            type: 1,
+                            components: [
+                                { type: 2, label: 'Kick', style: 2, custom_id: `kick_${userId}_${profile.name}` },
+                                { type: 2, label: 'Ban', style: 4, custom_id: `ban_${userId}_${profile.name}` },
+                                { type: 2, label: 'Unban', style: 3, custom_id: `unban_${userId}_${profile.name}` }
+                            ]
+                        }]
+                    }
+                });
+            }
 
             return NextResponse.json({
                 type: 4,
                 data: { content: message }
+            });
+        }
+
+        // Handle Button Clicks (Vercel)
+        if (type === 3) {
+            const [action, userId, username] = interaction.data.custom_id.split('_');
+
+            await supabase.from('command_queue').insert([{
+                server_id: guild_id,
+                command: action.toUpperCase(),
+                args: { username, reason: 'Discord Button Action', moderator: userTag },
+                status: 'PENDING'
+            }]);
+
+            await supabase.from('logs').insert([{
+                server_id: guild_id,
+                action: action.toUpperCase(),
+                target: username,
+                moderator: userTag
+            }]);
+
+            return NextResponse.json({
+                type: 4,
+                data: { content: `✅ **${action.toUpperCase()}** command queued for \`${username}\`.`, flags: 64 }
             });
         }
 

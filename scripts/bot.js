@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, ActivityType, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType, REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: '.env.local' });
 
@@ -82,6 +82,18 @@ const commands = [
     {
         name: 'ping',
         description: 'Check the bot response time and connection status',
+    },
+    {
+        name: 'lookup',
+        description: 'Lookup a Roblox player and see their status/actions',
+        options: [
+            {
+                name: 'username',
+                description: 'The Roblox username to lookup',
+                type: 3, // STRING
+                required: true,
+            }
+        ]
     }
 ];
 
@@ -205,7 +217,121 @@ client.on('interactionCreate', async interaction => {
     } else if (commandName === 'ping') {
         const latency = Math.abs(Date.now() - interaction.createdTimestamp);
         await interaction.reply(`🏓 **Pong!** \nLatency: \`${latency}ms\`\nStatus: \`Online (Vercel Integration Active)\``);
+    } else if (commandName === 'lookup') {
+        await interaction.deferReply();
+        const username = interaction.options.getString('username');
+
+        try {
+            // 1. Get User ID
+            const searchRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
+            });
+            const searchData = await searchRes.json();
+
+            if (!searchData.data || searchData.data.length === 0) {
+                return interaction.editReply(`❌ Player \`${username}\` not found on Roblox.`);
+            }
+
+            const userId = searchData.data[0].id;
+
+            // 2. Get Details & Thumb
+            const [profileRes, thumbRes] = await Promise.all([
+                fetch(`https://users.roblox.com/v1/users/${userId}`),
+                fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`)
+            ]);
+
+            const profile = await profileRes.json();
+            const thumb = await thumbRes.json();
+            const avatarUrl = thumb.data?.[0]?.imageUrl || '';
+
+            // 3. Check Presence
+            const { data: servers } = await supabase
+                .from('live_servers')
+                .select('id, players')
+                .eq('server_id', interaction.guildId);
+
+            const activeServer = servers?.find((s) =>
+                s.players?.some((p) => p.toLowerCase() === profile.name.toLowerCase())
+            );
+
+            // 4. Create Embed
+            const embed = new EmbedBuilder()
+                .setTitle(`Player Lookup: ${profile.displayName}`)
+                .setURL(`https://www.roblox.com/users/${userId}/profile`)
+                .setThumbnail(avatarUrl)
+                .setColor(activeServer ? '#10b981' : profile.isBanned ? '#ef4444' : '#0ea5e9')
+                .addFields(
+                    { name: 'Username', value: `\`${profile.name}\``, inline: true },
+                    { name: 'User ID', value: `\`${userId}\``, inline: true },
+                    { name: 'Status', value: activeServer ? '🟢 **In-Game**' : '⚪ Offline', inline: true },
+                    { name: 'Created', value: `<t:${Math.floor(new Date(profile.created).getTime() / 1000)}:R>`, inline: true },
+                    { name: 'Description', value: profile.description || '*No description*', inline: false }
+                )
+                .setFooter({ text: 'Ro-Link Dashboard Integration' })
+                .setTimestamp();
+
+            // 5. Actions
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`kick_${userId}_${profile.name}`)
+                    .setLabel('Kick')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId(`ban_${userId}_${profile.name}`)
+                    .setLabel('Ban')
+                    .setStyle(ButtonStyle.Danger),
+                new ButtonBuilder()
+                    .setCustomId(`unban_${userId}_${profile.name}`)
+                    .setLabel('Unban')
+                    .setStyle(ButtonStyle.Success)
+            );
+
+            await interaction.editReply({ embeds: [embed], components: [row] });
+
+        } catch (error) {
+            console.error(error);
+            await interaction.editReply('❌ Failed to fetch Roblox data.');
+        }
     }
+});
+
+// Handle Button Interactions
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isButton()) return;
+
+    const [action, userId, username] = interaction.customId.split('_');
+    const guildId = interaction.guildId;
+
+    // Check permissions (Admin only)
+    if (!interaction.member.permissions.has('Administrator')) {
+        return interaction.reply({ content: '❌ You need Administrator permissions to use these actions.', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    // Queue command for Roblox
+    const { error } = await supabase.from('command_queue').insert([{
+        server_id: guildId,
+        command: action.toUpperCase(),
+        args: { username: username, reason: 'Discord Button Action', moderator: interaction.user.tag },
+        status: 'PENDING'
+    }]);
+
+    if (error) {
+        return interaction.editReply(`❌ Failed to queue ${action}.`);
+    }
+
+    // Log the action
+    await supabase.from('logs').insert([{
+        server_id: guildId,
+        action: action.toUpperCase(),
+        target: username,
+        moderator: interaction.user.tag
+    }]);
+
+    await interaction.editReply(`✅ **${action.toUpperCase()}** command queued for \`${username}\`.`);
 });
 
 client.once('ready', () => {
