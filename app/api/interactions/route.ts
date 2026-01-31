@@ -69,6 +69,78 @@ export async function POST(req: Request) {
         if (type === 2) {
             const { name, options } = interaction.data;
 
+            // Handle Setup (Owner Only)
+            if (name === 'setup') {
+                if (!guild_id) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ This command can only be used in a Discord Server.`, flags: 64 }
+                    });
+                }
+
+                // Verify Owner via Discord API
+                const guildRes = await fetch(`https://discord.com/api/v10/guilds/${guild_id}`, {
+                    headers: { 'Authorization': `Bot ${process.env.DISCORD_TOKEN}` }
+                });
+
+                if (!guildRes.ok) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ Failed to verify server owner status.`, flags: 64 }
+                    });
+                }
+
+                const guildData = await guildRes.json();
+                if (user.id !== guildData.owner_id) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ This command can only be run by the server owner.`, flags: 64 }
+                    });
+                }
+
+                const placeId = options?.find((o: any) => o.name === 'place_id')?.value;
+                const universeId = options?.find((o: any) => o.name === 'universe_id')?.value;
+                const openCloudKey = options?.find((o: any) => o.name === 'api_key')?.value;
+                const generatedKey = 'rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
+                const { error: dbError } = await supabase
+                    .from('servers')
+                    .upsert({
+                        id: guild_id,
+                        place_id: placeId,
+                        universe_id: universeId,
+                        open_cloud_key: openCloudKey,
+                        api_key: generatedKey
+                    });
+
+                if (dbError) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ Setup failed: ${dbError.message}`, flags: 64 }
+                    });
+                }
+
+                return NextResponse.json({
+                    type: 4,
+                    data: {
+                        embeds: [{
+                            title: '✅ Ro-Link Setup Complete',
+                            color: 1095921,
+                            description: 'Your server has been successfully configured via Discord!',
+                            fields: [
+                                { name: 'Security Key', value: `\`${generatedKey}\`` },
+                                { name: 'Place ID', value: `\`${placeId}\``, inline: true },
+                                { name: 'Universe ID', value: `\`${universeId}\``, inline: true },
+                                { name: 'Dashboard', value: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guild_id}` }
+                            ],
+                            footer: { text: 'Keep your Security Key private!' },
+                            timestamp: new Date().toISOString()
+                        }],
+                        flags: 64
+                    }
+                });
+            }
+
             // Permission Check: Only 'ping' is public
             if (name !== 'ping') {
                 const permissions = BigInt(member?.permissions || '0');
@@ -101,7 +173,7 @@ export async function POST(req: Request) {
                 return NextResponse.json({
                     type: 4,
                     data: {
-                        content: `❌ This server is not set up with Ro-Link yet. Please visit the dashboard to initialize it: ${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guild_id}`,
+                        content: `❌ This server is not set up with Ro-Link yet.\n\n**Server Owners** can use \`/setup\` to initialize it directly, or visit the dashboard: ${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guild_id}`,
                         flags: 64
                     }
                 });

@@ -94,6 +94,30 @@ const commands = [
                 required: true,
             }
         ]
+    },
+    {
+        name: 'setup',
+        description: 'Initializes Ro-Link for this server (Owner Only)',
+        options: [
+            {
+                name: 'place_id',
+                description: 'The Roblox Place ID',
+                type: 3, // STRING
+                required: true,
+            },
+            {
+                name: 'universe_id',
+                description: 'The Roblox Universe ID',
+                type: 3, // STRING
+                required: true,
+            },
+            {
+                name: 'api_key',
+                description: 'Roblox Open Cloud API Key',
+                type: 3, // STRING
+                required: true,
+            }
+        ]
     }
 ];
 
@@ -171,9 +195,61 @@ client.once('ready', () => {
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    const { commandName, guildId, user } = interaction;
+    const { commandName, guildId, user, guild } = interaction;
 
-    // 1. Check if server is setup in Ro-Link
+    // 1. Handle Setup separately (Owner Only)
+    if (commandName === 'setup') {
+        if (user.id !== guild?.ownerId) {
+            return interaction.reply({
+                content: '❌ This command can only be run by the server owner.',
+                ephemeral: true
+            });
+        }
+
+        const placeId = interaction.options.getString('place_id');
+        const universeId = interaction.options.getString('universe_id');
+        const openCloudKey = interaction.options.getString('api_key');
+        const generatedKey = 'rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
+        await interaction.deferReply({ ephemeral: true });
+
+        const { error: dbError } = await supabase
+            .from('servers')
+            .upsert({
+                id: guildId,
+                place_id: placeId,
+                universe_id: universeId,
+                open_cloud_key: openCloudKey,
+                api_key: generatedKey
+            });
+
+        if (dbError) {
+            return interaction.editReply(`❌ Setup failed: ${dbError.message}`);
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('✅ Ro-Link Setup Complete')
+            .setColor('#10b981')
+            .setDescription('Your server has been successfully configured via Discord!')
+            .addFields(
+                { name: 'Security Key', value: `\`${generatedKey}\`` },
+                { name: 'Place ID', value: `\`${placeId}\``, inline: true },
+                { name: 'Universe ID', value: `\`${universeId}\``, inline: true },
+                { name: 'Dashboard', value: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guildId}` }
+            )
+            .setFooter({ text: 'Keep your Security Key private!' })
+            .setTimestamp();
+
+        return interaction.editReply({ embeds: [embed] });
+    }
+
+    // 2. Handle Ping (Public)
+    if (commandName === 'ping') {
+        const latency = Math.abs(Date.now() - interaction.createdTimestamp);
+        return interaction.reply(`🏓 **Pong!** \nLatency: \`${latency}ms\`\nStatus: \`Online (Vercel Integration Active)\``);
+    }
+
+    // 3. Check if server is setup in Ro-Link for all other commands
     const { data: server, error: serverError } = await supabase
         .from('servers')
         .select('id')
@@ -182,7 +258,15 @@ client.on('interactionCreate', async interaction => {
 
     if (!server) {
         return interaction.reply({
-            content: `❌ This server is not set up with Ro-Link yet. Please visit the dashboard to initialize it: ${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guildId}`,
+            content: `❌ This server is not set up with Ro-Link yet.\n\n**Server Owners** can use \`/setup\` to initialize it directly, or visit the dashboard: ${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guildId}`,
+            ephemeral: true
+        });
+    }
+
+    // 4. Permission Check for Moderation Commands
+    if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('BanMembers') && !interaction.member.permissions.has('KickMembers')) {
+        return interaction.reply({
+            content: '❌ You do not have permission to use moderation commands. (Requires Kick/Ban Members or Admin)',
             ephemeral: true
         });
     }
