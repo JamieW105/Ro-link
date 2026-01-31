@@ -11,6 +11,7 @@ interface RobloxPlayer {
     description: string;
     created: string;
     avatarUrl: string;
+    isBanned?: boolean;
 }
 
 // SVGs
@@ -30,10 +31,15 @@ const InfoIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
 );
 
+const LiveIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" fill="currentColor" /></svg>
+);
+
 export default function PlayerLookup() {
     const { id } = useParams();
     const [query, setQuery] = useState("");
     const [player, setPlayer] = useState<RobloxPlayer | null>(null);
+    const [presence, setPresence] = useState<{ inGame: boolean, jobId?: string } | null>(null);
     const [loading, setLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -44,6 +50,7 @@ export default function PlayerLookup() {
         setLoading(true);
         setError(null);
         setPlayer(null);
+        setPresence(null);
 
         try {
             const res = await fetch(`/api/roblox/proxy?username=${query}`);
@@ -51,6 +58,23 @@ export default function PlayerLookup() {
 
             if (!res.ok) throw new Error(data.error || 'Failed to find player');
             setPlayer(data);
+
+            // Check Presence in Live Servers
+            const { data: servers } = await supabase
+                .from('live_servers')
+                .select('id, players')
+                .eq('server_id', id);
+
+            if (servers) {
+                const activeServer = servers.find((s: any) =>
+                    s.players?.some((p: string) => p.toLowerCase() === data.username.toLowerCase())
+                );
+                if (activeServer) {
+                    setPresence({ inGame: true, jobId: activeServer.id });
+                } else {
+                    setPresence({ inGame: false });
+                }
+            }
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -75,7 +99,12 @@ export default function PlayerLookup() {
             .insert([{
                 server_id: id,
                 command: action,
-                args: { username: player.username, reason: 'Dashboard Action', moderator: 'Web Admin' },
+                args: {
+                    username: player.username,
+                    job_id: action === 'KICK' ? presence?.jobId : null,
+                    reason: 'Dashboard Action',
+                    moderator: 'Web Admin'
+                },
                 status: 'PENDING'
             }]);
 
@@ -99,7 +128,7 @@ export default function PlayerLookup() {
         <div className="space-y-8 max-w-5xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="flex flex-col gap-1">
                 <h1 className="text-2xl font-bold text-white tracking-tight">Player Lookup</h1>
-                <p className="text-slate-500 text-sm font-medium">Search for Roblox users and manage them in-game.</p>
+                <p className="text-slate-500 text-sm font-medium">Search for Roblox users using official User API data.</p>
             </div>
 
             {/* Search Bar */}
@@ -137,7 +166,7 @@ export default function PlayerLookup() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Player Card */}
                     <div className="lg:col-span-1 border border-slate-800 bg-[#020617] rounded-2xl overflow-hidden shadow-2xl">
-                        <div className="h-24 bg-gradient-to-r from-sky-600 to-indigo-600"></div>
+                        <div className={`h-24 bg-gradient-to-r ${player.isBanned ? 'from-red-600 to-rose-900' : 'from-sky-600 to-indigo-600'}`}></div>
                         <div className="px-8 pb-8 -mt-12 text-center">
                             <div className="inline-block p-1.5 bg-[#020617] rounded-full mb-4">
                                 <img
@@ -156,16 +185,33 @@ export default function PlayerLookup() {
                                 </div>
                                 <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800/50">
                                     <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest block mb-1">Status</span>
-                                    <span className="text-[9px] font-bold text-slate-500 px-2 py-0.5 bg-slate-800 rounded-full border border-slate-700">Checking...</span>
+                                    {presence?.inGame ? (
+                                        <span className="text-[9px] font-bold text-emerald-500 px-2 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20 uppercase flex items-center justify-center gap-1.5">
+                                            <LiveIcon /> IN GAME
+                                        </span>
+                                    ) : player.isBanned ? (
+                                        <span className="text-[9px] font-bold text-red-500 px-2 py-0.5 bg-red-500/10 rounded-full border border-red-500/20 uppercase tracking-tighter">Banned</span>
+                                    ) : (
+                                        <span className="text-[9px] font-bold text-slate-500 px-2 py-0.5 bg-slate-800 rounded-full border border-slate-700 uppercase tracking-tighter">Offline</span>
+                                    )}
                                 </div>
                             </div>
 
-                            <button
-                                disabled={true}
-                                className="w-full bg-slate-800/50 border border-slate-700 text-slate-500 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all cursor-not-allowed opacity-50"
-                            >
-                                JOIN SERVER (STABLE)
-                            </button>
+                            {presence?.inGame && presence.jobId ? (
+                                <a
+                                    href={`roblox://placeId=${id}&gameInstanceId=${presence.jobId}`}
+                                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
+                                >
+                                    <LiveIcon /> JOIN SERVER
+                                </a>
+                            ) : (
+                                <button
+                                    disabled={true}
+                                    className="w-full bg-slate-800/50 border border-slate-700 text-slate-500 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all cursor-not-allowed opacity-50"
+                                >
+                                    JOIN SERVER (OFFLINE)
+                                </button>
+                            )}
                         </div>
                     </div>
 

@@ -109,7 +109,14 @@ function RoLink:Initialize()
 					},
 					Body = HttpService:JSONEncode({
 						jobId = id,
-						playerCount = #Players:GetPlayers()
+						playerCount = #Players:GetPlayers(),
+						players = (function()
+							local pList = {}
+							for _, p in ipairs(Players:GetPlayers()) do
+								table.insert(pList, p.Name)
+							end
+							return pList
+						end)()
 					})
 				})
 			end)

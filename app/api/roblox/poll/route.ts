@@ -7,7 +7,7 @@ export async function POST(req: Request) {
         if (!authHeader) return NextResponse.json({ error: 'No API Key' }, { status: 401 });
 
         const apiKey = authHeader.replace('Bearer ', '');
-        const { jobId, playerCount } = await req.json().catch(() => ({}));
+        const { jobId, playerCount, players } = await req.json().catch(() => ({}));
 
         // 1. Validate API Key and get Server ID
         const { data: server, error: serverError } = await supabase
@@ -28,6 +28,7 @@ export async function POST(req: Request) {
                     id: jobId,
                     server_id: server.id,
                     player_count: playerCount || 0,
+                    players: players || [], // Store the names of players in the server
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'id' });
 
