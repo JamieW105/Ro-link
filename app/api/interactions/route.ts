@@ -51,6 +51,20 @@ export async function POST(req: Request) {
         const user = interactionUser || member?.user;
         const userTag = user ? `${user.username}${user.discriminator !== '0' ? '#' + user.discriminator : ''}` : 'Unknown';
 
+        // Helper to trigger Messaging Service
+        const triggerMessaging = async (command: string, args: any) => {
+            try {
+                const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.rolink.cloud';
+                await fetch(`${baseUrl}/api/roblox/message`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ serverId: guild_id, command, args })
+                });
+            } catch (e) {
+                console.error('Failed to trigger Messaging Service:', e);
+            }
+        };
+
         // 2. Handle PING
         if (type === 1) {
             return NextResponse.json({ type: 1 });
@@ -63,7 +77,7 @@ export async function POST(req: Request) {
             // Check if server is setup
             const { data: server } = await supabase
                 .from('servers')
-                .select('id')
+                .select('id, open_cloud_key')
                 .eq('id', guild_id)
                 .single();
 
@@ -81,35 +95,126 @@ export async function POST(req: Request) {
             const jobId = options?.find((o: any) => o.name === 'job_id')?.value;
             const reason = options?.find((o: any) => o.name === 'reason')?.value || 'No reason provided';
 
-            // Add to Command Queue
-            const { error } = await supabase.from('command_queue').insert([{
-                server_id: guild_id,
-                command: name.toUpperCase(),
-                args: { username: targetUser, job_id: jobId, reason: reason, moderator: userTag },
-                status: 'PENDING'
-            }]);
-
-            if (error) {
-                return NextResponse.json({
-                    type: 4,
-                    data: { content: `❌ Failed to queue command.`, flags: 64 }
-                });
-            }
-
-            // Add to Logs
-            await supabase.from('logs').insert([{
-                server_id: guild_id,
-                action: name.toUpperCase(),
-                target: targetUser || jobId || 'ALL',
-                moderator: userTag
-            }]);
-
             let message = '';
-            if (name === 'ban') message = `🔨 **Banned** \`${targetUser}\` from Roblox game.`;
-            else if (name === 'kick') message = `🥾 **Kicked** \`${targetUser}\` from Roblox server.`;
-            else if (name === 'unban') message = `🔓 **Unbanned** \`${targetUser}\` from Roblox.`;
-            else if (name === 'update') message = `🚀 **Update Signal Sent**! All game servers will restart shortly.`;
+            if (name === 'ban') {
+                // Add to Command Queue
+                const { error } = await supabase.from('command_queue').insert([{
+                    server_id: guild_id,
+                    command: name.toUpperCase(),
+                    args: { username: targetUser, reason: 'Discord Command', moderator: userTag },
+                    status: 'PENDING'
+                }]);
+
+                if (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ Failed to queue command.`, flags: 64 }
+                    });
+                }
+                await triggerMessaging(name.toUpperCase(), { username: targetUser, reason: 'Discord Command', moderator: userTag });
+                // Add to Logs
+                await supabase.from('logs').insert([{
+                    server_id: guild_id,
+                    action: name.toUpperCase(),
+                    target: targetUser,
+                    moderator: userTag
+                }]);
+                message = `🔨 **Banned** \`${targetUser}\` from Roblox game.`;
+            }
+            else if (name === 'kick') {
+                const { error } = await supabase.from('command_queue').insert([{
+                    server_id: guild_id,
+                    command: 'KICK',
+                    args: { username: targetUser, reason: 'Discord Command', moderator: userTag },
+                    status: 'PENDING'
+                }]);
+
+                if (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ Failed to queue command.`, flags: 64 }
+                    });
+                }
+                await triggerMessaging('KICK', { username: targetUser, reason: 'Discord Command', moderator: userTag });
+                // Add to Logs
+                await supabase.from('logs').insert([{
+                    server_id: guild_id,
+                    action: 'KICK',
+                    target: targetUser,
+                    moderator: userTag
+                }]);
+                message = `🥾 **Kicked** \`${targetUser}\` from Roblox server.`;
+            }
+            else if (name === 'unban') {
+                const { error } = await supabase.from('command_queue').insert([{
+                    server_id: guild_id,
+                    command: 'UNBAN',
+                    args: { username: targetUser, reason: 'Discord Command', moderator: userTag },
+                    status: 'PENDING'
+                }]);
+
+                if (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ Failed to queue command.`, flags: 64 }
+                    });
+                }
+                await triggerMessaging('UNBAN', { username: targetUser, reason: 'Discord Command', moderator: userTag });
+                // Add to Logs
+                await supabase.from('logs').insert([{
+                    server_id: guild_id,
+                    action: 'UNBAN',
+                    target: targetUser,
+                    moderator: userTag
+                }]);
+                message = `🔓 **Unbanned** \`${targetUser}\` from Roblox.`;
+            }
+            else if (name === 'update') {
+                const { error } = await supabase.from('command_queue').insert([{
+                    server_id: guild_id,
+                    command: 'UPDATE',
+                    args: { reason: "Manual Update Triggered", moderator: userTag },
+                    status: 'PENDING'
+                }]);
+
+                if (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ Failed to queue command.`, flags: 64 }
+                    });
+                }
+                await triggerMessaging('UPDATE', { reason: "Manual Update Triggered", moderator: userTag });
+                // Add to Logs
+                await supabase.from('logs').insert([{
+                    server_id: guild_id,
+                    action: 'UPDATE',
+                    target: 'ALL',
+                    moderator: userTag
+                }]);
+                message = `🚀 **Update Signal Sent**! All game servers will restart shortly.`;
+            }
             else if (name === 'shutdown') {
+                const { error } = await supabase.from('command_queue').insert([{
+                    server_id: guild_id,
+                    command: 'SHUTDOWN',
+                    args: { job_id: jobId, moderator: userTag },
+                    status: 'PENDING'
+                }]);
+
+                if (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ Failed to queue command.`, flags: 64 }
+                    });
+                }
+                await triggerMessaging('SHUTDOWN', { job_id: jobId, moderator: userTag });
+                // Add to Logs
+                await supabase.from('logs').insert([{
+                    server_id: guild_id,
+                    action: 'SHUTDOWN',
+                    target: jobId || 'ALL',
+                    moderator: userTag
+                }]);
                 const targetMsg = jobId ? `server \`${jobId}\`` : 'all active game servers';
                 message = `🛑 **SHUTDOWN SIGNAL SENT**! Closing ${targetMsg}.`;
             }
@@ -126,7 +231,10 @@ export async function POST(req: Request) {
 
                 // Fetch data for the embed (Official Roblox API)
                 const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${username}&limit=1`, {
-                    headers: { 'User-Agent': 'Mozilla/5.0' }
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0',
+                        ...(server?.open_cloud_key ? { 'x-api-key': server.open_cloud_key } : {})
+                    }
                 });
 
                 if (!searchRes.ok) {
@@ -197,19 +305,23 @@ export async function POST(req: Request) {
         if (type === 3) {
             const [action, userId, username] = interaction.data.custom_id.split('_');
 
-            await supabase.from('command_queue').insert([{
+            const { error } = await supabase.from('command_queue').insert([{
                 server_id: guild_id,
                 command: action.toUpperCase(),
                 args: { username, reason: 'Discord Button Action', moderator: userTag },
                 status: 'PENDING'
             }]);
 
-            await supabase.from('logs').insert([{
-                server_id: guild_id,
-                action: action.toUpperCase(),
-                target: username,
-                moderator: userTag
-            }]);
+            if (!error) {
+                await triggerMessaging(action.toUpperCase(), { username, reason: 'Discord Button Action', moderator: userTag });
+
+                await supabase.from('logs').insert([{
+                    server_id: guild_id,
+                    action: action.toUpperCase(),
+                    target: username,
+                    moderator: userTag
+                }]);
+            }
 
             return NextResponse.json({
                 type: 4,

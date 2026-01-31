@@ -53,7 +53,7 @@ export default function PlayerLookup() {
         setPresence(null);
 
         try {
-            const res = await fetch(`/api/proxy?username=${query}`);
+            const res = await fetch(`/api/proxy?username=${query}&serverId=${id}`);
             const data = await res.json();
 
             if (!res.ok) throw new Error(data.error || 'Failed to find player');
@@ -94,7 +94,9 @@ export default function PlayerLookup() {
         if (!confirm(confirmMsg)) return;
 
         setActionLoading(true);
-        const { error } = await supabase
+
+        // 1. Queue in Database (Fallback & History)
+        const { error: dbError } = await supabase
             .from('command_queue')
             .insert([{
                 server_id: id,
@@ -108,12 +110,31 @@ export default function PlayerLookup() {
                 status: 'PENDING'
             }]);
 
-        if (error) {
-            alert("Error: " + error.message);
-        } else {
-            alert(`${action} command queued for ${player.username}!`);
+        // 2. Trigger Messaging Service (Instant Action)
+        try {
+            await fetch('/api/roblox/message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverId: id,
+                    command: action,
+                    args: {
+                        username: player.username,
+                        job_id: action === 'KICK' ? presence?.jobId : null,
+                        reason: 'Dashboard Action',
+                        moderator: 'Web Admin'
+                    }
+                })
+            });
+        } catch (msgError) {
+            console.error('Messaging Service failed, falling back to polling.', msgError);
+        }
 
-            // Log the action locally too
+        if (dbError) {
+            alert("Error: " + dbError.message);
+        } else {
+            alert(`${action} signal sent to Roblox! (Instant via Open Cloud)`);
+
             await supabase.from('logs').insert([{
                 server_id: id,
                 action: action,

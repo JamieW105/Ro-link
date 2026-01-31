@@ -1,19 +1,37 @@
 import { NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const username = searchParams.get('username');
+    const serverId = searchParams.get('serverId');
 
     if (!username) {
         return NextResponse.json({ error: 'Username is required' }, { status: 400 });
     }
 
+    // Fetch User's Open Cloud Key
+    let apiKey = null;
+    if (serverId) {
+        const { data: server } = await supabase
+            .from('servers')
+            .select('open_cloud_key')
+            .eq('id', serverId)
+            .single();
+        apiKey = server?.open_cloud_key;
+    }
+
     try {
-        // 1. Search for user (Case-insensitive, finds closest match)
+        // 1. Search for user (Using API Key if available to bypass blocks)
+        const headers: any = {
+            'User-Agent': 'Mozilla/5.0'
+        };
+        if (apiKey) {
+            headers['x-api-key'] = apiKey;
+        }
+
         const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${username}&limit=1`, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
+            headers
         });
 
         if (!searchRes.ok) {

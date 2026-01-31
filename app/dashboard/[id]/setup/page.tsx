@@ -33,6 +33,8 @@ export default function SetupPage() {
     const { id } = useParams();
     const [step, setStep] = useState(1);
     const [placeId, setPlaceId] = useState("");
+    const [universeId, setUniverseId] = useState("");
+    const [openCloudKey, setOpenCloudKey] = useState("");
     const [apiKey, setApiKey] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -49,6 +51,9 @@ export default function SetupPage() {
 
             if (data && !error) {
                 setApiKey(data.api_key);
+                setPlaceId(data.place_id || "");
+                setUniverseId(data.universe_id || "");
+                setOpenCloudKey(data.open_cloud_key || "");
                 setStep(2);
             }
             setInitialLoading(false);
@@ -67,7 +72,13 @@ export default function SetupPage() {
 
         const { error: dbError } = await supabase
             .from('servers')
-            .insert([{ id, place_id: placeId, api_key: generatedKey }]);
+            .upsert({
+                id,
+                place_id: placeId,
+                universe_id: universeId,
+                open_cloud_key: openCloudKey,
+                api_key: generatedKey
+            });
 
         if (dbError) {
             setError(dbError.message);
@@ -85,15 +96,31 @@ export default function SetupPage() {
 local RoLink = {}
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local MessagingService = game:GetService("MessagingService")
 
 local API_BASE_URL = "${baseUrl}"
 local API_KEY = "${apiKey}"
 local POLL_INTERVAL = 5
 
 function RoLink:Initialize()
-	print("🚀 [Ro-Link] Initializing bridge...")
+	print("🚀 [Ro-Link] Initializing bridge with MessagingService...")
 	
+	-- 1. Listen for Instant Commands (Open Cloud)
+	task.spawn(function()
+		local success, connection = pcall(function()
+			return MessagingService:SubscribeAsync("AdminActions", function(message)
+				local data = message.Data
+				if typeof(data) == "string" then
+					data = HttpService:JSONDecode(data)
+				end
+				print("📩 [Ro-Link] Instant Command Received:", data.command)
+				self:Execute(data)
+			end)
+		end)
+		if not success then warn("⚠️ [Ro-Link] MessagingService failed to initialize.") end
+	end)
+
+	-- 2. Fallback Polling
 	task.spawn(function()
 		while true do
 			local id = game.JobId
@@ -201,15 +228,40 @@ return RoLink`;
                         <p className="text-slate-500 text-sm font-medium mb-8">Connect your Roblox game to Discord.</p>
 
                         <form onSubmit={handleSetup} className="space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold uppercase text-slate-500 tracking-widest pl-1 block">Place ID</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="Place ID"
+                                        className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-mono"
+                                        value={placeId}
+                                        onChange={(e) => setPlaceId(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold uppercase text-slate-500 tracking-widest pl-1 block">Universe ID</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="Universe ID"
+                                        className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-mono"
+                                        value={universeId}
+                                        onChange={(e) => setUniverseId(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
                             <div className="space-y-2">
-                                <label className="text-[10px] font-bold uppercase text-slate-500 tracking-widest pl-1 block">Roblox Place ID</label>
+                                <label className="text-[10px] font-bold uppercase text-slate-500 tracking-widest pl-1 block">Open Cloud API Key</label>
                                 <input
-                                    type="text"
+                                    type="password"
                                     required
-                                    placeholder="Enter Place ID"
-                                    className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white placeholder:text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-mono"
-                                    value={placeId}
-                                    onChange={(e) => setPlaceId(e.target.value)}
+                                    placeholder="Enter Roblox API Key"
+                                    className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-mono"
+                                    value={openCloudKey}
+                                    onChange={(e) => setOpenCloudKey(e.target.value)}
                                 />
                             </div>
 
