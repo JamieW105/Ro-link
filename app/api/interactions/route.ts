@@ -124,11 +124,9 @@ export async function POST(req: Request) {
             else if (name === 'lookup') {
                 const username = options.find((o: any) => o.name === 'username').value;
 
-                // Fetch data for the embed (Using RoProxy to bypass Vercel IP block)
-                const searchRes = await fetch('https://users.roproxy.com/v1/usernames/users', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
+                // Fetch data for the embed (Official Roblox API)
+                const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${username}&limit=1`, {
+                    headers: { 'User-Agent': 'Mozilla/5.0' }
                 });
 
                 if (!searchRes.ok) {
@@ -142,17 +140,16 @@ export async function POST(req: Request) {
                     return NextResponse.json({ type: 4, data: { content: `❌ Player \`${username}\` not found.` } });
                 }
 
-                const user = searchData.data[0];
-                const userId = user.id;
+                const userId = searchData.data[0].id;
 
                 const [profileRes, thumbRes, serversRes] = await Promise.all([
-                    fetch(`https://users.roproxy.com/v1/users/${userId}`),
+                    fetch(`https://users.roblox.com/v1/users/${userId}`),
                     fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`),
                     supabase.from('live_servers').select('players').eq('server_id', guild_id)
                 ]);
 
                 if (!profileRes.ok) {
-                    return NextResponse.json({ type: 4, data: { content: `❌ Failed to fetch detailed player info from Roblox (${profileRes.status}).` } });
+                    return NextResponse.json({ type: 4, data: { content: `❌ Failed to fetch detailed player info from Roblox.` } });
                 }
 
                 const profile = await profileRes.json();
