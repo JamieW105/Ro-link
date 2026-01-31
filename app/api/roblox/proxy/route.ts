@@ -16,8 +16,10 @@ export async function GET(req: Request) {
             body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
         });
         const searchData = await searchRes.json();
+        console.log(`[PROXY] Search result for ${username}:`, JSON.stringify(searchData));
 
         if (!searchData.data || searchData.data.length === 0) {
+            console.log(`[PROXY] No user found for: ${username}`);
             return NextResponse.json({ error: 'Player not found' }, { status: 404 });
         }
 
