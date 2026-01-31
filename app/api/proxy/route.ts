@@ -35,9 +35,12 @@ export async function GET(req: Request) {
         });
 
         if (!searchRes.ok) {
+            if (searchRes.status === 429) {
+                return NextResponse.json({ error: 'Roblox Rate Limit reached. Please wait a minute and try again. If you are using an Open Cloud key, ensure it has the necessary permissions.' }, { status: 429 });
+            }
             const errorText = await searchRes.text();
             console.error('[ROBLOX API ERROR]', searchRes.status, errorText);
-            return NextResponse.json({ error: `Roblox API Error (${searchRes.status})` }, { status: searchRes.status });
+            return NextResponse.json({ error: `Roblox API Error (${searchRes.status}): Failed to search for user.` }, { status: searchRes.status });
         }
 
         const searchData = await searchRes.json();
@@ -47,8 +50,8 @@ export async function GET(req: Request) {
 
         const userId = searchData.data[0].id;
 
-        // 2. Get Detailed Profile
-        const profileRes = await fetch('https://users.roblox.com/v1/users/' + userId);
+        // 2. Get Detailed Profile (Authenticated if possible)
+        const profileRes = await fetch('https://users.roblox.com/v1/users/' + userId, { headers });
         const profileData = await profileRes.json();
 
         // 3. Get Avatar Thumbnail

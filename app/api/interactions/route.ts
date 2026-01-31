@@ -247,6 +247,12 @@ export async function POST(req: Request) {
                 });
 
                 if (!searchRes.ok) {
+                    if (searchRes.status === 429) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `⚠️ **Rate Limited**: Roblox is currently limiting requests from this server. Please try again in 1-2 minutes or ensure your Open Cloud key has 'User' permissions enabled.`, flags: 64 }
+                        });
+                    }
                     const errorText = await searchRes.text();
                     console.error('[ROBLOX API ERROR]', searchRes.status, errorText);
                     return NextResponse.json({ type: 4, data: { content: `❌ Roblox API returned an error (${searchRes.status}).` } });
