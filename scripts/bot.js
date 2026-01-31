@@ -110,6 +110,18 @@ async function refreshCommands() {
 }
 
 let statusIndex = 0;
+
+async function syncStats() {
+    const guildCount = client.guilds.cache.size;
+    try {
+        await supabase
+            .from('bot_stats')
+            .upsert({ id: 'global', guild_count: guildCount, updated_at: new Date() });
+    } catch (e) {
+        console.error('[STATS] Failed to sync guild count to Supabase:', e.message);
+    }
+}
+
 function updateStatus() {
     const serverCount = client.guilds.cache.size;
     const supportUrl = "https://discord.gg/C3n4nAwYMw";
@@ -121,6 +133,7 @@ function updateStatus() {
 
     client.user.setActivity(statuses[statusIndex], { type: ActivityType.Custom });
     statusIndex = (statusIndex + 1) % statuses.length;
+    syncStats();
 }
 
 client.once('ready', () => {

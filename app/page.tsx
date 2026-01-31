@@ -31,11 +31,13 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchStats() {
-      // Servers
-      const { count: sCount } = await supabase
-        .from('servers')
-        .select('*', { count: 'exact', head: true });
-      if (sCount !== null) setServerCount(sCount);
+      // Real-time Bot Server Count (from bot_stats table updated by the bot)
+      const { data: bStats } = await supabase
+        .from('bot_stats')
+        .select('guild_count')
+        .eq('id', 'global')
+        .single();
+      if (bStats) setServerCount(bStats.guild_count);
 
       // Commands
       const { count: cCount } = await supabase
