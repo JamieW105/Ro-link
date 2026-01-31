@@ -281,7 +281,7 @@ export async function POST(req: Request) {
                 // Fetch Presence and Logs now that we have the exact name
                 const [serversRes, logsRes] = await Promise.all([
                     supabase.from('live_servers').select('players').eq('server_id', guild_id),
-                    supabase.from('logs').select('action, moderator, created_at').eq('server_id', guild_id).eq('target', profile.name).order('created_at', { ascending: false }).limit(3)
+                    supabase.from('logs').select('action, moderator, created_at').eq('server_id', guild_id).eq('target', profile.name).order('created_at', { ascending: false }).limit(5)
                 ]);
 
                 const activeServer = serversRes.data?.find((s: any) =>
@@ -293,20 +293,31 @@ export async function POST(req: Request) {
                     ? logs.map(l => `• **${l.action}** by ${l.moderator.split('#')[0]} (<t:${Math.floor(new Date(l.created_at).getTime() / 1000)}:R>)`).join('\n')
                     : '*No previous moderation.*';
 
+                const createdDate = new Date(profile.created);
+                const accountAgeDays = Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+
+                let statusText = activeServer ? '🟢 **In-Game**' : '⚪ Offline';
+                if (profile.isBanned) statusText = '🔴 **Banned on Roblox**';
+
                 return NextResponse.json({
                     type: 4,
                     data: {
                         embeds: [{
                             title: `Player Lookup: ${profile.displayName}`,
+                            url: `https://www.roblox.com/users/${userId}/profile`,
                             color: activeServer ? 1095921 : profile.isBanned ? 15681348 : 959977,
                             thumbnail: { url: avatarUrl },
                             fields: [
                                 { name: 'Username', value: `\`${profile.name}\``, inline: true },
                                 { name: 'User ID', value: `\`${userId}\``, inline: true },
-                                { name: 'Status', value: activeServer ? '🟢 **In-Game**' : '⚪ Offline', inline: true },
+                                { name: 'Status', value: statusText, inline: true },
+                                { name: 'Account Age', value: `\`${accountAgeDays.toLocaleString()} Days\``, inline: true },
+                                { name: 'Created', value: `<t:${Math.floor(createdDate.getTime() / 1000)}:D> (<t:${Math.floor(createdDate.getTime() / 1000)}:R>)`, inline: true },
+                                { name: 'Description', value: profile.description ? (profile.description.length > 200 ? profile.description.substring(0, 197) + '...' : profile.description) : '*No description*', inline: false },
                                 { name: '📜 Moderation History (Recent)', value: logField, inline: false }
                             ],
-                            footer: { text: 'Ro-Link Dashboard Integration' }
+                            footer: { text: 'Ro-Link Dashboard Integration' },
+                            timestamp: new Date().toISOString()
                         }],
                         components: [{
                             type: 1,
