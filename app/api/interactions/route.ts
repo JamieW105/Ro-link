@@ -83,17 +83,25 @@ export async function POST(req: Request) {
             }
 
             // Check if server is setup
-            const { data: server } = await supabase
-                .from('servers')
-                .select('id, open_cloud_key, place_id')
-                .eq('id', guild_id)
-                .single();
+            if (!guild_id) {
+                return NextResponse.json({
+                    type: 4,
+                    data: { content: `❌ This command can only be used in a Discord Server.`, flags: 64 }
+                });
+            }
 
-            if (!server) {
+            const { data: server, error: serverError } = await supabase
+                .from('servers')
+                .select('*')
+                .eq('id', guild_id)
+                .maybeSingle();
+
+            if (serverError || !server) {
+                console.error(`[AUTH] Server check failed for ${guild_id}:`, serverError);
                 return NextResponse.json({
                     type: 4,
                     data: {
-                        content: `❌ This server is not set up with Ro-Link yet. Please visit the dashboard to initialize it.`,
+                        content: `❌ This server is not set up with Ro-Link yet. Please visit the dashboard to initialize it: ${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guild_id}`,
                         flags: 64
                     }
                 });
