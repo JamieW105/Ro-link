@@ -4,9 +4,11 @@ import { supabase } from '@/lib/supabase';
 
 export const runtime = 'edge';
 
-// Pure JS hex to Uint8Array (Safe for Edge)
 function hexToUint8(hex: string) {
-    return new Uint8Array(hex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+    const cleanHex = hex.trim();
+    const matches = cleanHex.match(/.{1,2}/g);
+    if (!matches) return new Uint8Array(0);
+    return new Uint8Array(matches.map(byte => parseInt(byte, 16)));
 }
 
 async function verifyDiscordRequest(request: Request) {
@@ -15,7 +17,7 @@ async function verifyDiscordRequest(request: Request) {
     const publicKey = process.env.DISCORD_PUBLIC_KEY;
 
     if (!signature || !timestamp || !publicKey) {
-        console.error('Missing headers or Public Key');
+        console.error('Missing: ', { signature: !!signature, timestamp: !!timestamp, key: !!publicKey });
         return { isValid: false };
     }
 
@@ -28,10 +30,10 @@ async function verifyDiscordRequest(request: Request) {
             hexToUint8(publicKey)
         );
 
-        console.log(`Verify: ${isValid} | TS: ${timestamp} | Sig: ${signature.substring(0, 5)}...`);
+        console.log(`[VERIFY] Result: ${isValid} | TS: ${timestamp}`);
         return { isValid, body };
     } catch (e) {
-        console.error('Error during verification:', e);
+        console.error('Verify Exception:', e);
         return { isValid: false };
     }
 }
