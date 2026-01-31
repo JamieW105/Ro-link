@@ -124,8 +124,8 @@ export async function POST(req: Request) {
             else if (name === 'lookup') {
                 const username = options.find((o: any) => o.name === 'username').value;
 
-                // Fetch data for the embed
-                const searchRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+                // Fetch data for the embed (Using RoProxy to bypass Vercel IP block)
+                const searchRes = await fetch('https://users.roproxy.com/v1/usernames/users', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
@@ -146,8 +146,8 @@ export async function POST(req: Request) {
                 const userId = user.id;
 
                 const [profileRes, thumbRes, serversRes] = await Promise.all([
-                    fetch(`https://users.roblox.com/v1/users/${userId}`),
-                    fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`),
+                    fetch(`https://users.roproxy.com/v1/users/${userId}`),
+                    fetch(`https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`),
                     supabase.from('live_servers').select('players').eq('server_id', guild_id)
                 ]);
 

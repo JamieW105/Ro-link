@@ -10,7 +10,7 @@ export async function GET(req: Request) {
 
     try {
         // 1. Get User ID from Username (Exact Match)
-        const searchRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+        const searchRes = await fetch('https://users.roproxy.com/v1/usernames/users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
@@ -27,11 +27,11 @@ export async function GET(req: Request) {
         const userId = user.id;
 
         // 2. Get Detailed Profile
-        const profileRes = await fetch('https://users.roblox.com/v1/users/' + userId);
+        const profileRes = await fetch('https://users.roproxy.com/v1/users/' + userId);
         const profileData = await profileRes.json();
 
         // 3. Get Avatar Thumbnail (Headshot)
-        const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`);
+        const thumbRes = await fetch(`https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`);
         const thumbData = await thumbRes.json();
         const avatarUrl = thumbData.data?.[0]?.imageUrl || '';
 
