@@ -74,6 +74,19 @@ export async function POST(req: Request) {
         if (type === 2) {
             const { name, options } = interaction.data;
 
+            // Permission Check: Only 'ping' is public
+            if (name !== 'ping') {
+                const permissions = BigInt(member?.permissions || '0');
+                const hasPerms = (permissions & 0x2n) !== 0n || (permissions & 0x4n) !== 0n || (permissions & 0x8n) !== 0n || (permissions & 0x20n) !== 0n;
+
+                if (!hasPerms) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ You do not have permission to use this command. (Requires Kick/Ban Members or Admin)`, flags: 64 }
+                    });
+                }
+            }
+
             // Check if server is setup
             const { data: server } = await supabase
                 .from('servers')
@@ -313,6 +326,17 @@ export async function POST(req: Request) {
 
         // Handle Button Clicks (Vercel)
         if (type === 3) {
+            // Permission Check for buttons
+            const permissions = BigInt(member?.permissions || '0');
+            const hasPerms = (permissions & 0x2n) !== 0n || (permissions & 0x4n) !== 0n || (permissions & 0x8n) !== 0n || (permissions & 0x20n) !== 0n;
+
+            if (!hasPerms) {
+                return NextResponse.json({
+                    type: 4,
+                    data: { content: `❌ You do not have permission to use this button.`, flags: 64 }
+                });
+            }
+
             const [action, userId, username] = interaction.data.custom_id.split('_');
 
             const { error } = await supabase.from('command_queue').insert([{
