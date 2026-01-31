@@ -64,12 +64,12 @@ export default function Home() {
             <span className="text-xl font-semibold tracking-tight text-white pl-1">Ro-Link</span>
           </div>
           <div className="flex items-center gap-6">
-            <a
-              href="https://discord.com/oauth2/authorize?client_id=1466340007940722750&response_type=code&redirect_uri=https%3A%2F%2Frolink.cloud%2Fapi%2Fauth%2Fcallback%2Fdiscord&scope=identify+guilds"
+            <button
+              onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}
               className="px-5 py-2 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-lg transition-all shadow-md shadow-sky-900/20"
             >
               Sign In
-            </a>
+            </button>
           </div>
         </nav>
 
