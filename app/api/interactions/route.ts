@@ -85,7 +85,7 @@ export async function POST(req: Request) {
             // Check if server is setup
             const { data: server } = await supabase
                 .from('servers')
-                .select('id, open_cloud_key')
+                .select('id, open_cloud_key, place_id')
                 .eq('id', guild_id)
                 .single();
 
@@ -280,7 +280,7 @@ export async function POST(req: Request) {
 
                 // Fetch Presence and Logs now that we have the exact name
                 const [serversRes, logsRes] = await Promise.all([
-                    supabase.from('live_servers').select('players').eq('server_id', guild_id),
+                    supabase.from('live_servers').select('id, players').eq('server_id', guild_id),
                     supabase.from('logs').select('action, moderator, created_at').eq('server_id', guild_id).eq('target', profile.name).order('created_at', { ascending: false }).limit(5)
                 ]);
 
@@ -296,15 +296,44 @@ export async function POST(req: Request) {
                 const createdDate = new Date(profile.created);
                 const accountAgeDays = Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
 
-                let statusText = activeServer ? '🟢 **In-Game**' : '⚪ Offline';
+                let statusText = activeServer ? `🟢 **In-Game**\n\`${activeServer.id}\`` : '⚪ Offline';
                 if (profile.isBanned) statusText = '🔴 **Banned on Roblox**';
+
+                const components = [];
+
+                // Row 1: Links & Info
+                const actionRow1 = {
+                    type: 1,
+                    components: [
+                        { type: 2, label: 'View Profile', style: 5, url: `https://www.roblox.com/users/${userId}/profile` }
+                    ]
+                };
+
+                if (activeServer && server?.place_id) {
+                    actionRow1.components.push({
+                        type: 2,
+                        label: 'Join Server',
+                        style: 5,
+                        url: `roblox://placeId=${server.place_id}&gameInstanceId=${activeServer.id}`
+                    });
+                }
+                components.push(actionRow1);
+
+                // Row 2: Moderation Actions
+                components.push({
+                    type: 1,
+                    components: [
+                        { type: 2, label: 'Kick', style: 2, custom_id: `kick_${userId}_${profile.name}` },
+                        { type: 2, label: 'Ban', style: 4, custom_id: `ban_${userId}_${profile.name}` },
+                        { type: 2, label: 'Unban', style: 3, custom_id: `unban_${userId}_${profile.name}` }
+                    ]
+                });
 
                 return NextResponse.json({
                     type: 4,
                     data: {
                         embeds: [{
                             title: `Player Lookup: ${profile.displayName}`,
-                            url: `https://www.roblox.com/users/${userId}/profile`,
                             color: activeServer ? 1095921 : profile.isBanned ? 15681348 : 959977,
                             thumbnail: { url: avatarUrl },
                             fields: [
@@ -319,14 +348,7 @@ export async function POST(req: Request) {
                             footer: { text: 'Ro-Link Dashboard Integration' },
                             timestamp: new Date().toISOString()
                         }],
-                        components: [{
-                            type: 1,
-                            components: [
-                                { type: 2, label: 'Kick', style: 2, custom_id: `kick_${userId}_${profile.name}` },
-                                { type: 2, label: 'Ban', style: 4, custom_id: `ban_${userId}_${profile.name}` },
-                                { type: 2, label: 'Unban', style: 3, custom_id: `unban_${userId}_${profile.name}` }
-                            ]
-                        }]
+                        components
                     }
                 });
             }

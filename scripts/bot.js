@@ -293,16 +293,18 @@ client.on('interactionCreate', async interaction => {
             const thumb = await thumbRes.json();
             const avatarUrl = thumb.data?.[0]?.imageUrl || '';
 
-            // 3. Check Presence & Logs
-            const [serversRes, logsRes] = await Promise.all([
-                supabase.from('live_servers').select('players').eq('server_id', interaction.guildId),
-                supabase.from('logs').select('action, moderator, created_at').eq('server_id', interaction.guildId).eq('target', profile.name).order('created_at', { ascending: false }).limit(5)
+            // 3. Check Presence, Logs & Server Info
+            const [serversRes, logsRes, serverDataRes] = await Promise.all([
+                supabase.from('live_servers').select('id, players').eq('server_id', interaction.guildId),
+                supabase.from('logs').select('action, moderator, created_at').eq('server_id', interaction.guildId).eq('target', profile.name).order('created_at', { ascending: false }).limit(5),
+                supabase.from('servers').select('place_id').eq('id', interaction.guildId).single()
             ]);
 
             const activeServer = serversRes.data?.find((s) =>
                 s.players?.some((p) => p.toLowerCase() === profile.name.toLowerCase())
             );
 
+            const serverInfo = serverDataRes.data;
             const logs = logsRes.data || [];
             const logField = logs.length > 0
                 ? logs.map(l => `• **${l.action}** by ${l.moderator.split('#')[0]} (<t:${Math.floor(new Date(l.created_at).getTime() / 1000)}:R>)`).join('\n')
@@ -311,7 +313,7 @@ client.on('interactionCreate', async interaction => {
             const createdDate = new Date(profile.created);
             const accountAgeDays = Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
 
-            let statusText = activeServer ? '🟢 **In-Game**' : '⚪ Offline';
+            let statusText = activeServer ? `🟢 **In-Game**\n\`${activeServer.id}\`` : '⚪ Offline';
             if (profile.isBanned) statusText = '🔴 **Banned on Roblox**';
 
             // 4. Create Embed
@@ -333,7 +335,25 @@ client.on('interactionCreate', async interaction => {
                 .setTimestamp();
 
             // 5. Actions
-            const row = new ActionRowBuilder().addComponents(
+            const row = new ActionRowBuilder();
+
+            row.addComponents(
+                new ButtonBuilder()
+                    .setLabel('View Profile')
+                    .setURL(`https://www.roblox.com/users/${userId}/profile`)
+                    .setStyle(ButtonStyle.Link)
+            );
+
+            if (activeServer && serverInfo?.place_id) {
+                row.addComponents(
+                    new ButtonBuilder()
+                        .setLabel('Join Server')
+                        .setURL(`roblox://placeId=${serverInfo.place_id}&gameInstanceId=${activeServer.id}`)
+                        .setStyle(ButtonStyle.Link)
+                );
+            }
+
+            const row2 = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`kick_${userId}_${profile.name}`)
                     .setLabel('Kick')
@@ -348,7 +368,7 @@ client.on('interactionCreate', async interaction => {
                     .setStyle(ButtonStyle.Success)
             );
 
-            await interaction.editReply({ embeds: [embed], components: [row] });
+            await interaction.editReply({ embeds: [embed], components: [row, row2] });
 
         } catch (error) {
             console.error(error);
