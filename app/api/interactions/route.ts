@@ -55,9 +55,9 @@ export async function POST(req: Request) {
         const userTag = user ? `${user.username}${user.discriminator !== '0' ? '#' + user.discriminator : ''}` : 'Unknown';
 
         // Helper to trigger Messaging Service
-        const triggerMessaging = async (command: string, args: any) => {
+        const triggerMessaging = async (command: string, args: any, serverData: any = null) => {
             if (!guild_id) return;
-            await sendRobloxMessage(guild_id, command, args);
+            await sendRobloxMessage(guild_id, command, args, serverData);
         };
 
         // 2. Handle PING
@@ -161,17 +161,25 @@ export async function POST(req: Request) {
                 });
             }
 
-            // Permission Check: Only 'ping' is public
-            if (name !== 'ping') {
-                const permissions = BigInt(member?.permissions || '0');
-                const hasPerms = (permissions & 0x2n) !== 0n || (permissions & 0x4n) !== 0n || (permissions & 0x8n) !== 0n || (permissions & 0x20n) !== 0n;
+            // Handle 'ping' command immediately (No DB required)
+            if (name === 'ping') {
+                const timestamp = Number(BigInt(interaction.id) >> 22n) + 1420070400000;
+                const latency = Math.abs(Date.now() - timestamp);
+                return NextResponse.json({
+                    type: 4,
+                    data: { content: `🏓 **Pong!**\nLatency: \`${latency}ms\`\nInstance: \`Vercel Edge (Australia/Sydney)\`` }
+                });
+            }
 
-                if (!hasPerms) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: `❌ You do not have permission to use this command. (Requires Kick/Ban Members or Admin)`, flags: 64 }
-                    });
-                }
+            // Permission Check: Only 'ping' is public (Already handled ping above)
+            const permissions = BigInt(member?.permissions || '0');
+            const hasPerms = (permissions & 0x2n) !== 0n || (permissions & 0x4n) !== 0n || (permissions & 0x8n) !== 0n || (permissions & 0x20n) !== 0n;
+
+            if (!hasPerms) {
+                return NextResponse.json({
+                    type: 4,
+                    data: { content: `❌ You do not have permission to use this command. (Requires Kick/Ban Members or Admin)`, flags: 64 }
+                });
             }
 
             // Check if server is setup
@@ -205,134 +213,131 @@ export async function POST(req: Request) {
 
             let message = '';
             if (name === 'ban') {
-                // Add to Command Queue
-                const { error } = await supabase.from('command_queue').insert([{
-                    server_id: guild_id,
-                    command: name.toUpperCase(),
-                    args: { username: targetUser, reason: 'Discord Command', moderator: userTag },
-                    status: 'PENDING'
-                }]);
+                // Parallelize Operations
+                const [queueRes] = await Promise.all([
+                    supabase.from('command_queue').insert([{
+                        server_id: guild_id,
+                        command: name.toUpperCase(),
+                        args: { username: targetUser, reason: 'Discord Command', moderator: userTag },
+                        status: 'PENDING'
+                    }]),
+                    triggerMessaging(name.toUpperCase(), { username: targetUser, reason: 'Discord Command', moderator: userTag }, server),
+                    supabase.from('logs').insert([{
+                        server_id: guild_id,
+                        action: name.toUpperCase(),
+                        target: targetUser,
+                        moderator: userTag
+                    }])
+                ]);
 
-                if (error) {
+                if (queueRes.error) {
                     return NextResponse.json({
                         type: 4,
                         data: { content: `❌ Failed to queue command.`, flags: 64 }
                     });
                 }
-                await triggerMessaging(name.toUpperCase(), { username: targetUser, reason: 'Discord Command', moderator: userTag });
-                // Add to Logs
-                await supabase.from('logs').insert([{
-                    server_id: guild_id,
-                    action: name.toUpperCase(),
-                    target: targetUser,
-                    moderator: userTag
-                }]);
                 message = `🔨 **Banned** \`${targetUser}\` from Roblox game.`;
             }
             else if (name === 'kick') {
-                const { error } = await supabase.from('command_queue').insert([{
-                    server_id: guild_id,
-                    command: 'KICK',
-                    args: { username: targetUser, reason: 'Discord Command', moderator: userTag },
-                    status: 'PENDING'
-                }]);
+                const [queueRes] = await Promise.all([
+                    supabase.from('command_queue').insert([{
+                        server_id: guild_id,
+                        command: 'KICK',
+                        args: { username: targetUser, reason: 'Discord Command', moderator: userTag },
+                        status: 'PENDING'
+                    }]),
+                    triggerMessaging('KICK', { username: targetUser, reason: 'Discord Command', moderator: userTag }, server),
+                    supabase.from('logs').insert([{
+                        server_id: guild_id,
+                        action: 'KICK',
+                        target: targetUser,
+                        moderator: userTag
+                    }])
+                ]);
 
-                if (error) {
+                if (queueRes.error) {
                     return NextResponse.json({
                         type: 4,
                         data: { content: `❌ Failed to queue command.`, flags: 64 }
                     });
                 }
-                await triggerMessaging('KICK', { username: targetUser, reason: 'Discord Command', moderator: userTag });
-                // Add to Logs
-                await supabase.from('logs').insert([{
-                    server_id: guild_id,
-                    action: 'KICK',
-                    target: targetUser,
-                    moderator: userTag
-                }]);
                 message = `🥾 **Kicked** \`${targetUser}\` from Roblox server.`;
             }
             else if (name === 'unban') {
-                const { error } = await supabase.from('command_queue').insert([{
-                    server_id: guild_id,
-                    command: 'UNBAN',
-                    args: { username: targetUser, reason: 'Discord Command', moderator: userTag },
-                    status: 'PENDING'
-                }]);
+                const [queueRes] = await Promise.all([
+                    supabase.from('command_queue').insert([{
+                        server_id: guild_id,
+                        command: 'UNBAN',
+                        args: { username: targetUser, reason: 'Discord Command', moderator: userTag },
+                        status: 'PENDING'
+                    }]),
+                    triggerMessaging('UNBAN', { username: targetUser, reason: 'Discord Command', moderator: userTag }, server),
+                    supabase.from('logs').insert([{
+                        server_id: guild_id,
+                        action: 'UNBAN',
+                        target: targetUser,
+                        moderator: userTag
+                    }])
+                ]);
 
-                if (error) {
+                if (queueRes.error) {
                     return NextResponse.json({
                         type: 4,
                         data: { content: `❌ Failed to queue command.`, flags: 64 }
                     });
                 }
-                await triggerMessaging('UNBAN', { username: targetUser, reason: 'Discord Command', moderator: userTag });
-                // Add to Logs
-                await supabase.from('logs').insert([{
-                    server_id: guild_id,
-                    action: 'UNBAN',
-                    target: targetUser,
-                    moderator: userTag
-                }]);
                 message = `🔓 **Unbanned** \`${targetUser}\` from Roblox.`;
             }
             else if (name === 'update') {
-                const { error } = await supabase.from('command_queue').insert([{
-                    server_id: guild_id,
-                    command: 'UPDATE',
-                    args: { reason: "Manual Update Triggered", moderator: userTag },
-                    status: 'PENDING'
-                }]);
+                const [queueRes] = await Promise.all([
+                    supabase.from('command_queue').insert([{
+                        server_id: guild_id,
+                        command: 'UPDATE',
+                        args: { reason: "Manual Update Triggered", moderator: userTag },
+                        status: 'PENDING'
+                    }]),
+                    triggerMessaging('UPDATE', { reason: "Manual Update Triggered", moderator: userTag }, server),
+                    supabase.from('logs').insert([{
+                        server_id: guild_id,
+                        action: 'UPDATE',
+                        target: 'ALL',
+                        moderator: userTag
+                    }])
+                ]);
 
-                if (error) {
+                if (queueRes.error) {
                     return NextResponse.json({
                         type: 4,
                         data: { content: `❌ Failed to queue command.`, flags: 64 }
                     });
                 }
-                await triggerMessaging('UPDATE', { reason: "Manual Update Triggered", moderator: userTag });
-                // Add to Logs
-                await supabase.from('logs').insert([{
-                    server_id: guild_id,
-                    action: 'UPDATE',
-                    target: 'ALL',
-                    moderator: userTag
-                }]);
                 message = `🚀 **Update Signal Sent**! All game servers will restart shortly.`;
             }
             else if (name === 'shutdown') {
-                const { error } = await supabase.from('command_queue').insert([{
-                    server_id: guild_id,
-                    command: 'SHUTDOWN',
-                    args: { job_id: jobId, moderator: userTag },
-                    status: 'PENDING'
-                }]);
+                const [queueRes] = await Promise.all([
+                    supabase.from('command_queue').insert([{
+                        server_id: guild_id,
+                        command: 'SHUTDOWN',
+                        args: { job_id: jobId, moderator: userTag },
+                        status: 'PENDING'
+                    }]),
+                    triggerMessaging('SHUTDOWN', { job_id: jobId, moderator: userTag }, server),
+                    supabase.from('logs').insert([{
+                        server_id: guild_id,
+                        action: 'SHUTDOWN',
+                        target: jobId || 'ALL',
+                        moderator: userTag
+                    }])
+                ]);
 
-                if (error) {
+                if (queueRes.error) {
                     return NextResponse.json({
                         type: 4,
                         data: { content: `❌ Failed to queue command.`, flags: 64 }
                     });
                 }
-                await triggerMessaging('SHUTDOWN', { job_id: jobId, moderator: userTag });
-                // Add to Logs
-                await supabase.from('logs').insert([{
-                    server_id: guild_id,
-                    action: 'SHUTDOWN',
-                    target: jobId || 'ALL',
-                    moderator: userTag
-                }]);
                 const targetMsg = jobId ? `server \`${jobId}\`` : 'all active game servers';
                 message = `🛑 **SHUTDOWN SIGNAL SENT**! Closing ${targetMsg}.`;
-            }
-            else if (name === 'ping') {
-                const timestamp = Number(BigInt(interaction.id) >> 22n) + 1420070400000;
-                const latency = Math.abs(Date.now() - timestamp);
-                return NextResponse.json({
-                    type: 4,
-                    data: { content: `🏓 **Pong!**\nLatency: \`${latency}ms\`\nInstance: \`Vercel Edge (Australia/Sydney)\`` }
-                });
             }
             else if (name === 'lookup') {
                 const username = options.find((o: any) => o.name === 'username').value;
@@ -365,9 +370,13 @@ export async function POST(req: Request) {
 
                 const userId = searchData.data[0].id;
 
-                const [profileRes, thumbRes] = await Promise.all([
+                const canonicalName = searchData.data[0].name;
+
+                const [profileRes, thumbRes, serversRes, logsRes] = await Promise.all([
                     fetch(`https://users.roblox.com/v1/users/${userId}`, { headers }),
-                    fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`, { headers })
+                    fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`, { headers }),
+                    supabase.from('live_servers').select('id, players').eq('server_id', guild_id),
+                    supabase.from('logs').select('action, moderator, created_at').eq('server_id', guild_id).eq('target', canonicalName).order('created_at', { ascending: false }).limit(5)
                 ]);
 
                 if (!profileRes.ok) {
@@ -377,12 +386,6 @@ export async function POST(req: Request) {
                 const profile = await profileRes.json();
                 const thumb = await thumbRes.json();
                 const avatarUrl = thumb.data?.[0]?.imageUrl || '';
-
-                // Fetch Presence and Logs now that we have the exact name
-                const [serversRes, logsRes] = await Promise.all([
-                    supabase.from('live_servers').select('id, players').eq('server_id', guild_id),
-                    supabase.from('logs').select('action, moderator, created_at').eq('server_id', guild_id).eq('target', profile.name).order('created_at', { ascending: false }).limit(5)
-                ]);
 
                 const activeServer = serversRes.data?.find((s: any) =>
                     Array.isArray(s.players) && s.players.some((p: string) => p.toLowerCase() === profile.name.toLowerCase())
@@ -474,23 +477,22 @@ export async function POST(req: Request) {
 
             const [action, userId, username] = interaction.data.custom_id.split('_');
 
-            const { error } = await supabase.from('command_queue').insert([{
-                server_id: guild_id,
-                command: action.toUpperCase(),
-                args: { username, reason: 'Discord Button Action', moderator: userTag },
-                status: 'PENDING'
-            }]);
-
-            if (!error) {
-                await triggerMessaging(action.toUpperCase(), { username, reason: 'Discord Button Action', moderator: userTag });
-
-                await supabase.from('logs').insert([{
+            // Parallelize Button Actions
+            await Promise.all([
+                supabase.from('command_queue').insert([{
+                    server_id: guild_id,
+                    command: action.toUpperCase(),
+                    args: { username, reason: 'Discord Button Action', moderator: userTag },
+                    status: 'PENDING'
+                }]),
+                triggerMessaging(action.toUpperCase(), { username, reason: 'Discord Button Action', moderator: userTag }), // Will fetch server internally
+                supabase.from('logs').insert([{
                     server_id: guild_id,
                     action: action.toUpperCase(),
                     target: username,
                     moderator: userTag
-                }]);
-            }
+                }])
+            ]);
 
             return NextResponse.json({
                 type: 4,

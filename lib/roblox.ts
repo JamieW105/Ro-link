@@ -1,15 +1,24 @@
 import { supabase } from './supabase';
 
-export async function sendRobloxMessage(serverId: string, command: string, args: any) {
+export async function sendRobloxMessage(serverId: string, command: string, args: any, serverData?: any) {
     try {
         // 1. Get Open Cloud Credentials
-        const { data: server, error: serverError } = await supabase
-            .from('servers')
-            .select('universe_id, open_cloud_key')
-            .eq('id', serverId)
-            .single();
+        let server = serverData;
+        if (!server) {
+            const { data: dbServer, error: serverError } = await supabase
+                .from('servers')
+                .select('universe_id, open_cloud_key')
+                .eq('id', serverId)
+                .single();
+            
+            if (serverError) {
+                console.error('[MESSAGING] Failed to fetch server credentials:', serverError);
+                 return { success: false, error: 'Failed to fetch credentials' };
+            }
+            server = dbServer;
+        }
 
-        if (serverError || !server || !server.universe_id || !server.open_cloud_key) {
+        if (!server || !server.universe_id || !server.open_cloud_key) {
             console.error('[MESSAGING] Open Cloud not configured for server:', serverId);
             return { success: false, error: 'Open Cloud not configured' };
         }
