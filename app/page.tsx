@@ -101,13 +101,13 @@ export default function Home() {
         </nav>
 
         {/* Hero Section */}
-        <main className="mt-32 pb-20 flex flex-col items-center text-center">
+        <main className="mt-20 md:mt-32 pb-20 flex flex-col items-center text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/50 border border-slate-700 text-slate-400 text-xs font-medium mb-10">
             <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
             V1.0 Simple & Powerful
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-8 text-white leading-[1.1]">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight mb-8 text-white leading-[1.1]">
             Reliable Management for <br />
             <span className="text-slate-400">Roblox Communities</span>
           </h1>
@@ -129,7 +129,7 @@ export default function Home() {
           </div>
 
           {/* Social Proof / Stats */}
-          <div className="mt-24 pt-12 border-t border-slate-800/50 w-full grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="mt-16 md:mt-24 pt-12 border-t border-slate-800/50 w-full grid grid-cols-2 md:grid-cols-4 gap-8">
             <StatItem label="Servers" value={serverCount !== null ? serverCount.toLocaleString() : "0"} />
             <StatItem label="Commands" value={commandCount !== null ? commandCount.toLocaleString() : "0"} />
             <StatItem label="Response" value="< 45ms" />
@@ -137,7 +137,7 @@ export default function Home() {
           </div>
 
           {/* Features Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-40 w-full text-left">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mt-24 md:mt-40 w-full text-left">
             <FeatureCard
               icon={<ZapIcon />}
               title="Real-time Execution"
@@ -156,7 +156,7 @@ export default function Home() {
           </div>
         </main>
 
-        <footer className="mt-40 py-12 border-t border-slate-800/50 flex flex-col md:flex-row items-center justify-between text-slate-500">
+        <footer className="mt-24 md:mt-40 py-12 border-t border-slate-800/50 flex flex-col md:flex-row items-center justify-between text-slate-500">
           <p className="text-sm font-medium">© {new Date().getFullYear()} Ro-Link Systems Group</p>
           <div className="flex gap-8 mt-6 md:mt-0">
             <a href="#" className="text-xs hover:text-white transition-colors">Legal</a>

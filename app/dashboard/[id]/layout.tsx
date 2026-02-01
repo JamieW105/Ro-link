@@ -38,9 +38,9 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     ];
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-200 flex">
-            {/* Sidebar */}
-            <aside className="w-64 border-r border-slate-800 bg-[#020617] flex flex-col fixed inset-y-0 h-full z-50">
+        <div className="min-h-screen bg-[#020617] text-slate-200 flex flex-col md:flex-row">
+            {/* Sidebar (Desktop) */}
+            <aside className="hidden md:flex w-64 border-r border-slate-800 bg-[#020617] flex-col fixed inset-y-0 h-full z-50">
                 <div className="p-6">
                     <Link href="/dashboard" className="flex items-center gap-3 mb-10 pl-2 hover:opacity-80 transition-opacity cursor-pointer">
                         <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 rounded object-contain" />
@@ -81,28 +81,49 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 </div>
             </aside>
 
+            {/* Bottom Nav (Mobile) */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#020617]/90 border-t border-slate-800 backdrop-blur-md z-50 flex justify-around items-center h-16 px-2">
+                {menuItems.map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                        <Link
+                            key={item.href}
+                            href={item.href}
+                            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${isActive ? "text-sky-400" : "text-slate-500"}`}
+                        >
+                            {item.icon}
+                            <span className="text-[10px] font-bold mt-1">{item.label}</span>
+                        </Link>
+                    )
+                })}
+                <Link href="/dashboard" className="flex flex-col items-center justify-center p-2 text-slate-500">
+                    <BackIcon />
+                    <span className="text-[10px] font-bold mt-1">Exit</span>
+                </Link>
+            </nav>
+
             {/* Main Content Area */}
-            <main className="flex-1 ml-64 min-h-screen flex flex-col">
-                <header className="h-16 border-b border-slate-800 bg-[#020617]/80 backdrop-blur-md flex items-center justify-between px-10 sticky top-0 z-40">
+            <main className="flex-1 md:ml-64 min-h-screen flex flex-col mb-16 md:mb-0">
+                <header className="h-16 border-b border-slate-800 bg-[#020617]/80 backdrop-blur-md flex items-center justify-between px-4 md:px-10 sticky top-0 z-40">
                     <div className="flex items-center gap-3">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Server ID</span>
-                        <div className="h-4 w-[1px] bg-slate-800 mx-2"></div>
-                        <code className="text-xs font-mono text-sky-500 bg-sky-500/5 px-2 py-1 rounded border border-sky-500/10 uppercase tracking-tighter">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest hidden sm:block">Server ID</span>
+                        <div className="h-4 w-[1px] bg-slate-800 mx-2 hidden sm:block"></div>
+                        <code className="text-xs font-mono text-sky-500 bg-sky-500/5 px-2 py-1 rounded border border-sky-500/10 uppercase tracking-tighter truncate max-w-[120px] sm:max-w-none">
                             {id}
                         </code>
                     </div>
 
-                    <div className="flex items-center gap-6 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    <div className="flex items-center gap-3 sm:gap-6 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                         <div className="flex items-center gap-2">
                             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.3)]"></div>
-                            Network Status: <span className="text-emerald-500">Nominal</span>
+                            <span className="hidden sm:inline">Network Status:</span> <span className="text-emerald-500">Nominal</span>
                         </div>
-                        <div className="h-3 w-[1px] bg-slate-800"></div>
-                        API Latency: <span className="text-sky-500">12ms</span>
+                        <div className="h-3 w-[1px] bg-slate-800 hidden sm:block"></div>
+                        <span className="hidden sm:inline">API Latency:</span> <span className="text-sky-500 hidden sm:inline">12ms</span>
                     </div>
                 </header>
 
-                <div className="p-10 flex-1 bg-gradient-to-tr from-[#020617] via-[#020617] to-sky-950/10">
+                <div className="p-4 md:p-10 flex-1 bg-gradient-to-tr from-[#020617] via-[#020617] to-sky-950/10">
                     {children}
                 </div>
             </main>
