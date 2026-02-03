@@ -342,9 +342,8 @@ export async function POST(req: Request) {
             else if (name === 'lookup') {
                 const username = options.find((o: any) => o.name === 'username').value;
 
-                // Headers for Roblox API
+                // Headers for Roblox API (Legacy Search does NOT support x-api-key)
                 const headers: any = { 'User-Agent': 'Mozilla/5.0' };
-                if (server?.open_cloud_key) headers['x-api-key'] = server.open_cloud_key;
 
                 // Fetch data for the embed (Official Roblox API)
                 const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${username}&limit=10`, {

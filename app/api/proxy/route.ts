@@ -22,25 +22,16 @@ export async function GET(req: Request) {
     }
 
     try {
-        // 1. Search for user (Using API Key if available to bypass blocks)
-        const headers: any = {
-            'User-Agent': 'Mozilla/5.0'
-        };
-        if (apiKey) {
-            headers['x-api-key'] = apiKey;
-        }
-
+        // 1. Search for user (Legacy Search does NOT support x-api-key)
         const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${username}&limit=10`, {
-            headers
+            headers: { 'User-Agent': 'Mozilla/5.0' }
         });
 
         if (!searchRes.ok) {
             if (searchRes.status === 429) {
-                return NextResponse.json({ error: 'Roblox Rate Limit reached. Please wait a minute and try again. If you are using an Open Cloud key, ensure it has the necessary permissions.' }, { status: 429 });
+                return NextResponse.json({ error: 'Roblox Rate Limit reached.' }, { status: 429 });
             }
-            const errorText = await searchRes.text();
-            console.error('[ROBLOX API ERROR]', searchRes.status, errorText);
-            return NextResponse.json({ error: `Roblox API Error (${searchRes.status}): Failed to search for user.` }, { status: searchRes.status });
+            return NextResponse.json({ error: `Roblox Search Error (${searchRes.status})` }, { status: searchRes.status });
         }
 
         const searchData = await searchRes.json();
@@ -50,9 +41,24 @@ export async function GET(req: Request) {
 
         const userId = searchData.data[0].id;
 
-        // 2. Get Detailed Profile (Authenticated if possible)
-        const profileRes = await fetch('https://users.roblox.com/v1/users/' + userId, { headers });
-        const profileData = await profileRes.json();
+        // 2. Get Detailed Profile (Use Cloud v2 if API key is available)
+        let profileData;
+        if (apiKey) {
+            const cloudRes = await fetch(`https://apis.roblox.com/cloud/v2/users/${userId}`, {
+                headers: { 'x-api-key': apiKey }
+            });
+            if (cloudRes.ok) {
+                profileData = await cloudRes.json();
+                // Map Cloud v2 fields to legacy fields for frontend compatibility
+                profileData.name = profileData.name.split('/').pop(); // "users/123" -> "123"
+                profileData.displayName = profileData.displayName;
+            }
+        }
+
+        if (!profileData) {
+            const legacyProfileRes = await fetch('https://users.roblox.com/v1/users/' + userId);
+            profileData = await legacyProfileRes.json();
+        }
 
         // 3. Get Avatar Thumbnail
         const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`);
