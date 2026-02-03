@@ -1,7 +1,7 @@
 'use client';
 
-import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
 interface RobloxPlayer {
@@ -37,17 +37,28 @@ const LiveIcon = () => (
 
 export default function PlayerLookup() {
     const { id } = useParams();
+    const searchParams = useSearchParams();
     const [query, setQuery] = useState("");
     const [player, setPlayer] = useState<RobloxPlayer | null>(null);
     const [presence, setPresence] = useState<{ inGame: boolean, jobId?: string } | null>(null);
+    const [linkedPlaceId, setLinkedPlaceId] = useState<string | null>(null);
     const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    async function handleSearch(e: React.FormEvent) {
-        e.preventDefault();
-        if (!query) return;
+    // Fetch Server Config (Place ID)
+    useEffect(() => {
+        async function fetchConfig() {
+            if (!id) return;
+            const { data } = await supabase.from('servers').select('linked_place_id').eq('id', id).single();
+            if (data) setLinkedPlaceId(data.linked_place_id);
+        }
+        fetchConfig();
+    }, [id]);
+
+    const performSearch = useCallback(async (searchQuery: string) => {
+        if (!searchQuery) return;
         setLoading(true);
         setError(null);
         setPlayer(null);
@@ -55,7 +66,7 @@ export default function PlayerLookup() {
         setLogs([]);
 
         try {
-            const res = await fetch(`/api/proxy?username=${query}&serverId=${id}`);
+            const res = await fetch(`/api/proxy?username=${searchQuery}&serverId=${id}`);
             const data = await res.json();
 
             if (!res.ok) throw new Error(data.error || 'Failed to find player');
@@ -86,6 +97,20 @@ export default function PlayerLookup() {
         } finally {
             setLoading(false);
         }
+    }, [id]);
+
+    // Handle initial search from query param
+    useEffect(() => {
+        const usernameParam = searchParams.get('username');
+        if (usernameParam) {
+            setQuery(usernameParam);
+            performSearch(usernameParam);
+        }
+    }, [searchParams, performSearch]);
+
+    async function handleSearch(e: React.FormEvent) {
+        e.preventDefault();
+        performSearch(query);
     }
 
     async function handleAction(action: 'KICK' | 'BAN' | 'UNBAN') {
@@ -228,9 +253,9 @@ export default function PlayerLookup() {
                                 </div>
                             </div>
 
-                            {presence?.inGame && presence.jobId ? (
+                            {presence?.inGame && presence.jobId && linkedPlaceId ? (
                                 <a
-                                    href={`roblox://placeId=${id}&gameInstanceId=${presence.jobId}`}
+                                    href={`roblox://placeId=${linkedPlaceId}&gameInstanceId=${presence.jobId}`}
                                     className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
                                 >
                                     <LiveIcon /> JOIN SERVER

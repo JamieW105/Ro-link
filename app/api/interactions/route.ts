@@ -408,7 +408,8 @@ export async function POST(req: Request) {
                 const actionRow1 = {
                     type: 1,
                     components: [
-                        { type: 2, label: 'View Profile', style: 5, url: `https://www.roblox.com/users/${userId}/profile` }
+                        { type: 2, label: 'View Profile', style: 5, url: `https://www.roblox.com/users/${userId}/profile` },
+                        { type: 2, label: 'View on Dashboard', style: 5, url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guild_id}/lookup?username=${profile.name}` }
                     ]
                 };
 
