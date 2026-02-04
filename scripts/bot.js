@@ -1,5 +1,16 @@
 const { Client, GatewayIntentBits, ActivityType, REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
+const { setGlobalDispatcher, Agent } = require('undici');
+
+// Increase connection timeout for slow networks
+setGlobalDispatcher(new Agent({
+    connect: { timeout: 60000 },
+    bodyTimeout: 60000,
+    headersTimeout: 60000
+}));
+
+// Bypass SSL certificate validation for development/self-signed certs
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 require('dotenv').config({ path: '.env.local' });
 
 // Initialize Supabase
@@ -9,6 +20,9 @@ const supabase = createClient(
 );
 
 const client = new Client({
+    rest: {
+        timeout: 30000,
+    },
     intents: [
         GatewayIntentBits.Guilds,
     ]
@@ -98,6 +112,10 @@ const commands = [
     {
         name: 'setup',
         description: 'Initializes Ro-Link for this server (Owner Only)',
+    },
+    {
+        name: 'help',
+        description: 'Show info and list of available commands',
     }
 ];
 
@@ -240,6 +258,31 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'ping') {
         const latency = Math.abs(Date.now() - interaction.createdTimestamp);
         return interaction.reply(`🏓 **Pong!** \nLatency: \`${latency}ms\`\nStatus: \`Online (Vercel Integration Active)\``);
+    }
+
+    // 3. Handle Help (Public)
+    if (commandName === 'help') {
+        const infoEmbed = new EmbedBuilder()
+            .setTitle('Info')
+            .setColor('#0ea5e9')
+            .setDescription("Welcome to Ro-Link. We are a platform that enables you to connect your Discord / cmds to Roblox. We make the connection between Discord and Roblox feel like a very small gap. We allow kick, ban and unban cmds along with an advanced dashboard to show you your servers and player count.\n\nGive us a try, we are aways looking to help all community's no matter the size. Ro-link is perfect for any game and allows you to respond to urgent reports without the bother of having to join in game.");
+
+        const commandsEmbed = new EmbedBuilder()
+            .setTitle('Commands')
+            .setColor('#10b981')
+            .addFields(
+                { name: '/setup', value: 'Initializes Ro-Link for this server (Owner Only).' },
+                { name: '/ping', value: 'Check the bot response time and connection status.' },
+                { name: '/ban', value: 'Permanently ban a user from the Roblox game.' },
+                { name: '/kick', value: 'Kick a user from the game server.' },
+                { name: '/unban', value: 'Unban a user from the Roblox game.' },
+                { name: '/update', value: 'Send a global update signal to all Roblox servers (restarts them).' },
+                { name: '/shutdown', value: 'Immediately shut down game servers.' },
+                { name: '/lookup', value: 'Lookup a Roblox player and see their status/actions.' },
+                { name: '/help', value: 'Show info and list of available commands.' }
+            );
+
+        return interaction.reply({ embeds: [infoEmbed, commandsEmbed] });
     }
 
     // 3. Check if server is setup in Ro-Link for all other commands
@@ -613,4 +656,14 @@ return RoLink`;
     return [embed1, embed2];
 }
 
-client.login(process.env.DISCORD_TOKEN);
+console.log('Attempting to log in to Discord...');
+client.login(process.env.DISCORD_TOKEN).catch(err => {
+    console.error('FAILED TO LOGIN:', err);
+    if (err.rawError) {
+        const decoder = new TextDecoder();
+        const body = decoder.decode(err.rawError);
+        console.error('--- ERROR BODY START ---');
+        console.error(body);
+        console.error('--- ERROR BODY END ---');
+    }
+});

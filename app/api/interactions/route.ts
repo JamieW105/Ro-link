@@ -171,6 +171,37 @@ export async function POST(req: Request) {
                 });
             }
 
+            // Handle 'help' command
+            if (name === 'help') {
+                return NextResponse.json({
+                    type: 4,
+                    data: {
+                        embeds: [
+                            {
+                                title: 'Info',
+                                description: "Welcome to Ro-Link. We are a platform that enables you to connect your Discord / cmds to Roblox. We make the connection between Discord and Roblox feel like a very small gap. We allow kick, ban and unban cmds along with an advanced dashboard to show you your servers and player count.\n\nGive us a try, we are aways looking to help all community's no matter the size. Ro-link is perfect for any game and allows you to respond to urgent reports without the bother of having to join in game.",
+                                color: 959977
+                            },
+                            {
+                                title: 'Commands',
+                                color: 1095921,
+                                fields: [
+                                    { name: '/setup', value: 'Initializes Ro-Link for this server (Owner Only).' },
+                                    { name: '/ping', value: 'Check the bot response time and connection status.' },
+                                    { name: '/ban', value: 'Permanently ban a user from the Roblox game.' },
+                                    { name: '/kick', value: 'Kick a user from the game server.' },
+                                    { name: '/unban', value: 'Unban a user from the Roblox game.' },
+                                    { name: '/update', value: 'Send a global update signal to all Roblox servers (restarts them).' },
+                                    { name: '/shutdown', value: 'Immediately shut down game servers.' },
+                                    { name: '/lookup', value: 'Lookup a Roblox player and see their status/actions.' },
+                                    { name: '/help', value: 'Show info and list of available commands.' }
+                                ]
+                            }
+                        ]
+                    }
+                });
+            }
+
             // Permission Check: Only 'ping' is public (Already handled ping above)
             const permissions = BigInt(member?.permissions || '0');
             const hasPerms = (permissions & 0x2n) !== 0n || (permissions & 0x4n) !== 0n || (permissions & 0x8n) !== 0n || (permissions & 0x20n) !== 0n;
