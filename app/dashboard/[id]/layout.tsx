@@ -4,6 +4,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { useSession } from "next-auth/react";
 
 // SVGs
 const OverviewIcon = () => (
@@ -29,13 +30,16 @@ const LookupIcon = () => (
 export default function ServerLayout({ children }: { children: React.ReactNode }) {
     const { id } = useParams();
     const pathname = usePathname();
+    const { data: session } = useSession();
+
+    const isReadOnly = session?.user?.name?.toLowerCase() === 'cherubdude';
 
     const menuItems = [
         { label: "Overview", icon: <OverviewIcon />, href: `/dashboard/${id}` },
         { label: "Live Servers", icon: <ServersIcon />, href: `/dashboard/${id}/servers` },
         { label: "Player Lookup", icon: <LookupIcon />, href: `/dashboard/${id}/lookup` },
-        { label: "Setup", icon: <SetupIcon />, href: `/dashboard/${id}/setup` },
-    ];
+        { label: "Setup", icon: <SetupIcon />, href: `/dashboard/${id}/setup`, hide: isReadOnly },
+    ].filter(item => !item.hide);
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200 flex flex-col md:flex-row">

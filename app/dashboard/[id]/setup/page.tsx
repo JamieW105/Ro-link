@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { useSession } from "next-auth/react";
 
 // SVGs
 const SearchIcon = () => (
@@ -31,6 +32,7 @@ const RefreshIcon = () => (
 
 export default function SetupPage() {
     const { id } = useParams();
+    const { data: session } = useSession();
     const [step, setStep] = useState(1);
     const [placeId, setPlaceId] = useState("");
     const [universeId, setUniverseId] = useState("");
@@ -39,6 +41,8 @@ export default function SetupPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [initialLoading, setInitialLoading] = useState(true);
+
+    const isReadOnly = session?.user?.name?.toLowerCase() === 'cherubdude';
 
     useEffect(() => {
         async function checkStatus() {
@@ -62,6 +66,18 @@ export default function SetupPage() {
     }, [id]);
 
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com';
+
+    if (isReadOnly) {
+        return (
+            <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
+                <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center mb-6 text-slate-400 border border-slate-700 shadow-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                </div>
+                <h1 className="text-2xl font-bold mb-2 tracking-tight">Access Denied</h1>
+                <p className="text-slate-400 mb-8 max-w-sm text-sm">You have read-only access to this dashboard. You cannot modify server configuration.</p>
+            </div>
+        );
+    }
 
     async function handleSetup(e: React.FormEvent) {
         e.preventDefault();

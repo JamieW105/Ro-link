@@ -3,6 +3,7 @@
 import { useParams, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { useSession } from "next-auth/react";
 
 interface RobloxPlayer {
     id: number;
@@ -37,6 +38,7 @@ const LiveIcon = () => (
 
 export default function PlayerLookup() {
     const { id } = useParams();
+    const { data: session } = useSession();
     const searchParams = useSearchParams();
     const [query, setQuery] = useState("");
     const [player, setPlayer] = useState<RobloxPlayer | null>(null);
@@ -46,6 +48,8 @@ export default function PlayerLookup() {
     const [loading, setLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const isReadOnly = session?.user?.name?.toLowerCase() === 'cherubdude';
 
     // Fetch Server Config (Place ID)
     useEffect(() => {
@@ -115,6 +119,11 @@ export default function PlayerLookup() {
 
     async function handleAction(action: 'KICK' | 'BAN' | 'UNBAN') {
         if (!player || !id) return;
+
+        if (isReadOnly) {
+            alert("You do not have permission to perform this action (Read-only access).");
+            return;
+        }
 
         const confirmMsg = action === 'BAN'
             ? `Are you sure you want to PERMANENTLY BAN ${player.username}?`

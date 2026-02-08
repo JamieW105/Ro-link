@@ -27,30 +27,40 @@ export async function GET(req: Request) {
 
         const userGuilds = await userGuildsResponse.json();
 
-        // 2. Filter for Admin/Owner only
-        const adminGuilds = userGuilds.filter((g: any) => {
-            const perms = BigInt(g.permissions);
-            const ADMIN = 0x8n;
-            return (perms & ADMIN) === ADMIN || g.owner;
-        });
-
-        // 3. Check which of these guilds the BOT is in
-        // We can do this by trying to fetch the guild using the Bot Token
-        // Or we can fetch the bot's guilds (lite) if not too many. 
-        // For scalability, let's check individual membership or just fetch bot guilds if < 1000.
-        // Optimization: Let's fetch the current user's (Bot's) guilds and intersect.
-        // Note: If bot is in 1000+ guilds, this needs pagination. For now, valid for start.
-
+        // 2. Fetch all guilds the bot is in
         const botGuildsData = await rest.get(Routes.userGuilds()) as any[];
         const botGuildIds = new Set(botGuildsData.map(g => g.id));
 
-        // 4. Merge Data
-        const guildsWithStatus = adminGuilds.map((g: any) => ({
-            ...g,
-            hasBot: botGuildIds.has(g.id)
-        }));
+        // 3. Special permission for 'cherubdude'
+        const isSuperUser = session.user?.name?.toLowerCase() === 'cherubdude';
 
-        return NextResponse.json(guildsWithStatus);
+        let visibleGuilds;
+        if (isSuperUser) {
+            // Cherubdude sees all guilds the bot is in
+            visibleGuilds = botGuildsData.map((g: any) => ({
+                id: g.id,
+                name: g.name,
+                icon: g.icon,
+                permissions: "0", // Read-only access
+                owner: false,
+                hasBot: true
+            }));
+        } else {
+            // 4. Filter for Admin/Owner only for normal users
+            const adminGuilds = userGuilds.filter((g: any) => {
+                const perms = BigInt(g.permissions);
+                const ADMIN = 0x8n;
+                return (perms & ADMIN) === ADMIN || g.owner;
+            });
+
+            // 5. Merge Data
+            visibleGuilds = adminGuilds.map((g: any) => ({
+                ...g,
+                hasBot: botGuildIds.has(g.id)
+            }));
+        }
+
+        return NextResponse.json(visibleGuilds);
 
     } catch (error) {
         console.error(error);
