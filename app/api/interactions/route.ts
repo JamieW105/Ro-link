@@ -185,7 +185,7 @@ export async function POST(req: Request) {
                             {
                                 title: 'Commands',
                                 color: 1095921,
-                                description: [
+                                fields: [
                                     { name: '`/setup`', value: 'Initializes Ro-Link for this server (Owner Only).' },
                                     { name: '`/ping`', value: 'Check the bot response time and connection status.' },
                                     { name: '`/ban`', value: 'Permanently ban a user from the Roblox game.' },

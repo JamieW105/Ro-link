@@ -18,6 +18,9 @@ export const authOptions = {
         },
         async session({ session, token }: any) {
             session.accessToken = token.accessToken
+            if (session.user) {
+                session.user.id = token.sub
+            }
             return session
         }
     },

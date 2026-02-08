@@ -42,7 +42,7 @@ export default function SetupPage() {
     const [error, setError] = useState<string | null>(null);
     const [initialLoading, setInitialLoading] = useState(true);
 
-    const isReadOnly = session?.user?.name?.toLowerCase() === 'cherubdude';
+    const isReadOnly = (session?.user as any)?.id === '953414442060746854';
 
     useEffect(() => {
         async function checkStatus() {

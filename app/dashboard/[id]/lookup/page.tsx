@@ -49,7 +49,7 @@ export default function PlayerLookup() {
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const isReadOnly = session?.user?.name?.toLowerCase() === 'cherubdude';
+    const isReadOnly = (session?.user as any)?.id === '953414442060746854';
 
     // Fetch Server Config (Place ID)
     useEffect(() => {

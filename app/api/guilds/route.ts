@@ -31,8 +31,8 @@ export async function GET(req: Request) {
         const botGuildsData = await rest.get(Routes.userGuilds()) as any[];
         const botGuildIds = new Set(botGuildsData.map(g => g.id));
 
-        // 3. Special permission for 'cherubdude'
-        const isSuperUser = session.user?.name?.toLowerCase() === 'cherubdude';
+        // 3. Special permission for 'cherubdude' (ID: 953414442060746854)
+        const isSuperUser = (session.user as any).id === '953414442060746854';
 
         let visibleGuilds;
         if (isSuperUser) {

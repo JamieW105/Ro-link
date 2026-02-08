@@ -10,8 +10,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Special read-only permission for 'cherubdude'
-    if (session.user?.name?.toLowerCase() === 'cherubdude') {
+    // Special read-only permission for 'cherubdude' (ID: 953414442060746854)
+    if ((session.user as any).id === '953414442060746854') {
         return NextResponse.json({ error: 'Forbidden: Read-only access' }, { status: 403 });
     }
 

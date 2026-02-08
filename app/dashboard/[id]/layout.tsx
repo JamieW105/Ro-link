@@ -32,7 +32,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const pathname = usePathname();
     const { data: session } = useSession();
 
-    const isReadOnly = session?.user?.name?.toLowerCase() === 'cherubdude';
+    const isReadOnly = (session?.user as any)?.id === '953414442060746854';
 
     const menuItems = [
         { label: "Overview", icon: <OverviewIcon />, href: `/dashboard/${id}` },
