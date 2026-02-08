@@ -31,15 +31,16 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchStats() {
-      // Real-time Bot Server Count (Initial Fetch)
-      const { data: bStats } = await supabase
-        .from('bot_stats')
-        .select('guild_count')
-        .eq('id', 'global')
-        .single();
-      if (bStats) setServerCount(bStats.guild_count);
+      // Real-time Bot Server Count (From Discord API)
+      try {
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+        if (data.guild_count !== undefined) setServerCount(data.guild_count);
+      } catch (err) {
+        console.error("Failed to fetch server count", err);
+      }
 
-      // Commands
+      // Commands (From DB still OK as per request context?)
       const { count: cCount } = await supabase
         .from('logs')
         .select('*', { count: 'exact', head: true });
@@ -48,26 +49,10 @@ export default function Home() {
 
     fetchStats();
 
-    // 1. Subscribe to Realtime Updates (Based off the bot's sync)
-    const channel = supabase
-      .channel('bot_stats_realtime')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'bot_stats',
-        filter: 'id=eq.global'
-      }, (payload) => {
-        if (payload.new && payload.new.guild_count !== undefined) {
-          setServerCount(payload.new.guild_count);
-        }
-      })
-      .subscribe();
-
-    // 2. Fallback Polling (Every 60s)
+    // 2. Poll every 60s for updates
     const interval = setInterval(fetchStats, 60000);
 
     return () => {
-      supabase.removeChannel(channel);
       clearInterval(interval);
     };
   }, []);
