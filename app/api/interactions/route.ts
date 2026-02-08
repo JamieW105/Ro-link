@@ -185,16 +185,16 @@ export async function POST(req: Request) {
                             {
                                 title: 'Commands',
                                 color: 1095921,
-                                fields: [
-                                    { name: '/setup', value: 'Initializes Ro-Link for this server (Owner Only).' },
-                                    { name: '/ping', value: 'Check the bot response time and connection status.' },
-                                    { name: '/ban', value: 'Permanently ban a user from the Roblox game.' },
-                                    { name: '/kick', value: 'Kick a user from the game server.' },
-                                    { name: '/unban', value: 'Unban a user from the Roblox game.' },
-                                    { name: '/update', value: 'Send a global update signal to all Roblox servers (restarts them).' },
-                                    { name: '/shutdown', value: 'Immediately shut down game servers.' },
-                                    { name: '/lookup', value: 'Lookup a Roblox player and see their status/actions.' },
-                                    { name: '/help', value: 'Show info and list of available commands.' }
+                                description: [
+                                    { name: '`/setup`', value: 'Initializes Ro-Link for this server (Owner Only).' },
+                                    { name: '`/ping`', value: 'Check the bot response time and connection status.' },
+                                    { name: '`/ban`', value: 'Permanently ban a user from the Roblox game.' },
+                                    { name: '`/kick`', value: 'Kick a user from the game server.' },
+                                    { name: '`/unban`', value: 'Unban a user from the Roblox game.' },
+                                    { name: '`/update`', value: 'Send a global update signal to all Roblox servers (restarts them).' },
+                                    { name: '`/shutdown`', value: 'Immediately shut down game servers.' },
+                                    { name: '`/lookup`', value: 'Lookup a Roblox player and see their status/actions.' },
+                                    { name: '`/help`', value: 'Show info and list of available commands.' }
                                 ]
                             }
                         ]

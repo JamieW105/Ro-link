@@ -51,7 +51,12 @@ export async function GET(req: Request) {
                 profileData = await cloudRes.json();
                 // Map Cloud v2 fields to legacy fields for frontend compatibility
                 profileData.name = profileData.name.split('/').pop(); // "users/123" -> "123"
-                profileData.displayName = profileData.displayName;
+                profileData.description = profileData.about;
+                profileData.created = profileData.createTime;
+                // profileData.isBanned is not available in Cloud API v2 standard response usually, 
+                // but we can default it or leave it undefined if not present.
+                // Legacy API provides isBanned. If we want isBanned, we might need to fallback or check legacy if critical.
+                // For now, let's keep it simple.
             }
         }
 
@@ -64,16 +69,6 @@ export async function GET(req: Request) {
         const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`);
         const thumbData = await thumbRes.json();
         const avatarUrl = thumbData.data?.[0]?.imageUrl || '';
-
-        return NextResponse.json({
-            id: userId,
-            username: profileData.name,
-            displayName: profileData.displayName,
-            description: profileData.description,
-            created: profileData.created,
-            isBanned: profileData.isBanned,
-            avatarUrl
-        });
 
         return NextResponse.json({
             id: userId,
