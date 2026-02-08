@@ -190,6 +190,18 @@ client.once('ready', () => {
     setInterval(updateStatus, 15000); // Cycle every 15 seconds
 });
 
+client.on('guildCreate', guild => {
+    console.log(`[GUILD] Joined new guild: ${guild.name} (${guild.id})`);
+    syncStats();
+    updateStatus();
+});
+
+client.on('guildDelete', guild => {
+    console.log(`[GUILD] Left guild: ${guild.name} (${guild.id})`);
+    syncStats();
+    updateStatus();
+});
+
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 

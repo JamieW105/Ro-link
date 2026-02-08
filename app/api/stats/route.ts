@@ -4,21 +4,22 @@ export const runtime = 'edge';
 
 export async function GET() {
     try {
-        const response = await fetch('https://discord.com/api/v10/users/@me/guilds?limit=200', {
+        const response = await fetch('https://discord.com/api/v10/applications/@me', {
             headers: {
                 Authorization: `Bot ${process.env.DISCORD_TOKEN}`,
             },
+            cache: 'no-store'
         });
 
         if (!response.ok) {
             throw new Error(`Discord API Error: ${response.status}`);
         }
 
-        const guilds = await response.json();
-        const count = Array.isArray(guilds) ? guilds.length : 0;
+        const app = await response.json();
+        const count = app.approximate_guild_count || 0;
 
-        // Note: Returns the count of servers the bot is currently in.
-        // Pagination would be needed if the bot is in >200 servers.
+        // Note: Returns the 'Install Count' which matches the Developer Portal
+        // This includes cached/offline servers and may differ from active connections.
 
         return NextResponse.json({ guild_count: count });
     } catch (error) {
