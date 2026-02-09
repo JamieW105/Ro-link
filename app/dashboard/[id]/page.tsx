@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useSession } from "next-auth/react";
 
 interface Log {
     id: string;
@@ -35,13 +36,24 @@ const GlobeIcon = () => (
 
 export default function ServerDashboard() {
     const { id } = useParams();
+    const { data: session } = useSession();
     const [apiKey, setApiKey] = useState<string | null>(null);
     const [logs, setLogs] = useState<Log[]>([]);
+    const [serverName, setServerName] = useState<string>("Loading Server...");
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         async function fetchData() {
             if (!id) return;
+
+            // Fetch Server Name from our proxy API
+            fetch('/api/guilds')
+                .then(res => res.json())
+                .then(guilds => {
+                    const g = guilds.find((g: any) => g.id === id);
+                    if (g) setServerName(g.name);
+                });
+
             const { data: server } = await supabase
                 .from('servers')
                 .select('*')
@@ -67,10 +79,21 @@ export default function ServerDashboard() {
 
     return (
         <div className="space-y-8 max-w-6xl animate-in fade-in slide-in-from-bottom-2 duration-500">
-            {/* Header / Intro */}
-            <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-bold text-white tracking-tight">Overview</h1>
-                <p className="text-slate-500 text-sm font-medium">See what&apos;s happening in your game.</p>
+            {/* Welcome Section */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 pb-2 border-b border-slate-800/50">
+                <img
+                    src={session?.user?.image || ""}
+                    alt=""
+                    className="w-14 h-14 rounded-2xl border border-sky-500/20 shadow-lg shadow-sky-500/5 bg-slate-800 p-0.5"
+                />
+                <div className="flex flex-col gap-1">
+                    <h1 className="text-2xl font-bold text-white tracking-tight">
+                        Welcome, <span className="text-sky-500">{session?.user?.name}</span>
+                    </h1>
+                    <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
+                        Currently managing <span className="text-slate-300 font-bold px-2 py-0.5 bg-slate-800 rounded-md border border-slate-700/50">{serverName}</span>
+                    </p>
+                </div>
             </div>
 
             {/* Metric Grid */}
