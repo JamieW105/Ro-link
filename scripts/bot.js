@@ -294,6 +294,7 @@ client.on('interactionCreate', async interaction => {
                 { name: '/unban', value: 'Unban a user from the Roblox game.' },
                 { name: '/update', value: 'Send a global update signal to all Roblox servers (restarts them).' },
                 { name: '/shutdown', value: 'Immediately shut down game servers.' },
+                { name: '/misc', value: 'Access miscellaneous player actions like Fly, Kill, and Heal.' },
                 { name: '/help', value: 'Show info and list of available commands.' }
             );
 
