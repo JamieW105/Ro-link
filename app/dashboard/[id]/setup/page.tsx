@@ -214,6 +214,52 @@ function RoLink:Execute(cmd)
 				end)
 			end
 		end)
+	elseif cmd.command == "FLY" then
+		local player = Players:FindFirstChild(username)
+		if player and player.Character then
+			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+			if hrp and not hrp:FindFirstChild("RoLinkFly") then
+				local bv = Instance.new("BodyVelocity", hrp)
+				bv.Name = "RoLinkFly"
+				bv.MaxForce = Vector3.new(1,1,1) * 100000
+				bv.Velocity = Vector3.new(0,0,0)
+			end
+		end
+	elseif cmd.command == "NOCLIP" then
+		local player = Players:FindFirstChild(username)
+		if player and player.Character then
+			for _, v in pairs(player.Character:GetDescendants()) do
+				if v:IsA("BasePart") then v.CanCollide = false end
+			end
+		end
+	elseif cmd.command == "INVIS" then
+		local player = Players:FindFirstChild(username)
+		if player and player.Character then
+			for _, v in pairs(player.Character:GetDescendants()) do
+				if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = 1 end
+			end
+			if player.Character:FindFirstChild("Head") then player.Character.Head.Transparency = 1 end
+		end
+	elseif cmd.command == "GHOST" then
+		local player = Players:FindFirstChild(username)
+		if player and player.Character then
+			for _, v in pairs(player.Character:GetDescendants()) do
+				if v:IsA("BasePart") or v:IsA("MeshPart") then
+					v.Material = Enum.Material.ForceField
+				end
+			end
+		end
+	elseif cmd.command == "SET_CHAR" then
+		local player = Players:FindFirstChild(username)
+		local charUser = cmd.args.char_user
+		if player and charUser then
+			task.spawn(function()
+				local success, userId = pcall(function() return Players:GetUserIdFromNameAsync(charUser) end)
+				if success and userId then
+					player:LoadCharacterWithHumanoidDescription(Players:GetHumanoidDescriptionFromUserId(userId))
+				end
+			end)
+		end
 	elseif cmd.command == "UPDATE" then
 		for _, player in ipairs(Players:GetPlayers()) do
 			player:Kick("Server is updating. Please rejoin in a moment!")

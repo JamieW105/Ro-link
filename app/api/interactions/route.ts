@@ -370,6 +370,31 @@ export async function POST(req: Request) {
                 const targetMsg = jobId ? `server \`${jobId}\`` : 'all active game servers';
                 message = `🛑 **SHUTDOWN SIGNAL SENT**! Closing ${targetMsg}.`;
             }
+
+            else if (name === 'misc') {
+                return NextResponse.json({
+                    type: 4,
+                    data: {
+                        content: `Select a miscellaneous action:`,
+                        flags: 64,
+                        components: [{
+                            type: 1,
+                            components: [{
+                                type: 3,
+                                custom_id: `misc_menu`,
+                                placeholder: 'Select an action to perform',
+                                options: [
+                                    { label: 'Fly', value: 'FLY', description: 'Enable flight for the player', emoji: { name: '✈️' } },
+                                    { label: 'Noclip', value: 'NOCLIP', description: 'Allow player to walk through walls', emoji: { name: '👻' } },
+                                    { label: 'Invis', value: 'INVIS', description: 'Make the player invisible', emoji: { name: '🫥' } },
+                                    { label: 'Ghost', value: 'GHOST', description: 'Apply a ForceField material', emoji: { name: '🛡️' } },
+                                    { label: 'Set Character', value: 'SET_CHAR', description: 'Change the player\'s character appearance', emoji: { name: '👤' } }
+                                ]
+                            }]
+                        }]
+                    }
+                });
+            }
             else if (name === 'lookup') {
                 const username = options.find((o: any) => o.name === 'username').value;
 
@@ -506,6 +531,45 @@ export async function POST(req: Request) {
                 });
             }
 
+            if (interaction.data.custom_id === 'misc_menu') {
+                const action = interaction.data.values[0];
+
+                const components = [{
+                    type: 1,
+                    components: [{
+                        type: 4,
+                        custom_id: 'target_user',
+                        label: "Target Username",
+                        style: 1,
+                        placeholder: 'Enter the Roblox username',
+                        required: true
+                    }]
+                }];
+
+                if (action === 'SET_CHAR') {
+                    components.push({
+                        type: 1,
+                        components: [{
+                            type: 4,
+                            custom_id: 'char_user',
+                            label: "Character Username",
+                            style: 1,
+                            placeholder: 'Username of appearance to copy',
+                            required: true
+                        }]
+                    });
+                }
+
+                return NextResponse.json({
+                    type: 9,
+                    data: {
+                        title: `Action: ${action}`,
+                        custom_id: `misc_modal_${action}`,
+                        components: components
+                    }
+                });
+            }
+
             const [action, userId, username] = interaction.data.custom_id.split('_');
 
             // Parallelize Button Actions
@@ -534,6 +598,40 @@ export async function POST(req: Request) {
         // Handle Modal Submissions (Vercel)
         if (type === 5) {
             const { custom_id, components: modalComponents } = interaction.data;
+
+            if (custom_id.startsWith('misc_modal_')) {
+                const action = custom_id.replace('misc_modal_', '');
+
+                const getField = (id: string) => {
+                    const row = modalComponents.find((c: any) => c.components.some((ic: any) => ic.custom_id === id));
+                    return row ? row.components.find((ic: any) => ic.custom_id === id).value : '';
+                };
+
+                const targetUser = getField('target_user');
+                let args: any = { username: targetUser, moderator: userTag };
+                let msgContent = `✅ Queuing **${action}** for **${targetUser}**...`;
+
+                if (action === 'SET_CHAR') {
+                    const charUser = getField('char_user');
+                    args.char_user = charUser;
+                    msgContent = `✅ Queuing **Set Character** (to ${charUser}) for **${targetUser}**...`;
+                }
+
+                await Promise.all([
+                    supabase.from('command_queue').insert([{
+                        server_id: guild_id,
+                        command: action,
+                        args: args,
+                        status: 'PENDING'
+                    }]),
+                    triggerMessaging(action, args)
+                ]);
+
+                return NextResponse.json({
+                    type: 4,
+                    data: { content: msgContent, flags: 64 }
+                });
+            }
 
             if (custom_id === 'setup_modal') {
                 const getField = (id: string) => {
@@ -649,18 +747,63 @@ end
 
 function RoLink:Execute(cmd)
 	local u, r = cmd.args.username, cmd.args.reason or "No reason"
+	local p = Players:FindFirstChild(u) 
+    
+    if not p and cmd.command ~= "UPDATE" and cmd.command ~= "SHUTDOWN" then return end
+
 	if cmd.command == "KICK" then
-		local p = Players:FindFirstChild(u) if p then p:Kick(r) end
+		p:Kick(r)
 	elseif cmd.command == "BAN" then
 		task.spawn(function()
 			local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(u) end)
 			if s and uid then pcall(function() Players:BanAsync({UserIds={uid},Duration=-1,DisplayReason=r,PrivateReason="RoLink"}) end) end
+            if p then p:Kick("Banned: "..r) end
 		end)
 	elseif cmd.command == "UNBAN" then
 		task.spawn(function()
 			local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(u) end)
 			if s and uid then pcall(function() Players:UnbanAsync({UserIds={uid}}) end) end
 		end)
+    elseif cmd.command == "FLY" then
+        if p and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and not hrp:FindFirstChild("RoLinkFly") then
+                local bv = Instance.new("BodyVelocity", hrp)
+                bv.Name = "RoLinkFly"
+                bv.MaxForce = Vector3.new(1,1,1) * 100000
+                bv.Velocity = Vector3.new(0,0,0) -- Hover
+            end
+        end
+    elseif cmd.command == "NOCLIP" then
+         if p and p.Character then
+            for _, v in pairs(p.Character:GetDescendants()) do
+                if v:IsA("BasePart") then v.CanCollide = false end
+            end
+         end
+    elseif cmd.command == "INVIS" then
+         if p and p.Character then
+            for _, v in pairs(p.Character:GetDescendants()) do
+                if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = 1 end
+            end
+            p.Character.Head.Transparency = 1
+         end
+    elseif cmd.command == "GHOST" then
+        if p and p.Character then
+            for _, v in pairs(p.Character:GetDescendants()) do
+                if v:IsA("BasePart") or v:IsA("MeshPart") then
+                    v.Material = Enum.Material.ForceField
+                end
+            end
+        end
+    elseif cmd.command == "SET_CHAR" then
+        if p and cmd.args.char_user then
+            task.spawn(function()
+                 local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(cmd.args.char_user) end)
+                 if s and uid then
+                     p:LoadCharacterWithHumanoidDescription(Players:GetHumanoidDescriptionFromUserId(uid))
+                 end
+            end)
+        end
 	elseif cmd.command == "UPDATE" then
 		for _, p in ipairs(Players:GetPlayers()) do p:Kick("Updating...") end
 	elseif cmd.command == "SHUTDOWN" then

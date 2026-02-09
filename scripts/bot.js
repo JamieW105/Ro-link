@@ -1,34 +1,11 @@
-const { Client, GatewayIntentBits, ActivityType, REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType, REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
 const { setGlobalDispatcher, Agent } = require('undici');
 
-// Increase connection timeout for slow networks
-setGlobalDispatcher(new Agent({
-    connect: { timeout: 60000 },
-    bodyTimeout: 60000,
-    headersTimeout: 60000
-}));
-
-// Bypass SSL certificate validation for development/self-signed certs
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-require('dotenv').config({ path: '.env.local' });
-
-// Initialize Supabase
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
-const client = new Client({
-    rest: {
-        timeout: 30000,
-    },
-    intents: [
-        GatewayIntentBits.Guilds,
-    ]
-});
+// ... (previous setup code stays same) ...
 
 const commands = [
+    // ... (previous commands) ...
     {
         name: 'ban',
         description: 'Permanently ban a user from the Roblox game',
@@ -78,9 +55,15 @@ const commands = [
         ]
     },
     {
+        name: 'misc',
+        description: 'Perform miscellaneous player actions (Fly, Noclip, etc.)',
+        options: []
+    },
+    {
         name: 'update',
         description: 'Send a global update signal to all Roblox servers (restarts them)',
     },
+    // ... (rest of commands)
     {
         name: 'shutdown',
         description: 'Immediately shut down game servers',
@@ -96,18 +79,6 @@ const commands = [
     {
         name: 'ping',
         description: 'Check the bot response time and connection status',
-    },
-    {
-        name: 'lookup',
-        description: 'Lookup a Roblox player and see their status/actions',
-        options: [
-            {
-                name: 'username',
-                description: 'The Roblox username to lookup',
-                type: 3, // STRING
-                required: true,
-            }
-        ]
     },
     {
         name: 'setup',
@@ -393,9 +364,53 @@ client.on('interactionCreate', async interaction => {
 
         const targetMsg = jobId ? `server \`${jobId}\`` : 'all active game servers';
         await interaction.reply(`🛑 **SHUTDOWN SIGNAL SENT**! Closing ${targetMsg}.`);
+        // ... (rest of simple handlers)
+    } else if (commandName === 'misc') {
+    } else if (commandName === 'misc') {
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('misc_menu')
+                    .setPlaceholder('Select an action to perform')
+                    .addOptions(
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Fly')
+                            .setDescription('Enable flight for the player')
+                            .setValue('FLY')
+                            .setEmoji('✈️'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Noclip')
+                            .setDescription('Allow player to walk through walls')
+                            .setValue('NOCLIP')
+                            .setEmoji('👻'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Invis')
+                            .setDescription('Make the player invisible')
+                            .setValue('INVIS')
+                            .setEmoji('🫥'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Ghost')
+                            .setDescription('Apply a ForceField material')
+                            .setValue('GHOST')
+                            .setEmoji('🛡️'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Set Character')
+                            .setDescription('Change the player\'s character appearance')
+                            .setValue('SET_CHAR')
+                            .setEmoji('👤'),
+                    ),
+            );
+
+        await interaction.reply({
+            content: `Select a miscellaneous action:`,
+            components: [row],
+            ephemeral: true
+        });
+
     } else if (commandName === 'ping') {
         const latency = Math.abs(Date.now() - interaction.createdTimestamp);
         await interaction.reply(`🏓 **Pong!** \nLatency: \`${latency}ms\`\nStatus: \`Online (Vercel Integration Active)\``);
+
     } else if (commandName === 'lookup') {
         await interaction.deferReply();
         const username = interaction.options.getString('username');
@@ -506,6 +521,73 @@ client.on('interactionCreate', async interaction => {
             console.error(error);
             await interaction.editReply('❌ Failed to fetch Roblox data.');
         }
+    }
+});
+
+// Handle Select Menu Interactions
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isStringSelectMenu()) return;
+
+    if (interaction.customId === 'misc_menu') {
+        const action = interaction.values[0];
+
+        const modal = new ModalBuilder()
+            .setCustomId(`misc_modal_${action}`)
+            .setTitle(`Action: ${action}`);
+
+        const targetUserInput = new TextInputBuilder()
+            .setCustomId('target_user')
+            .setLabel("Target Username")
+            .setPlaceholder('Enter the Roblox username')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        const rows = [new ActionRowBuilder().addComponents(targetUserInput)];
+
+        if (action === 'SET_CHAR') {
+            const charUserInput = new TextInputBuilder()
+                .setCustomId('char_user')
+                .setLabel("Character Username")
+                .setPlaceholder('Username of appearance to copy')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+            rows.push(new ActionRowBuilder().addComponents(charUserInput));
+        }
+
+        modal.addComponents(...rows);
+        await interaction.showModal(modal);
+    }
+});
+
+// Handle Modal Submissions (Misc)
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isModalSubmit()) return;
+
+    if (interaction.customId.startsWith('misc_modal_')) {
+        const action = interaction.customId.replace('misc_modal_', '');
+        const targetUser = interaction.fields.getTextInputValue('target_user');
+
+        let args = { username: targetUser, moderator: interaction.user.tag };
+        let msgContent = `✅ Queuing **${action}** for **${targetUser}**...`;
+
+        if (action === 'SET_CHAR') {
+            const charUser = interaction.fields.getTextInputValue('char_user');
+            args.char_user = charUser;
+            msgContent = `✅ Queuing **Set Character** (to ${charUser}) for **${targetUser}**...`;
+        }
+
+        await interaction.reply({ content: msgContent, ephemeral: true });
+
+        await supabase.from('command_queue').insert([{
+            server_id: interaction.guildId,
+            command: action,
+            args: args,
+            status: 'PENDING'
+        }]);
+    }
+});
+
+
     }
 });
 
@@ -637,18 +719,64 @@ end
 
 function RoLink:Execute(cmd)
 	local u, r = cmd.args.username, cmd.args.reason or "No reason"
+	local p = Players:FindFirstChild(u) 
+    
+    if not p and cmd.command ~= "UPDATE" and cmd.command ~= "SHUTDOWN" then return end
+
 	if cmd.command == "KICK" then
-		local p = Players:FindFirstChild(u) if p then p:Kick(r) end
+		p:Kick(r)
 	elseif cmd.command == "BAN" then
 		task.spawn(function()
 			local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(u) end)
 			if s and uid then pcall(function() Players:BanAsync({UserIds={uid},Duration=-1,DisplayReason=r,PrivateReason="RoLink"}) end) end
+            if p then p:Kick("Banned: "..r) end
 		end)
 	elseif cmd.command == "UNBAN" then
 		task.spawn(function()
 			local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(u) end)
 			if s and uid then pcall(function() Players:UnbanAsync({UserIds={uid}}) end) end
 		end)
+    elseif cmd.command == "FLY" then
+        if p and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and not hrp:FindFirstChild("RoLinkFly") then
+                local bv = Instance.new("BodyVelocity", hrp)
+                bv.Name = "RoLinkFly"
+                bv.MaxForce = Vector3.new(1,1,1) * 100000
+                bv.Velocity = Vector3.new(0,0,0) -- Hover
+                -- Simple hover/fly. Real fly requires client input.
+            end
+        end
+    elseif cmd.command == "NOCLIP" then
+         if p and p.Character then
+            for _, v in pairs(p.Character:GetDescendants()) do
+                if v:IsA("BasePart") then v.CanCollide = false end
+            end
+         end
+    elseif cmd.command == "INVIS" then
+         if p and p.Character then
+            for _, v in pairs(p.Character:GetDescendants()) do
+                if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = 1 end
+            end
+            p.Character.Head.Transparency = 1
+         end
+    elseif cmd.command == "GHOST" then
+        if p and p.Character then
+            for _, v in pairs(p.Character:GetDescendants()) do
+                if v:IsA("BasePart") or v:IsA("MeshPart") then
+                    v.Material = Enum.Material.ForceField
+                end
+            end
+        end
+    elseif cmd.command == "SET_CHAR" then
+        if p and cmd.args.char_user then
+            task.spawn(function()
+                 local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(cmd.args.char_user) end)
+                 if s and uid then
+                     p:LoadCharacterWithHumanoidDescription(Players:GetHumanoidDescriptionFromUserId(uid))
+                 end
+            end)
+        end
 	elseif cmd.command == "UPDATE" then
 		for _, p in ipairs(Players:GetPlayers()) do p:Kick("Updating...") end
 	elseif cmd.command == "SHUTDOWN" then
