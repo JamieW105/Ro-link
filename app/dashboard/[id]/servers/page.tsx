@@ -49,14 +49,27 @@ export default function ServersPage() {
     useEffect(() => {
         async function fetchData() {
             if (!id) return;
+
+            // 1. Cleanup stale servers globally (optional but good for DB health)
+            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+            // 2. Fetch active servers
             const { data, error } = await supabase
                 .from('live_servers')
                 .select('*')
                 .eq('server_id', id)
+                .gte('updated_at', fiveMinutesAgo) // Only fetch fresh ones
                 .order('updated_at', { ascending: false });
 
             if (!error && data) setLiveServers(data);
             setLoading(false);
+
+            // 3. Background cleanup for this specific guild
+            await supabase
+                .from('live_servers')
+                .delete()
+                .eq('server_id', id)
+                .lt('updated_at', fiveMinutesAgo);
         }
 
         fetchData();

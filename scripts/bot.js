@@ -141,6 +141,22 @@ async function syncStats() {
     }
 }
 
+async function cleanupLiveServers() {
+    try {
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { error, count } = await supabase
+            .from('live_servers')
+            .delete({ count: 'exact' })
+            .lt('updated_at', fiveMinutesAgo);
+
+        if (!error && count && count > 0) {
+            console.log(`[CLEANUP] Removed ${count} stale servers.`);
+        }
+    } catch (e) {
+        console.error('[CLEANUP] Failed to remove stale servers:', e.message);
+    }
+}
+
 async function updateStatus() {
     let serverCount = client.guilds.cache.size;
     const supportUrl = "https://discord.gg/C3n4nAwYMw";
@@ -184,7 +200,9 @@ client.once('ready', () => {
 
     updateStatus();
     refreshCommands();
+    cleanupLiveServers();
     setInterval(updateStatus, 15000); // Cycle every 15 seconds
+    setInterval(cleanupLiveServers, 60000); // Cleanup every minute
 });
 
 client.on('guildCreate', guild => {
