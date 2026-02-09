@@ -34,26 +34,38 @@ export async function GET(req: Request) {
         // 3. Special permission for 'cherubdude' (ID: 953414442060746854)
         const isSuperUser = (session.user as any).id === '953414442060746854';
 
+        // Filter for Admin/Owner only for normal users (and superuser managing their own)
+        const adminGuilds = userGuilds.filter((g: any) => {
+            const perms = BigInt(g.permissions);
+            const MANAGE_GUILD = 0x20n;
+            const ADMIN = 0x8n;
+            return (perms & ADMIN) === ADMIN || (perms & MANAGE_GUILD) === MANAGE_GUILD || g.owner;
+        });
+
+        const adminGuildIds = new Set(adminGuilds.map((g: any) => g.id));
+
         let visibleGuilds;
         if (isSuperUser) {
-            // Cherubdude sees all guilds the bot is in
-            visibleGuilds = botGuildsData.map((g: any) => ({
-                id: g.id,
-                name: g.name,
-                icon: g.icon,
-                permissions: "0", // Read-only access
-                owner: false,
-                hasBot: true
-            }));
-        } else {
-            // 4. Filter for Admin/Owner only for normal users
-            const adminGuilds = userGuilds.filter((g: any) => {
-                const perms = BigInt(g.permissions);
-                const ADMIN = 0x8n;
-                return (perms & ADMIN) === ADMIN || g.owner;
-            });
+            // Cherubdude sees ALL guilds the bot is in + guilds they can manage
+            const botOnlyGuilds = botGuildsData
+                .filter((g: any) => !adminGuildIds.has(g.id))
+                .map((g: any) => ({
+                    id: g.id,
+                    name: g.name,
+                    icon: g.icon,
+                    permissions: "0", // Read-only for these
+                    owner: false,
+                    hasBot: true
+                }));
 
-            // 5. Merge Data
+            const cherubManagedGuilds = adminGuilds.map((g: any) => ({
+                ...g,
+                hasBot: botGuildIds.has(g.id)
+            }));
+
+            visibleGuilds = [...cherubManagedGuilds, ...botOnlyGuilds];
+        } else {
+            // Merge Data for normal users
             visibleGuilds = adminGuilds.map((g: any) => ({
                 ...g,
                 hasBot: botGuildIds.has(g.id)

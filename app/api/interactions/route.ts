@@ -375,20 +375,32 @@ export async function POST(req: Request) {
                 return NextResponse.json({
                     type: 4,
                     data: {
-                        content: `Select a miscellaneous action:`,
+                        embeds: [{
+                            title: '🪄 Miscellaneous Player Actions',
+                            description: 'Select an action from the menu below to apply it to a Roblox player.',
+                            color: 0x0ea5e9,
+                            fields: [
+                                { name: '✈️ Fly', value: 'Enables hover/flight for the target player.', inline: true },
+                                { name: '👻 Noclip', value: 'Allows the player to pass through walls.', inline: true },
+                                { name: '🫥 Invis', value: 'Makes the player and their accessories fully invisible.', inline: true },
+                                { name: '🛡️ Ghost', value: 'Applies a ForceField material to the player character.', inline: true },
+                                { name: '👤 Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: true }
+                            ],
+                            footer: { text: 'Ro-Link Utility System' }
+                        }],
                         flags: 64,
                         components: [{
                             type: 1,
                             components: [{
                                 type: 3,
                                 custom_id: `misc_menu`,
-                                placeholder: 'Select an action to perform',
+                                placeholder: 'Choose an action...',
                                 options: [
                                     { label: 'Fly', value: 'FLY', description: 'Enable flight for the player', emoji: { name: '✈️' } },
                                     { label: 'Noclip', value: 'NOCLIP', description: 'Allow player to walk through walls', emoji: { name: '👻' } },
                                     { label: 'Invis', value: 'INVIS', description: 'Make the player invisible', emoji: { name: '🫥' } },
                                     { label: 'Ghost', value: 'GHOST', description: 'Apply a ForceField material', emoji: { name: '🛡️' } },
-                                    { label: 'Set Character', value: 'SET_CHAR', description: 'Change the player\'s character appearance', emoji: { name: '👤' } }
+                                    { label: 'Set Character', value: 'SET_CHAR', description: 'Change appearance', emoji: { name: '👤' } }
                                 ]
                             }]
                         }]

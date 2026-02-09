@@ -392,11 +392,24 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply(`🛑 **SHUTDOWN SIGNAL SENT**! Closing ${targetMsg}.`);
         // ... (rest of simple handlers)
     } else if (commandName === 'misc') {
+        const embed = new EmbedBuilder()
+            .setTitle('🪄 Miscellaneous Player Actions')
+            .setDescription('Select an action from the menu below to apply it to a Roblox player.')
+            .setColor('#0ea5e9')
+            .addFields(
+                { name: '✈️ Fly', value: 'Enables hover/flight for the target player.', inline: true },
+                { name: '👻 Noclip', value: 'Allows the player to pass through walls.', inline: true },
+                { name: '🫥 Invis', value: 'Makes the player and their accessories fully invisible.', inline: true },
+                { name: '🛡️ Ghost', value: 'Applies a ForceField material to the player character.', inline: true },
+                { name: '👤 Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: true }
+            )
+            .setFooter({ text: 'Ro-Link Utility System' });
+
         const row = new ActionRowBuilder()
             .addComponents(
                 new StringSelectMenuBuilder()
                     .setCustomId('misc_menu')
-                    .setPlaceholder('Select an action to perform')
+                    .setPlaceholder('Choose an action...')
                     .addOptions(
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Fly')
@@ -420,14 +433,14 @@ client.on('interactionCreate', async interaction => {
                             .setEmoji('🛡️'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Set Character')
-                            .setDescription('Change the player\'s character appearance')
+                            .setDescription('Change appearance')
                             .setValue('SET_CHAR')
                             .setEmoji('👤'),
                     ),
             );
 
         await interaction.reply({
-            content: `Select a miscellaneous action:`,
+            embeds: [embed],
             components: [row],
             ephemeral: true
         });

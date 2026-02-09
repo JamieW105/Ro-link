@@ -15,6 +15,10 @@ const ServersIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12a7 7 0 0 1 14 0" /><path d="M8.5 15.5a3.5 3.5 0 0 1 7 0" /><path d="M2 8a12 12 0 0 1 20 0" /><circle cx="12" cy="18" r="1" /></svg>
 );
 
+const MagicIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m2 22 5-5" /><path d="M9.5 14.5 16 8" /><path d="m17 2 5 5" /><path d="m19 10 1-1" /><path d="m20 9 1-1" /><path d="M15 4l1-1" /><path d="M14 5l1-1" /></svg>
+);
+
 const SetupIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></svg>
 );
@@ -31,12 +35,34 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const { id } = useParams();
     const pathname = usePathname();
     const { data: session } = useSession();
+    const [isReadOnly, setIsReadOnly] = useState(true);
 
-    const isReadOnly = (session?.user as any)?.id === '953414442060746854';
+    useEffect(() => {
+        if (!session) return;
+        const userId = (session?.user as any)?.id;
+        const superUserId = '953414442060746854';
+
+        if (userId === superUserId) {
+            // Fetch guilds to see if cherubmanaged this one
+            fetch('/api/guilds')
+                .then(res => res.json())
+                .then(guilds => {
+                    const g = guilds.find((g: any) => g.id === id);
+                    if (g && g.permissions !== "0") {
+                        setIsReadOnly(false);
+                    } else {
+                        setIsReadOnly(true);
+                    }
+                });
+        } else {
+            setIsReadOnly(false);
+        }
+    }, [session, id]);
 
     const menuItems = [
         { label: "Overview", icon: <OverviewIcon />, href: `/dashboard/${id}` },
         { label: "Live Servers", icon: <ServersIcon />, href: `/dashboard/${id}/servers` },
+        { label: "Misc Actions", icon: <MagicIcon />, href: `/dashboard/${id}/misc` },
         { label: "Player Lookup", icon: <LookupIcon />, href: `/dashboard/${id}/lookup` },
         { label: "Setup", icon: <SetupIcon />, href: `/dashboard/${id}/setup`, hide: isReadOnly },
     ].filter(item => !item.hide);

@@ -1,0 +1,201 @@
+'use client';
+
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useSession } from "next-auth/react";
+
+interface LiveServer {
+    id: string;
+    players: string[];
+    updated_at?: string;
+}
+
+// Icons
+const MagicIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m2 22 5-5" /><path d="M9.5 14.5 16 8" /><path d="m17 2 5 5" /><path d="m19 10 1-1" /><path d="m20 9 1-1" /><path d="M15 4l1-1" /><path d="M14 5l1-1" /></svg>
+);
+
+const UserIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+);
+
+export default function MiscPage() {
+    const { id: guildId } = useParams();
+    const { data: session } = useSession();
+    const [players, setPlayers] = useState<{ name: string; serverId: string }[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [charUser, setCharUser] = useState("");
+
+    useEffect(() => {
+        async function fetchPlayers() {
+            if (!guildId) return;
+            const { data, error } = await supabase
+                .from('live_servers')
+                .select('id, players')
+                .eq('server_id', guildId);
+
+            if (!error && data) {
+                const allPlayers: { name: string; serverId: string }[] = [];
+                data.forEach((server: LiveServer) => {
+                    if (Array.isArray(server.players)) {
+                        server.players.forEach(p => {
+                            allPlayers.push({ name: p, serverId: server.id });
+                        });
+                    }
+                });
+                setPlayers(allPlayers);
+            }
+            setLoading(false);
+        }
+
+        fetchPlayers();
+        const interval = setInterval(fetchPlayers, 15000);
+        return () => clearInterval(interval);
+    }, [guildId]);
+
+    async function handleAction(target: string, action: string, extraArgs = {}) {
+        if (!guildId) return;
+        setActionLoading(`${target}-${action}`);
+
+        const { error } = await supabase
+            .from('command_queue')
+            .insert([{
+                server_id: guildId,
+                command: action,
+                args: {
+                    username: target,
+                    moderator: session?.user?.name || "Dashboard",
+                    ...extraArgs
+                },
+                status: 'PENDING'
+            }]);
+
+        if (error) {
+            alert("Error: " + error.message);
+        }
+        setActionLoading(null);
+    }
+
+    if (loading) return null;
+
+    return (
+        <div className="space-y-10 max-w-7xl animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="flex flex-col gap-1 text-left">
+                <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+                    <span className="p-2 bg-sky-600/10 rounded-lg text-sky-500 border border-sky-500/10">
+                        <MagicIcon />
+                    </span>
+                    Miscellaneous Actions
+                </h1>
+                <p className="text-slate-500 text-sm font-medium">Manage player effects and appearances across all live servers.</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Actions Explanation */}
+                <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-6 h-fit h-full">
+                    <h2 className="text-xs font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-sky-500 rounded-full"></div>
+                        Action Glossary
+                    </h2>
+                    <div className="space-y-4">
+                        {[
+                            { name: 'Fly', desc: 'Enables flight/hovering for the player.' },
+                            { name: 'Noclip', desc: 'Allows walking through walls (disables collisions).' },
+                            { name: 'Invis', desc: 'Makes the character fully transparent.' },
+                            { name: 'Ghost', desc: 'Applies the glowing ForceField material.' },
+                            { name: 'Set Char', desc: 'Copies the appearance of any username provided.' }
+                        ].map(action => (
+                            <div key={action.name} className="flex flex-col gap-1 p-3 bg-slate-950/40 rounded-lg border border-slate-800/50">
+                                <span className="text-xs font-bold text-sky-400">{action.name}</span>
+                                <span className="text-[11px] text-slate-500 font-medium">{action.desc}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Player List */}
+                <div className="bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden shadow-xl min-h-[400px]">
+                    <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/20 flex justify-between items-center">
+                        <h2 className="text-xs font-bold text-white uppercase tracking-widest">Active Players ({players.length})</h2>
+                    </div>
+
+                    <div className="divide-y divide-slate-800/50 max-h-[600px] overflow-y-auto custom-scrollbar">
+                        {players.length === 0 ? (
+                            <div className="p-20 text-center text-slate-600 font-bold uppercase text-[10px] tracking-widest">
+                                No players online.
+                            </div>
+                        ) : (
+                            players.map(player => (
+                                <div key={`${player.name}-${player.serverId}`} className="p-6 hover:bg-white/5 transition-all">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 border border-slate-700">
+                                                <UserIcon />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-white text-sm">{player.name}</h3>
+                                                <p className="text-[10px] font-mono text-slate-500 uppercase tracking-tighter">SERVER: {player.serverId.substring(0, 8)}...</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2">
+                                            {['FLY', 'NOCLIP', 'INVIS', 'GHOST'].map(action => (
+                                                <button
+                                                    key={action}
+                                                    disabled={actionLoading === `${player.name}-${action}`}
+                                                    onClick={() => handleAction(player.name, action)}
+                                                    className="px-3 py-1.5 bg-slate-800 hover:bg-sky-600 text-white rounded-md text-[10px] font-bold uppercase tracking-tight transition-all border border-slate-700 disabled:opacity-50"
+                                                >
+                                                    {actionLoading === `${player.name}-${action}` ? "..." : action}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Set Char Input */}
+                                    <div className="mt-4 flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Enter Character Username..."
+                                            value={charUser}
+                                            onChange={(e) => setCharUser(e.target.value)}
+                                            className="flex-1 bg-black/40 border border-slate-800 rounded-md px-3 py-1.5 text-[11px] text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
+                                        />
+                                        <button
+                                            disabled={!charUser || actionLoading === `${player.name}-SET_CHAR`}
+                                            onClick={() => {
+                                                handleAction(player.name, 'SET_CHAR', { char_user: charUser });
+                                                setCharUser("");
+                                            }}
+                                            className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-[10px] font-bold uppercase tracking-tight transition-all disabled:opacity-50"
+                                        >
+                                            {actionLoading === `${player.name}-SET_CHAR` ? "..." : "Set Char"}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <style jsx>{`
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 4px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: #1e293b;
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: #334155;
+                }
+            `}</style>
+        </div>
+    );
+}
