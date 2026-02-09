@@ -294,7 +294,6 @@ client.on('interactionCreate', async interaction => {
                 { name: '/unban', value: 'Unban a user from the Roblox game.' },
                 { name: '/update', value: 'Send a global update signal to all Roblox servers (restarts them).' },
                 { name: '/shutdown', value: 'Immediately shut down game servers.' },
-                { name: '/lookup', value: 'Lookup a Roblox player and see their status/actions.' },
                 { name: '/help', value: 'Show info and list of available commands.' }
             );
 
@@ -409,10 +408,10 @@ client.on('interactionCreate', async interaction => {
                 { name: '🫥 Invis', value: 'Makes the player and their accessories fully invisible.', inline: false },
                 { name: '🛡️ Ghost', value: 'Applies a ForceField material to the player character.', inline: false },
                 { name: '👤 Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: false },
-                { name: '💖 Heal', value: 'Restores player health to maximum.', inline: true },
-                { name: '💀 Kill', value: 'Immediately kills the target player.', inline: true },
-                { name: '🔄 Reset', value: 'Resets the player character.', inline: true },
-                { name: '🌪️ Refresh', value: 'Respawn the player character.', inline: true }
+                { name: '💖 Heal', value: 'Restores player health to maximum.', inline: false },
+                { name: '💀 Kill', value: 'Immediately kills the target player.', inline: false },
+                { name: '🔄 Reset', value: 'Resets the player character.', inline: false },
+                { name: '🌪️ Refresh', value: 'Respawn the player character.', inline: false }
             )
             .setFooter({ text: 'Ro-Link Utility System' });
 
@@ -479,9 +478,8 @@ client.on('interactionCreate', async interaction => {
     } else if (commandName === 'ping') {
         const latency = Math.abs(Date.now() - interaction.createdTimestamp);
         await interaction.reply(`🏓 **Pong!** \nLatency: \`${latency}ms\`\nStatus: \`Online (Vercel Integration Active)\``);
-
-
-    });
+    }
+});
 
 // Handle Select Menu Interactions
 client.on('interactionCreate', async interaction => {

@@ -24,6 +24,12 @@ const UserIcon = () => (
     </svg>
 );
 
+const SearchIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+    </svg>
+);
+
 export default function MiscPage() {
     const { id: guildId } = useParams();
     const { data: session } = useSession();
@@ -31,6 +37,7 @@ export default function MiscPage() {
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [charUser, setCharUser] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
         async function fetchPlayers() {
@@ -84,6 +91,12 @@ export default function MiscPage() {
 
     if (loading) return null;
 
+    const filteredPlayers = players.filter(p =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const isManualTarget = searchQuery.length > 0 && !players.some(p => p.name.toLowerCase() === searchQuery.toLowerCase());
+
     return (
         <div className="space-y-10 max-w-7xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="flex flex-col gap-1 text-left">
@@ -96,47 +109,84 @@ export default function MiscPage() {
                 <p className="text-slate-500 text-sm font-medium">Manage player effects and appearances across all live servers.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Actions Explanation */}
-                <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-6 h-fit h-full">
-                    <h2 className="text-xs font-bold text-white uppercase tracking-widest mb-6 flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-sky-500 rounded-full"></div>
-                        Action Glossary
-                    </h2>
-                    <div className="space-y-4">
-                        {[
-                            { name: 'Fly', desc: 'Enables flight/hovering for the player.' },
-                            { name: 'Noclip', desc: 'Allows walking through walls (disables collisions).' },
-                            { name: 'Invis', desc: 'Makes the character fully transparent.' },
-                            { name: 'Ghost', desc: 'Applies the glowing ForceField material.' },
-                            { name: 'Set Char', desc: 'Copies the appearance of any username provided.' },
-                            { name: 'Heal', desc: 'Restores the player to maximum health.' },
-                            { name: 'Kill', desc: 'Immediately kills the target player.' },
-                            { name: 'Reset', desc: 'Resets the player character.' }
-                        ].map(action => (
-                            <div key={action.name} className="flex flex-col gap-1 p-3 bg-slate-950/40 rounded-lg border border-slate-800/50">
-                                <span className="text-xs font-bold text-sky-400">{action.name}</span>
-                                <span className="text-[11px] text-slate-500 font-medium">{action.desc}</span>
-                            </div>
-                        ))}
+            <div className="w-full">
+                {/* Search & Manual Bar */}
+                <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4 items-center">
+                    <div className="relative flex-1 w-full">
+                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-500">
+                            <SearchIcon />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search live players or enter username for manual action..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full bg-black/40 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
+                        />
                     </div>
                 </div>
 
                 {/* Player List */}
                 <div className="bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden shadow-xl min-h-[400px]">
                     <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/20 flex justify-between items-center">
-                        <h2 className="text-xs font-bold text-white uppercase tracking-widest">Active Players ({players.length})</h2>
+                        <h2 className="text-xs font-bold text-white uppercase tracking-widest">
+                            {searchQuery ? `Search Results (${filteredPlayers.length})` : `Active Players (${players.length})`}
+                        </h2>
                     </div>
 
-                    <div className="divide-y divide-slate-800/50 max-h-[600px] overflow-y-auto custom-scrollbar">
-                        {players.length === 0 ? (
+                    <div className="divide-y divide-slate-800/50 max-h-[700px] overflow-y-auto custom-scrollbar">
+                        {/* Manual Target Row (Only shown if searching and no exact match) */}
+                        {isManualTarget && (
+                            <div className="p-6 bg-sky-500/5 border-b border-sky-500/10">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className="px-2 py-0.5 bg-sky-600 text-white text-[9px] font-black uppercase rounded">Manual Target</div>
+                                    <h3 className="font-bold text-white text-sm">{searchQuery}</h3>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {['FLY', 'NOCLIP', 'INVIS', 'GHOST', 'HEAL', 'KILL', 'RESET', 'REFRESH'].map(action => (
+                                        <button
+                                            key={action}
+                                            disabled={actionLoading === `${searchQuery}-${action}`}
+                                            onClick={() => handleAction(searchQuery, action)}
+                                            className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all border disabled:opacity-50 ${action === 'KILL' ? 'bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20' :
+                                                action === 'HEAL' ? 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20' :
+                                                    'bg-slate-800 hover:bg-sky-600 text-white border-slate-700'
+                                                }`}
+                                        >
+                                            {actionLoading === `${searchQuery}-${action}` ? "..." : action}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="mt-4 flex gap-2 max-w-md">
+                                    <input
+                                        type="text"
+                                        placeholder="Username to copy appearance..."
+                                        value={charUser}
+                                        onChange={(e) => setCharUser(e.target.value)}
+                                        className="flex-1 bg-black/40 border border-slate-800 rounded-md px-3 py-1.5 text-[11px] text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
+                                    />
+                                    <button
+                                        disabled={!charUser || actionLoading === `${searchQuery}-SET_CHAR`}
+                                        onClick={() => {
+                                            handleAction(searchQuery, 'SET_CHAR', { char_user: charUser });
+                                            setCharUser("");
+                                        }}
+                                        className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-[10px] font-bold uppercase tracking-tight transition-all disabled:opacity-50"
+                                    >
+                                        Set Char
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {filteredPlayers.length === 0 && !isManualTarget ? (
                             <div className="p-20 text-center text-slate-600 font-bold uppercase text-[10px] tracking-widest">
-                                No players online.
+                                {searchQuery ? "No matching players found." : "No players online."}
                             </div>
                         ) : (
-                            players.map(player => (
-                                <div key={`${player.name}-${player.serverId}`} className="p-6 hover:bg-white/5 transition-all">
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            filteredPlayers.map(player => (
+                                <div key={`${player.name}-${player.serverId}`} className="p-6 hover:bg-sky-500/5 transition-all">
+                                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
                                         <div className="flex items-center gap-4">
                                             <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 border border-slate-700">
                                                 <UserIcon />
@@ -154,8 +204,8 @@ export default function MiscPage() {
                                                     disabled={actionLoading === `${player.name}-${action}`}
                                                     onClick={() => handleAction(player.name, action)}
                                                     className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all border disabled:opacity-50 ${action === 'KILL' ? 'bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20' :
-                                                            action === 'HEAL' ? 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20' :
-                                                                'bg-slate-800 hover:bg-sky-600 text-white border-slate-700'
+                                                        action === 'HEAL' ? 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20' :
+                                                            'bg-slate-800 hover:bg-sky-600 text-white border-slate-700'
                                                         }`}
                                                 >
                                                     {actionLoading === `${player.name}-${action}` ? "..." : action}
@@ -165,7 +215,7 @@ export default function MiscPage() {
                                     </div>
 
                                     {/* Set Char Input */}
-                                    <div className="mt-4 flex gap-2">
+                                    <div className="mt-4 flex gap-2 max-w-md">
                                         <input
                                             type="text"
                                             placeholder="Enter Character Username..."
