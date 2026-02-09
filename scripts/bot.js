@@ -90,18 +90,7 @@ const commands = [
             }
         ]
     },
-    {
-        name: 'lookup',
-        description: 'Lookup a Roblox player and see their status/actions',
-        options: [
-            {
-                name: 'username',
-                description: 'The Roblox username to lookup',
-                type: 3,
-                required: true,
-            }
-        ]
-    },
+
     {
         name: 'ping',
         description: 'Check the bot response time and connection status',
@@ -491,118 +480,8 @@ client.on('interactionCreate', async interaction => {
         const latency = Math.abs(Date.now() - interaction.createdTimestamp);
         await interaction.reply(`🏓 **Pong!** \nLatency: \`${latency}ms\`\nStatus: \`Online (Vercel Integration Active)\``);
 
-    } else if (commandName === 'lookup') {
-        await interaction.deferReply();
-        const username = interaction.options.getString('username');
 
-        try {
-            // 1. Get User ID
-            const searchRes = await fetch('https://users.roblox.com/v1/usernames/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
-            });
-            const searchData = await searchRes.json();
-
-            if (!searchData.data || searchData.data.length === 0) {
-                return interaction.editReply(`❌ Player \`${username}\` not found on Roblox.`);
-            }
-
-            const userId = searchData.data[0].id;
-
-            // 2. Get Details & Thumb
-            const [profileRes, thumbRes] = await Promise.all([
-                fetch(`https://users.roblox.com/v1/users/${userId}`),
-                fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`)
-            ]);
-
-            const profile = await profileRes.json();
-            const thumb = await thumbRes.json();
-            const avatarUrl = thumb.data?.[0]?.imageUrl || '';
-
-            // 3. Check Presence, Logs & Server Info
-            const [serversRes, logsRes, serverDataRes] = await Promise.all([
-                supabase.from('live_servers').select('id, players').eq('server_id', interaction.guildId),
-                supabase.from('logs').select('action, moderator, created_at').eq('server_id', interaction.guildId).eq('target', profile.name).order('created_at', { ascending: false }).limit(5),
-                supabase.from('servers').select('linked_place_id').eq('id', interaction.guildId).single()
-            ]);
-
-            const activeServer = serversRes.data?.find((s) =>
-                s.players?.some((p) => p.toLowerCase() === profile.name.toLowerCase())
-            );
-
-            const serverInfo = serverDataRes.data;
-            const logs = logsRes.data || [];
-            const logField = logs.length > 0
-                ? logs.map(l => `• **${l.action}** by ${l.moderator.split('#')[0]} (<t:${Math.floor(new Date(l.created_at).getTime() / 1000)}:R>)`).join('\n')
-                : '*No previous moderation.*';
-
-            const createdDate = new Date(profile.created);
-            const accountAgeDays = Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-
-            let statusText = activeServer ? `🟢 **In-Game**\n\`${activeServer.id}\`` : '⚪ Offline';
-            if (profile.isBanned) statusText = '🔴 **Banned on Roblox**';
-
-            // 4. Create Embed
-            const embed = new EmbedBuilder()
-                .setTitle(`Player Lookup: ${profile.displayName}`)
-                .setURL(`https://www.roblox.com/users/${userId}/profile`)
-                .setThumbnail(avatarUrl)
-                .setColor(activeServer ? '#10b981' : profile.isBanned ? '#ef4444' : '#0ea5e9')
-                .addFields(
-                    { name: 'Username', value: `\`${profile.name}\``, inline: true },
-                    { name: 'User ID', value: `\`${userId}\``, inline: true },
-                    { name: 'Status', value: statusText, inline: true },
-                    { name: 'Account Age', value: `\`${accountAgeDays.toLocaleString()} Days\``, inline: true },
-                    { name: 'Created', value: `<t:${Math.floor(createdDate.getTime() / 1000)}:D> (<t:${Math.floor(createdDate.getTime() / 1000)}:R>)`, inline: true },
-                    { name: 'Description', value: profile.description ? (profile.description.length > 200 ? profile.description.substring(0, 197) + '...' : profile.description) : '*No description*', inline: false },
-                    { name: '📜 Moderation History (Recent)', value: logField, inline: false }
-                )
-                .setFooter({ text: 'Ro-Link Dashboard Integration' })
-                .setTimestamp();
-
-            // 5. Actions
-            const row = new ActionRowBuilder();
-
-            row.addComponents(
-                new ButtonBuilder()
-                    .setLabel('View Profile')
-                    .setURL(`https://www.roblox.com/users/${userId}/profile`)
-                    .setStyle(ButtonStyle.Link)
-            );
-
-            if (activeServer && serverInfo?.linked_place_id) {
-                row.addComponents(
-                    new ButtonBuilder()
-                        .setLabel('Join Server')
-                        .setURL(`roblox://placeId=${serverInfo.linked_place_id}&gameInstanceId=${activeServer.id}`)
-                        .setStyle(ButtonStyle.Link)
-                );
-            }
-
-            const row2 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`kick_${userId}_${profile.name}`)
-                    .setLabel('Kick')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId(`ban_${userId}_${profile.name}`)
-                    .setLabel('Ban')
-                    .setStyle(ButtonStyle.Danger),
-                new ButtonBuilder()
-                    .setCustomId(`unban_${userId}_${profile.name}`)
-                    .setLabel('Unban')
-                    .setStyle(ButtonStyle.Success)
-            );
-
-            await interaction.editReply({ embeds: [embed], components: [row, row2] });
-
-        } catch (error) {
-            console.error(error);
-            await interaction.editReply('❌ Failed to fetch Roblox data.');
-        }
-    }
-});
+    });
 
 // Handle Select Menu Interactions
 client.on('interactionCreate', async interaction => {
