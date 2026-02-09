@@ -59,13 +59,18 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         }
     }, [session, id]);
 
-    const menuItems = [
-        { label: "Overview", icon: <OverviewIcon />, href: `/dashboard/${id}` },
+    const utilityItems = [
+        { label: "Home", icon: <OverviewIcon />, href: `/dashboard/${id}` },
         { label: "Live Servers", icon: <ServersIcon />, href: `/dashboard/${id}/servers` },
-        { label: "Misc Actions", icon: <MagicIcon />, href: `/dashboard/${id}/misc` },
         { label: "Player Lookup", icon: <LookupIcon />, href: `/dashboard/${id}/lookup` },
+        { label: "Misc Actions", icon: <MagicIcon />, href: `/dashboard/${id}/misc` },
+    ];
+
+    const settingItems = [
         { label: "Setup", icon: <SetupIcon />, href: `/dashboard/${id}/setup`, hide: isReadOnly },
     ].filter(item => !item.hide);
+
+    const allItems = [...utilityItems, ...settingItems];
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200 flex flex-col md:flex-row">
@@ -77,26 +82,56 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                         <span className="text-lg font-bold tracking-tight text-white">Ro-Link</span>
                     </Link>
 
-                    <nav className="space-y-1">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 ml-2">Main Menu</p>
-                        {menuItems.map((item) => {
-                            const isActive = pathname === item.href;
-                            return (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all group font-semibold text-sm ${isActive
-                                        ? "bg-sky-600/10 text-sky-400 border border-sky-500/10"
-                                        : "text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent"
-                                        }`}
-                                >
-                                    <span className={`${isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300 transition-colors"}`}>
-                                        {item.icon}
-                                    </span>
-                                    {item.label}
-                                </Link>
-                            );
-                        })}
+                    <nav className="space-y-8">
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 ml-2">Utility</p>
+                            <div className="space-y-1">
+                                {utilityItems.map((item) => {
+                                    const isActive = pathname === item.href;
+                                    return (
+                                        <Link
+                                            key={item.href}
+                                            href={item.href}
+                                            className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all group font-semibold text-sm ${isActive
+                                                ? "bg-sky-600/10 text-sky-400 border border-sky-500/10"
+                                                : "text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent"
+                                                }`}
+                                        >
+                                            <span className={`${isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300 transition-colors"}`}>
+                                                {item.icon}
+                                            </span>
+                                            {item.label}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {settingItems.length > 0 && (
+                            <div>
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 ml-2">Setting</p>
+                                <div className="space-y-1">
+                                    {settingItems.map((item) => {
+                                        const isActive = pathname === item.href;
+                                        return (
+                                            <Link
+                                                key={item.href}
+                                                href={item.href}
+                                                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all group font-semibold text-sm ${isActive
+                                                    ? "bg-sky-600/10 text-sky-400 border border-sky-500/10"
+                                                    : "text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent"
+                                                    }`}
+                                            >
+                                                <span className={`${isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300 transition-colors"}`}>
+                                                    {item.icon}
+                                                </span>
+                                                {item.label}
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </nav>
                 </div>
 
@@ -113,7 +148,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
             {/* Bottom Nav (Mobile) */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#020617]/90 border-t border-slate-800 backdrop-blur-md z-50 flex justify-around items-center h-16 px-2">
-                {menuItems.map((item) => {
+                {allItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
                         <Link
