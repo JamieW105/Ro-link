@@ -1,11 +1,26 @@
 const { Client, GatewayIntentBits, ActivityType, REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
 const { setGlobalDispatcher, Agent } = require('undici');
+require('dotenv').config({ path: '.env.local' });
 
-// ... (previous setup code stays same) ...
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+setGlobalDispatcher(new Agent({
+    connect: { timeout: 60_000 },
+    headersTimeout: 60_000,
+    bodyTimeout: 60_000,
+}));
+
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers,
+    ],
+});
 
 const commands = [
-    // ... (previous commands) ...
     {
         name: 'ban',
         description: 'Permanently ban a user from the Roblox game',
@@ -63,7 +78,6 @@ const commands = [
         name: 'update',
         description: 'Send a global update signal to all Roblox servers (restarts them)',
     },
-    // ... (rest of commands)
     {
         name: 'shutdown',
         description: 'Immediately shut down game servers',
@@ -73,6 +87,18 @@ const commands = [
                 description: 'The specific Roblox JobId to shut down (Leave empty for ALL servers)',
                 type: 3, // STRING
                 required: false,
+            }
+        ]
+    },
+    {
+        name: 'lookup',
+        description: 'Lookup a Roblox player and see their status/actions',
+        options: [
+            {
+                name: 'username',
+                description: 'The Roblox username to lookup',
+                type: 3,
+                required: true,
             }
         ]
     },
@@ -366,7 +392,6 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply(`🛑 **SHUTDOWN SIGNAL SENT**! Closing ${targetMsg}.`);
         // ... (rest of simple handlers)
     } else if (commandName === 'misc') {
-    } else if (commandName === 'misc') {
         const row = new ActionRowBuilder()
             .addComponents(
                 new StringSelectMenuBuilder()
@@ -588,8 +613,6 @@ client.on('interactionCreate', async interaction => {
 });
 
 
-    }
-});
 
 // Handle Button Interactions
 client.on('interactionCreate', async interaction => {
