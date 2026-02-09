@@ -397,11 +397,11 @@ client.on('interactionCreate', async interaction => {
             .setDescription('Select an action from the menu below to apply it to a Roblox player.')
             .setColor('#0ea5e9')
             .addFields(
-                { name: '✈️ Fly', value: 'Enables hover/flight for the target player.', inline: true },
-                { name: '👻 Noclip', value: 'Allows the player to pass through walls.', inline: true },
-                { name: '🫥 Invis', value: 'Makes the player and their accessories fully invisible.', inline: true },
-                { name: '🛡️ Ghost', value: 'Applies a ForceField material to the player character.', inline: true },
-                { name: '👤 Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: true }
+                { name: '✈️ Fly', value: 'Enables hover/flight for the target player.', inline: false },
+                { name: '👻 Noclip', value: 'Allows the player to pass through walls.', inline: false },
+                { name: '🫥 Invis', value: 'Makes the player and their accessories fully invisible.', inline: false },
+                { name: '🛡️ Ghost', value: 'Applies a ForceField material to the player character.', inline: false },
+                { name: '👤 Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: false }
             )
             .setFooter({ text: 'Ro-Link Utility System' });
 
