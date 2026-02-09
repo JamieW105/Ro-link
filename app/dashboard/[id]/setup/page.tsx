@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
@@ -42,11 +42,25 @@ export default function SetupPage() {
     const [error, setError] = useState<string | null>(null);
     const [initialLoading, setInitialLoading] = useState(true);
 
-    const isReadOnly = (session?.user as any)?.id === '953414442060746854';
+    const router = useRouter();
+    const [isReadOnly, setIsReadOnly] = useState(true);
 
     useEffect(() => {
         async function checkStatus() {
-            if (!id) return;
+            if (!id || !session) return;
+
+            // First check if current user has management perms for this server
+            const res = await fetch('/api/guilds');
+            const guilds = await res.json();
+            const g = guilds.find((guild: any) => guild.id === id);
+
+            if (!g || (g.permissions === "0" && (session.user as any).id === '953414442060746854')) {
+                router.push(`/dashboard/${id}`);
+                return;
+            }
+
+            setIsReadOnly(false);
+
             const { data, error } = await supabase
                 .from('servers')
                 .select('*')
@@ -58,12 +72,12 @@ export default function SetupPage() {
                 setPlaceId(data.place_id || "");
                 setUniverseId(data.universe_id || "");
                 setOpenCloudKey(data.open_cloud_key || "");
-                setStep(2);
+                setStep(4);
             }
             setInitialLoading(false);
         }
         checkStatus();
-    }, [id]);
+    }, [id, session, router]);
 
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com';
 

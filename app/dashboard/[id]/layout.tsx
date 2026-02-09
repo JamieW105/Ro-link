@@ -48,29 +48,52 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const { id } = useParams();
     const pathname = usePathname();
     const { data: session } = useSession();
+    const router = useRouter();
     const [isReadOnly, setIsReadOnly] = useState(true);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!session) return;
         const userId = (session?.user as any)?.id;
         const superUserId = '953414442060746854';
 
-        if (userId === superUserId) {
-            // Fetch guilds to see if cherubmanaged this one
-            fetch('/api/guilds')
-                .then(res => res.json())
-                .then(guilds => {
-                    const g = guilds.find((g: any) => g.id === id);
-                    if (g && g.permissions !== "0") {
+        fetch('/api/guilds')
+            .then(res => res.json())
+            .then(guilds => {
+                const g = guilds.find((g: any) => g.id === id);
+
+                // Permission Guard
+                if (!g) {
+                    console.log("[Guard] Server not found in user list or superuser monitor.");
+                    router.push('/dashboard');
+                    return;
+                }
+
+                // Bot Presence Guard
+                if (!g.hasBot) {
+                    console.log("[Guard] Bot not present in this server.");
+                    router.push('/dashboard');
+                    return;
+                }
+
+                if (userId === superUserId) {
+                    if (g.permissions !== "0") {
                         setIsReadOnly(false);
                     } else {
                         setIsReadOnly(true);
                     }
-                });
-        } else {
-            setIsReadOnly(false);
-        }
-    }, [session, id]);
+                } else {
+                    setIsReadOnly(false);
+                }
+                setLoading(false);
+            })
+            .catch(err => {
+                console.error("[Guard] Error checking permissions:", err);
+                router.push('/dashboard');
+            });
+    }, [session, id, router]);
+
+    if (loading) return null; // Don't flash sidebar while checking perms
 
     const utilityItems = [
         { label: "Home", icon: <HomeIcon />, href: `/dashboard/${id}` },
