@@ -109,7 +109,10 @@ export default function MiscPage() {
                             { name: 'Noclip', desc: 'Allows walking through walls (disables collisions).' },
                             { name: 'Invis', desc: 'Makes the character fully transparent.' },
                             { name: 'Ghost', desc: 'Applies the glowing ForceField material.' },
-                            { name: 'Set Char', desc: 'Copies the appearance of any username provided.' }
+                            { name: 'Set Char', desc: 'Copies the appearance of any username provided.' },
+                            { name: 'Heal', desc: 'Restores the player to maximum health.' },
+                            { name: 'Kill', desc: 'Immediately kills the target player.' },
+                            { name: 'Reset', desc: 'Resets the player character.' }
                         ].map(action => (
                             <div key={action.name} className="flex flex-col gap-1 p-3 bg-slate-950/40 rounded-lg border border-slate-800/50">
                                 <span className="text-xs font-bold text-sky-400">{action.name}</span>
@@ -145,12 +148,15 @@ export default function MiscPage() {
                                         </div>
 
                                         <div className="flex flex-wrap gap-2">
-                                            {['FLY', 'NOCLIP', 'INVIS', 'GHOST'].map(action => (
+                                            {['FLY', 'NOCLIP', 'INVIS', 'GHOST', 'HEAL', 'KILL', 'RESET', 'REFRESH'].map(action => (
                                                 <button
                                                     key={action}
                                                     disabled={actionLoading === `${player.name}-${action}`}
                                                     onClick={() => handleAction(player.name, action)}
-                                                    className="px-3 py-1.5 bg-slate-800 hover:bg-sky-600 text-white rounded-md text-[10px] font-bold uppercase tracking-tight transition-all border border-slate-700 disabled:opacity-50"
+                                                    className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all border disabled:opacity-50 ${action === 'KILL' ? 'bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20' :
+                                                            action === 'HEAL' ? 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20' :
+                                                                'bg-slate-800 hover:bg-sky-600 text-white border-slate-700'
+                                                        }`}
                                                 >
                                                     {actionLoading === `${player.name}-${action}` ? "..." : action}
                                                 </button>

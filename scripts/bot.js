@@ -419,7 +419,11 @@ client.on('interactionCreate', async interaction => {
                 { name: '👻 Noclip', value: 'Allows the player to pass through walls.', inline: false },
                 { name: '🫥 Invis', value: 'Makes the player and their accessories fully invisible.', inline: false },
                 { name: '🛡️ Ghost', value: 'Applies a ForceField material to the player character.', inline: false },
-                { name: '👤 Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: false }
+                { name: '👤 Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: false },
+                { name: '💖 Heal', value: 'Restores player health to maximum.', inline: true },
+                { name: '💀 Kill', value: 'Immediately kills the target player.', inline: true },
+                { name: '🔄 Reset', value: 'Resets the player character.', inline: true },
+                { name: '🌪️ Refresh', value: 'Respawn the player character.', inline: true }
             )
             .setFooter({ text: 'Ro-Link Utility System' });
 
@@ -454,6 +458,26 @@ client.on('interactionCreate', async interaction => {
                             .setDescription('Change appearance')
                             .setValue('SET_CHAR')
                             .setEmoji('👤'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Heal')
+                            .setDescription('Restore health')
+                            .setValue('HEAL')
+                            .setEmoji('💖'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Kill')
+                            .setDescription('Instant kill')
+                            .setValue('KILL')
+                            .setEmoji('💀'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Reset')
+                            .setDescription('Reset character')
+                            .setValue('RESET')
+                            .setEmoji('🔄'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Refresh')
+                            .setDescription('Refresh character')
+                            .setValue('REFRESH')
+                            .setEmoji('🌪️'),
                     ),
             );
 
@@ -831,6 +855,16 @@ function RoLink:Execute(cmd)
                  end
             end)
         end
+    elseif cmd.command == "HEAL" then
+        if p and p.Character and p.Character:FindFirstChild("Humanoid") then
+            p.Character.Humanoid.Health = p.Character.Humanoid.MaxHealth
+        end
+    elseif cmd.command == "KILL" then
+        if p and p.Character and p.Character:FindFirstChild("Humanoid") then
+            p.Character.Humanoid.Health = 0
+        end
+    elseif cmd.command == "RESET" or cmd.command == "REFRESH" then
+        if p then p:LoadCharacter() end
 	elseif cmd.command == "UPDATE" then
 		for _, p in ipairs(Players:GetPlayers()) do p:Kick("Updating...") end
 	elseif cmd.command == "SHUTDOWN" then
