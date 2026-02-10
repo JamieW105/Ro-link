@@ -741,8 +741,15 @@ function RoLink:Execute(cmd)
         if p and p.Character and p.Character:FindFirstChild("Humanoid") then
             p.Character.Humanoid.Health = 0
         end
-    elseif cmd.command == "RESET" or cmd.command == "REFRESH" then
+    elseif cmd.command == "RESET" then
         if p then p:LoadCharacter() end
+    elseif cmd.command == "REFRESH" then
+        if p and p.Character then
+            local cf = p.Character:GetPrimaryPartCFrame()
+            p:LoadCharacter()
+            p.CharacterAdded:Wait()
+            p.Character:SetPrimaryPartCFrame(cf)
+        end
 	elseif cmd.command == "UPDATE" then
 		for _, p in ipairs(Players:GetPlayers()) do p:Kick("Updating...") end
 	elseif cmd.command == "SHUTDOWN" then

@@ -284,9 +284,17 @@ function RoLink:Execute(cmd)
 		if player and player.Character and player.Character:FindFirstChild("Humanoid") then
 			player.Character.Humanoid.Health = 0
 		end
-	elseif cmd.command == "RESET" or cmd.command == "REFRESH" then
+	elseif cmd.command == "RESET" then
 		local player = Players:FindFirstChild(username)
 		if player then player:LoadCharacter() end
+	elseif cmd.command == "REFRESH" then
+		local player = Players:FindFirstChild(username)
+		if player and player.Character then
+			local cf = player.Character:GetPrimaryPartCFrame()
+			player:LoadCharacter()
+			player.CharacterAdded:Wait()
+			player.Character:SetPrimaryPartCFrame(cf)
+		end
 	elseif cmd.command == "UPDATE" then
 		for _, player in ipairs(Players:GetPlayers()) do
 			player:Kick("Server is updating. Please rejoin in a moment!")

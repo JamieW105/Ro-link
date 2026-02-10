@@ -49,6 +49,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const pathname = usePathname();
     const { data: session } = useSession();
     const router = useRouter();
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isReadOnly, setIsReadOnly] = useState(true);
     const [loading, setLoading] = useState(true);
 
@@ -93,6 +94,11 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             });
     }, [session, id, router]);
 
+    // Close sidebar on pathname change (mobile)
+    useEffect(() => {
+        setIsSidebarOpen(false);
+    }, [pathname]);
+
     if (loading) return null; // Don't flash sidebar while checking perms
 
     const utilityItems = [
@@ -110,15 +116,32 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200 flex flex-col md:flex-row font-sans">
-            {/* Sidebar (Desktop) */}
-            <aside className="hidden md:flex w-64 border-r border-slate-800 bg-[#020617] flex-col fixed inset-y-0 h-full z-50">
-                <div className="p-6">
-                    <Link href="/dashboard" className="flex items-center gap-3 mb-10 pl-2 hover:opacity-80 transition-opacity cursor-pointer">
-                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 rounded object-contain shadow-lg shadow-sky-500/10" />
-                        <span className="text-xl font-black tracking-tighter text-white uppercase italic">Ro-Link</span>
-                    </Link>
+            {/* Sidebar Overlay (Mobile) */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] md:hidden transition-opacity duration-300"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
 
-                    <nav className="space-y-8">
+            {/* Sidebar (Desktop & Mobile Drawer) */}
+            <aside className={`
+                fixed inset-y-0 left-0 w-72 bg-[#020617] border-r border-slate-800 z-[70] 
+                transform transition-transform duration-300 ease-in-out flex flex-col
+                md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            `}>
+                <div className="p-6 flex flex-col h-full">
+                    <div className="flex items-center justify-between mb-8">
+                        <Link href="/dashboard" className="flex items-center gap-3 pl-2 hover:opacity-80 transition-opacity cursor-pointer">
+                            <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 rounded object-contain shadow-lg shadow-sky-500/10" />
+                            <span className="text-xl font-black tracking-tighter text-white uppercase italic">Ro-Link</span>
+                        </Link>
+                        <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-2 text-slate-500 hover:text-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </div>
+
+                    <nav className="flex-1 space-y-8 overflow-y-auto pr-2 custom-scrollbar">
                         <div>
                             <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-4 ml-2">Utility</p>
                             <div className="space-y-1">
@@ -128,9 +151,9 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                         <Link
                                             key={item.href}
                                             href={item.href}
-                                            className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all group font-semibold text-sm ${isActive
-                                                ? "bg-sky-600/10 text-sky-400 border border-sky-500/10"
-                                                : "text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent"
+                                            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group font-semibold text-sm ${isActive
+                                                ? "bg-sky-600/10 text-sky-400 border border-sky-500/10 shadow-sm shadow-sky-900/5"
+                                                : "text-slate-400 hover:text-white hover:bg-slate-800/40 border border-transparent"
                                                 }`}
                                         >
                                             <span className={`${isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300 transition-colors"}`}>
@@ -153,9 +176,9 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                             <Link
                                                 key={item.href}
                                                 href={item.href}
-                                                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all group font-semibold text-sm ${isActive
-                                                    ? "bg-sky-600/10 text-sky-400 border border-sky-500/10"
-                                                    : "text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent"
+                                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group font-semibold text-sm ${isActive
+                                                    ? "bg-sky-600/10 text-sky-400 border border-sky-500/10 shadow-sm shadow-sky-900/5"
+                                                    : "text-slate-400 hover:text-white hover:bg-slate-800/40 border border-transparent"
                                                     }`}
                                             >
                                                 <span className={`${isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300 transition-colors"}`}>
@@ -169,55 +192,43 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                             </div>
                         )}
                     </nav>
-                </div>
 
-                <div className="mt-auto p-6">
-                    <Link
-                        href="/dashboard"
-                        className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800/50 transition-all font-semibold text-sm group"
-                    >
-                        <BackIcon />
-                        Back to Servers
-                    </Link>
+                    <div className="mt-auto pt-6 border-t border-slate-800">
+                        <Link
+                            href="/dashboard"
+                            className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800/40 transition-all font-semibold text-sm group"
+                        >
+                            <BackIcon />
+                            Back to Servers
+                        </Link>
+                    </div>
                 </div>
             </aside>
 
-            {/* Bottom Nav (Mobile) */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#020617]/90 border-t border-slate-800 backdrop-blur-md z-50 flex justify-around items-center h-16 px-2">
-                {allItems.map((item) => {
-                    const isActive = pathname === item.href;
-                    return (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${isActive ? "text-sky-400" : "text-slate-500"}`}
-                        >
-                            {item.icon}
-                            <span className="text-[10px] font-bold mt-1">{item.label}</span>
-                        </Link>
-                    )
-                })}
-                <Link href="/dashboard" className="flex flex-col items-center justify-center p-2 text-slate-500">
-                    <BackIcon />
-                    <span className="text-[10px] font-bold mt-1">Exit</span>
-                </Link>
-            </nav>
-
             {/* Main Content Area */}
-            <main className="flex-1 md:ml-64 min-h-screen flex flex-col mb-16 md:mb-0">
-                <header className="h-16 border-b border-slate-800 bg-[#020617]/80 backdrop-blur-md flex items-center justify-between px-4 md:px-10 sticky top-0 z-40">
+            <main className="flex-1 md:ml-72 min-h-screen flex flex-col">
+                <header className="h-16 border-b border-slate-800 bg-[#020617]/80 backdrop-blur-md flex items-center justify-between px-4 md:px-10 sticky top-0 z-50">
                     <div className="flex items-center gap-3">
-                        <span className="text-xs font-bold text-slate-600 uppercase tracking-widest hidden sm:block">Server ID</span>
-                        <div className="h-4 w-[1px] bg-slate-800 mx-2 hidden sm:block"></div>
-                        <code className="text-[10px] font-mono text-sky-500 bg-sky-500/5 px-2 py-1 rounded border border-sky-500/10 uppercase tracking-wider truncate max-w-[120px] sm:max-w-none">
-                            {id}
-                        </code>
+                        <button
+                            onClick={() => setIsSidebarOpen(true)}
+                            className="md:hidden p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest hidden sm:block">Server ID</span>
+                            <div className="h-4 w-[1px] bg-slate-800 mx-2 hidden sm:block"></div>
+                            <code className="text-[10px] font-mono text-sky-400 bg-sky-400/5 px-2 py-1 rounded border border-sky-400/10 uppercase tracking-wider truncate max-w-[100px] sm:max-w-none">
+                                {id}
+                            </code>
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-3 sm:gap-6 text-[10px] font-bold text-slate-600 uppercase tracking-widest">
                         <div className="flex items-center gap-2">
                             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_12px_rgba(16,185,129,0.5)]"></div>
-                            <span className="hidden sm:inline">Network Status:</span> <span className="text-emerald-500">Nominal</span>
+                            <span className="hidden xs:inline">Network:</span> <span className="text-emerald-500">Nominal</span>
                         </div>
                         <div className="h-3 w-[1px] bg-slate-800 hidden sm:block"></div>
                         <span className="hidden sm:inline">API Latency:</span> <span className="text-sky-500 hidden sm:inline">12ms</span>

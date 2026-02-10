@@ -29,6 +29,8 @@ export default function Home() {
   const [serverCount, setServerCount] = useState<number | null>(null);
   const [commandCount, setCommandCount] = useState<number | null>(null);
 
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   useEffect(() => {
     async function fetchStats() {
       // Real-time Bot Server Count (From Discord API)
@@ -72,7 +74,9 @@ export default function Home() {
             <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link Logo" className="w-9 h-9 rounded-lg object-contain" />
             <span className="text-xl font-semibold tracking-tight text-white pl-1">Ro-Link</span>
           </div>
-          <div className="flex items-center gap-6">
+
+          {/* Desktop Links */}
+          <div className="hidden md:flex items-center gap-8">
             <a href="/docs" className="text-sm font-semibold text-slate-400 hover:text-white transition-colors">
               Documentation
             </a>
@@ -83,7 +87,34 @@ export default function Home() {
               Sign In
             </button>
           </div>
+
+          {/* Mobile Toggle */}
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="md:hidden p-2 text-slate-400 hover:text-white transition-colors"
+          >
+            {isMenuOpen ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            )}
+          </button>
         </nav>
+
+        {/* Mobile Menu */}
+        <div className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-48 opacity-100 mb-8' : 'max-h-0 opacity-0'}`}>
+          <div className="flex flex-col gap-4 bg-slate-900/50 border border-slate-800 p-6 rounded-2xl backdrop-blur-sm">
+            <a href="/docs" className="text-base font-semibold text-slate-300 hover:text-white transition-colors">
+              Documentation
+            </a>
+            <button
+              onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}
+              className="w-full px-5 py-3 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-xl transition-all shadow-md shadow-sky-900/10 text-center"
+            >
+              Sign In to Dashboard
+            </button>
+          </div>
+        </div>
 
         {/* Hero Section */}
         <main className="mt-20 md:mt-32 pb-20 flex flex-col items-center text-center">

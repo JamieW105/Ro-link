@@ -76,26 +76,41 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-200 p-4 sm:p-8 md:p-12">
-            <div className="max-w-7xl mx-auto">
-                <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 md:mb-12 border-b border-slate-800 pb-6 md:pb-10 gap-6">
-                    <Link href="/dashboard" className="flex items-center gap-4 hover:opacity-80 transition-opacity cursor-pointer">
-                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-12 h-12 rounded-xl object-contain shadow-lg border border-white/5 bg-slate-900/50 p-1" />
-                        <div>
-                            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Your Servers</h1>
-                            <p className="text-slate-500 text-xs md:text-sm font-medium mt-1">Select a server to manage.</p>
-                        </div>
+        <div className="min-h-screen bg-[#020617] text-slate-200">
+            {/* Sticky Professional Navbar */}
+            <nav className="sticky top-0 z-50 bg-[#020617]/80 backdrop-blur-md border-b border-slate-800">
+                <div className="max-w-7xl mx-auto px-4 sm:px-8 h-20 flex items-center justify-between">
+                    <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-9 h-9 rounded-lg object-contain shadow-lg border border-white/5" />
+                        <span className="text-xl font-bold tracking-tight text-white hidden xs:block">Ro-Link</span>
                     </Link>
-                    <div className="flex items-center gap-4 bg-slate-900/50 p-3 rounded-xl border border-slate-800 shadow-sm backdrop-blur-sm w-full sm:w-auto">
-                        <img src={session?.user?.image || ''} alt="" className="w-10 h-10 rounded-lg border border-slate-700" />
-                        <div className="text-left pr-2 flex-1 sm:flex-none">
-                            <p className="font-semibold text-sm text-white truncate">{session?.user?.name}</p>
-                            <button onClick={() => signOut()} className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-red-400 transition-colors mt-0.5 uppercase tracking-wider">
+
+                    <div className="flex items-center gap-3 sm:gap-4 pl-4 border-l border-slate-800 ml-auto">
+                        <div className="text-right hidden sm:block">
+                            <p className="text-sm font-semibold text-white leading-none mb-1">{session?.user?.name}</p>
+                            <button onClick={() => signOut()} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
                                 <LogOutIcon />
                                 Sign Out
                             </button>
                         </div>
+                        <div className="relative group">
+                            <img src={session?.user?.image || ''} alt="" className="w-10 h-10 rounded-xl border border-slate-700 shadow-sm transition-transform group-hover:scale-105" />
+                            <button
+                                onClick={() => signOut()}
+                                className="sm:hidden absolute -bottom-1 -right-1 bg-slate-900 border border-slate-700 p-1.5 rounded-lg text-slate-400 hover:text-red-400 shadow-xl"
+                                title="Sign Out"
+                            >
+                                <LogOutIcon />
+                            </button>
+                        </div>
                     </div>
+                </div>
+            </nav>
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 md:py-12">
+                <header className="mb-8 md:mb-12">
+                    <h1 className="text-2xl md:text-4xl font-extrabold text-white tracking-tight mb-2">Select a Server</h1>
+                    <p className="text-slate-500 text-sm md:text-base font-medium">Choose a community to manage and monitor.</p>
                 </header>
 
                 {loading ? (
