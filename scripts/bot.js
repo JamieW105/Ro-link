@@ -215,7 +215,7 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'setup') {
         if (user.id !== guild?.ownerId) {
             return interaction.reply({
-                content: '❌ This command can only be run by the server owner.',
+                content: 'This command can only be run by the server owner.',
                 ephemeral: true
             });
         }
@@ -230,7 +230,7 @@ client.on('interactionCreate', async interaction => {
         if (existingServer) {
             const embeds = getSetupEmbeds(guildId, existingServer.api_key);
             return interaction.reply({
-                content: 'ℹ️ **This server is already set up!** Here are your integration details:',
+                content: '**This server is already set up!** Here are your integration details:',
                 embeds: embeds,
                 ephemeral: true
             });
@@ -273,18 +273,22 @@ client.on('interactionCreate', async interaction => {
     // 2. Handle Ping (Public)
     if (commandName === 'ping') {
         const latency = Math.abs(Date.now() - interaction.createdTimestamp);
-        return interaction.reply(`🏓 **Pong!** \nLatency: \`${latency}ms\`\nStatus: \`Online (Vercel Integration Active)\``);
+        return interaction.reply(`**Pong!** \nLatency: \`${latency}ms\`\nStatus: \`Online (Vercel Integration Active)\``);
     }
 
     // 3. Handle Help (Public)
     if (commandName === 'help') {
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
         const infoEmbed = new EmbedBuilder()
             .setTitle('Info')
+            .setURL(baseUrl)
+            .setThumbnail(`${baseUrl}/Media/Ro-LinkIcon.png`)
             .setColor('#0ea5e9')
             .setDescription("Welcome to Ro-Link. We are a platform that enables you to connect your Discord / cmds to Roblox. We make the connection between Discord and Roblox feel like a very small gap. We allow kick, ban and unban cmds along with an advanced dashboard to show you your servers and player count.\n\nGive us a try, we are aways looking to help all community's no matter the size. Ro-link is perfect for any game and allows you to respond to urgent reports without the bother of having to join in game.");
 
         const commandsEmbed = new EmbedBuilder()
             .setTitle('Commands')
+            .setURL(`${baseUrl}/docs`)
             .setColor('#10b981')
             .addFields(
                 { name: '/setup', value: 'Initializes Ro-Link for this server (Owner Only).' },
@@ -310,7 +314,7 @@ client.on('interactionCreate', async interaction => {
 
     if (!server) {
         return interaction.reply({
-            content: `❌ This server is not set up with Ro-Link yet.\n\n**Server Owners** can use \`/setup\` to initialize it directly, or visit the dashboard: ${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guildId}`,
+            content: `This server is not set up with Ro-Link yet.\n\n**Server Owners** can use \`/setup\` to initialize it directly, or visit the dashboard: ${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guildId}`,
             ephemeral: true
         });
     }
@@ -318,7 +322,7 @@ client.on('interactionCreate', async interaction => {
     // 4. Permission Check for Moderation Commands
     if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('BanMembers') && !interaction.member.permissions.has('KickMembers')) {
         return interaction.reply({
-            content: '❌ You do not have permission to use moderation commands. (Requires Kick/Ban Members or Admin)',
+            content: 'You do not have permission to use moderation commands. (Requires Kick/Ban Members or Admin)',
             ephemeral: true
         });
     }
@@ -342,9 +346,9 @@ client.on('interactionCreate', async interaction => {
     }]);
 
     if (commandName === 'ban') {
-        await interaction.reply(`🔨 **Banned** \`${targetUser}\` from Roblox game. Reason: ${reason}`);
+        await interaction.reply(`**Banned** \`${targetUser}\` from Roblox game. Reason: ${reason}`);
     } else if (commandName === 'kick') {
-        await interaction.reply(`🥾 **Kicked** \`${targetUser}\` from Roblox server. Reason: ${reason}`);
+        await interaction.reply(`**Kicked** \`${targetUser}\` from Roblox server. Reason: ${reason}`);
     } else if (commandName === 'unban') {
         const targetUser = interaction.options.getString('username');
 
@@ -359,10 +363,10 @@ client.on('interactionCreate', async interaction => {
 
         if (error) {
             console.error(error);
-            return interaction.reply({ content: '❌ Failed to queue unban command.', ephemeral: true });
+            return interaction.reply({ content: 'Failed to queue unban command.', ephemeral: true });
         }
 
-        await interaction.reply(`🔓 **Unbanned** \`${targetUser}\` from Roblox. Command sent to game servers.`);
+        await interaction.reply(`**Unbanned** \`${targetUser}\` from Roblox. Command sent to game servers.`);
     } else if (commandName === 'update') {
         const { error } = await supabase
             .from('command_queue')
@@ -375,10 +379,10 @@ client.on('interactionCreate', async interaction => {
 
         if (error) {
             console.error(error);
-            return interaction.reply({ content: '❌ Failed to queue update command.', ephemeral: true });
+            return interaction.reply({ content: 'Failed to queue update command.', ephemeral: true });
         }
 
-        await interaction.reply(`🚀 **Update Signal Sent**! All game servers will restart shortly.`);
+        await interaction.reply(`**Update Signal Sent**! All game servers will restart shortly.`);
     } else if (commandName === 'shutdown') {
         const jobId = interaction.options.getString('job_id');
         const { error } = await supabase
@@ -392,27 +396,27 @@ client.on('interactionCreate', async interaction => {
 
         if (error) {
             console.error(error);
-            return interaction.reply({ content: '❌ Failed to queue shutdown command.', ephemeral: true });
+            return interaction.reply({ content: 'Failed to queue shutdown command.', ephemeral: true });
         }
 
         const targetMsg = jobId ? `server \`${jobId}\`` : 'all active game servers';
-        await interaction.reply(`🛑 **SHUTDOWN SIGNAL SENT**! Closing ${targetMsg}.`);
+        await interaction.reply(`**SHUTDOWN SIGNAL SENT**! Closing ${targetMsg}.`);
         // ... (rest of simple handlers)
     } else if (commandName === 'misc') {
         const embed = new EmbedBuilder()
-            .setTitle('🪄 Miscellaneous Player Actions')
+            .setTitle('Miscellaneous Player Actions')
             .setDescription('Select an action from the menu below to apply it to a Roblox player.')
             .setColor('#0ea5e9')
             .addFields(
-                { name: '✈️ Fly', value: 'Enables hover/flight for the target player.', inline: false },
-                { name: '👻 Noclip', value: 'Allows the player to pass through walls.', inline: false },
-                { name: '🫥 Invis', value: 'Makes the player and their accessories fully invisible.', inline: false },
-                { name: '🛡️ Ghost', value: 'Applies a ForceField material to the player character.', inline: false },
-                { name: '👤 Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: false },
-                { name: '💖 Heal', value: 'Restores player health to maximum.', inline: false },
-                { name: '💀 Kill', value: 'Immediately kills the target player.', inline: false },
-                { name: '🔄 Reset', value: 'Resets the player character.', inline: false },
-                { name: '🌪️ Refresh', value: 'Respawn the player character.', inline: false }
+                { name: 'Fly', value: 'Enables hover/flight for the target player.', inline: false },
+                { name: 'Noclip', value: 'Allows the player to pass through walls.', inline: false },
+                { name: 'Invis', value: 'Makes the player and their accessories fully invisible.', inline: false },
+                { name: 'Ghost', value: 'Applies a ForceField material to the player character.', inline: false },
+                { name: 'Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: false },
+                { name: 'Heal', value: 'Restores player health to maximum.', inline: false },
+                { name: 'Kill', value: 'Immediately kills the target player.', inline: false },
+                { name: 'Reset', value: 'Resets the player character.', inline: false },
+                { name: 'Refresh', value: 'Respawn the player character.', inline: false }
             )
             .setFooter({ text: 'Ro-Link Utility System' });
 
@@ -425,48 +429,39 @@ client.on('interactionCreate', async interaction => {
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Fly')
                             .setDescription('Enable flight for the player')
-                            .setValue('FLY')
-                            .setEmoji('✈️'),
+                            .setValue('FLY'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Noclip')
                             .setDescription('Allow player to walk through walls')
-                            .setValue('NOCLIP')
-                            .setEmoji('👻'),
+                            .setValue('NOCLIP'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Invis')
                             .setDescription('Make the player invisible')
-                            .setValue('INVIS')
-                            .setEmoji('🫥'),
+                            .setValue('INVIS'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Ghost')
                             .setDescription('Apply a ForceField material')
-                            .setValue('GHOST')
-                            .setEmoji('🛡️'),
+                            .setValue('GHOST'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Set Character')
                             .setDescription('Change appearance')
-                            .setValue('SET_CHAR')
-                            .setEmoji('👤'),
+                            .setValue('SET_CHAR'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Heal')
                             .setDescription('Restore health')
-                            .setValue('HEAL')
-                            .setEmoji('💖'),
+                            .setValue('HEAL'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Kill')
                             .setDescription('Instant kill')
-                            .setValue('KILL')
-                            .setEmoji('💀'),
+                            .setValue('KILL'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Reset')
                             .setDescription('Reset character')
-                            .setValue('RESET')
-                            .setEmoji('🔄'),
+                            .setValue('RESET'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Refresh')
                             .setDescription('Refresh character')
-                            .setValue('REFRESH')
-                            .setEmoji('🌪️'),
+                            .setValue('REFRESH'),
                     ),
             );
 
@@ -478,7 +473,7 @@ client.on('interactionCreate', async interaction => {
 
     } else if (commandName === 'ping') {
         const latency = Math.abs(Date.now() - interaction.createdTimestamp);
-        await interaction.reply(`🏓 **Pong!** \nLatency: \`${latency}ms\`\nStatus: \`Online (Vercel Integration Active)\``);
+        await interaction.reply(`**Pong!** \nLatency: \`${latency}ms\`\nStatus: \`Online (Vercel Integration Active)\``);
     }
 });
 
@@ -526,12 +521,12 @@ client.on('interactionCreate', async interaction => {
         const targetUser = interaction.fields.getTextInputValue('target_user');
 
         let args = { username: targetUser, moderator: interaction.user.tag };
-        let msgContent = `✅ Queuing **${action}** for **${targetUser}**...`;
+        let msgContent = `Queuing **${action}** for **${targetUser}**...`;
 
         if (action === 'SET_CHAR') {
             const charUser = interaction.fields.getTextInputValue('char_user');
             args.char_user = charUser;
-            msgContent = `✅ Queuing **Set Character** (to ${charUser}) for **${targetUser}**...`;
+            msgContent = `Queuing **Set Character** (to ${charUser}) for **${targetUser}**...`;
         }
 
         await interaction.reply({ content: msgContent, ephemeral: true });
@@ -556,7 +551,7 @@ client.on('interactionCreate', async interaction => {
 
     // Check permissions (Admin only)
     if (!interaction.member.permissions.has('Administrator')) {
-        return interaction.reply({ content: '❌ You need Administrator permissions to use these actions.', ephemeral: true });
+        return interaction.reply({ content: 'You need Administrator permissions to use these actions.', ephemeral: true });
     }
 
     await interaction.deferReply({ ephemeral: true });
@@ -570,7 +565,7 @@ client.on('interactionCreate', async interaction => {
     }]);
 
     if (error) {
-        return interaction.editReply(`❌ Failed to queue ${action}.`);
+        return interaction.editReply(`Failed to queue ${action}.`);
     }
 
     // Log the action
@@ -581,7 +576,7 @@ client.on('interactionCreate', async interaction => {
         moderator: interaction.user.tag
     }]);
 
-    await interaction.editReply(`✅ **${action.toUpperCase()}** command queued for \`${username}\`.`);
+    await interaction.editReply(`**${action.toUpperCase()}** command queued for \`${username}\`.`);
 });
 
 // Handle Modal Submissions
@@ -607,12 +602,12 @@ client.on('interactionCreate', async interaction => {
             });
 
         if (dbError) {
-            return interaction.editReply(`❌ Setup failed: ${dbError.message}`);
+            return interaction.editReply(`Setup failed: ${dbError.message}`);
         }
 
         const embeds = getSetupEmbeds(interaction.guildId, generatedKey);
         await interaction.editReply({
-            content: '✅ **Setup Successful!** Please follow the instructions below to complete the integration:',
+            content: '**Setup Successful!** Please follow the instructions below to complete the integration:',
             embeds: embeds
         });
     }
@@ -623,8 +618,10 @@ function getSetupEmbeds(guildId, apiKey) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
     const embed1 = new EmbedBuilder()
-        .setTitle('🛠️ Studio Setup Instructions')
+        .setTitle('Studio Setup Instructions')
         .setColor('#0ea5e9')
+        .setURL(`${baseUrl}/dashboard/${guildId}`)
+        .setThumbnail(`${baseUrl}/Media/Ro-LinkIcon.png`)
         .addFields(
             { name: '1. ModuleScript', value: "Create a `ModuleScript` in `ReplicatedStorage` named `RoLink`." },
             { name: '2. Paste Code', value: "Copy the code from the next message/box and paste it into that script." },
@@ -761,7 +758,7 @@ end
 return RoLink`;
 
     const embed2 = new EmbedBuilder()
-        .setTitle('📄 Core Bridge Code (RoLink Module)')
+        .setTitle('Core Bridge Code (RoLink Module)')
         .setColor('#10b981')
         .setDescription('```lua\n' + luaCode + '\n```')
         .setFooter({ text: 'Keep your Security Key private!' });
