@@ -155,6 +155,11 @@ async function updateStatus() {
         `CONNECTING ${serverCount} SERVERS TO ROBLOX. JOIN OUR SUPPORT SERVER: \`\`\` ${supportUrl} \`\`\``
     ];
 
+    if (!process.env.DISCORD_BEARER_TOKEN || process.env.DISCORD_BEARER_TOKEN === '0') {
+        // Skip metadata sync if no bearer token is provided
+        return;
+    }
+
     try {
         // Using the raw Discord API with an Application Bearer Token
         const response = await fetch(`https://discord.com/api/v10/applications/${process.env.DISCORD_CLIENT_ID}`, {

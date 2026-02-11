@@ -173,17 +173,21 @@ export async function POST(req: Request) {
 
             // Handle 'help' command
             if (name === 'help') {
+                const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
                 return NextResponse.json({
                     type: 4,
                     data: {
                         embeds: [
                             {
                                 title: 'Info',
+                                url: baseUrl,
+                                image: { url: `${baseUrl}/Media/Ro-LinkIcon.png` },
                                 description: "Welcome to Ro-Link. We are a platform that enables you to connect your Discord / cmds to Roblox. We make the connection between Discord and Roblox feel like a very small gap. We allow kick, ban and unban cmds along with an advanced dashboard to show you your servers and player count.\n\nGive us a try, we are aways looking to help all community's no matter the size. Ro-link is perfect for any game and allows you to respond to urgent reports without the bother of having to join in game.",
                                 color: 959977
                             },
                             {
                                 title: 'Commands',
+                                url: `${baseUrl}/docs`,
                                 color: 1095921,
                                 fields: [
                                     { name: '`/setup`', value: 'Initializes Ro-Link for this server (Owner Only).' },
@@ -193,7 +197,7 @@ export async function POST(req: Request) {
                                     { name: '`/unban`', value: 'Unban a user from the Roblox game.' },
                                     { name: '`/update`', value: 'Send a global update signal to all Roblox servers (restarts them).' },
                                     { name: '`/shutdown`', value: 'Immediately shut down game servers.' },
-                                    { name: '`/lookup`', value: 'Lookup a Roblox player and see their status/actions.' },
+                                    { name: '`/misc`', value: 'Access miscellaneous player actions like Fly, Kill, and Heal.' },
                                     { name: '`/help`', value: 'Show info and list of available commands.' }
                                 ]
                             }
@@ -380,11 +384,15 @@ export async function POST(req: Request) {
                             description: 'Select an action from the menu below to apply it to a Roblox player.',
                             color: 0x0ea5e9,
                             fields: [
-                                { name: '✈️ Fly', value: 'Enables hover/flight for the target player.', inline: true },
-                                { name: '👻 Noclip', value: 'Allows the player to pass through walls.', inline: true },
-                                { name: '🫥 Invis', value: 'Makes the player and their accessories fully invisible.', inline: true },
-                                { name: '🛡️ Ghost', value: 'Applies a ForceField material to the player character.', inline: true },
-                                { name: '👤 Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: true }
+                                { name: 'Fly', value: 'Enables hover/flight for the target player.', inline: false },
+                                { name: 'Noclip', value: 'Allows the player to pass through walls.', inline: false },
+                                { name: 'Invis', value: 'Makes the player and their accessories fully invisible.', inline: false },
+                                { name: 'Ghost', value: 'Applies a ForceField material to the player character.', inline: false },
+                                { name: 'Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: false },
+                                { name: 'Heal', value: 'Restores player health to maximum.', inline: false },
+                                { name: 'Kill', value: 'Immediately kills the target player.', inline: false },
+                                { name: 'Reset', value: 'Resets the player character.', inline: false },
+                                { name: 'Refresh', value: 'Respawn the player character.', inline: false }
                             ],
                             footer: { text: 'Ro-Link Utility System' }
                         }],
@@ -400,129 +408,18 @@ export async function POST(req: Request) {
                                     { label: 'Noclip', value: 'NOCLIP', description: 'Allow player to walk through walls', emoji: { name: '👻' } },
                                     { label: 'Invis', value: 'INVIS', description: 'Make the player invisible', emoji: { name: '🫥' } },
                                     { label: 'Ghost', value: 'GHOST', description: 'Apply a ForceField material', emoji: { name: '🛡️' } },
-                                    { label: 'Set Character', value: 'SET_CHAR', description: 'Change appearance', emoji: { name: '👤' } }
+                                    { label: 'Set Character', value: 'SET_CHAR', description: 'Change appearance', emoji: { name: '👤' } },
+                                    { label: 'Heal', value: 'HEAL', description: 'Restore health', emoji: { name: '❤️' } },
+                                    { label: 'Kill', value: 'KILL', description: 'Instant kill', emoji: { name: '💀' } },
+                                    { label: 'Reset', value: 'RESET', description: 'Reset character', emoji: { name: '🔄' } },
+                                    { label: 'Refresh', value: 'REFRESH', description: 'Refresh character', emoji: { name: '✨' } }
                                 ]
                             }]
                         }]
                     }
                 });
             }
-            else if (name === 'lookup') {
-                const username = options.find((o: any) => o.name === 'username').value;
 
-                // Headers for Roblox API (Legacy Search does NOT support x-api-key)
-                const headers: any = { 'User-Agent': 'Mozilla/5.0' };
-
-                // Fetch data for the embed (Official Roblox API)
-                const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${username}&limit=10`, {
-                    headers
-                });
-
-                if (!searchRes.ok) {
-                    if (searchRes.status === 429) {
-                        return NextResponse.json({
-                            type: 4,
-                            data: { content: `⚠️ **Rate Limited**: Roblox is currently limiting requests from this server. Please try again in 1-2 minutes or ensure your Open Cloud key has 'User' permissions enabled.`, flags: 64 }
-                        });
-                    }
-                    const errorText = await searchRes.text();
-                    console.error('[ROBLOX API ERROR]', searchRes.status, errorText);
-                    return NextResponse.json({ type: 4, data: { content: `❌ Roblox API returned an error (${searchRes.status}).` } });
-                }
-
-                const searchData = await searchRes.json();
-                if (!searchData.data?.[0]) {
-                    return NextResponse.json({ type: 4, data: { content: `❌ Player \`${username}\` not found.` } });
-                }
-
-                const userId = searchData.data[0].id;
-
-                const canonicalName = searchData.data[0].name;
-
-                const [profileRes, thumbRes, serversRes, logsRes] = await Promise.all([
-                    fetch(`https://users.roblox.com/v1/users/${userId}`, { headers }),
-                    fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`, { headers }),
-                    supabase.from('live_servers').select('id, players').eq('server_id', guild_id),
-                    supabase.from('logs').select('action, moderator, created_at').eq('server_id', guild_id).eq('target', canonicalName).order('created_at', { ascending: false }).limit(5)
-                ]);
-
-                if (!profileRes.ok) {
-                    return NextResponse.json({ type: 4, data: { content: `❌ Failed to fetch detailed player info from Roblox.` } });
-                }
-
-                const profile = await profileRes.json();
-                const thumb = await thumbRes.json();
-                const avatarUrl = thumb.data?.[0]?.imageUrl || '';
-
-                const activeServer = serversRes.data?.find((s: any) =>
-                    Array.isArray(s.players) && s.players.some((p: string) => p.toLowerCase() === profile.name.toLowerCase())
-                );
-
-                const logs = logsRes.data || [];
-                const logField = logs.length > 0
-                    ? logs.map(l => `• **${l.action}** by ${l.moderator.split('#')[0]} (<t:${Math.floor(new Date(l.created_at).getTime() / 1000)}:R>)`).join('\n')
-                    : '*No previous moderation.*';
-
-                const createdDate = new Date(profile.created);
-                const accountAgeDays = Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-
-                let statusText = activeServer ? `🟢 **In-Game**\n\`${activeServer.id}\`` : '⚪ Offline';
-                if (profile.isBanned) statusText = '🔴 **Banned on Roblox**';
-
-                const components = [];
-
-                // Row 1: Links & Info
-                const actionRow1 = {
-                    type: 1,
-                    components: [
-                        { type: 2, label: 'View Profile', style: 5, url: `https://www.roblox.com/users/${userId}/profile` },
-                        { type: 2, label: 'View on Dashboard', style: 5, url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/${guild_id}/lookup?username=${profile.name}` }
-                    ]
-                };
-
-                if (activeServer && server?.linked_place_id) {
-                    actionRow1.components.push({
-                        type: 2,
-                        label: 'Join Server',
-                        style: 5,
-                        url: `roblox://placeId=${server.linked_place_id}&gameInstanceId=${activeServer.id}`
-                    });
-                }
-                components.push(actionRow1);
-
-                // Row 2: Moderation Actions
-                components.push({
-                    type: 1,
-                    components: [
-                        { type: 2, label: 'Kick', style: 2, custom_id: `kick_${userId}_${profile.name}` },
-                        { type: 2, label: 'Ban', style: 4, custom_id: `ban_${userId}_${profile.name}` },
-                        { type: 2, label: 'Unban', style: 3, custom_id: `unban_${userId}_${profile.name}` }
-                    ]
-                });
-
-                return NextResponse.json({
-                    type: 4,
-                    data: {
-                        embeds: [{
-                            title: `Player Lookup: ${profile.displayName}`,
-                            color: activeServer ? 1095921 : profile.isBanned ? 15681348 : 959977,
-                            thumbnail: { url: avatarUrl },
-                            fields: [
-                                { name: 'Username', value: `\`${profile.name}\``, inline: true },
-                                { name: 'User ID', value: `\`${userId}\``, inline: true },
-                                { name: 'Status', value: statusText, inline: true },
-                                { name: 'Account Age', value: `\`${accountAgeDays.toLocaleString()} Days\``, inline: true },
-                                { name: 'Created', value: `<t:${Math.floor(createdDate.getTime() / 1000)}:D> (<t:${Math.floor(createdDate.getTime() / 1000)}:R>)`, inline: true },
-                                { name: 'Description', value: profile.description ? (profile.description.length > 200 ? profile.description.substring(0, 197) + '...' : profile.description) : '*No description*', inline: false },
-                                { name: '📜 Moderation History (Recent)', value: logField, inline: false }
-                            ],
-                            footer: { text: 'Ro-Link Dashboard Integration' },
-                            timestamp: new Date().toISOString()
-                        }],
-                        components
-                    }
-                });
-            }
 
             return NextResponse.json({
                 type: 4,
@@ -815,6 +712,23 @@ function RoLink:Execute(cmd)
                      p:LoadCharacterWithHumanoidDescription(Players:GetHumanoidDescriptionFromUserId(uid))
                  end
             end)
+        end
+    elseif cmd.command == "HEAL" then
+        if p and p.Character and p.Character:FindFirstChild("Humanoid") then
+            p.Character.Humanoid.Health = p.Character.Humanoid.MaxHealth
+        end
+    elseif cmd.command == "KILL" then
+        if p and p.Character and p.Character:FindFirstChild("Humanoid") then
+            p.Character.Humanoid.Health = 0
+        end
+    elseif cmd.command == "RESET" then
+        if p then p:LoadCharacter() end
+    elseif cmd.command == "REFRESH" then
+        if p and p.Character then
+            local cf = p.Character:GetPrimaryPartCFrame()
+            p:LoadCharacter()
+            p.CharacterAdded:Wait()
+            p.Character:SetPrimaryPartCFrame(cf)
         end
 	elseif cmd.command == "UPDATE" then
 		for _, p in ipairs(Players:GetPlayers()) do p:Kick("Updating...") end
