@@ -120,7 +120,7 @@ export default function Home() {
         <main className="mt-20 md:mt-32 pb-20 flex flex-col items-center text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/50 border border-slate-700 text-slate-400 text-xs font-medium mb-10">
             <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            V1.0 Simple & Powerful
+            V1.5 Simple & Powerful
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight mb-8 text-white leading-[1.1]">
