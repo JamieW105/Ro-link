@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     type: "website",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Ro-Link | Connect Discord to Roblox",
     description: "Connect your Discord community to your Roblox games seamlessly.",
     images: ["/icon.png"],

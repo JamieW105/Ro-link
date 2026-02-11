@@ -282,7 +282,7 @@ client.on('interactionCreate', async interaction => {
         const infoEmbed = new EmbedBuilder()
             .setTitle('Info')
             .setURL(baseUrl)
-            .setThumbnail(`${baseUrl}/Media/Ro-LinkIcon.png`)
+            .setImage(`${baseUrl}/Media/Ro-LinkIcon.png`)
             .setColor('#0ea5e9')
             .setDescription("Welcome to Ro-Link. We are a platform that enables you to connect your Discord / cmds to Roblox. We make the connection between Discord and Roblox feel like a very small gap. We allow kick, ban and unban cmds along with an advanced dashboard to show you your servers and player count.\n\nGive us a try, we are aways looking to help all community's no matter the size. Ro-link is perfect for any game and allows you to respond to urgent reports without the bother of having to join in game.");
 
@@ -621,7 +621,7 @@ function getSetupEmbeds(guildId, apiKey) {
         .setTitle('Studio Setup Instructions')
         .setColor('#0ea5e9')
         .setURL(`${baseUrl}/dashboard/${guildId}`)
-        .setThumbnail(`${baseUrl}/Media/Ro-LinkIcon.png`)
+        .setImage(`${baseUrl}/Media/Ro-LinkIcon.png`)
         .addFields(
             { name: '1. ModuleScript', value: "Create a `ModuleScript` in `ReplicatedStorage` named `RoLink`." },
             { name: '2. Paste Code', value: "Copy the code from the next message/box and paste it into that script." },
