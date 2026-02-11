@@ -27,8 +27,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary",
     title: "Ro-Link | Connect Discord to Roblox",
-    description: "The ultimate platform for bridging Discord and Roblox. High-performance moderation tool with real-time analytics.",
-    images: ["/Media/Ro-LinkIcon.png"],
+    description: "The ultimate platform for bridging Discord and Roblox. High-performance moderation tool with real-time analytics, live moderation from discord and 24/7 hosting.",
+    images: ["/Media/preview.png"],
   },
 };
 
