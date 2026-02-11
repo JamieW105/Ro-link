@@ -7,15 +7,15 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Ro-Link | Connect Discord to Roblox",
-  description: "Securely bridge Discord and Roblox. Manage communities, moderate players in real-time, and monitor live game server health with Ro-Link.",
+  description: "The ultimate platform for bridging Discord and Roblox. High-performance moderation tool with real-time analytics.",
   openGraph: {
     title: "Ro-Link | Connect Discord to Roblox",
     description: "The ultimate platform for bridging Discord and Roblox. High-performance moderation tool with real-time analytics.",
-    url: "https://ro-link.vercel.app", // Fallback if production
+    url: "https://rolink.cloud",
     siteName: "Ro-Link",
     images: [
       {
-        url: "/icon.png", // Use the large icon for social preview
+        url: "/Media/Ro-LinkIcon.png",
         width: 512,
         height: 512,
         alt: "Ro-Link Logo",
@@ -25,11 +25,15 @@ export const metadata: Metadata = {
     type: "website",
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title: "Ro-Link | Connect Discord to Roblox",
-    description: "Connect your Discord community to your Roblox games seamlessly.",
-    images: ["/icon.png"],
+    description: "The ultimate platform for bridging Discord and Roblox. High-performance moderation tool with real-time analytics.",
+    images: ["/Media/Ro-LinkIcon.png"],
   },
+};
+
+export const viewport = {
+  themeColor: "#0ea5e9",
 };
 
 export default function RootLayout({
