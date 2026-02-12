@@ -79,7 +79,7 @@ export default function PlayerLookup() {
             // Fetch Presence and Logs in Parallel
             const [serversRes, logsRes] = await Promise.all([
                 supabase.from('live_servers').select('id, players').eq('server_id', id),
-                supabase.from('logs').select('*').eq('server_id', id).eq('target', data.username).order('created_at', { ascending: false })
+                supabase.from('logs').select('*').eq('server_id', id).eq('target', data.username).order('timestamp', { ascending: false })
             ]);
 
             if (serversRes.data) {
@@ -183,7 +183,7 @@ export default function PlayerLookup() {
             }]);
 
             // Re-fetch logs
-            const { data } = await supabase.from('logs').select('*').eq('server_id', id).eq('target', player.username).order('created_at', { ascending: false });
+            const { data } = await supabase.from('logs').select('*').eq('server_id', id).eq('target', player.username).order('timestamp', { ascending: false });
             if (data) setLogs(data);
         }
         setActionLoading(false);
@@ -320,11 +320,11 @@ export default function PlayerLookup() {
                                                 <div className={`w-2 h-2 rounded-full ${log.action === 'BAN' ? 'bg-red-500' : log.action === 'KICK' ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
                                                 <div>
                                                     <span className="text-[10px] font-bold text-white uppercase tracking-wider">{log.action}</span>
-                                                    <p className="text-[11px] text-slate-500 mt-1 font-medium">By {log.moderator} • {new Date(log.created_at).toLocaleDateString()}</p>
+                                                    <p className="text-[11px] text-slate-500 mt-1 font-medium">By {log.moderator} • {new Date(log.timestamp).toLocaleDateString()}</p>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <span className="text-[9px] font-mono text-slate-600 uppercase tracking-widest">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span className="text-[9px] font-mono text-slate-600 uppercase tracking-widest">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
                                         </div>
                                     ))}

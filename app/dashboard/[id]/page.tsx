@@ -10,7 +10,7 @@ interface Log {
     action: string;
     target: string;
     moderator: string;
-    created_at: string;
+    timestamp: string;
 }
 
 // SVGs
@@ -66,7 +66,7 @@ export default function ServerDashboard() {
                 .from('logs')
                 .select('*')
                 .eq('server_id', id)
-                .order('created_at', { ascending: false })
+                .order('timestamp', { ascending: false })
                 .limit(10);
 
             if (logData) setLogs(logData);
@@ -214,7 +214,7 @@ export default function ServerDashboard() {
                                         <td className="px-8 py-4 font-semibold text-white">{log.target}</td>
                                         <td className="px-8 py-4 text-slate-400 font-medium">{log.moderator}</td>
                                         <td className="px-8 py-4 text-right text-slate-600 font-mono text-[10px] font-bold">
-                                            {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                         </td>
                                     </tr>
                                 ))}
