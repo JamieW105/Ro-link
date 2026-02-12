@@ -332,81 +332,96 @@ client.on('interactionCreate', async interaction => {
         });
     }
 
-    const targetUser = interaction.options.getString('username');
-    const reason = interaction.options.getString('reason') || 'No reason provided';
-
-    // 2. Add to Audit Logs
-    await supabase.from('logs').insert([{
-        server_id: guildId,
-        action: commandName.toUpperCase(),
-        target: targetUser,
-        moderator: user.tag
-    }]);
-
-    // 3. Add to Command Queue for Roblox
-    await supabase.from('command_queue').insert([{
-        server_id: guildId,
-        command: commandName.toUpperCase(),
-        args: { username: targetUser, reason: reason, moderator: user.tag }
-    }]);
-
     if (commandName === 'ban') {
-        await interaction.reply(`**Banned** \`${targetUser}\` from Roblox game. Reason: ${reason}`);
+        const targetUser = interaction.options.getString('username');
+        const reason = interaction.options.getString('reason') || 'No reason provided';
+
+        await Promise.all([
+            supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'BAN',
+                target: targetUser,
+                moderator: user.tag
+            }]),
+            supabase.from('command_queue').insert([{
+                server_id: guildId,
+                command: 'BAN',
+                args: { username: targetUser, reason: reason, moderator: user.tag },
+                status: 'PENDING'
+            }]),
+            interaction.reply(`🔨 **Banned** \`${targetUser}\` from Roblox game. Reason: ${reason}`)
+        ]);
     } else if (commandName === 'kick') {
-        await interaction.reply(`**Kicked** \`${targetUser}\` from Roblox server. Reason: ${reason}`);
+        const targetUser = interaction.options.getString('username');
+        const reason = interaction.options.getString('reason') || 'No reason provided';
+
+        await Promise.all([
+            supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'KICK',
+                target: targetUser,
+                moderator: user.tag
+            }]),
+            supabase.from('command_queue').insert([{
+                server_id: guildId,
+                command: 'KICK',
+                args: { username: targetUser, reason: reason, moderator: user.tag },
+                status: 'PENDING'
+            }]),
+            interaction.reply(`🥾 **Kicked** \`${targetUser}\` from Roblox server. Reason: ${reason}`)
+        ]);
     } else if (commandName === 'unban') {
         const targetUser = interaction.options.getString('username');
 
-        const { error } = await supabase
-            .from('command_queue')
-            .insert([{
-                server_id: interaction.guildId,
+        await Promise.all([
+            supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'UNBAN',
+                target: targetUser,
+                moderator: user.tag
+            }]),
+            supabase.from('command_queue').insert([{
+                server_id: guildId,
                 command: 'UNBAN',
-                args: { username: targetUser, moderator: interaction.user.tag },
+                args: { username: targetUser, moderator: user.tag },
                 status: 'PENDING'
-            }]);
-
-        if (error) {
-            console.error(error);
-            return interaction.reply({ content: 'Failed to queue unban command.', ephemeral: true });
-        }
-
-        await interaction.reply(`**Unbanned** \`${targetUser}\` from Roblox. Command sent to game servers.`);
+            }]),
+            interaction.reply(`🔓 **Unbanned** \`${targetUser}\` from Roblox. Command sent to game servers.`)
+        ]);
     } else if (commandName === 'update') {
-        const { error } = await supabase
-            .from('command_queue')
-            .insert([{
-                server_id: interaction.guildId,
+        await Promise.all([
+            supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'UPDATE',
+                target: 'ALL',
+                moderator: user.tag
+            }]),
+            supabase.from('command_queue').insert([{
+                server_id: guildId,
                 command: 'UPDATE',
-                args: { moderator: interaction.user.tag },
+                args: { moderator: user.tag },
                 status: 'PENDING'
-            }]);
-
-        if (error) {
-            console.error(error);
-            return interaction.reply({ content: 'Failed to queue update command.', ephemeral: true });
-        }
-
-        await interaction.reply(`**Update Signal Sent**! All game servers will restart shortly.`);
+            }]),
+            interaction.reply(`🚀 **Update Signal Sent**! All game servers will restart shortly.`)
+        ]);
     } else if (commandName === 'shutdown') {
         const jobId = interaction.options.getString('job_id');
-        const { error } = await supabase
-            .from('command_queue')
-            .insert([{
-                server_id: interaction.guildId,
+
+        await Promise.all([
+            supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'SHUTDOWN',
+                target: jobId || 'ALL',
+                moderator: user.tag
+            }]),
+            supabase.from('command_queue').insert([{
+                server_id: guildId,
                 command: 'SHUTDOWN',
-                args: { job_id: jobId, moderator: interaction.user.tag },
+                args: { job_id: jobId, moderator: user.tag },
                 status: 'PENDING'
-            }]);
-
-        if (error) {
-            console.error(error);
-            return interaction.reply({ content: 'Failed to queue shutdown command.', ephemeral: true });
-        }
-
-        const targetMsg = jobId ? `server \`${jobId}\`` : 'all active game servers';
-        await interaction.reply(`**SHUTDOWN SIGNAL SENT**! Closing ${targetMsg}.`);
-        // ... (rest of simple handlers)
+            }]),
+            interaction.reply(`🛑 **SHUTDOWN SIGNAL SENT**! Closing \`${jobId || 'all active game servers'}\`.`)
+        ]);
     } else if (commandName === 'misc') {
         const embed = new EmbedBuilder()
             .setTitle('Miscellaneous Player Actions')
@@ -541,6 +556,13 @@ client.on('interactionCreate', async interaction => {
             command: action,
             args: args,
             status: 'PENDING'
+        }]);
+
+        await supabase.from('logs').insert([{
+            server_id: interaction.guildId,
+            action: action,
+            target: targetUser,
+            moderator: interaction.user.tag
         }]);
     }
 });

@@ -533,7 +533,13 @@ export async function POST(req: Request) {
                         args: args,
                         status: 'PENDING'
                     }]),
-                    triggerMessaging(action, args)
+                    triggerMessaging(action, args),
+                    supabase.from('logs').insert([{
+                        server_id: guild_id,
+                        action: action,
+                        target: targetUser,
+                        moderator: userTag
+                    }])
                 ]);
 
                 return NextResponse.json({
