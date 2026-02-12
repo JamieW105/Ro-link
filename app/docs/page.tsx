@@ -15,7 +15,8 @@ const Icons = {
     Copy: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>,
     Check: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="20 6 9 17 4 12" /></svg>,
     Menu: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg>,
-    X: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+    X: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>,
+    Terminal: (props: any) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></svg>
 };
 
 // --- Reusable Content Components ---
@@ -277,6 +278,115 @@ RoLink.Initialize({
                 </section>
             </div>
         )
+    },
+    {
+        id: 'developer-api',
+        category: 'developer',
+        title: 'Public API',
+        icon: Icons.Terminal,
+        toc: [
+            { id: 'auth', title: 'Authentication' },
+            { id: 'lookup', title: 'User Lookup' },
+            { id: 'command', title: 'Execute Command' }
+        ],
+        content: (
+            <div className="space-y-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                <p className="text-lg text-slate-400">
+                    Ro-Link provides a RESTful API for developers to interact solely via external applications.
+                </p>
+
+                <section id="auth" className="scroll-mt-24">
+                    <h2 className="text-2xl font-bold text-white mb-4">Authentication</h2>
+                    <p className="text-slate-400 mb-4">
+                        All API requests require your <Highlight>Server Key</Highlight> (found in Dashboard) passed as a header.
+                    </p>
+                    <CodeBlock label="Header Format">
+                        x-api-key: rl_xxxxxxxxxxxxx
+                    </CodeBlock>
+                </section>
+
+                <section id="lookup" className="scroll-mt-24">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="h-px bg-slate-800 flex-1"></div>
+                        <h2 className="text-xl font-bold text-white">GET /user</h2>
+                        <div className="h-px bg-slate-800 flex-1"></div>
+                    </div>
+                    <p className="text-slate-400 mb-4">
+                        Retrieve detailed information about a Roblox player by username.
+                    </p>
+
+                    <h4 className="text-sm font-bold text-white mb-2">Endpoint</h4>
+                    <div className="bg-slate-950 p-3 rounded font-mono text-xs text-sky-400 mb-4 border border-slate-800">
+                        GET https://rolink.cloud/api/v1/user?username=Roblox
+                    </div>
+
+                    <h4 className="text-sm font-bold text-white mb-2">Example Request</h4>
+                    <CodeBlock label="cURL">
+                        {`curl -X GET "https://rolink.cloud/api/v1/user?username=Roblox" \\
+     -H "x-api-key: YOUR_KEY_HERE"`}
+                    </CodeBlock>
+                </section>
+
+                <section id="command" className="scroll-mt-24">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="h-px bg-slate-800 flex-1"></div>
+                        <h2 className="text-xl font-bold text-white">POST /command</h2>
+                        <div className="h-px bg-slate-800 flex-1"></div>
+                    </div>
+                    <p className="text-slate-400 mb-4">
+                        Queue a moderation command to be executed in your game.
+                    </p>
+
+                    <h4 className="text-sm font-bold text-white mb-2">Endpoint</h4>
+                    <div className="bg-slate-950 p-3 rounded font-mono text-xs text-sky-400 mb-4 border border-slate-800">
+                        POST https://rolink.cloud/api/v1/command
+                    </div>
+
+                    <h4 className="text-sm font-bold text-white mb-2">Request Body</h4>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm text-slate-400 mb-6">
+                            <thead className="bg-slate-900 text-white font-semibold">
+                                <tr>
+                                    <th className="p-3">Field</th>
+                                    <th className="p-3">Type</th>
+                                    <th className="p-3">Description</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800">
+                                <tr>
+                                    <td className="p-3 font-mono text-sky-400">command</td>
+                                    <td className="p-3">string</td>
+                                    <td>Action (e.g., KICK, BAN, UNBAN, SHUTDOWN)</td>
+                                </tr>
+                                <tr>
+                                    <td className="p-3 font-mono text-sky-400">args</td>
+                                    <td className="p-3">object</td>
+                                    <td>Parameters (username, reason, etc.)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h4 className="text-sm font-bold text-white mb-2">Example: Kick Player</h4>
+                    <CodeBlock label="JavaScript (Fetch)">
+                        {`fetch('https://rolink.cloud/api/v1/command', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': 'YOUR_KEY_HERE'
+    },
+    body: JSON.stringify({
+        command: 'KICK',
+        args: {
+            username: 'Exploiter123',
+            reason: 'Flying'
+        }
+    })
+});`}
+                    </CodeBlock>
+                </section>
+            </div>
+        )
     }
 ];
 
@@ -314,7 +424,7 @@ export default function DocsPage() {
                 {/* Left Sidebar (Navigation) */}
                 <aside className={`
                     fixed inset-0 z-40 bg-[#020617] lg:bg-transparent lg:static lg:w-72 lg:block border-r border-slate-800/50
-                    ${mobileMenuOpen ? 'flex flex-col' : 'hidden'}
+                    \${mobileMenuOpen ? 'flex flex-col' : 'hidden'}
                 `}>
                     <div className="h-screen sticky top-0 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-800">
                         <div className="hidden lg:flex items-center gap-2 font-bold text-xl text-white mb-8">
@@ -407,7 +517,7 @@ export default function DocsPage() {
                 {/* Right Sidebar (Table of Contents) */}
                 <aside className={`
                     hidden xl:block w-72 sticky top-0 h-screen overflow-y-auto px-6 py-16 border-l border-slate-800/50 bg-[#020617]/50 backdrop-blur-sm
-                    ${activePage.toc.length === 0 ? 'invisible' : ''}
+                    \${activePage.toc.length === 0 ? 'invisible' : ''}
                 `}>
                     <div className="mb-6">
                         <h4 className="text-xs font-bold text-white uppercase tracking-widest">On this page</h4>
@@ -439,12 +549,12 @@ function NavButton({ active, onClick, children, icon: Icon }: { active: boolean,
             onClick={onClick}
             className={`
                 w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group
-                ${active
-                    ? "bg-sky-500/10 text-sky-400"
+                \${active 
+                    ? "bg-sky-500/10 text-sky-400" 
                     : "text-slate-400 hover:text-white hover:bg-white/5"}
             `}
         >
-            <Icon className={`w-4 h-4 transition-colors ${active ? "text-sky-400" : "text-slate-600 group-hover:text-slate-400"}`} />
+            <Icon className={`w-4 h-4 transition-colors \${active ? "text-sky-400" : "text-slate-600 group-hover:text-slate-400"}`} />
             {children}
         </button>
     )
