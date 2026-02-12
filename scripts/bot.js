@@ -490,8 +490,8 @@ client.on('interactionCreate', async interaction => {
         const action = interaction.values[0];
 
         const modal = new ModalBuilder()
-            .setCustomId(`misc_modal_${action}`)
-            .setTitle(`Action: ${action}`);
+            .setCustomId(`misc_modal_\${action}`)
+            .setTitle(`Action: \${action}`);
 
         const targetUserInput = new TextInputBuilder()
             .setCustomId('target_user')
@@ -526,12 +526,12 @@ client.on('interactionCreate', async interaction => {
         const targetUser = interaction.fields.getTextInputValue('target_user');
 
         let args = { username: targetUser, moderator: interaction.user.tag };
-        let msgContent = `Queuing **${action}** for **${targetUser}**...`;
+        let msgContent = `Queuing **\${action}** for **\${targetUser}**...`;
 
         if (action === 'SET_CHAR') {
             const charUser = interaction.fields.getTextInputValue('char_user');
             args.char_user = charUser;
-            msgContent = `Queuing **Set Character** (to ${charUser}) for **${targetUser}**...`;
+            msgContent = `Queuing **Set Character** (to \${charUser}) for **\${targetUser}**...`;
         }
 
         await interaction.reply({ content: msgContent, ephemeral: true });
@@ -570,7 +570,7 @@ client.on('interactionCreate', async interaction => {
     }]);
 
     if (error) {
-        return interaction.editReply(`Failed to queue ${action}.`);
+        return interaction.editReply(`Failed to queue \${action}.`);
     }
 
     // Log the action
@@ -581,7 +581,7 @@ client.on('interactionCreate', async interaction => {
         moderator: interaction.user.tag
     }]);
 
-    await interaction.editReply(`**${action.toUpperCase()}** command queued for \`${username}\`.`);
+    await interaction.editReply(`**\${action.toUpperCase()}** command queued for \`\${username}\`.`);
 });
 
 // Handle Modal Submissions
@@ -607,7 +607,7 @@ client.on('interactionCreate', async interaction => {
             });
 
         if (dbError) {
-            return interaction.editReply(`Setup failed: ${dbError.message}`);
+            return interaction.editReply(`Setup failed: \${dbError.message}`);
         }
 
         const embeds = getSetupEmbeds(interaction.guildId, generatedKey);
@@ -625,14 +625,14 @@ function getSetupEmbeds(guildId, apiKey) {
     const embed1 = new EmbedBuilder()
         .setTitle('Studio Setup Instructions')
         .setColor('#0ea5e9')
-        .setURL(`${baseUrl}/dashboard/${guildId}`)
-        .setImage(`${baseUrl}/Media/Ro-LinkIcon.png`)
+        .setURL(`\${baseUrl}/dashboard/\${guildId}`)
+        .setImage(`\${baseUrl}/Media/Ro-LinkIcon.png`)
         .addFields(
             { name: '1. ModuleScript', value: "Create a `ModuleScript` in `ReplicatedStorage` named `RoLink`." },
             { name: '2. Paste Code', value: "Copy the code from the next message/box and paste it into that script." },
             { name: '3. Starter Script', value: "Create a `Script` in `ServerScriptService` with:\n```lua\nlocal RoLink = require(game.ReplicatedStorage:WaitForChild('RoLink'))\nRoLink:Initialize()\n```" },
             { name: '4. Permissions', value: "Enable **HTTP Requests** and **API Services** in Game Settings." },
-            { name: 'Dashboard', value: `${baseUrl}/dashboard/${guildId}` }
+            { name: 'Dashboard', value: `\${baseUrl}/dashboard/\${guildId}` }
         );
 
     const luaCode = `-- RoLink Core Bridge
@@ -641,8 +641,8 @@ local Http = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MS = game:GetService("MessagingService")
 
-local URL = "${baseUrl}"
-local KEY = "${apiKey}"
+local URL = "\${baseUrl}"
+local KEY = "\${apiKey}"
 local POLL_INTERVAL = 5
 
 function RoLink:Initialize()
@@ -695,35 +695,46 @@ function RoLink:Execute(cmd)
 			if s and uid then pcall(function() Players:UnbanAsync({UserIds={uid}}) end) end
 		end)
     elseif cmd.command == "FLY" then
-        if p and p.Character then
-            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-            if hrp and not hrp:FindFirstChild("RoLinkFly") then
-                local bv = Instance.new("BodyVelocity", hrp)
+        if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = p.Character.HumanoidRootPart
+            local bv = hrp:FindFirstChild("RoLinkFly")
+            if bv then 
+                bv:Destroy() 
+            else
+                bv = Instance.new("BodyVelocity", hrp)
                 bv.Name = "RoLinkFly"
-                bv.MaxForce = Vector3.new(1,1,1) * 100000
-                bv.Velocity = Vector3.new(0,0,0) -- Hover
-                -- Simple hover/fly. Real fly requires client input.
+                bv.MaxForce = Vector3.new(1,1,1) * 1000000
+                bv.Velocity = Vector3.new(0,0,0)
             end
         end
     elseif cmd.command == "NOCLIP" then
          if p and p.Character then
+            local attr = "RoLink_Noclip"
+            local state = not p.Character:GetAttribute(attr)
+            p.Character:SetAttribute(attr, state)
             for _, v in pairs(p.Character:GetDescendants()) do
-                if v:IsA("BasePart") then v.CanCollide = false end
+                if v:IsA("BasePart") then v.CanCollide = not state end
             end
          end
     elseif cmd.command == "INVIS" then
          if p and p.Character then
+            local attr = "RoLink_Invis"
+            local state = not p.Character:GetAttribute(attr)
+            p.Character:SetAttribute(attr, state)
             for _, v in pairs(p.Character:GetDescendants()) do
-                if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = 1 end
+                if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = state and 1 or 0 end
             end
-            p.Character.Head.Transparency = 1
+            if p.Character:FindFirstChild("Head") and p.Character.Head:FindFirstChild("face") then
+                p.Character.Head.face.Transparency = state and 1 or 0
+            end
          end
     elseif cmd.command == "GHOST" then
         if p and p.Character then
+            local attr = "RoLink_Ghost"
+            local state = not p.Character:GetAttribute(attr)
+            p.Character:SetAttribute(attr, state)
             for _, v in pairs(p.Character:GetDescendants()) do
-                if v:IsA("BasePart") or v:IsA("MeshPart") then
-                    v.Material = Enum.Material.ForceField
-                end
+                 if v:IsA("BasePart") or v:IsA("MeshPart") then v.Material = state and Enum.Material.ForceField or Enum.Material.Plastic end
             end
         end
     elseif cmd.command == "SET_CHAR" then

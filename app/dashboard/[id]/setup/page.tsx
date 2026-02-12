@@ -128,8 +128,8 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MessagingService = game:GetService("MessagingService")
 
-local API_BASE_URL = "${baseUrl}"
-local API_KEY = "${apiKey}"
+local API_BASE_URL = "\${baseUrl}"
+local API_KEY = "\${apiKey}"
 local POLL_INTERVAL = 5
 
 function RoLink:Initialize()
@@ -200,8 +200,10 @@ function RoLink:Execute(cmd)
 	local reason = cmd.args.reason or "No reason provided"
 	local moderator = cmd.args.moderator or "System"
 
+    local player = Players:FindFirstChild(username) 
+    if not player and cmd.command ~= "UPDATE" and cmd.command ~= "SHUTDOWN" then return end
+
 	if cmd.command == "KICK" then
-		local player = Players:FindFirstChild(username)
 		if player then player:Kick(reason) end
 	elseif cmd.command == "BAN" then
 		task.spawn(function()
@@ -216,6 +218,7 @@ function RoLink:Execute(cmd)
 					})
 				end)
 			end
+            if player then player:Kick("Banned: "..reason) end
 		end)
 	elseif cmd.command == "UNBAN" then
 		task.spawn(function()
@@ -229,42 +232,53 @@ function RoLink:Execute(cmd)
 			end
 		end)
 	elseif cmd.command == "FLY" then
-		local player = Players:FindFirstChild(username)
 		if player and player.Character then
 			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-			if hrp and not hrp:FindFirstChild("RoLinkFly") then
-				local bv = Instance.new("BodyVelocity", hrp)
-				bv.Name = "RoLinkFly"
-				bv.MaxForce = Vector3.new(1,1,1) * 100000
-				bv.Velocity = Vector3.new(0,0,0)
+            if hrp then
+                local bv = hrp:FindFirstChild("RoLinkFly")
+                if bv then
+                    bv:Destroy() -- Toggle Off
+                else
+                    bv = Instance.new("BodyVelocity", hrp)
+                    bv.Name = "RoLinkFly"
+                    bv.MaxForce = Vector3.new(1,1,1) * 100000
+                    bv.Velocity = Vector3.new(0,0,0) -- Toggle On (Hover)
+                end
 			end
 		end
 	elseif cmd.command == "NOCLIP" then
-		local player = Players:FindFirstChild(username)
 		if player and player.Character then
+            local attr = "RoLink_Noclip"
+            local state = not player.Character:GetAttribute(attr)
+            player.Character:SetAttribute(attr, state)
 			for _, v in pairs(player.Character:GetDescendants()) do
-				if v:IsA("BasePart") then v.CanCollide = false end
+				if v:IsA("BasePart") then v.CanCollide = not state end
 			end
 		end
 	elseif cmd.command == "INVIS" then
-		local player = Players:FindFirstChild(username)
 		if player and player.Character then
+            local attr = "RoLink_Invis"
+            local state = not player.Character:GetAttribute(attr)
+            player.Character:SetAttribute(attr, state)
 			for _, v in pairs(player.Character:GetDescendants()) do
-				if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = 1 end
+				if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = state and 1 or 0 end
 			end
-			if player.Character:FindFirstChild("Head") then player.Character.Head.Transparency = 1 end
+			if player.Character:FindFirstChild("Head") and player.Character.Head:FindFirstChild("face") then 
+                player.Character.Head.face.Transparency = state and 1 or 0 
+            end
 		end
 	elseif cmd.command == "GHOST" then
-		local player = Players:FindFirstChild(username)
 		if player and player.Character then
+            local attr = "RoLink_Ghost"
+            local state = not player.Character:GetAttribute(attr)
+            player.Character:SetAttribute(attr, state)
 			for _, v in pairs(player.Character:GetDescendants()) do
 				if v:IsA("BasePart") or v:IsA("MeshPart") then
-					v.Material = Enum.Material.ForceField
+					v.Material = state and Enum.Material.ForceField or Enum.Material.Plastic
 				end
 			end
 		end
 	elseif cmd.command == "SET_CHAR" then
-		local player = Players:FindFirstChild(username)
 		local charUser = cmd.args.char_user
 		if player and charUser then
 			task.spawn(function()
@@ -275,20 +289,16 @@ function RoLink:Execute(cmd)
 			end)
 		end
 	elseif cmd.command == "HEAL" then
-		local player = Players:FindFirstChild(username)
 		if player and player.Character and player.Character:FindFirstChild("Humanoid") then
 			player.Character.Humanoid.Health = player.Character.Humanoid.MaxHealth
 		end
 	elseif cmd.command == "KILL" then
-		local player = Players:FindFirstChild(username)
 		if player and player.Character and player.Character:FindFirstChild("Humanoid") then
 			player.Character.Humanoid.Health = 0
 		end
 	elseif cmd.command == "RESET" then
-		local player = Players:FindFirstChild(username)
 		if player then player:LoadCharacter() end
 	elseif cmd.command == "REFRESH" then
-		local player = Players:FindFirstChild(username)
 		if player and player.Character then
 			local cf = player.Character:GetPrimaryPartCFrame()
 			player:LoadCharacter()
@@ -302,8 +312,8 @@ function RoLink:Execute(cmd)
 	elseif cmd.command == "SHUTDOWN" then
 		local targetJobId = cmd.args.job_id
 		if not targetJobId or targetJobId == game.JobId then
-			for _, player in ipairs(Players:GetPlayers()) do
-				player:Kick("This server has been shut down by a moderator.")
+			for _, p in ipairs(Players:GetPlayers()) do
+				p:Kick("This server has been shut down by a moderator.")
 			end
 		end
 	end
@@ -315,7 +325,7 @@ return RoLink`;
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className={`w-full transition-all duration-700 ${step === 1 ? 'max-w-md mx-auto mt-20' : 'max-w-7xl'}`}>
+            <div className={`w-full transition-all duration-700 \${step === 1 ? 'max-w-md mx-auto mt-20' : 'max-w-7xl'}`}>
                 {step === 1 ? (
                     <div className="bg-slate-900 border border-slate-800 rounded-xl p-10 shadow-3xl">
                         <div className="w-12 h-12 bg-sky-600/10 rounded-lg flex items-center justify-center text-sky-500 mb-8 border border-sky-500/10">
