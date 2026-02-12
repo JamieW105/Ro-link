@@ -10,7 +10,7 @@ interface Log {
     action: string;
     target: string;
     moderator: string;
-    timestamp: string;
+    created_at: string;
 }
 
 // SVGs
@@ -66,13 +66,34 @@ export default function ServerDashboard() {
                 .from('logs')
                 .select('*')
                 .eq('server_id', id)
-                .order('timestamp', { ascending: false })
+                .order('created_at', { ascending: false })
                 .limit(10);
 
             if (logData) setLogs(logData);
             setLoading(false);
         }
         fetchData();
+
+        // Subscribe to real-time log updates
+        const channel = supabase
+            .channel(`dashboard_logs_${id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'logs',
+                    filter: `server_id=eq.${id}`
+                },
+                (payload) => {
+                    setLogs((prev) => [payload.new as Log, ...prev].slice(0, 10));
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        }
     }, [id]);
 
     if (loading) return null;
@@ -193,7 +214,7 @@ export default function ServerDashboard() {
                                         <td className="px-8 py-4 font-semibold text-white">{log.target}</td>
                                         <td className="px-8 py-4 text-slate-400 font-medium">{log.moderator}</td>
                                         <td className="px-8 py-4 text-right text-slate-600 font-mono text-[10px] font-bold">
-                                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                            {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                         </td>
                                     </tr>
                                 ))}
