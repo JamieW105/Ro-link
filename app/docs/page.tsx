@@ -287,103 +287,246 @@ RoLink.Initialize({
         toc: [
             { id: 'auth', title: 'Authentication' },
             { id: 'lookup', title: 'User Lookup' },
-            { id: 'command', title: 'Execute Command' }
+            { id: 'command-usage', title: 'Execute Command' },
+            { id: 'command-reference', title: 'Command Reference' },
+            { id: 'rate-limits', title: 'Limits & Best Practices' }
         ],
         content: (
             <div className="space-y-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
                 <p className="text-lg text-slate-400">
-                    Ro-Link provides a RESTful API for developers to interact solely via external applications.
+                    The Ro-Link Public API allows you to integrate your external applications (Discord bots, websites, etc.) with your Roblox game servers.
                 </p>
 
                 <section id="auth" className="scroll-mt-24">
                     <h2 className="text-2xl font-bold text-white mb-4">Authentication</h2>
                     <p className="text-slate-400 mb-4">
-                        All API requests require your <Highlight>Server Key</Highlight> (found in Dashboard) passed as a header.
+                        Every request must be authenticated using your unique <Highlight>Server Key</Highlight>. You can generate this key in the Ro-Link Dashboard under specific server settings.
                     </p>
+                    <InfoBox title="Header Requirement">
+                        Pass your key in the custom <code className="text-sky-400">x-api-key</code> header. Do not share this key publicly.
+                    </InfoBox>
                     <CodeBlock label="Header Format">
                         x-api-key: rl_xxxxxxxxxxxxx
                     </CodeBlock>
                 </section>
 
                 <section id="lookup" className="scroll-mt-24">
-                    <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-3 mb-6">
                         <div className="h-px bg-slate-800 flex-1"></div>
                         <h2 className="text-xl font-bold text-white">GET /user</h2>
                         <div className="h-px bg-slate-800 flex-1"></div>
                     </div>
                     <p className="text-slate-400 mb-4">
-                        Retrieve detailed information about a Roblox player by username.
+                        Retrieve detailed information about a Roblox player by their username. This endpoint interacts with Roblox's API through our secure proxy.
                     </p>
 
-                    <h4 className="text-sm font-bold text-white mb-2">Endpoint</h4>
-                    <div className="bg-slate-950 p-3 rounded font-mono text-xs text-sky-400 mb-4 border border-slate-800">
-                        GET https://rolink.cloud/api/v1/user?username=Roblox
+                    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 mb-6 font-mono text-sm">
+                        <span className="text-emerald-500 font-bold">GET</span> <span className="text-slate-400">https://rolink.cloud/api/v1/user</span><span className="text-sky-400">?username=Roblox</span>
                     </div>
 
-                    <h4 className="text-sm font-bold text-white mb-2">Example Request</h4>
-                    <CodeBlock label="cURL">
-                        {`curl -X GET "https://rolink.cloud/api/v1/user?username=Roblox" \\
-     -H "x-api-key: YOUR_KEY_HERE"`}
+                    <h4 className="text-sm font-bold text-white mb-2 uppercase tracking-wider text-xs">Query Parameters</h4>
+                    <table className="w-full text-left text-sm text-slate-400 mb-6 border-collapse">
+                        <thead>
+                            <tr className="border-b border-slate-800 text-slate-200">
+                                <th className="p-2">Parameter</th>
+                                <th className="p-2">Type</th>
+                                <th className="p-2">Required</th>
+                                <th className="p-2">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/50">
+                            <tr>
+                                <td className="p-2 font-mono text-sky-400">username</td>
+                                <td className="p-2">string</td>
+                                <td className="p-2 text-emerald-500">Yes</td>
+                                <td className="p-2">The exact username of the Roblox player.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <CodeBlock label="Example Response">
+                        {`{
+  "id": 1,
+  "name": "Roblox",
+  "displayName": "Roblox",
+  "hasVerifiedBadge": true,
+  "isBanned": false,
+  "description": "The official Roblox account."
+}`}
                     </CodeBlock>
                 </section>
 
-                <section id="command" className="scroll-mt-24">
-                    <div className="flex items-center gap-3 mb-4">
+                <section id="command-usage" className="scroll-mt-24">
+                    <div className="flex items-center gap-3 mb-6">
                         <div className="h-px bg-slate-800 flex-1"></div>
                         <h2 className="text-xl font-bold text-white">POST /command</h2>
                         <div className="h-px bg-slate-800 flex-1"></div>
                     </div>
                     <p className="text-slate-400 mb-4">
-                        Queue a moderation command to be executed in your game.
+                        Send moderation or utility commands to your active game servers. These commands are executed via Roblox MessagingService.
                     </p>
 
-                    <h4 className="text-sm font-bold text-white mb-2">Endpoint</h4>
-                    <div className="bg-slate-950 p-3 rounded font-mono text-xs text-sky-400 mb-4 border border-slate-800">
-                        POST https://rolink.cloud/api/v1/command
+                    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 mb-6 font-mono text-sm">
+                        <span className="text-sky-500 font-bold">POST</span> <span className="text-slate-400">https://rolink.cloud/api/v1/command</span>
                     </div>
 
-                    <h4 className="text-sm font-bold text-white mb-2">Request Body</h4>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm text-slate-400 mb-6">
-                            <thead className="bg-slate-900 text-white font-semibold">
-                                <tr>
-                                    <th className="p-3">Field</th>
-                                    <th className="p-3">Type</th>
-                                    <th className="p-3">Description</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800">
-                                <tr>
-                                    <td className="p-3 font-mono text-sky-400">command</td>
-                                    <td className="p-3">string</td>
-                                    <td>Action (e.g., KICK, BAN, UNBAN, SHUTDOWN)</td>
-                                </tr>
-                                <tr>
-                                    <td className="p-3 font-mono text-sky-400">args</td>
-                                    <td className="p-3">object</td>
-                                    <td>Parameters (username, reason, etc.)</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <h4 className="text-sm font-bold text-white mb-2 uppercase tracking-wider text-xs">JSON Body Parameters</h4>
+                    <table className="w-full text-left text-sm text-slate-400 mb-6 border-collapse">
+                        <thead>
+                            <tr className="border-b border-slate-800 text-slate-200">
+                                <th className="p-2">Field</th>
+                                <th className="p-2">Type</th>
+                                <th className="p-2">Required</th>
+                                <th className="p-2">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/50">
+                            <tr>
+                                <td className="p-2 font-mono text-sky-400">command</td>
+                                <td className="p-2">string</td>
+                                <td className="p-2 text-emerald-500">Yes</td>
+                                <td className="p-2">The specific action to perform (see Reference below). Case-insensitive.</td>
+                            </tr>
+                            <tr>
+                                <td className="p-2 font-mono text-sky-400">args</td>
+                                <td className="p-2">object</td>
+                                <td className="p-2 text-emerald-500">Yes</td>
+                                <td className="p-2">Parameters required for the specific command.</td>
+                            </tr>
+                            <tr>
+                                <td className="p-2 font-mono text-sky-400">moderator</td>
+                                <td className="p-2">string</td>
+                                <td className="p-2 text-slate-500">No</td>
+                                <td className="p-2">Name of the user invoking the command (for logs). Defaults to "API User".</td>
+                            </tr>
+                        </tbody>
+                    </table>
 
-                    <h4 className="text-sm font-bold text-white mb-2">Example: Kick Player</h4>
-                    <CodeBlock label="JavaScript (Fetch)">
-                        {`fetch('https://rolink.cloud/api/v1/command', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': 'YOUR_KEY_HERE'
-    },
-    body: JSON.stringify({
-        command: 'KICK',
-        args: {
-            username: 'Exploiter123',
-            reason: 'Flying'
-        }
-    })
-});`}
+                    <CodeBlock label="Example Payload (Kick)">
+                        {`{
+    "command": "KICK",
+    "moderator": "AdminBot",
+    "args": {
+        "username": "Exploiter123",
+        "reason": "Flying detected by anti-cheat"
+    }
+}`}
                     </CodeBlock>
+                </section>
+
+                <section id="command-reference" className="scroll-mt-24">
+                    <h2 className="text-2xl font-bold text-white mb-6">Command Reference</h2>
+                    <p className="text-slate-400 mb-6">
+                        Below is a list of all supported commands and their required arguments structure.
+                    </p>
+
+                    <div className="space-y-6">
+
+                        {/* Moderation Commands */}
+                        <div className="border border-slate-800 rounded-xl overflow-hidden">
+                            <div className="bg-slate-900/50 px-4 py-3 border-b border-slate-800 font-bold text-white flex items-center gap-2">
+                                <Icons.Key className="w-4 h-4 text-emerald-500" /> Moderation
+                            </div>
+                            <div className="p-4 bg-slate-950/30 space-y-4">
+                                <div>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <code className="text-sky-400 font-bold bg-sky-950/30 px-2 py-1 rounded">KICK</code>
+                                        <span className="text-slate-400 text-sm">Removes a player from the server.</span>
+                                    </div>
+                                    <pre className="text-xs text-slate-500 bg-slate-900 p-2 rounded border border-slate-800/50">
+                                        {"args: { username: string, reason?: string }"}
+                                    </pre>
+                                </div>
+                                <div className="border-t border-slate-800/50 pt-4">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <code className="text-sky-400 font-bold bg-sky-950/30 px-2 py-1 rounded">BAN</code>
+                                        <span className="text-slate-400 text-sm">Permanently bans a player.</span>
+                                    </div>
+                                    <pre className="text-xs text-slate-500 bg-slate-900 p-2 rounded border border-slate-800/50">
+                                        {"args: { username: string, reason?: string }"}
+                                    </pre>
+                                </div>
+                                <div className="border-t border-slate-800/50 pt-4">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <code className="text-sky-400 font-bold bg-sky-950/30 px-2 py-1 rounded">UNBAN</code>
+                                        <span className="text-slate-400 text-sm">Revokes a ban.</span>
+                                    </div>
+                                    <pre className="text-xs text-slate-500 bg-slate-900 p-2 rounded border border-slate-800/50">
+                                        {"args: { username: string }"}
+                                    </pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Server Management */}
+                        <div className="border border-slate-800 rounded-xl overflow-hidden">
+                            <div className="bg-slate-900/50 px-4 py-3 border-b border-slate-800 font-bold text-white flex items-center gap-2">
+                                <Icons.Globe className="w-4 h-4 text-sky-500" /> Server Management
+                            </div>
+                            <div className="p-4 bg-slate-950/30 space-y-4">
+                                <div>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <code className="text-sky-400 font-bold bg-sky-950/30 px-2 py-1 rounded">SHUTDOWN</code>
+                                        <span className="text-slate-400 text-sm">Closes server(s).</span>
+                                    </div>
+                                    <pre className="text-xs text-slate-500 bg-slate-900 p-2 rounded border border-slate-800/50">
+                                        {"args: { job_id?: string }  // Omit job_id to shutdown ALL servers"}
+                                    </pre>
+                                </div>
+                                <div className="border-t border-slate-800/50 pt-4">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <code className="text-sky-400 font-bold bg-sky-950/30 px-2 py-1 rounded">UPDATE</code>
+                                        <span className="text-slate-400 text-sm">Triggers a soft shutdown for updates.</span>
+                                    </div>
+                                    <pre className="text-xs text-slate-500 bg-slate-900 p-2 rounded border border-slate-800/50">
+                                        {"args: {} // No arguments required"}
+                                    </pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Player Actions */}
+                        <div className="border border-slate-800 rounded-xl overflow-hidden">
+                            <div className="bg-slate-900/50 px-4 py-3 border-b border-slate-800 font-bold text-white flex items-center gap-2">
+                                <Icons.Rocket className="w-4 h-4 text-purple-500" /> Player Actions
+                            </div>
+                            <div className="p-4 bg-slate-950/30 space-y-4">
+                                <p className="text-sm text-slate-500 italic mb-2">Each command requires <code className="text-sky-400 text-xs">args: {'{ username: string }'}</code> unless specified.</p>
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                                    {['FLY', 'NOCLIP', 'GOD', 'INVISIBLE', 'KILL', 'RESPAWN', 'UNFLY', 'VISIBLE'].map(cmd => (
+                                        <div key={cmd} className="bg-slate-900 border border-slate-800 px-3 py-2 rounded text-center text-xs font-mono text-slate-300">
+                                            {cmd}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="border-t border-slate-800/50 pt-4 mt-2">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <code className="text-sky-400 font-bold bg-sky-950/30 px-2 py-1 rounded">SET_CHAR</code>
+                                        <span className="text-slate-400 text-sm">Morph a player into another character.</span>
+                                    </div>
+                                    <pre className="text-xs text-slate-500 bg-slate-900 p-2 rounded border border-slate-800/50">
+                                        {"args: { username: string, char_user: string }"}
+                                    </pre>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </section>
+
+                <section id="rate-limits" className="scroll-mt-24">
+                    <h2 className="text-2xl font-bold text-white mb-4">Limits & Best Practices</h2>
+                    <div className="bg-amber-900/20 border border-amber-900/50 rounded-xl p-5 mb-6">
+                        <h4 className="text-amber-500 font-bold mb-2">Roblox MessagingService Limits</h4>
+                        <p className="text-sm text-slate-400 leading-relaxed">
+                            Ro-Link uses Roblox's MessagingService to deliver commands. To ensure stability, avoid sending more than <span className="text-white font-bold">50 commands per minute</span> per game universe. Exceeding this may cause commands to be dropped by Roblox.
+                        </p>
+                    </div>
+                    <ul className="list-disc list-inside space-y-2 text-slate-400 text-sm">
+                        <li>Commands are processed asynchronously. A <code className="text-emerald-500">200 OK</code> response means the command was <strong>queued</strong>, not necessarily executed in-game immediately.</li>
+                        <li>Ensure usernames are accurate; incorrect usernames will simply result in no action on the server.</li>
+                        <li>For high-volume automated systems, implement a local queue to space out requests.</li>
+                    </ul>
                 </section>
             </div>
         )

@@ -620,8 +620,8 @@ local Http = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MS = game:GetService("MessagingService")
 
-local URL = "${baseUrl}"
-local KEY = "${apiKey}"
+local URL = "\${baseUrl}"
+local KEY = "\${apiKey}"
 local POLL_INTERVAL = 5
 
 function RoLink:Initialize()
@@ -674,34 +674,46 @@ function RoLink:Execute(cmd)
 			if s and uid then pcall(function() Players:UnbanAsync({UserIds={uid}}) end) end
 		end)
     elseif cmd.command == "FLY" then
-        if p and p.Character then
-            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-            if hrp and not hrp:FindFirstChild("RoLinkFly") then
-                local bv = Instance.new("BodyVelocity", hrp)
+        if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = p.Character.HumanoidRootPart
+            local bv = hrp:FindFirstChild("RoLinkFly")
+            if bv then 
+                bv:Destroy() 
+            else
+                bv = Instance.new("BodyVelocity", hrp)
                 bv.Name = "RoLinkFly"
-                bv.MaxForce = Vector3.new(1,1,1) * 100000
-                bv.Velocity = Vector3.new(0,0,0) -- Hover
+                bv.MaxForce = Vector3.new(1,1,1) * 1000000
+                bv.Velocity = Vector3.new(0,0,0)
             end
         end
     elseif cmd.command == "NOCLIP" then
          if p and p.Character then
+            local attr = "RoLink_Noclip"
+            local state = not p.Character:GetAttribute(attr)
+            p.Character:SetAttribute(attr, state)
             for _, v in pairs(p.Character:GetDescendants()) do
-                if v:IsA("BasePart") then v.CanCollide = false end
+                if v:IsA("BasePart") then v.CanCollide = not state end
             end
          end
     elseif cmd.command == "INVIS" then
          if p and p.Character then
+            local attr = "RoLink_Invis"
+            local state = not p.Character:GetAttribute(attr)
+            p.Character:SetAttribute(attr, state)
             for _, v in pairs(p.Character:GetDescendants()) do
-                if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = 1 end
+                if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = state and 1 or 0 end
             end
-            p.Character.Head.Transparency = 1
+            if p.Character:FindFirstChild("Head") and p.Character.Head:FindFirstChild("face") then
+                p.Character.Head.face.Transparency = state and 1 or 0
+            end
          end
     elseif cmd.command == "GHOST" then
         if p and p.Character then
+            local attr = "RoLink_Ghost"
+            local state = not p.Character:GetAttribute(attr)
+            p.Character:SetAttribute(attr, state)
             for _, v in pairs(p.Character:GetDescendants()) do
-                if v:IsA("BasePart") or v:IsA("MeshPart") then
-                    v.Material = Enum.Material.ForceField
-                end
+                 if v:IsA("BasePart") or v:IsA("MeshPart") then v.Material = state and Enum.Material.ForceField or Enum.Material.Plastic end
             end
         end
     elseif cmd.command == "SET_CHAR" then
