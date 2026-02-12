@@ -1,17 +1,69 @@
-# Ro-Link
+# 🔗 Ro-Link
 
-Ro-Link is a bridge application connecting Discord communities to their Roblox games. It allows Discord server administrators to manage their Roblox games directly from Discord slash commands.
+**The Ultimate Discord-to-Roblox Bridge**
 
-## Architecture
-- **Web Dashboard (Next.js)**: For linking Discord servers to Roblox games and generating API keys.
-- **Discord Bot**: Interface for moderation commands.
-- **Roblox Script**: A Lua script that polls the backend for commands to execute in-game.
-- **Backend**: API and Database (Supabase + Next.js) to manage the command queue.
+Ro-Link is a powerful, open-source application that bridges the gap between your Discord community and your Roblox game. It allows Discord server administrators and moderators to manage their Roblox games directly from Discord using slash commands and an advanced web dashboard.
 
-## planned Commands
-The system will support the following Discord slash commands:
+## ✨ Features
 
-- `/ban [user]` - Permanently ban a user from the game.
-- `/softban [user]` - (To be defined: e.g., Ban then unban to clear data, or server-specific ban?)
-- `/kick [user]` - Kick a user from the current server.
-- `/timed_kick [user] [duration]` - (To be defined: Delayed kick or Temporary Ban?)
+### 🛡️ Moderation
+Execute moderation actions directly from Discord without joining the game:
+- **/ban**: Permanently ban a user from your game.
+- **/kick**: Kick a specific user from the server.
+- **/unban**: Revoke a ban.
+- **Logs**: All actions are logged to your Supabase database and Discord.
+
+### 🎮 Server Management
+Control your game servers remotely:
+- **/shutdown**: Shut down specific servers (by Job ID) or global shutdowns.
+- **/update**: Trigger a "soft shutdown" to force game updates.
+- **Live Stats**: View active server counts and player lists (via Dashboard).
+
+### 🪄 Fun & Utility (/misc)
+Interact with players in real-time:
+- **Fly / Noclip**: Give players flight or noclip permissions.
+- **Invisible / Ghost**: Change player visibility and collision.
+- **Heal / Kill**: Manage player health.
+- **Set Character**: Morph players into other avatars.
+
+### ⚡ Real-Time Architecture
+- **Hybrid Bot System**: Works as a **Serverless Discord Bot** (Vercel) for high scalability and as a **Standalone Bot** for maintaining status and background tasks.
+- **Open Cloud & Polling**: Uses Roblox Open Cloud for instant messaging and HTTP Polling for reliable command execution.
+
+---
+
+## 🏗️ Architecture
+
+Ro-Link consists of three main components:
+
+1.  **Web Dashboard (Next.js)**: 
+    - A modern UI for linking Discord servers to Roblox games.
+    - Generates specific API keys for security.
+    - View logs and manage settings.
+    - Hosted on Vercel.
+
+2.  **Discord Bot**:
+    - **Interaction Endpoint (`app/api/interactions`)**: Handles slash commands, buttons, and modals via Webhooks.
+    - **Status Agent (`scripts/bot.js`)**: A lightweight process that updates the bot's "Playing" status and syncs global stats.
+
+3.  **Roblox Game**:
+    - Contains a `ModuleScript` (RoLink) and a Server Script.
+    - Polls the Next.js API for commands.
+    - Listens to Roblox MessagingService for instant updates.
+
+---
+
+## 🚀 Usage
+
+### Verified Owners Only
+Only the Discord Server Owner can run `/setup` to link a game.
+
+1.  **Run `/setup`**: Enter your Roblox Place ID, Universe ID, and Open Cloud API Key.
+2.  **Install Lua Script**: The bot will generate a secure script. Paste this into your Roblox game (ServerScriptService).
+3.  **Manage**: Use `/ban`, `/kick`, or `/misc` immediately.
+
+---
+
+## 📚 Documentation
+
+For detailed installation and configuration instructions, please read the [**Setup Guide**](guide.md).
