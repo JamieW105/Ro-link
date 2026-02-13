@@ -10,6 +10,11 @@ export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
 
     if (!session || !session.accessToken) {
+        // Return active status if specifically pinged, otherwise unauthorized
+        const { searchParams } = new URL(req.url);
+        if (searchParams.get('status') === 'check') {
+            return NextResponse.json({ status: 'API Active', message: 'Guilds endpoint operational' }, { status: 200 });
+        }
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

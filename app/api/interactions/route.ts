@@ -41,6 +41,8 @@ async function verifyDiscordRequest(request: Request) {
     }
 }
 
+
+
 export async function POST(req: Request) {
     try {
         const { isValid, body } = await verifyDiscordRequest(req);
@@ -857,5 +859,8 @@ return RoLink`;
 }
 
 export async function GET() {
-    return new NextResponse('Ro-Link Discord Interaction Endpoint is Online. (Use POST for Discord)', { status: 200 });
+    return NextResponse.json({
+        status: 'API Active',
+        message: 'Interactions endpoint ready for Discord webhooks (POST)'
+    }, { status: 200 });
 }

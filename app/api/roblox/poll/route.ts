@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+export async function GET() {
+    return NextResponse.json({
+        status: 'API Active',
+        message: 'Endpoint ready for Roblox server polling (POST)'
+    }, { status: 200 });
+}
+
 export async function POST(req: Request) {
     try {
         const authHeader = req.headers.get('Authorization');

@@ -11,6 +11,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params;
 
     if (!session || !session.accessToken) {
+        const { searchParams } = new URL(req.url);
+        if (searchParams.get('status') === 'check') {
+            return NextResponse.json({ status: 'API Active', message: 'Roles endpoint operational' }, { status: 200 });
+        }
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

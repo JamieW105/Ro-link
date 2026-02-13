@@ -48,7 +48,10 @@ export async function GET(req: Request) {
             });
         }
 
-        return NextResponse.json({ error: 'Missing search parameters (robloxId, robloxUsername, or discordId)' }, { status: 400 });
+        return NextResponse.json({
+            status: 'API Active',
+            message: 'Ready for bidirectional mapping'
+        }, { status: 200 });
 
     } catch (err: any) {
         console.error('[LOOKUP API] Error:', err);

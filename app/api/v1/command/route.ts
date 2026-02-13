@@ -3,6 +3,13 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 
+export async function GET() {
+    return NextResponse.json({
+        status: 'API Active',
+        message: 'Endpoint ready for command payloads (POST)'
+    }, { status: 200 });
+}
+
 export async function POST(req: Request) {
     // 1. Authenticate with API Key
     const apiKey = req.headers.get('x-api-key');

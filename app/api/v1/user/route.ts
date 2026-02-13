@@ -22,7 +22,10 @@ export async function GET(req: Request) {
     const username = searchParams.get('username');
 
     if (!username) {
-        return NextResponse.json({ error: 'Username is required' }, { status: 400 });
+        return NextResponse.json({
+            status: 'API Active',
+            message: 'Ready for player lookup'
+        }, { status: 200 });
     }
 
     try {

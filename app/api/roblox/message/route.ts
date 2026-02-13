@@ -3,6 +3,13 @@ import { sendRobloxMessage } from '@/lib/roblox';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
+export async function GET() {
+    return NextResponse.json({
+        status: 'API Active',
+        message: 'Endpoint ready for Roblox messaging (POST)'
+    }, { status: 200 });
+}
+
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
 
