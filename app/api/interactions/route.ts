@@ -725,11 +725,49 @@ local Http = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MS = game:GetService("MessagingService")
 
-local URL = "\${baseUrl}"
-local KEY = "\${apiKey}"
+local URL = "${baseUrl}"
+local KEY = "${apiKey}"
 local POLL_INTERVAL = 5
 
 function RoLink:Initialize()
+	-- 1. Fetch Server Settings
+	task.spawn(function()
+		local s, r = pcall(function()
+			return Http:RequestAsync({
+				Url = URL .. "/api/v1/settings",
+				Method = "GET",
+				Headers = { ["x-api-key"] = KEY }
+			})
+		end)
+		if s and r.StatusCode == 200 then
+			self.settings = Http:JSONDecode(r.Body)
+		end
+	end)
+
+	-- 2. Security Check (Block Unverified Joins)
+	Players.PlayerAdded:Connect(function(player)
+		-- Wait for settings to load if they haven't yet
+		for i=1, 5 do
+			if self.settings then break end
+			task.wait(0.5)
+		end
+		
+		if self.settings and self.settings.blockUnverified then
+			local s, r = pcall(function()
+				return Http:RequestAsync({
+					Url = URL .. "/api/v1/lookup?robloxId=" .. player.UserId,
+					Method = "GET"
+				})
+			end)
+			
+			-- 404 means the user has no mapping in Ro-Link
+			if s and r.StatusCode == 404 then
+				player:Kick("\n[Ro-Link Security]\n\nThis game requires a linked Discord account.\n\nLink your account at: " .. URL .. "/verify")
+			end
+		end
+	end)
+
+	-- 3. Subscribe to Command Service
 	task.spawn(function()
 		pcall(function()
 			MS:SubscribeAsync("AdminActions", function(msg)
@@ -739,6 +777,8 @@ function RoLink:Initialize()
 			end)
 		end)
 	end)
+
+	-- 4. Command Polling Fallback
 	task.spawn(function()
 		while true do
 			local id = game.JobId ~= "" and game.JobId or "STUDIO"

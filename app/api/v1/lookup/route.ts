@@ -17,7 +17,6 @@ export async function GET(req: Request) {
 
     try {
         if (robloxUserId || robloxUsername) {
-            // Find Discord via Roblox
             let query = supabase.from('verified_users').select('*');
 
             if (robloxUserId) {
@@ -29,9 +28,10 @@ export async function GET(req: Request) {
             const { data, error } = await query.maybeSingle();
 
             if (error) throw error;
-            if (!data) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+            if (!data) return NextResponse.json({ verified: false, error: 'User not found' }, { status: 404 });
 
             return NextResponse.json({
+                verified: true,
                 discordId: data.discord_id,
                 robloxId: data.roblox_id,
                 robloxUsername: data.roblox_username

@@ -35,6 +35,7 @@ export default function VerificationPage() {
     const [enabled, setEnabled] = useState(false);
     const [onJoinRole, setOnJoinRole] = useState("");
     const [verifiedRole, setVerifiedRole] = useState("");
+    const [blockUnverified, setBlockUnverified] = useState(false);
 
     useEffect(() => {
         async function fetchData() {
@@ -53,7 +54,7 @@ export default function VerificationPage() {
             // 2. Fetch Server Settings
             const { data, error: dbError } = await supabase
                 .from('servers')
-                .select('verification_enabled, on_join_role, verified_role')
+                .select('verification_enabled, on_join_role, verified_role, block_unverified')
                 .eq('id', id)
                 .single();
 
@@ -61,6 +62,7 @@ export default function VerificationPage() {
                 setEnabled(data.verification_enabled || false);
                 setOnJoinRole(data.on_join_role || "");
                 setVerifiedRole(data.verified_role || "");
+                setBlockUnverified(data.block_unverified || false);
             }
 
             // 3. Fetch Roles
@@ -89,7 +91,8 @@ export default function VerificationPage() {
             .update({
                 verification_enabled: enabled,
                 on_join_role: onJoinRole,
-                verified_role: verifiedRole
+                verified_role: verifiedRole,
+                block_unverified: blockUnverified
             })
             .eq('id', id);
 
@@ -206,6 +209,27 @@ export default function VerificationPage() {
                                     </select>
                                 </div>
                                 <p className="text-[10px] text-slate-500 font-medium pl-2 leading-relaxed italic">Awarded immediately when a member joins the Discord server.</p>
+                            </div>
+                        </div>
+
+                        {/* Extra Safety Setting */}
+                        <div className={`mt-12 pt-10 border-t border-slate-800/60 transition-all duration-700 ${!enabled ? 'opacity-30 pointer-events-none' : ''}`}>
+                            <div className="flex items-center justify-between p-6 bg-red-500/5 border border-red-500/10 rounded-2xl">
+                                <div className="flex items-center gap-5">
+                                    <div className="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center text-red-500 border border-red-500/20 shadow-lg shadow-red-900/5">
+                                        <ShieldIcon />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-bold text-white uppercase tracking-tight">Block Unverified Joins</h4>
+                                        <p className="text-[11px] text-slate-500 font-medium mt-1">Automatically kick players from the Roblox game if they haven't linked their Discord account.</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setBlockUnverified(!blockUnverified)}
+                                    className={`w-14 h-7 rounded-full transition-all duration-500 relative border-2 ${blockUnverified ? 'bg-red-600/20 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
+                                >
+                                    <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${blockUnverified ? 'left-8 bg-red-500' : 'left-1.5 bg-slate-500'}`} />
+                                </button>
                             </div>
                         </div>
 
