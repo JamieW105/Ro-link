@@ -3,6 +3,18 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 export async function GET(req: Request) {
+    const { searchParams } = new URL(req.url);
+    const username = searchParams.get('username');
+
+    // Heartbeat check (Allow check without API key)
+    // If no username is provided, or status=check, or it's Better Uptime, return 200
+    if (!username || searchParams.get('status') === 'check' || req.headers.get('user-agent')?.includes('Better Uptime')) {
+        return NextResponse.json({
+            status: 'API Active',
+            message: 'Ready for player lookup'
+        }, { status: 200 });
+    }
+
     const apiKey = req.headers.get('x-api-key');
     if (!apiKey) {
         return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
@@ -16,16 +28,6 @@ export async function GET(req: Request) {
 
     if (authError || !server) {
         return NextResponse.json({ error: 'Invalid API Key' }, { status: 403 });
-    }
-
-    const { searchParams } = new URL(req.url);
-    const username = searchParams.get('username');
-
-    if (!username) {
-        return NextResponse.json({
-            status: 'API Active',
-            message: 'Ready for player lookup'
-        }, { status: 200 });
     }
 
     try {

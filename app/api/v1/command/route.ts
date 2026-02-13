@@ -3,7 +3,17 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 
-export async function GET() {
+export async function GET(req: Request) {
+    const { searchParams } = new URL(req.url);
+
+    // Heartbeat check for uptime monitors
+    if (searchParams.get('status') === 'check' || req.headers.get('user-agent')?.includes('Better Uptime')) {
+        return NextResponse.json({
+            status: 'API Active',
+            message: 'Endpoint ready for command payloads (POST)'
+        }, { status: 200 });
+    }
+
     return NextResponse.json({
         status: 'API Active',
         message: 'Endpoint ready for command payloads (POST)'

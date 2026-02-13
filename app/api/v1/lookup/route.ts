@@ -7,6 +7,14 @@ export async function GET(req: Request) {
     const robloxUsername = searchParams.get('robloxUsername');
     const discordId = searchParams.get('discordId');
 
+    // Heartbeat check for uptime monitors
+    if (!robloxUserId && !robloxUsername && !discordId || searchParams.get('status') === 'check' || req.headers.get('user-agent')?.includes('Better Uptime')) {
+        return NextResponse.json({
+            status: 'API Active',
+            message: 'Ready for bidirectional mapping'
+        }, { status: 200 });
+    }
+
     try {
         if (robloxUserId || robloxUsername) {
             // Find Discord via Roblox
