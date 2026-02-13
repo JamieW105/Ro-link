@@ -5,9 +5,7 @@ import { useSession, signIn } from "next-auth/react";
 import { supabase } from "@/lib/supabase";
 
 const RobloxIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M18.5,1.5L5.5,4.5L1.5,18.5L14.5,22.5L22.5,9.5L18.5,1.5ZM14.5,12.5L9.5,13.5L8.5,8.5L13.5,7.5L14.5,12.5Z" />
-    </svg>
+    <img src="/Media/Roblox.png" alt="Roblox" className="w-6 h-6 object-contain" />
 );
 
 const DiscordIcon = () => (
