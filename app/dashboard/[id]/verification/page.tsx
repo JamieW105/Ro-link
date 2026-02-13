@@ -17,6 +17,10 @@ const RoleIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5" /><path d="M20 21a8 8 0 0 0-16 0" /></svg>
 );
 
+const InfoIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+);
+
 export default function VerificationPage() {
     const { id } = useParams();
     const { data: session } = useSession();
@@ -36,7 +40,7 @@ export default function VerificationPage() {
         async function fetchData() {
             if (!id || !session) return;
 
-            // 1. Check Permissions (Already handled by layout but good to be safe)
+            // 1. Check Permissions
             const guildRes = await fetch('/api/guilds');
             const guilds = await guildRes.json();
             const g = guilds.find((guild: any) => guild.id === id);
@@ -105,128 +109,186 @@ export default function VerificationPage() {
     );
 
     return (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-4xl mx-auto">
-            <div className="flex items-center gap-4 mb-8">
-                <div className="w-12 h-12 bg-sky-600/10 rounded-xl flex items-center justify-center text-sky-500 border border-sky-500/10 shadow-lg shadow-sky-900/5">
-                    <ShieldIcon />
-                </div>
-                <div>
-                    <h1 className="text-2xl font-black tracking-tight text-white uppercase italic">Verification System</h1>
-                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Manage your Roblox-to-Discord linking settings</p>
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full pb-20">
+            {/* Page Header - Integrated Layout */}
+            <div className="mb-10 pb-8 border-b border-slate-800/60">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-5">
+                        <div className="w-14 h-14 bg-sky-600/10 rounded-2xl flex items-center justify-center text-sky-500 border border-sky-500/20 shadow-2xl shadow-sky-900/10">
+                            <ShieldIcon />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">Verification</h1>
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className={`w-2 h-2 rounded-full ${enabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`}></span>
+                                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+                                    {enabled ? 'System Operational' : 'System Disabled'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="hidden md:flex bg-sky-600 hover:bg-sky-500 text-white font-bold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-sky-900/20 text-xs disabled:opacity-50 items-center justify-center gap-3 active:scale-95 border border-sky-400/20"
+                    >
+                        {saving ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                            <>
+                                <SaveIcon />
+                                SAVE CHANGES
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {/* Main Settings */}
-                <div className="md:col-span-2 space-y-6">
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-5">
+            <div className="grid grid-cols-12 gap-8">
+                {/* Main Settings Column */}
+                <div className="col-span-12 lg:col-span-8 space-y-8">
+                    {/* Primary Config Section */}
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-8 opacity-[0.02] text-white">
                             <ShieldIcon />
                         </div>
 
-                        <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-800/50">
+                        <div className="flex items-center justify-between mb-12">
                             <div>
-                                <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-1">Enable Verification</h3>
-                                <p className="text-xs text-slate-500">Allow users to link their Roblox accounts.</p>
+                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Toggle Verification</h3>
+                                <p className="text-sm text-slate-500">Enable or disable the Roblox-to-Discord linking flow for this server.</p>
                             </div>
                             <button
                                 onClick={() => setEnabled(!enabled)}
-                                className={`w-14 h-7 rounded-full transition-all duration-300 relative ${enabled ? 'bg-sky-600 shadow-[0_0_15px_rgba(2,132,199,0.3)]' : 'bg-slate-800'}`}
+                                className={`w-16 h-8 rounded-full transition-all duration-500 relative border-2 ${enabled ? 'bg-sky-600/20 border-sky-500 shadow-[0_0_20px_rgba(2,132,199,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
                             >
-                                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 ${enabled ? 'left-8' : 'left-1'}`} />
+                                <div className={`absolute top-1 w-4.5 h-4.5 rounded-full transition-all duration-500 shadow-md ${enabled ? 'left-9 bg-sky-400' : 'left-1.5 bg-slate-500'}`} />
                             </button>
                         </div>
 
-                        <div className={`space-y-8 transition-all duration-500 ${!enabled ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-bold uppercase text-slate-500 tracking-widest pl-1 flex items-center gap-2">
+                        <div className={`grid grid-cols-1 md:grid-cols-2 gap-10 transition-all duration-700 ${!enabled ? 'opacity-30 pointer-events-none' : ''}`}>
+                            <div className="space-y-4">
+                                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-[0.2em] pl-1 flex items-center gap-2">
                                     <RoleIcon />
                                     Verified Role
                                 </label>
-                                <select
-                                    className="w-full bg-black/40 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-600/50 transition-all cursor-pointer"
-                                    value={verifiedRole}
-                                    onChange={(e) => setVerifiedRole(e.target.value)}
-                                >
-                                    <option value="">None (Disabled)</option>
-                                    {roles.map(role => (
-                                        <option key={role.id} value={role.id}>{role.name}</option>
-                                    ))}
-                                </select>
-                                <p className="text-[10px] text-slate-600 font-medium pl-1">This role will be given to users after they successfully verify.</p>
+                                <div className="relative">
+                                    <select
+                                        className="w-full bg-slate-950/50 border border-slate-800/80 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-600/30 transition-all cursor-pointer hover:border-slate-700"
+                                        value={verifiedRole}
+                                        onChange={(e) => setVerifiedRole(e.target.value)}
+                                    >
+                                        <option value="">None (Disabled)</option>
+                                        {roles.map(role => (
+                                            <option key={role.id} value={role.id}>{role.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <p className="text-[10px] text-slate-500 font-medium pl-2 leading-relaxed italic">Awarded automatically after a successful Roblox link.</p>
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-bold uppercase text-slate-500 tracking-widest pl-1 flex items-center gap-2">
+                            <div className="space-y-4">
+                                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-[0.2em] pl-1 flex items-center gap-2">
                                     <RoleIcon />
                                     On Join Role
                                 </label>
-                                <select
-                                    className="w-full bg-black/40 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-600/50 transition-all cursor-pointer"
-                                    value={onJoinRole}
-                                    onChange={(e) => setOnJoinRole(e.target.value)}
-                                >
-                                    <option value="">None (Disabled)</option>
-                                    {roles.map(role => (
-                                        <option key={role.id} value={role.id}>{role.name}</option>
-                                    ))}
-                                </select>
-                                <p className="text-[10px] text-slate-600 font-medium pl-1">This role will be given to users immediately when they join the server.</p>
+                                <div className="relative">
+                                    <select
+                                        className="w-full bg-slate-950/50 border border-slate-800/80 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-600/30 transition-all cursor-pointer hover:border-slate-700"
+                                        value={onJoinRole}
+                                        onChange={(e) => setOnJoinRole(e.target.value)}
+                                    >
+                                        <option value="">None (Disabled)</option>
+                                        {roles.map(role => (
+                                            <option key={role.id} value={role.id}>{role.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <p className="text-[10px] text-slate-500 font-medium pl-2 leading-relaxed italic">Awarded immediately when a member joins the Discord server.</p>
                             </div>
                         </div>
 
-                        <div className="mt-10 flex items-center gap-4">
+                        <div className="mt-12 md:hidden">
                             <button
                                 onClick={handleSave}
                                 disabled={saving}
-                                className="flex-1 bg-sky-600 hover:bg-sky-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-sky-900/10 text-xs disabled:opacity-50 flex items-center justify-center gap-3 active:scale-95"
+                                className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-sky-900/10 text-xs disabled:opacity-50 flex items-center justify-center gap-3 active:scale-95"
                             >
-                                {saving ? (
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                    <>
-                                        <SaveIcon />
-                                        SAVE SETTINGS
-                                    </>
-                                )}
+                                {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "SAVE SETTINGS"}
                             </button>
-                            {success && (
-                                <span className="text-emerald-500 text-[10px] font-bold uppercase tracking-widest animate-pulse">Saved Successfully</span>
-                            )}
-                            {error && (
-                                <span className="text-red-500 text-[10px] font-bold uppercase tracking-widest">{error}</span>
-                            )}
                         </div>
+                    </div>
+
+                    {/* Status Box */}
+                    <div className="p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
+                        <div className="flex items-center gap-5">
+                            <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/10">
+                                <InfoIcon />
+                            </div>
+                            <div>
+                                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-tight">System Status</h4>
+                                <p className="text-[11px] text-slate-500 font-medium tracking-tight mt-0.5">Ro-Link authentication servers are currently synced and stable.</p>
+                            </div>
+                        </div>
+                        {success && (
+                            <div className="flex items-center gap-2 text-emerald-500 animate-in fade-in slide-in-from-right-2 duration-300">
+                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Changes Saved</span>
+                            </div>
+                        )}
+                        {error && <span className="text-red-500 text-[10px] font-bold uppercase tracking-widest">{error}</span>}
                     </div>
                 </div>
 
-                {/* Sidebar Info */}
-                <div className="space-y-6">
-                    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-6">
-                        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-4">How it works</h4>
-                        <ul className="space-y-4">
-                            <li className="flex gap-4">
-                                <span className="text-sky-500 font-bold text-xs mt-0.5">01</span>
-                                <p className="text-xs text-slate-500 leading-relaxed">Users visit the verification portal and link their Roblox account via OAuth2.</p>
-                            </li>
-                            <li className="flex gap-4">
-                                <span className="text-sky-500 font-bold text-xs mt-0.5">02</span>
-                                <p className="text-xs text-slate-500 leading-relaxed">Ro-Link stores the mapping and updates their roles in your Discord server.</p>
-                            </li>
-                            <li className="flex gap-4">
-                                <span className="text-sky-500 font-bold text-xs mt-0.5">03</span>
-                                <p className="text-xs text-slate-500 leading-relaxed">Existing members can also use <code className="text-sky-400 bg-sky-400/5 px-1 rounded">/get-roblox</code> to check verification status.</p>
-                            </li>
-                        </ul>
+                {/* Info Column */}
+                <div className="col-span-12 lg:col-span-4 space-y-8">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-8">
+                        <h4 className="text-xs font-bold text-white uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
+                            <span className="w-6 h-px bg-sky-600"></span>
+                            Documentation
+                        </h4>
+                        <div className="space-y-8">
+                            {[
+                                { step: "01", text: "Users link via Ro-Link portal using Roblox OAuth2." },
+                                { step: "02", text: "Roles are instantly synced across all eligible servers." },
+                                { step: "03", text: "Administrators can pull verification data via API." }
+                            ].map((item, i) => (
+                                <div key={i} className="flex gap-4 group">
+                                    <span className="text-sky-500 font-black text-xs mt-0.5 group-hover:scale-110 transition-transform">
+                                        {item.step}
+                                    </span>
+                                    <p className="text-xs text-slate-500 leading-relaxed group-hover:text-slate-300 transition-colors">
+                                        {item.text}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
                     </div>
 
-                    <div className="bg-sky-600/5 border border-sky-500/10 rounded-2xl p-6">
-                        <h4 className="text-xs font-bold text-sky-400 uppercase tracking-wider mb-2">Bot Permissions</h4>
-                        <p className="text-[10px] text-slate-500 leading-relaxed mb-4">Ensure the Ro-Link bot role is positioned <b>above</b> the roles you want it to assign.</p>
-                        <div className="p-2.5 bg-sky-500/10 rounded-lg border border-sky-500/20 text-[9px] font-mono text-sky-300">
-                            + Ro-Link Bot <br />
-                            + Verified Role <br />
-                            + On Join Role
+                    <div className="bg-sky-600/5 border border-sky-500/10 rounded-[2rem] p-8 relative overflow-hidden group hover:border-sky-500/30 transition-all">
+                        <div className="absolute -bottom-6 -right-6 opacity-[0.03] text-sky-400 group-hover:rotate-12 transition-transform duration-700">
+                            <ShieldIcon />
+                        </div>
+                        <h4 className="text-sm font-bold text-sky-400 mb-2">Bot Context</h4>
+                        <p className="text-[11px] text-slate-500 leading-relaxed mb-6">Ro-Link requires its role to be above any roles it attempts to assign.</p>
+                        <div className="p-5 bg-slate-950/60 rounded-2xl border border-sky-500/20 text-[10px] font-mono text-sky-300 leading-loose">
+                            <div className="flex justify-between border-b border-sky-500/10 pb-2 mb-2">
+                                <span className="opacity-50">Role Hierarchy</span>
+                                <span className="text-sky-500 font-bold">Priority</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="w-1.5 h-1.5 bg-sky-500 rounded-full"></span>
+                                Ro-Link Bot
+                            </div>
+                            <div className="flex items-center gap-3 ml-4 opacity-50">
+                                <span className="w-1 h-px bg-sky-900"></span>
+                                Verified Role
+                            </div>
+                            <div className="flex items-center gap-3 ml-4 opacity-50">
+                                <span className="w-1 h-px bg-sky-900"></span>
+                                On Join Role
+                            </div>
                         </div>
                     </div>
                 </div>
