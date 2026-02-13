@@ -133,9 +133,47 @@ local API_KEY = "\${apiKey}"
 local POLL_INTERVAL = 5
 
 function RoLink:Initialize()
-	print("🚀 [Ro-Link] Initializing bridge with MessagingService...")
+	print("🚀 [Ro-Link] Initializing bridge with Security Protocol...")
 	
-	-- 1. Listen for Instant Commands (Open Cloud)
+	-- 0. Fetch Server Settings
+	task.spawn(function()
+		local success, result = pcall(function()
+			return HttpService:RequestAsync({
+				Url = API_BASE_URL .. "/api/v1/settings",
+				Method = "GET",
+				Headers = { ["x-api-key"] = API_KEY }
+			})
+		end)
+		if success and result.StatusCode == 200 then
+			self.settings = HttpService:JSONDecode(result.Body)
+			print("🛡️ [Ro-Link] Security settings synced.")
+		end
+	end)
+
+	-- 1. Security Check (Block Unverified Joins)
+	Players.PlayerAdded:Connect(function(player)
+		-- Wait for settings to load
+		for i=1, 5 do
+			if self.settings then break end
+			task.wait(0.5)
+		end
+		
+		if self.settings and self.settings.blockUnverified then
+			local success, result = pcall(function()
+				return HttpService:RequestAsync({
+					Url = API_BASE_URL .. "/api/v1/lookup?robloxId=" .. player.UserId,
+					Method = "GET"
+				})
+			end)
+			
+			-- 404 means the user has no mapping in Ro-Link
+			if success and result.StatusCode == 404 then
+				player:Kick("\n[Ro-Link Security]\n\nThis game requires a linked Discord account.\n\nLink your account at: " .. API_BASE_URL .. "/verify")
+			end
+		end
+	end)
+
+	-- 2. Listen for Instant Commands (Open Cloud)
 	task.spawn(function()
 		local success, connection = pcall(function()
 			return MessagingService:SubscribeAsync("AdminActions", function(message)
@@ -150,7 +188,7 @@ function RoLink:Initialize()
 		if not success then warn("⚠️ [Ro-Link] MessagingService failed to initialize.") end
 	end)
 
-	-- 2. Fallback Polling
+	-- 3. Fallback Polling
 	task.spawn(function()
 		while true do
 			local id = game.JobId
