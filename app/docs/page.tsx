@@ -286,7 +286,8 @@ RoLink.Initialize({
         icon: Icons.Terminal,
         toc: [
             { id: 'auth', title: 'Authentication' },
-            { id: 'lookup', title: 'User Lookup' },
+            { id: 'lookup', title: 'User Data' },
+            { id: 'lookup-mapping', title: 'Account Mapping' },
             { id: 'command-usage', title: 'Execute Command' },
             { id: 'command-reference', title: 'Command Reference' },
             { id: 'rate-limits', title: 'Limits & Best Practices' }
@@ -352,6 +353,57 @@ RoLink.Initialize({
   "hasVerifiedBadge": true,
   "isBanned": false,
   "description": "The official Roblox account."
+}`}
+                    </CodeBlock>
+                </section>
+
+                <section id="lookup-mapping" className="scroll-mt-24">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="h-px bg-slate-800 flex-1"></div>
+                        <h2 className="text-xl font-bold text-white">GET /lookup</h2>
+                        <div className="h-px bg-slate-800 flex-1"></div>
+                    </div>
+                    <p className="text-slate-400 mb-4">
+                        Perform bidirectional mapping between Roblox and Discord accounts. Requires users to have verified via the Ro-Link portal.
+                    </p>
+
+                    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 mb-6 font-mono text-sm">
+                        <span className="text-emerald-500 font-bold">GET</span> <span className="text-slate-400">https://rolink.cloud/api/v1/lookup</span><span className="text-sky-400">?discordId=123456789</span>
+                    </div>
+
+                    <h4 className="text-sm font-bold text-white mb-2 uppercase tracking-wider text-xs">Query Parameters (One required)</h4>
+                    <table className="w-full text-left text-sm text-slate-400 mb-6 border-collapse">
+                        <thead>
+                            <tr className="border-b border-slate-800 text-slate-200">
+                                <th className="p-2">Parameter</th>
+                                <th className="p-2">Type</th>
+                                <th className="p-2">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/50">
+                            <tr>
+                                <td className="p-2 font-mono text-sky-400">discordId</td>
+                                <td className="p-2">string</td>
+                                <td className="p-2">The Discord ID to find the Roblox account for.</td>
+                            </tr>
+                            <tr>
+                                <td className="p-2 font-mono text-sky-400">robloxId</td>
+                                <td className="p-2">string</td>
+                                <td className="p-2">The Roblox UserID to find the Discord account for.</td>
+                            </tr>
+                            <tr>
+                                <td className="p-2 font-mono text-sky-400">robloxUsername</td>
+                                <td className="p-2">string</td>
+                                <td className="p-2">The Roblox Username to find the Discord account for.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <CodeBlock label="Example Response">
+                        {`{
+  "discordId": "953414442060746854",
+  "robloxId": "1234567",
+  "robloxUsername": "RobloxPlayer"
 }`}
                     </CodeBlock>
                 </section>

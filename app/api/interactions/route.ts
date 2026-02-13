@@ -198,10 +198,107 @@ export async function POST(req: Request) {
                                     { name: '`/update`', value: 'Send a global update signal to all Roblox servers (restarts them).' },
                                     { name: '`/shutdown`', value: 'Immediately shut down game servers.' },
                                     { name: '`/misc`', value: 'Access miscellaneous player actions like Fly, Kill, and Heal.' },
+                                    { name: '`/verify`', value: 'Link your Roblox account with Ro-Link.' },
+                                    { name: '`/get-discord`', value: 'Find a Discord user from their Roblox account.' },
+                                    { name: '`/get-roblox`', value: 'Find a Roblox account from a Discord user.' },
                                     { name: '`/help`', value: 'Show info and list of available commands.' }
                                 ]
                             }
                         ]
+                    }
+                });
+            }
+
+            if (name === 'verify') {
+                const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+                return NextResponse.json({
+                    type: 4,
+                    data: {
+                        embeds: [{
+                            title: '🔗 Link your Roblox Account',
+                            description: 'To use Ro-Link features, you must link your Roblox account with your Discord account.',
+                            color: 0x0ea5e9,
+                            fields: [
+                                { name: 'Step 1', value: `Click [here](${baseUrl}/verify) to go to the verification portal.` },
+                                { name: 'Step 2', value: 'Log in with Discord and authorized Roblox via OAuth.' },
+                                { name: 'Step 3', value: 'Return here and use `/get-roblox` to see your linked account!' }
+                            ],
+                            footer: { text: 'Ro-Link Verification System' }
+                        }],
+                        components: [{
+                            type: 1,
+                            components: [{
+                                type: 2,
+                                style: 5,
+                                label: 'Link Account',
+                                url: `${baseUrl}/verify`
+                            }]
+                        }],
+                        flags: 64
+                    }
+                });
+            }
+
+            if (name === 'get-discord') {
+                const robloxUsername = options?.find((o: any) => o.name === 'roblox_username')?.value;
+                const { data, error } = await supabase
+                    .from('verified_users')
+                    .select('*')
+                    .ilike('roblox_username', robloxUsername)
+                    .maybeSingle();
+
+                if (error || !data) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ No Discord account found linked to Roblox user \`${robloxUsername}\`.`, flags: 64 }
+                    });
+                }
+
+                return NextResponse.json({
+                    type: 4,
+                    data: {
+                        embeds: [{
+                            title: '🔍 Ro-Link Lookup',
+                            color: 0x10b981,
+                            fields: [
+                                { name: 'Roblox User', value: `[${data.roblox_username}](https://www.roblox.com/users/${data.roblox_id}/profile)`, inline: true },
+                                { name: 'Discord User', value: `<@${data.discord_id}>`, inline: true },
+                                { name: 'Discord ID', value: `\`${data.discord_id}\``, inline: false }
+                            ],
+                            footer: { text: 'Ro-Link Utility System' }
+                        }]
+                    }
+                });
+            }
+
+            if (name === 'get-roblox') {
+                const discordUserId = options?.find((o: any) => o.name === 'discord_user')?.value;
+                const { data, error } = await supabase
+                    .from('verified_users')
+                    .select('*')
+                    .eq('discord_id', discordUserId)
+                    .maybeSingle();
+
+                if (error || !data) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ No Roblox account found linked to <@${discordUserId}>.`, flags: 64 }
+                    });
+                }
+
+                return NextResponse.json({
+                    type: 4,
+                    data: {
+                        embeds: [{
+                            title: '🔍 Ro-Link Lookup',
+                            color: 0x10b981,
+                            fields: [
+                                { name: 'Discord User', value: `<@${data.discord_id}>`, inline: true },
+                                { name: 'Roblox User', value: `[${data.roblox_username}](https://www.roblox.com/users/${data.roblox_id}/profile)`, inline: true },
+                                { name: 'Roblox ID', value: `\`${data.roblox_id}\``, inline: false }
+                            ],
+                            footer: { text: 'Ro-Link Utility System' }
+                        }]
                     }
                 });
             }

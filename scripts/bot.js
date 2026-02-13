@@ -102,6 +102,34 @@ const commands = [
     {
         name: 'help',
         description: 'Show info and list of available commands',
+    },
+    {
+        name: 'verify',
+        description: 'Link your Roblox account with Ro-Link',
+    },
+    {
+        name: 'get-discord',
+        description: 'Find a Discord user from their Roblox account',
+        options: [
+            {
+                name: 'roblox_username',
+                description: 'The Roblox username to lookup',
+                type: 3,
+                required: true
+            }
+        ]
+    },
+    {
+        name: 'get-roblox',
+        description: 'Find a Roblox account from a Discord user',
+        options: [
+            {
+                name: 'discord_user',
+                description: 'The Discord user to lookup',
+                type: 6, // USER
+                required: true
+            }
+        ]
     }
 ];
 
@@ -209,6 +237,45 @@ client.on('guildDelete', guild => {
     console.log(`[GUILD] Left guild: ${guild.name} (${guild.id})`);
     syncStats();
     updateStatus();
+});
+
+client.on('guildMemberAdd', async member => {
+    const { guild, id: userId } = member;
+
+    try {
+        // 1. Fetch Server Settings
+        const { data: server, error } = await supabase
+            .from('servers')
+            .select('verification_enabled, on_join_role, verified_role')
+            .eq('id', guild.id)
+            .single();
+
+        if (error || !server || !server.verification_enabled) return;
+
+        // 2. Give On Join Role if it exists
+        if (server.on_join_role) {
+            const role = guild.roles.cache.get(server.on_join_role);
+            if (role) {
+                await member.roles.add(role).catch(e => console.error(`[ROLES] Failed to add on-join role:`, e.message));
+            }
+        }
+
+        // 3. Check if user is verified
+        const { data: verifiedUser } = await supabase
+            .from('verified_users')
+            .select('roblox_id')
+            .eq('discord_id', userId)
+            .maybeSingle();
+
+        if (verifiedUser && server.verified_role) {
+            const role = guild.roles.cache.get(server.verified_role);
+            if (role) {
+                await member.roles.add(role).catch(e => console.error(`[ROLES] Failed to add verified role:`, e.message));
+            }
+        }
+    } catch (e) {
+        console.error(`[JOIN] Error handling member join:`, e.message);
+    }
 });
 
 client.on('interactionCreate', async interaction => {
@@ -494,6 +561,81 @@ client.on('interactionCreate', async interaction => {
     } else if (commandName === 'ping') {
         const latency = Math.abs(Date.now() - interaction.createdTimestamp);
         await interaction.reply(`**Pong!** \nLatency: \`${latency}ms\`\nStatus: \`Online (Vercel Integration Active)\``);
+    } else if (commandName === 'verify') {
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const embed = new EmbedBuilder()
+            .setTitle('🔗 Link your Roblox Account')
+            .setDescription('To use Ro-Link features, you must link your Roblox account with your Discord account.')
+            .setColor('#0ea5e9')
+            .addFields(
+                { name: 'Step 1', value: `Click [here](\${baseUrl}/verify) to go to the verification portal.` },
+                { name: 'Step 2', value: 'Log in with Discord and authorized Roblox via OAuth.' },
+                { name: 'Step 3', value: 'Return here and use `/get-roblox` to see your linked account!' }
+            )
+            .setFooter({ text: 'Ro-Link Verification System' });
+
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setLabel('Link Account')
+                    .setURL(`\${baseUrl}/verify`)
+                    .setStyle(ButtonStyle.Link)
+            );
+
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+    } else if (commandName === 'get-discord') {
+        const robloxUsername = interaction.options.getString('roblox_username');
+
+        await interaction.deferReply({ ephemeral: false });
+
+        const { data, error } = await supabase
+            .from('verified_users')
+            .select('*')
+            .ilike('roblox_username', robloxUsername)
+            .maybeSingle();
+
+        if (error || !data) {
+            return interaction.editReply(`❌ No Discord account found linked to Roblox user \`\${robloxUsername}\`.`);
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('🔍 Ro-Link Lookup')
+            .setColor('#10b981')
+            .addFields(
+                { name: 'Roblox User', value: `[\${data.roblox_username}](https://www.roblox.com/users/\${data.roblox_id}/profile)`, inline: true },
+                { name: 'Discord User', value: `<@\${data.discord_id}>`, inline: true },
+                { name: 'Discord ID', value: `\`\${data.discord_id}\``, inline: false }
+            )
+            .setFooter({ text: 'Ro-Link Utility System' });
+
+        await interaction.editReply({ embeds: [embed] });
+
+    } else if (commandName === 'get-roblox') {
+        const discordUser = interaction.options.getUser('discord_user');
+
+        await interaction.deferReply({ ephemeral: false });
+
+        const { data, error } = await supabase
+            .from('verified_users')
+            .select('*')
+            .eq('discord_id', discordUser.id)
+            .maybeSingle();
+
+        if (error || !data) {
+            return interaction.editReply(`❌ No Roblox account found linked to <@\${discordUser.id}>.`);
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('🔍 Ro-Link Lookup')
+            .setColor('#10b981')
+            .addFields(
+                { name: 'Discord User', value: `<@\${data.discord_id}>`, inline: true },
+                { name: 'Roblox User', value: `[\${data.roblox_username}](https://www.roblox.com/users/\${data.roblox_id}/profile)`, inline: true },
+                { name: 'Roblox ID', value: `\`\${data.roblox_id}\``, inline: false }
+            )
+            .setFooter({ text: 'Ro-Link Utility System' });
+
+        await interaction.editReply({ embeds: [embed] });
     }
 });
 
