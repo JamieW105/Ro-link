@@ -1,5 +1,6 @@
 'use client';
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
@@ -252,12 +253,10 @@ export default function ReportsPage() {
                             </div>
                         ) : (
                             reports.map(report => (
-                                <div
+                                <Link
                                     key={report.id}
-                                    onClick={() => setSelectedReport(report)}
-                                    className={`p-4 rounded-xl border transition-all cursor-pointer group ${selectedReport?.id === report.id
-                                        ? "bg-sky-600/10 border-sky-500/30 shadow-lg shadow-sky-900/10"
-                                        : "bg-slate-900/40 border-slate-800/50 hover:bg-slate-800 hover:border-slate-700"}`}
+                                    href={`/dashboard/${id}/reports/${report.id}`}
+                                    className="block p-4 rounded-xl border bg-slate-900/40 border-slate-800/50 hover:bg-slate-800 hover:border-slate-700 transition-all cursor-pointer group"
                                 >
                                     <div className="flex justify-between items-start mb-2">
                                         <span className="text-xs font-bold text-white bg-slate-800 px-2 py-0.5 rounded border border-slate-700">{report.reported_roblox_username}</span>
@@ -267,7 +266,7 @@ export default function ReportsPage() {
                                     <div className="flex items-center gap-2 text-[10px] text-slate-600 font-bold uppercase tracking-wider">
                                         <span>By: {report.reporter_roblox_username || report.reporter_discord_id}</span>
                                     </div>
-                                </div>
+                                </Link>
                             ))
                         )}
                     </div>

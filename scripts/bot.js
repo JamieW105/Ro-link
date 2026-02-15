@@ -130,6 +130,11 @@ const commands = [
                 required: true
             }
         ]
+    },
+    {
+        name: 'report',
+        description: 'Submit a report against a player for rule violations',
+        options: []
     }
 ];
 
@@ -636,6 +641,44 @@ client.on('interactionCreate', async interaction => {
             .setFooter({ text: 'Ro-Link Utility System' });
 
         await interaction.editReply({ embeds: [embed] });
+
+    } else if (commandName === 'report') {
+        const { data: server, error: serverError } = await supabase
+            .from('servers')
+            .select('reports_enabled')
+            .eq('id', guildId)
+            .single();
+
+        if (serverError || !server?.reports_enabled) {
+            return interaction.reply({
+                content: `❌ The report system is currently **DISABLED** in this server.`,
+                ephemeral: true
+            });
+        }
+
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const embed = new EmbedBuilder()
+            .setTitle('Player Reporting System')
+            .setDescription('Submit a report against a player for rule violations. All reports are reviewed by server moderators.')
+            .setColor('#ff4444')
+            .setThumbnail(`${baseUrl}/Media/Ro-LinkIcon.png`)
+            .addFields(
+                { name: 'Warning', value: "False reporting or misuse of this system may result in a ban from the bot and server.", inline: false },
+                { name: 'Process', value: "1. Click the button below\n2. Enter the Roblox Username\n3. Describe the incident and provide proof if possible", inline: false }
+            )
+            .setFooter({ text: 'Ro-Link Systems • Reports', iconURL: `${baseUrl}/Media/Ro-LinkIcon.png` })
+            .setTimestamp();
+
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('report_open')
+                    .setLabel('Create Report')
+                    .setStyle(ButtonStyle.Danger)
+                    .setEmoji('🚨')
+            );
+
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
     }
 });
 
@@ -945,6 +988,97 @@ return RoLink`;
 
     return [embed1, embed2];
 }
+
+// Handle Report Button
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isButton()) return;
+    if (interaction.customId !== 'report_open') return;
+
+    const modal = new ModalBuilder()
+        .setCustomId('report_submit')
+        .setTitle('Submit Player Report');
+
+    const usernameInput = new TextInputBuilder()
+        .setCustomId('roblox_username')
+        .setLabel("Roblox Username")
+        .setPlaceholder('Who are you reporting?')
+        .setStyle(TextInputStyle.Short)
+        .setMinLength(3)
+        .setMaxLength(20)
+        .setRequired(true);
+
+    const reasonInput = new TextInputBuilder()
+        .setCustomId('reason')
+        .setLabel("Reason & Evidence")
+        .setPlaceholder('Describe what happened...')
+        .setStyle(TextInputStyle.Paragraph)
+        .setMinLength(10)
+        .setMaxLength(1000)
+        .setRequired(true);
+
+    modal.addComponents(
+        new ActionRowBuilder().addComponents(usernameInput),
+        new ActionRowBuilder().addComponents(reasonInput)
+    );
+
+    await interaction.showModal(modal);
+});
+
+// Handle Report Submission
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isModalSubmit()) return;
+    if (interaction.customId !== 'report_submit') return;
+
+    const robloxUsername = interaction.fields.getTextInputValue('roblox_username');
+    const reason = interaction.fields.getTextInputValue('reason');
+    const guildId = interaction.guildId;
+
+    await interaction.deferReply({ ephemeral: true });
+
+    // 1. Save to Database
+    const { error: dbError } = await supabase.from('reports').insert([{
+        server_id: guildId,
+        reporter_discord_id: interaction.user.id,
+        reporter_roblox_username: null,
+        reported_roblox_username: robloxUsername,
+        reason: reason,
+        status: 'PENDING'
+    }]);
+
+    if (dbError) {
+        console.error('Report DB Error:', dbError);
+        return interaction.editReply(`❌ Failed to submit report. Please try again later.`);
+    }
+
+    // 2. Send Notification to Channel (if configured)
+    const { data: server } = await supabase
+        .from('servers')
+        .select('reports_channel_id, moderator_role_id')
+        .eq('id', guildId)
+        .single();
+
+    if (server?.reports_channel_id) {
+        const channel = await client.channels.fetch(server.reports_channel_id).catch(() => null);
+        if (channel && channel.isTextBased()) {
+            const roleMention = server.moderator_role_id ? `<@&${server.moderator_role_id}>` : '';
+
+            const embed = new EmbedBuilder()
+                .setTitle('🚨 New User Report')
+                .setColor('#ff4444')
+                .addFields(
+                    { name: 'Reported User', value: `\`${robloxUsername}\``, inline: true },
+                    { name: 'Reporter', value: `<@${interaction.user.id}>`, inline: true },
+                    { name: 'Reason', value: reason }
+                )
+                .setFooter({ text: `Ro-Link Systems • ID: ${guildId}` })
+                .setTimestamp();
+
+            await channel.send({ content: roleMention, embeds: [embed] }).catch(err => console.error('Failed to forward report to Discord:', err));
+        }
+    }
+
+    await interaction.editReply(`✅ **Report Submitted!** The moderation team has been notified.`);
+});
 
 console.log('Attempting to log in to Discord...');
 client.login(process.env.DISCORD_TOKEN).catch(err => {
