@@ -181,30 +181,30 @@ export async function POST(req: Request) {
                     data: {
                         embeds: [
                             {
-                                title: 'Info',
+                                title: 'Ro-Link System Information',
+                                description: "Welcome to **Ro-Link**, the premium bridge between Discord and Roblox. Manage your community with seamless integration, powerful moderation tools, and real-time data syncing.\n\n**Note:** To setup your server, use `/setup`.",
                                 url: baseUrl,
-                                image: { url: `${baseUrl}/Media/Ro-LinkIcon.png` },
-                                description: "Welcome to Ro-Link. We are a platform that enables you to connect your Discord / cmds to Roblox. We make the connection between Discord and Roblox feel like a very small gap. We allow kick, ban and unban cmds along with an advanced dashboard to show you your servers and player count.\n\nGive us a try, we are aways looking to help all community's no matter the size. Ro-link is perfect for any game and allows you to respond to urgent reports without the bother of having to join in game.",
-                                color: 959977
-                            },
-                            {
-                                title: 'Commands',
-                                url: `${baseUrl}/docs`,
-                                color: 1095921,
+                                color: 0x2b2d31,
+                                thumbnail: { url: `${baseUrl}/Media/Ro-LinkIcon.png` },
                                 fields: [
-                                    { name: '`/setup`', value: 'Initializes Ro-Link for this server (Owner Only).' },
-                                    { name: '`/ping`', value: 'Check the bot response time and connection status.' },
-                                    { name: '`/ban`', value: 'Permanently ban a user from the Roblox game.' },
-                                    { name: '`/kick`', value: 'Kick a user from the game server.' },
-                                    { name: '`/unban`', value: 'Unban a user from the Roblox game.' },
-                                    { name: '`/update`', value: 'Send a global update signal to all Roblox servers (restarts them).' },
-                                    { name: '`/shutdown`', value: 'Immediately shut down game servers.' },
-                                    { name: '`/misc`', value: 'Access miscellaneous player actions like Fly, Kill, and Heal.' },
-                                    { name: '`/verify`', value: 'Link your Roblox account with Ro-Link.' },
-                                    { name: '`/get-discord`', value: 'Find a Discord user from their Roblox account.' },
-                                    { name: '`/get-roblox`', value: 'Find a Roblox account from a Discord user.' },
-                                    { name: '`/help`', value: 'Show info and list of available commands.' }
-                                ]
+                                    {
+                                        name: '**Management Commands**',
+                                        value: "`/setup` - Initialize the bridge (Owner Only)\n`/update` - Global Server Soft-Shutdown\n`/shutdown` - Emergency Server Shutdown",
+                                        inline: false
+                                    },
+                                    {
+                                        name: '**Moderation Commands**',
+                                        value: "`/ban` - Permanently ban a user\n`/kick` - Kick a user from the server\n`/unban` - Revoke a ban\n`/misc` - Player actions (Fly, Heal, etc.)",
+                                        inline: false
+                                    },
+                                    {
+                                        name: '**Utility Commands**',
+                                        value: "`/get-discord` - Find Discord from Roblox\n`/get-roblox` - Find Roblox from Discord\n`/verify` - Link your account",
+                                        inline: false
+                                    }
+                                ],
+                                footer: { text: 'Ro-Link Systems • Premium Integration', icon_url: `${baseUrl}/Media/Ro-LinkIcon.png` },
+                                timestamp: new Date().toISOString()
                             }
                         ]
                     }
@@ -217,22 +217,24 @@ export async function POST(req: Request) {
                     type: 4,
                     data: {
                         embeds: [{
-                            title: '🔗 Link your Roblox Account',
-                            description: 'To use Ro-Link features, you must link your Roblox account with your Discord account.',
-                            color: 0x0ea5e9,
+                            title: 'Account Verification',
+                            description: 'Link your Roblox account to unlock all features.',
+                            color: 0x2b2d31,
+                            thumbnail: { url: `${baseUrl}/Media/Ro-LinkIcon.png` },
                             fields: [
-                                { name: 'Step 1', value: `Click [here](${baseUrl}/verify) to go to the verification portal.` },
-                                { name: 'Step 2', value: 'Log in with Discord and authorized Roblox via OAuth.' },
-                                { name: 'Step 3', value: 'Return here and use `/get-roblox` to see your linked account!' }
+                                { name: 'Step 1', value: `Navigate to [**Verification Portal**](${baseUrl}/verify)`, inline: true },
+                                { name: 'Step 2', value: 'Log in with Discord', inline: true },
+                                { name: 'Step 3', value: 'Authorize Roblox', inline: true }
                             ],
-                            footer: { text: 'Ro-Link Verification System' }
+                            footer: { text: 'Ro-Link Systems • Verification', icon_url: `${baseUrl}/Media/Ro-LinkIcon.png` },
+                            timestamp: new Date().toISOString()
                         }],
                         components: [{
                             type: 1,
                             components: [{
                                 type: 2,
                                 style: 5,
-                                label: 'Link Account',
+                                label: 'Open Verification Portal',
                                 url: `${baseUrl}/verify`
                             }]
                         }],
@@ -252,7 +254,7 @@ export async function POST(req: Request) {
                 if (error || !data) {
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `❌ No Discord account found linked to Roblox user \`${robloxUsername}\`.`, flags: 64 }
+                        data: { content: `❌ No Discord account found for **${robloxUsername}**.`, flags: 64 }
                     });
                 }
 
@@ -260,14 +262,16 @@ export async function POST(req: Request) {
                     type: 4,
                     data: {
                         embeds: [{
-                            title: '🔍 Ro-Link Lookup',
-                            color: 0x10b981,
+                            title: `Player Lookup: ${data.roblox_username}`,
+                            color: 0x2b2d31,
+                            thumbnail: { url: `https://www.roblox.com/headshot-thumbnail/image?userId=${data.roblox_id}&width=420&height=420&format=png` },
                             fields: [
-                                { name: 'Roblox User', value: `[${data.roblox_username}](https://www.roblox.com/users/${data.roblox_id}/profile)`, inline: true },
-                                { name: 'Discord User', value: `<@${data.discord_id}>`, inline: true },
-                                { name: 'Discord ID', value: `\`${data.discord_id}\``, inline: false }
+                                { name: 'Roblox Account', value: `[${data.roblox_username}](https://www.roblox.com/users/${data.roblox_id}/profile)\n\`ID: ${data.roblox_id}\``, inline: true },
+                                { name: 'Discord Account', value: `<@${data.discord_id}>\n\`ID: ${data.discord_id}\``, inline: true },
+                                { name: 'Linked Date', value: `<t:${Math.floor(new Date(data.created_at).getTime() / 1000)}:R>`, inline: false }
                             ],
-                            footer: { text: 'Ro-Link Utility System' }
+                            footer: { text: 'Ro-Link Systems • Lookup Service' },
+                            timestamp: new Date().toISOString()
                         }]
                     }
                 });
@@ -284,7 +288,7 @@ export async function POST(req: Request) {
                 if (error || !data) {
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `❌ No Roblox account found linked to <@${discordUserId}>.`, flags: 64 }
+                        data: { content: `❌ No Roblox account found for <@${discordUserId}>.`, flags: 64 }
                     });
                 }
 
@@ -292,14 +296,16 @@ export async function POST(req: Request) {
                     type: 4,
                     data: {
                         embeds: [{
-                            title: '🔍 Ro-Link Lookup',
-                            color: 0x10b981,
+                            title: `Player Lookup`,
+                            color: 0x2b2d31,
+                            thumbnail: { url: `https://www.roblox.com/headshot-thumbnail/image?userId=${data.roblox_id}&width=420&height=420&format=png` },
                             fields: [
-                                { name: 'Discord User', value: `<@${data.discord_id}>`, inline: true },
-                                { name: 'Roblox User', value: `[${data.roblox_username}](https://www.roblox.com/users/${data.roblox_id}/profile)`, inline: true },
-                                { name: 'Roblox ID', value: `\`${data.roblox_id}\``, inline: false }
+                                { name: 'Discord Account', value: `<@${data.discord_id}>\n\`ID: ${data.discord_id}\``, inline: true },
+                                { name: 'Roblox Account', value: `[${data.roblox_username}](https://www.roblox.com/users/${data.roblox_id}/profile)\n\`ID: ${data.roblox_id}\``, inline: true },
+                                { name: 'Linked Date', value: `<t:${Math.floor(new Date(data.created_at).getTime() / 1000)}:R>`, inline: false }
                             ],
-                            footer: { text: 'Ro-Link Utility System' }
+                            footer: { text: 'Ro-Link Systems • Lookup Service' },
+                            timestamp: new Date().toISOString()
                         }]
                     }
                 });
@@ -479,21 +485,17 @@ export async function POST(req: Request) {
                     type: 4,
                     data: {
                         embeds: [{
-                            title: '🪄 Miscellaneous Player Actions',
+                            title: 'Miscellaneous Actions',
                             description: 'Select an action from the menu below to apply it to a Roblox player.',
-                            color: 0x0ea5e9,
+                            color: 0x2b2d31,
                             fields: [
-                                { name: 'Fly', value: 'Enables hover/flight for the target player.', inline: false },
-                                { name: 'Noclip', value: 'Allows the player to pass through walls.', inline: false },
-                                { name: 'Invis', value: 'Makes the player and their accessories fully invisible.', inline: false },
-                                { name: 'Ghost', value: 'Applies a ForceField material to the player character.', inline: false },
-                                { name: 'Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: false },
-                                { name: 'Heal', value: 'Restores player health to maximum.', inline: false },
-                                { name: 'Kill', value: 'Immediately kills the target player.', inline: false },
-                                { name: 'Reset', value: 'Resets the player character.', inline: false },
-                                { name: 'Refresh', value: 'Respawn the player character.', inline: false }
+                                { name: 'Movement', value: "`FLY` `NOCLIP`", inline: true },
+                                { name: 'Visibility', value: "`INVIS` `GHOST`", inline: true },
+                                { name: 'Vitality', value: "`HEAL` `KILL` `RESET`", inline: true },
+                                { name: 'Identity', value: "`SET_CHAR` `REFRESH`", inline: true }
                             ],
-                            footer: { text: 'Ro-Link Utility System' }
+                            footer: { text: 'Ro-Link Systems • Admin Tools' },
+                            timestamp: new Date().toISOString()
                         }],
                         flags: 64,
                         components: [{
@@ -503,15 +505,15 @@ export async function POST(req: Request) {
                                 custom_id: `misc_menu`,
                                 placeholder: 'Choose an action...',
                                 options: [
-                                    { label: 'Fly', value: 'FLY', description: 'Enable flight for the player', emoji: { name: '✈️' } },
-                                    { label: 'Noclip', value: 'NOCLIP', description: 'Allow player to walk through walls', emoji: { name: '👻' } },
-                                    { label: 'Invis', value: 'INVIS', description: 'Make the player invisible', emoji: { name: '🫥' } },
-                                    { label: 'Ghost', value: 'GHOST', description: 'Apply a ForceField material', emoji: { name: '🛡️' } },
-                                    { label: 'Set Character', value: 'SET_CHAR', description: 'Change appearance', emoji: { name: '👤' } },
-                                    { label: 'Heal', value: 'HEAL', description: 'Restore health', emoji: { name: '❤️' } },
-                                    { label: 'Kill', value: 'KILL', description: 'Instant kill', emoji: { name: '💀' } },
-                                    { label: 'Reset', value: 'RESET', description: 'Reset character', emoji: { name: '🔄' } },
-                                    { label: 'Refresh', value: 'REFRESH', description: 'Refresh character', emoji: { name: '✨' } }
+                                    { label: 'Fly', value: 'FLY', description: 'Enable flight for the player' },
+                                    { label: 'Noclip', value: 'NOCLIP', description: 'Allow player to walk through walls' },
+                                    { label: 'Invis', value: 'INVIS', description: 'Make the player invisible' },
+                                    { label: 'Ghost', value: 'GHOST', description: 'Apply a ForceField material' },
+                                    { label: 'Set Character', value: 'SET_CHAR', description: 'Change appearance' },
+                                    { label: 'Heal', value: 'HEAL', description: 'Restore health' },
+                                    { label: 'Kill', value: 'KILL', description: 'Instant kill' },
+                                    { label: 'Reset', value: 'RESET', description: 'Reset character' },
+                                    { label: 'Refresh', value: 'REFRESH', description: 'Refresh character' }
                                 ]
                             }]
                         }]
@@ -699,21 +701,26 @@ function getSetupEmbeds(guildId: string, apiKey: string) {
 
     return [
         {
-            title: '🛠️ Studio Setup Instructions',
-            color: 959977,
+            title: 'Studio Setup Instructions',
+            color: 0x2b2d31,
+            description: "Follow these steps to integrate Ro-Link with your Roblox game.",
+            thumbnail: { url: `${baseUrl}/Media/Ro-LinkIcon.png` },
             fields: [
-                { name: '1. ModuleScript', value: "Create a `ModuleScript` in `ReplicatedStorage` named `RoLink`." },
-                { name: '2. Paste Code', value: "Copy the code from the next box and paste it into that script." },
-                { name: '3. Starter Script', value: "Create a `Script` in `ServerScriptService` with:\n```lua\nlocal RoLink = require(game.ReplicatedStorage:WaitForChild('RoLink'))\nRoLink:Initialize()\n```" },
-                { name: '4. Permissions', value: "Enable **HTTP Requests** and **API Services** in Game Settings." },
-                { name: 'Dashboard', value: `${baseUrl}/dashboard/${guildId}` }
-            ]
+                { name: '1. ModuleScript', value: "Create a `ModuleScript` in `ReplicatedStorage` named `RoLink`.", inline: false },
+                { name: '2. Paste Code', value: "Copy the **Code Block** below and paste it into the `RoLink` script.", inline: false },
+                { name: '3. Starter Script', value: "Create a `Script` in `ServerScriptService` with:\n```lua\nlocal RoLink = require(game.ReplicatedStorage:WaitForChild('RoLink'))\nRoLink:Initialize()\n```", inline: false },
+                { name: '4. Permissions', value: "Enable **HTTP Requests** and **API Services** in Game Settings.", inline: false },
+                { name: 'Dashboard', value: `[**Manage Server**](${baseUrl}/dashboard/${guildId})`, inline: false }
+            ],
+            footer: { text: 'Ro-Link Systems • Setup', icon_url: `${baseUrl}/Media/Ro-LinkIcon.png` },
+            timestamp: new Date().toISOString()
         },
         {
-            title: '📄 Core Bridge Code (RoLink Module)',
-            color: 1095921,
+            title: 'Core Bridge Code (RoLink Module)',
+            color: 0x2b2d31,
             description: '```lua\n' + getLuaCode(baseUrl, apiKey) + '\n```',
-            footer: { text: 'Keep your Security Key private!' }
+            footer: { text: 'KEEP YOUR SECURITY KEY PRIVATE!' },
+            timestamp: new Date().toISOString()
         }
     ];
 }
