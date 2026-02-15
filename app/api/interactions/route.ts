@@ -311,7 +311,52 @@ export async function POST(req: Request) {
                 });
             }
 
-            // Permission Check: Only 'ping' is public (Already handled ping above)
+            if (name === 'report') {
+                const { data: server, error: serverError } = await supabase
+                    .from('servers')
+                    .select('reports_enabled')
+                    .eq('id', guild_id)
+                    .single();
+
+                if (serverError || !server?.reports_enabled) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ The report system is currently **DISABLED** in this server.`, flags: 64 }
+                    });
+                }
+
+                const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+                return NextResponse.json({
+                    type: 4,
+                    data: {
+                        embeds: [{
+                            title: 'Player Reporting System',
+                            description: 'Submit a report against a player for rule violations. All reports are reviewed by server moderators.',
+                            color: 0xff4444,
+                            thumbnail: { url: `${baseUrl}/Media/Ro-LinkIcon.png` },
+                            fields: [
+                                { name: 'Warning', value: "False reporting or misuse of this system may result in a ban from the bot and server.", inline: false },
+                                { name: 'Process', value: "1. Click the button below\n2. Enter the Roblox Username\n3. Describe the incident and provide proof if possible", inline: false }
+                            ],
+                            footer: { text: 'Ro-Link Systems • Reports', icon_url: `${baseUrl}/Media/Ro-LinkIcon.png` },
+                            timestamp: new Date().toISOString()
+                        }],
+                        components: [{
+                            type: 1,
+                            components: [{
+                                type: 2,
+                                style: 4, // Danger/Red
+                                label: 'Create Report',
+                                custom_id: 'report_open',
+                                emoji: { name: '🚨' }
+                            }]
+                        }],
+                        flags: 64
+                    }
+                });
+            }
+
+
             const permissions = BigInt(member?.permissions || '0');
             const hasPerms = (permissions & 0x2n) !== 0n || (permissions & 0x4n) !== 0n || (permissions & 0x8n) !== 0n || (permissions & 0x20n) !== 0n;
 
@@ -530,9 +575,46 @@ export async function POST(req: Request) {
 
         // Handle Button Clicks (Vercel)
         if (type === 3) {
+            // Public Button: Report Form
+            if (interaction.data.custom_id === 'report_open') {
+                return NextResponse.json({
+                    type: 9,
+                    data: {
+                        title: "Submit Player Report",
+                        custom_id: "report_submit",
+                        components: [{
+                            type: 1,
+                            components: [{
+                                type: 4,
+                                custom_id: "roblox_username",
+                                label: "Roblox Username",
+                                style: 1,
+                                min_length: 3,
+                                max_length: 20,
+                                placeholder: "Who are you reporting?",
+                                required: true
+                            }]
+                        }, {
+                            type: 1,
+                            components: [{
+                                type: 4,
+                                custom_id: "reason",
+                                label: "Reason & Evidence",
+                                style: 2,
+                                min_length: 10,
+                                max_length: 1000,
+                                placeholder: "Describe what happened...",
+                                required: true
+                            }]
+                        }]
+                    }
+                });
+            }
+
             // Permission Check for buttons
             const permissions = BigInt(member?.permissions || '0');
             const hasPerms = (permissions & 0x2n) !== 0n || (permissions & 0x4n) !== 0n || (permissions & 0x8n) !== 0n || (permissions & 0x20n) !== 0n;
+
 
             if (!hasPerms) {
                 return NextResponse.json({
@@ -646,6 +728,72 @@ export async function POST(req: Request) {
                 return NextResponse.json({
                     type: 4,
                     data: { content: msgContent, flags: 64 }
+                });
+            }
+
+            if (custom_id === 'report_submit') {
+                const getField = (id: string) => {
+                    const row = modalComponents.find((c: any) => c.components.some((ic: any) => ic.custom_id === id));
+                    return row ? row.components.find((ic: any) => ic.custom_id === id).value : '';
+                };
+
+                const robloxUsername = getField('roblox_username');
+                const reason = getField('reason');
+
+                // 1. Save to Database
+                const { error: dbError } = await supabase.from('reports').insert([{
+                    server_id: guild_id,
+                    reporter_discord_id: member?.user?.id || interactionUser?.id,
+                    reporter_roblox_username: null,
+                    reported_roblox_username: robloxUsername,
+                    reason: reason,
+                    status: 'PENDING'
+                }]);
+
+                if (dbError) {
+                    console.error('Report DB Error:', dbError);
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ Failed to submit report. Please try again later.`, flags: 64 }
+                    });
+                }
+
+                // 2. Send Notification to Channel (if configured)
+                const { data: server } = await supabase
+                    .from('servers')
+                    .select('reports_channel_id, moderator_role_id')
+                    .eq('id', guild_id)
+                    .single();
+
+                if (server?.reports_channel_id) {
+                    const roleMention = server.moderator_role_id ? `<@&${server.moderator_role_id}>` : '';
+
+                    fetch(`https://discord.com/api/v10/channels/${server.reports_channel_id}/messages`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            content: roleMention,
+                            embeds: [{
+                                title: '🚨 New User Report',
+                                color: 0xff4444,
+                                fields: [
+                                    { name: 'Reported User', value: `\`${robloxUsername}\``, inline: true },
+                                    { name: 'Reporter', value: `<@${member?.user?.id || interactionUser?.id}>`, inline: true },
+                                    { name: 'Reason', value: reason }
+                                ],
+                                footer: { text: `Ro-Link Systems • ID: ${guild_id}` },
+                                timestamp: new Date().toISOString()
+                            }]
+                        })
+                    }).catch(err => console.error('Failed to forward report to Discord:', err));
+                }
+
+                return NextResponse.json({
+                    type: 4,
+                    data: { content: `✅ **Report Submitted!** The moderation team has been notified.`, flags: 64 }
                 });
             }
 

@@ -104,8 +104,6 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const utilityItems = [
         { label: "Home", icon: <HomeIcon />, href: `/dashboard/${id}` },
         { label: "Live Servers", icon: <ServersIcon />, href: `/dashboard/${id}/servers` },
-        { label: "Player Lookup", icon: <LookupIcon />, href: `/dashboard/${id}/lookup` },
-        { label: "Misc Actions", icon: <MagicIcon />, href: `/dashboard/${id}/misc` },
         {
             label: "Verification",
             icon: (
@@ -118,11 +116,27 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         },
     ];
 
+    const moderationItems = [
+        { label: "Player Lookup", icon: <LookupIcon />, href: `/dashboard/${id}/lookup` },
+        {
+            label: "Reports",
+            icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+            ),
+            href: `/dashboard/${id}/reports`
+        },
+        { label: "Misc Actions", icon: <MagicIcon />, href: `/dashboard/${id}/misc` },
+    ];
+
     const settingItems = [
         { label: "Setup", icon: <SetupIcon />, href: `/dashboard/${id}/setup`, hide: isReadOnly },
     ].filter(item => !item.hide);
 
-    const allItems = [...utilityItems, ...settingItems];
+    const allItems = [...utilityItems, ...moderationItems, ...settingItems];
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200 flex flex-col md:flex-row font-sans">
@@ -156,6 +170,30 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                             <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-4 ml-2">Utility</p>
                             <div className="space-y-1">
                                 {utilityItems.map((item) => {
+                                    const isActive = pathname === item.href;
+                                    return (
+                                        <Link
+                                            key={item.href}
+                                            href={item.href}
+                                            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group font-semibold text-sm ${isActive
+                                                ? "bg-sky-600/10 text-sky-400 border border-sky-500/10 shadow-sm shadow-sky-900/5"
+                                                : "text-slate-400 hover:text-white hover:bg-slate-800/40 border border-transparent"
+                                                }`}
+                                        >
+                                            <span className={`${isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300 transition-colors"}`}>
+                                                {item.icon}
+                                            </span>
+                                            {item.label}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-4 ml-2">Moderation</p>
+                            <div className="space-y-1">
+                                {moderationItems.map((item) => {
                                     const isActive = pathname === item.href;
                                     return (
                                         <Link
