@@ -1,20 +1,17 @@
 'use client';
 
-import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 
-// Icons (Reusing from other pages for consistency)
+// Icons
 const ChevronLeftIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-);
-const UserIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
 );
 const ShieldIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" /></svg>
 );
 
 export default function ReportDetailsPage() {
@@ -29,12 +26,24 @@ export default function ReportDetailsPage() {
     const [actionLoading, setActionLoading] = useState(false);
     const [reason, setReason] = useState("");
     const [discordUser, setDiscordUser] = useState<any | null>(null); // For fetching Discord profile data (avatar, etc)
+    const [serverName, setServerName] = useState<string>("this server");
 
     useEffect(() => {
         if (!id || !reportId) return;
 
         async function fetchData() {
             setLoading(true);
+
+            // Fetch Server Name
+            const { data: serverInfo } = await supabase
+                .from('servers')
+                .select('name')
+                .eq('id', id)
+                .single();
+
+            if (serverInfo && serverInfo.name) {
+                setServerName(serverInfo.name);
+            }
 
             // 1. Fetch Report Details
             const { data: reportData, error: reportError } = await supabase
@@ -153,24 +162,15 @@ export default function ReportDetailsPage() {
         // 5. Notify User via Discord DM
         if (profiles?.discord_id) {
             try {
-                // Fetch server name for the DM
-                const { data: serverNameData } = await supabase
-                    .from('servers')
-                    .select('name')
-                    .eq('id', id) // 'id' from params is the server ID
-                    .single();
-
-                const serverName = serverNameData?.name || "the server";
-
                 await fetch('/api/discord/dm', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         userId: profiles.discord_id,
                         embed: {
-                            title: `Moderation Action: ${action}`,
+                            title: `Moderation Action from ${serverName}: ${action}`,
                             color: 0xff0000,
-                            description: `You have received a moderation action in **${serverName}**.`,
+                            description: `You have been **${action.toLowerCase()}** from **${serverName}**.`,
                             fields: [
                                 { name: "Reason", value: reason || "No reason provided" },
                                 { name: "Moderator", value: moderator }

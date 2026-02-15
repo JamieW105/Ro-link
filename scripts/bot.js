@@ -999,12 +999,12 @@ client.on('interactionCreate', async interaction => {
         .setTitle('Submit Player Report');
 
     const usernameInput = new TextInputBuilder()
-        .setCustomId('roblox_username')
-        .setLabel("Roblox Username")
-        .setPlaceholder('Who are you reporting?')
+        .setCustomId('target_input')
+        .setLabel("Roblox User or Discord ID")
+        .setPlaceholder('Username or User ID')
         .setStyle(TextInputStyle.Short)
         .setMinLength(3)
-        .setMaxLength(20)
+        .setMaxLength(32)
         .setRequired(true);
 
     const reasonInput = new TextInputBuilder()
@@ -1029,7 +1029,7 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.isModalSubmit()) return;
     if (interaction.customId !== 'report_submit') return;
 
-    const robloxUsername = interaction.fields.getTextInputValue('roblox_username');
+    const targetInput = interaction.fields.getTextInputValue('target_input');
     const reason = interaction.fields.getTextInputValue('reason');
     const guildId = interaction.guildId;
 
@@ -1040,7 +1040,7 @@ client.on('interactionCreate', async interaction => {
         server_id: guildId,
         reporter_discord_id: interaction.user.id,
         reporter_roblox_username: null,
-        reported_roblox_username: robloxUsername,
+        reported_roblox_username: targetInput,
         reason: reason,
         status: 'PENDING'
     }]);
@@ -1066,7 +1066,7 @@ client.on('interactionCreate', async interaction => {
                 .setTitle('🚨 New User Report')
                 .setColor('#ff4444')
                 .addFields(
-                    { name: 'Reported User', value: `\`${robloxUsername}\``, inline: true },
+                    { name: 'Reported User', value: `\`${targetInput}\``, inline: true },
                     { name: 'Reporter', value: `<@${interaction.user.id}>`, inline: true },
                     { name: 'Reason', value: reason }
                 )
