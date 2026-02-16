@@ -95,6 +95,23 @@ export default function ReportDetailsPage() {
         fetchData();
     }, [id, reportId, router]);
 
+    // Fetch Discord User Data if it's a Discord ID
+    useEffect(() => {
+        if (!report?.reported_roblox_username) return;
+
+        const isDiscordId = /^\d{17,20}$/.test(report.reported_roblox_username);
+        const discordId = isDiscordId ? report.reported_roblox_username : profiles?.discord_id;
+
+        if (discordId) {
+            fetch(`/api/discord/user?userId=${discordId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.error) setDiscordUser(data);
+                })
+                .catch(err => console.error("Failed to fetch Discord user:", err));
+        }
+    }, [report, profiles]);
+
     const handleAction = async (action: 'KICK' | 'BAN' | 'SOFTBAN', type: 'ROBLOX') => {
         const isDiscordId = /^\d{17,20}$/.test(report.reported_roblox_username);
         const targetUsername = profiles?.roblox_username || report.reported_roblox_username;
@@ -326,9 +343,11 @@ export default function ReportDetailsPage() {
                                 <img
                                     src={profiles?.roblox_id
                                         ? `https://www.roblox.com/headshot-thumbnail/image?userId=${profiles.roblox_id}&width=420&height=420&format=png`
-                                        : /^\d+$/.test(report.reported_roblox_username)
-                                            ? `https://api.dicebear.com/7.x/identicon/svg?seed=${report.reported_roblox_username}`
-                                            : `https://www.roblox.com/headshot-thumbnail/image?userId=1&width=420&height=420&format=png`
+                                        : discordUser?.avatar_url
+                                            ? discordUser.avatar_url
+                                            : /^\d+$/.test(report.reported_roblox_username)
+                                                ? `https://api.dicebear.com/7.x/identicon/svg?seed=${report.reported_roblox_username}`
+                                                : `https://www.roblox.com/headshot-thumbnail/image?userId=1&width=420&height=420&format=png`
                                     }
                                     className="w-20 h-20 rounded-xl border-4 border-[#020617] bg-slate-800 object-cover shadow-lg"
                                     alt="Avatar"
@@ -339,9 +358,16 @@ export default function ReportDetailsPage() {
                             </div>
 
                             <div className="mt-4">
-                                <h2 className="text-lg font-bold text-white">{report.reported_roblox_username}</h2>
-                                {profiles?.roblox_id && <p className="text-xs font-mono text-slate-500">Roblox ID: {profiles.roblox_id}</p>}
-                                {/^\d+$/.test(report.reported_roblox_username) && !profiles?.roblox_id && <p className="text-xs font-mono text-slate-500">Unlinked Discord User</p>}
+                                <h2 className="text-lg font-bold text-white">
+                                    {discordUser ? (discordUser.global_name || discordUser.username) : report.reported_roblox_username}
+                                </h2>
+                                {discordUser && discordUser.global_name && (
+                                    <p className="text-xs font-mono text-slate-500">@{discordUser.username}</p>
+                                )}
+                                {profiles?.roblox_id && <p className="text-xs font-mono text-slate-500 mt-1">Roblox ID: {profiles.roblox_id}</p>}
+                                {/^\d+$/.test(report.reported_roblox_username) && !profiles?.roblox_id && !discordUser && (
+                                    <p className="text-xs font-mono text-slate-500 mt-1">Unlinked Discord User</p>
+                                )}
                             </div>
 
                             <div className="mt-6 space-y-3">
