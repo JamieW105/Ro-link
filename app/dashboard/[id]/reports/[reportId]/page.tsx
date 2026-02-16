@@ -61,29 +61,28 @@ export default function ReportDetailsPage() {
             setReason(`Re: Report #${reportData.id.slice(0, 8)} - ${reportData.reason}`);
 
             // 2. Fetch Linked Profiles (Verified Users)
-            // Try to find by Roblox Username first as that's what we have in the report
-            const { data: profileData } = await supabase
-                .from('verified_users')
-                .select('*')
-                .ilike('roblox_username', reportData.reported_roblox_username)
-                .maybeSingle();
+            // Try to find by Roblox Username OR Discord ID
+            const isDiscordId = /^\d{17,20}$/.test(reportData.reported_roblox_username);
 
-            setProfiles(profileData);
-
-            if (profileData) {
-                // Fetch Discord Profile Data via simple API Proxy if possible, or just link
-                // For now we just have the ID. 
+            let profileQuery = supabase.from('verified_users').select('*');
+            if (isDiscordId) {
+                profileQuery = profileQuery.eq('discord_id', reportData.reported_roblox_username);
+            } else {
+                profileQuery = profileQuery.ilike('roblox_username', reportData.reported_roblox_username);
             }
 
+            const { data: profileData } = await profileQuery.maybeSingle();
+            setProfiles(profileData);
+
             // 3. Fetch Global Moderation Logs
-            // We need to join with servers to get the server name
+            // Search logs for the reported target OR the linked Roblox username if found
             const { data: logsData } = await supabase
                 .from('logs')
                 .select(`
                     *,
                     servers ( name )
                 `)
-                .eq('target', reportData.reported_roblox_username)
+                .or(`target.eq.${reportData.reported_roblox_username}${profileData?.roblox_username ? `,target.eq.${profileData.roblox_username}` : ''}`)
                 .order('timestamp', { ascending: false });
 
             if (logsData) {
@@ -97,7 +96,15 @@ export default function ReportDetailsPage() {
     }, [id, reportId, router]);
 
     const handleAction = async (action: 'KICK' | 'BAN' | 'SOFTBAN', type: 'ROBLOX') => {
-        if (!confirm(`Are you sure you want to ${action} ${report.reported_roblox_username}?`)) return;
+        const isDiscordId = /^\d{17,20}$/.test(report.reported_roblox_username);
+        const targetUsername = profiles?.roblox_username || report.reported_roblox_username;
+
+        if (isDiscordId && !profiles?.roblox_username) {
+            alert("❌ This report is against a Discord ID that is NOT linked to a Roblox account. Roblox moderation actions cannot be applied.");
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to ${action} ${targetUsername}?`)) return;
         setActionLoading(true);
 
         const moderator = (session?.user as any)?.name || 'Web Admin';
@@ -108,7 +115,7 @@ export default function ReportDetailsPage() {
             server_id: id,
             command: action,
             args: {
-                username: report.reported_roblox_username,
+                username: targetUsername,
                 reason: reason,
                 moderator: moderator
             },
@@ -317,26 +324,41 @@ export default function ReportDetailsPage() {
                         <div className="px-6 pb-6 -mt-10">
                             <div className="relative inline-block">
                                 <img
-                                    src={`https://www.roblox.com/headshot-thumbnail/image?userId=${profiles?.roblox_id || 1}&width=420&height=420&format=png`}
+                                    src={profiles?.roblox_id
+                                        ? `https://www.roblox.com/headshot-thumbnail/image?userId=${profiles.roblox_id}&width=420&height=420&format=png`
+                                        : /^\d+$/.test(report.reported_roblox_username)
+                                            ? `https://api.dicebear.com/7.x/identicon/svg?seed=${report.reported_roblox_username}`
+                                            : `https://www.roblox.com/headshot-thumbnail/image?userId=1&width=420&height=420&format=png`
+                                    }
                                     className="w-20 h-20 rounded-xl border-4 border-[#020617] bg-slate-800 object-cover shadow-lg"
                                     alt="Avatar"
                                 />
-                                {profiles?.discord_id && <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-[#5865F2] rounded-full border-2 border-[#020617] flex items-center justify-center text-white text-[10px]">D</div>}
+                                {(profiles?.discord_id || /^\d+$/.test(report.reported_roblox_username)) && (
+                                    <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-[#5865F2] rounded-full border-2 border-[#020617] flex items-center justify-center text-white text-[10px]">D</div>
+                                )}
                             </div>
 
                             <div className="mt-4">
                                 <h2 className="text-lg font-bold text-white">{report.reported_roblox_username}</h2>
-                                {profiles?.roblox_id && <p className="text-xs font-mono text-slate-500">ID: {profiles.roblox_id}</p>}
+                                {profiles?.roblox_id && <p className="text-xs font-mono text-slate-500">Roblox ID: {profiles.roblox_id}</p>}
+                                {/^\d+$/.test(report.reported_roblox_username) && !profiles?.roblox_id && <p className="text-xs font-mono text-slate-500">Unlinked Discord User</p>}
                             </div>
 
                             <div className="mt-6 space-y-3">
                                 <a
-                                    href={`https://www.roblox.com/users/${profiles?.roblox_id || 'profile'}/profile`}
+                                    href={profiles?.roblox_id
+                                        ? `https://www.roblox.com/users/${profiles.roblox_id}/profile`
+                                        : /^\d+$/.test(report.reported_roblox_username)
+                                            ? `https://discord.com/users/${report.reported_roblox_username}`
+                                            : `https://www.roblox.com/search/users?keyword=${report.reported_roblox_username}`
+                                    }
                                     target="_blank"
                                     rel="noreferrer"
                                     className="flex items-center justify-between p-3 bg-slate-900 rounded-xl border border-slate-800 hover:bg-slate-800 hover:border-slate-700 transition-all group"
                                 >
-                                    <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors">Roblox Profile</span>
+                                    <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors">
+                                        {/^\d+$/.test(report.reported_roblox_username) && !profiles?.roblox_id ? "Discord Profile" : "Roblox Profile"}
+                                    </span>
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600 group-hover:text-white"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
                                 </a>
                                 {profiles?.discord_id ? (

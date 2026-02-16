@@ -1058,7 +1058,12 @@ client.on('interactionCreate', async interaction => {
         .single();
 
     if (server?.reports_channel_id) {
-        const channel = await client.channels.fetch(server.reports_channel_id).catch(() => null);
+        console.log(`[REPORTS] Forwarding report to channel: ${server.reports_channel_id}`);
+        const channel = await client.channels.fetch(server.reports_channel_id).catch(err => {
+            console.error(`[REPORTS] Error fetching channel ${server.reports_channel_id}: ${err.message}`);
+            return null;
+        });
+
         if (channel && channel.isTextBased()) {
             const roleMention = server.moderator_role_id ? `<@&${server.moderator_role_id}>` : '';
 
@@ -1073,8 +1078,14 @@ client.on('interactionCreate', async interaction => {
                 .setFooter({ text: `Ro-Link Systems • ID: ${guildId}` })
                 .setTimestamp();
 
-            await channel.send({ content: roleMention, embeds: [embed] }).catch(err => console.error('Failed to forward report to Discord:', err));
+            await channel.send({ content: roleMention, embeds: [embed] }).catch(err => {
+                console.error(`[REPORTS] Error sending message to channel: ${err.message}`);
+            });
+        } else {
+            console.error(`[REPORTS] Channel ${server.reports_channel_id} not found or not text-based.`);
         }
+    } else {
+        console.log(`[REPORTS] No reports channel configured for guild ${guildId}`);
     }
 
     await interaction.editReply(`✅ **Report Submitted!** The moderation team has been notified.`);

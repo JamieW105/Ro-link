@@ -78,8 +78,8 @@ export default function ReportsPage() {
             .from('servers')
             .update({
                 reports_enabled: reportsEnabled,
-                reports_channel_id: reportsChannelId,
-                moderator_role_id: moderatorRoleId
+                reports_channel_id: reportsChannelId.trim(),
+                moderator_role_id: moderatorRoleId.trim()
             })
             .eq('id', id);
 
