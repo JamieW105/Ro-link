@@ -586,12 +586,12 @@ export async function POST(req: Request) {
                             type: 1,
                             components: [{
                                 type: 4,
-                                custom_id: "roblox_username",
-                                label: "Roblox Username",
+                                custom_id: "target_input",
+                                label: "Roblox User or Discord ID",
                                 style: 1,
                                 min_length: 3,
-                                max_length: 20,
-                                placeholder: "Who are you reporting?",
+                                max_length: 32,
+                                placeholder: "Username or User ID",
                                 required: true
                             }]
                         }, {
@@ -737,7 +737,7 @@ export async function POST(req: Request) {
                     return row ? row.components.find((ic: any) => ic.custom_id === id).value : '';
                 };
 
-                const robloxUsername = getField('roblox_username');
+                const targetInput = getField('target_input');
                 const reason = getField('reason');
 
                 // 1. Save to Database
@@ -745,7 +745,7 @@ export async function POST(req: Request) {
                     server_id: guild_id,
                     reporter_discord_id: member?.user?.id || interactionUser?.id,
                     reporter_roblox_username: null,
-                    reported_roblox_username: robloxUsername,
+                    reported_roblox_username: targetInput,
                     reason: reason,
                     status: 'PENDING'
                 }]);
@@ -766,6 +766,7 @@ export async function POST(req: Request) {
                     .single();
 
                 if (server?.reports_channel_id) {
+                    console.log(`[REPORTS] Forwarding report to channel: ${server.reports_channel_id}`);
                     const roleMention = server.moderator_role_id ? `<@&${server.moderator_role_id}>` : '';
 
                     fetch(`https://discord.com/api/v10/channels/${server.reports_channel_id}/messages`, {
@@ -780,7 +781,7 @@ export async function POST(req: Request) {
                                 title: '🚨 New User Report',
                                 color: 0xff4444,
                                 fields: [
-                                    { name: 'Reported User', value: `\`${robloxUsername}\``, inline: true },
+                                    { name: 'Reported User', value: `\`${targetInput}\``, inline: true },
                                     { name: 'Reporter', value: `<@${member?.user?.id || interactionUser?.id}>`, inline: true },
                                     { name: 'Reason', value: reason }
                                 ],
@@ -788,7 +789,15 @@ export async function POST(req: Request) {
                                 timestamp: new Date().toISOString()
                             }]
                         })
-                    }).catch(err => console.error('Failed to forward report to Discord:', err));
+                    }).then(res => {
+                        if (!res.ok) {
+                            console.error(`[REPORTS] Failed to send to channel ${server.reports_channel_id}: ${res.status}`);
+                        } else {
+                            console.log(`[REPORTS] Successfully forwarded report to channel ${server.reports_channel_id}`);
+                        }
+                    }).catch(err => console.error('[REPORTS] Error forwarding report to Discord:', err));
+                } else {
+                    console.log(`[REPORTS] No reports channel configured for guild ${guild_id}`);
                 }
 
                 return NextResponse.json({
