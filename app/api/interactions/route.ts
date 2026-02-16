@@ -662,7 +662,80 @@ export async function POST(req: Request) {
                 });
             }
 
-            const [action, userId, username] = interaction.data.custom_id.split('_');
+            if (interaction.data.custom_id.startsWith('switch_')) {
+                const isRoblox = interaction.data.custom_id.startsWith('switch_roblox');
+                const target = interaction.data.custom_id.split('_').pop();
+
+                const components = [{
+                    type: 1,
+                    components: isRoblox ? [
+                        { type: 2, style: 2, label: 'Kick (Roblox)', custom_id: `KICK_0_${target}` },
+                        { type: 2, style: 4, label: 'Ban (Roblox)', custom_id: `BAN_0_${target}` },
+                        { type: 2, style: 1, label: 'Discord Actions', custom_id: `switch_discord_${target}` }
+                    ] : [
+                        { type: 2, style: 2, label: 'Kick (Discord)', custom_id: `discord_kick_${target}` },
+                        { type: 2, style: 4, label: 'Ban (Discord)', custom_id: `discord_ban_${target}` },
+                        { type: 2, style: 1, label: 'Roblox Actions', custom_id: `switch_roblox_${target}` }
+                    ]
+                }];
+
+                return NextResponse.json({
+                    type: 7, // UPDATE_MESSAGE
+                    data: { components }
+                });
+            }
+
+            if (interaction.data.custom_id.startsWith('discord_')) {
+                const parts = interaction.data.custom_id.split('_');
+                const discAction = parts[1]; // kick or ban
+                const target = parts.slice(2).join('_');
+
+                let targetId = target;
+                if (target.includes('<@')) {
+                    targetId = target.replace(/[<@!>]/g, '');
+                }
+
+                // If not numeric, it might be a username, try resolving
+                if (isNaN(Number(targetId))) {
+                    const { data } = await supabase.from('verified_users').select('discord_id').ilike('roblox_username', target).maybeSingle();
+                    if (data) targetId = data.discord_id;
+                }
+
+                if (isNaN(Number(targetId))) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ Could not resolve Discord ID for \`${target}\`.`, flags: 64 }
+                    });
+                }
+
+                const res = await fetch(`https://discord.com/api/v10/guilds/${guild_id}/${discAction === 'ban' ? 'bans' : 'members'}/${targetId}`, {
+                    method: discAction === 'ban' ? 'PUT' : 'DELETE',
+                    headers: {
+                        'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: discAction === 'ban' ? JSON.stringify({ reason: 'Ro-Link Reporting Action' }) : undefined
+                });
+
+                if (!res.ok) {
+                    const err = await res.text();
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ Failed to ${discAction} user: ${err}`, flags: 64 }
+                    });
+                }
+
+                return NextResponse.json({
+                    type: 4,
+                    data: { content: `✅ Successfully **${discAction.toUpperCase()}ED** <@${targetId}> from the server.`, flags: 64 }
+                });
+            }
+
+            const customId = interaction.data.custom_id;
+            const parts = customId.split('_');
+            const action = parts[0];
+            const userId = parts[1];
+            const username = parts.slice(2).join('_');
 
             // Parallelize Button Actions
             await Promise.all([
@@ -787,6 +860,29 @@ export async function POST(req: Request) {
                                 ],
                                 footer: { text: `Ro-Link Systems • ID: ${guild_id}` },
                                 timestamp: new Date().toISOString()
+                            }],
+                            components: [{
+                                type: 1,
+                                components: [
+                                    {
+                                        type: 2,
+                                        style: 2,
+                                        label: 'Kick (Discord)',
+                                        custom_id: `discord_kick_${targetInput}`
+                                    },
+                                    {
+                                        type: 2,
+                                        style: 4,
+                                        label: 'Ban (Discord)',
+                                        custom_id: `discord_ban_${targetInput}`
+                                    },
+                                    {
+                                        type: 2,
+                                        style: 1,
+                                        label: 'Roblox Actions',
+                                        custom_id: `switch_roblox_${targetInput}`
+                                    }
+                                ]
                             }]
                         })
                     }).then(res => {

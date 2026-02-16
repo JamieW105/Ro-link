@@ -758,12 +758,86 @@ client.on('interactionCreate', async interaction => {
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
 
-    const [action, userId, username] = interaction.customId.split('_');
+    const customId = interaction.customId;
+
+    // Handle Report Toggle
+    if (customId.startsWith('switch_')) {
+        const isRoblox = customId.startsWith('switch_roblox');
+        const target = customId.split('_').pop();
+
+        const row = new ActionRowBuilder()
+            .addComponents(
+                isRoblox ? [
+                    new ButtonBuilder().setCustomId(`KICK_0_${target}`).setLabel('Kick (Roblox)').setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder().setCustomId(`BAN_0_${target}`).setLabel('Ban (Roblox)').setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder().setCustomId(`switch_discord_${target}`).setLabel('Discord Actions').setStyle(ButtonStyle.Primary)
+                ] : [
+                    new ButtonBuilder().setCustomId(`discord_kick_${target}`).setLabel('Kick (Discord)').setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder().setCustomId(`discord_ban_${target}`).setLabel('Ban (Discord)').setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder().setCustomId(`switch_roblox_${target}`).setLabel('Roblox Actions').setStyle(ButtonStyle.Primary)
+                ]
+            );
+
+        return await interaction.update({ components: [row] });
+    }
+
+    // Handle Discord Actions
+    if (customId.startsWith('discord_')) {
+        const parts = customId.split('_');
+        const action = parts[1]; // kick or ban
+        const target = parts.slice(2).join('_');
+
+        let targetId = target;
+        if (target.includes('<@')) {
+            targetId = target.replace(/[<@!>]/g, '');
+        }
+
+        // Check permissions
+        if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has(action === 'ban' ? 'BanMembers' : 'KickMembers')) {
+            return interaction.reply({ content: `You do not have permission to ${action} members.`, ephemeral: true });
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+
+        // Resolve target to ID if it's a username
+        if (isNaN(Number(targetId))) {
+            const { data } = await supabase.from('verified_users').select('discord_id').ilike('roblox_username', target).maybeSingle();
+            if (data) targetId = data.discord_id;
+        }
+
+        if (isNaN(Number(targetId))) {
+            return interaction.editReply(`❌ Could not resolve Discord ID for \`${target}\`.`);
+        }
+
+        try {
+            const member = await interaction.guild.members.fetch(targetId).catch(() => null);
+            if (!member && action === 'kick') {
+                return interaction.editReply(`❌ User <@${targetId}> is not in the server.`);
+            }
+
+            if (action === 'ban') {
+                await interaction.guild.members.ban(targetId, { reason: `Report Action by ${interaction.user.tag}` });
+            } else {
+                await member.kick(`Report Action by ${interaction.user.tag}`);
+            }
+
+            await interaction.editReply(`✅ Successfully **${action.toUpperCase()}ED** <@${targetId}> from the server.`);
+        } catch (e) {
+            console.error(`[DISCORD ACTION] Failed to ${action}:`, e.message);
+            await interaction.editReply(`❌ Failed to ${action} user: ${e.message}`);
+        }
+        return;
+    }
+
+    const parts = customId.split('_');
+    const action = parts[0];
+    const userId = parts[1];
+    const username = parts.slice(2).join('_');
     const guildId = interaction.guildId;
 
     // Check permissions (Admin only)
-    if (!interaction.member.permissions.has('Administrator')) {
-        return interaction.reply({ content: 'You need Administrator permissions to use these actions.', ephemeral: true });
+    if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('BanMembers') && !interaction.member.permissions.has('KickMembers')) {
+        return interaction.reply({ content: 'You need moderation permissions to use these actions.', ephemeral: true });
     }
 
     await interaction.deferReply({ ephemeral: true });
@@ -777,7 +851,7 @@ client.on('interactionCreate', async interaction => {
     }]);
 
     if (error) {
-        return interaction.editReply(`Failed to queue \${action}.`);
+        return interaction.editReply(`Failed to queue ${action}.`);
     }
 
     // Log the action
@@ -788,7 +862,7 @@ client.on('interactionCreate', async interaction => {
         moderator: interaction.user.tag
     }]);
 
-    await interaction.editReply(`**\${action.toUpperCase()}** command queued for \`\${username}\`.`);
+    await interaction.editReply(`**${action.toUpperCase()}** command queued for \`${username}\`.`);
 });
 
 // Handle Modal Submissions
@@ -1078,7 +1152,23 @@ client.on('interactionCreate', async interaction => {
                 .setFooter({ text: `Ro-Link Systems • ID: ${guildId}` })
                 .setTimestamp();
 
-            await channel.send({ content: roleMention, embeds: [embed] }).catch(err => {
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`discord_kick_${targetInput}`)
+                        .setLabel('Kick (Discord)')
+                        .setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId(`discord_ban_${targetInput}`)
+                        .setLabel('Ban (Discord)')
+                        .setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder()
+                        .setCustomId(`switch_roblox_${targetInput}`)
+                        .setLabel('Roblox Actions')
+                        .setStyle(ButtonStyle.Primary)
+                );
+
+            await channel.send({ content: roleMention, embeds: [embed], components: [row] }).catch(err => {
                 console.error(`[REPORTS] Error sending message to channel: ${err.message}`);
             });
         } else {
