@@ -6,7 +6,8 @@ import { Routes } from 'discord-api-types/v10';
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN!);
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+    const params = await props.params;
     const session = await getServerSession(authOptions);
 
     // Check if user is Cherubdude (ID: 953414442060746854)

@@ -1052,6 +1052,11 @@ function RoLink:Initialize()
 			end)
 			if s and r.StatusCode == 200 then
 				local d = Http:JSONDecode(r.Body)
+                if d.settings then
+                    self.settings = self.settings or {}
+                    self.settings.adminCmdsEnabled = d.settings.adminCmdsEnabled
+                    self.settings.miscCmdsEnabled = d.settings.miscCmdsEnabled
+                end
 				for _, c in ipairs(d.commands or {}) do self:Execute(c) end
 			end
 			task.wait(POLL_INTERVAL)
@@ -1063,22 +1068,26 @@ function RoLink:Execute(cmd)
 	local u, r = cmd.args.username, cmd.args.reason or "No reason"
 	local p = Players:FindFirstChild(u) 
     
+    -- Permission Checks (Default to TRUE if settings not loaded or key missing)
+    local function isAdmin() return not self.settings or self.settings.adminCmdsEnabled ~= false end
+    local function isMisc() return not self.settings or self.settings.miscCmdsEnabled ~= false end
+
     if not p and cmd.command ~= "UPDATE" and cmd.command ~= "SHUTDOWN" then return end
 
-	if cmd.command == "KICK" then
+	if cmd.command == "KICK" and isAdmin() then
 		p:Kick(r)
-	elseif cmd.command == "BAN" then
+	elseif cmd.command == "BAN" and isAdmin() then
 		task.spawn(function()
 			local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(u) end)
 			if s and uid then pcall(function() Players:BanAsync({UserIds={uid},Duration=-1,DisplayReason=r,PrivateReason="RoLink"}) end) end
             if p then p:Kick("Banned: "..r) end
 		end)
-	elseif cmd.command == "UNBAN" then
+	elseif cmd.command == "UNBAN" and isAdmin() then
 		task.spawn(function()
 			local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(u) end)
 			if s and uid then pcall(function() Players:UnbanAsync({UserIds={uid}}) end) end
 		end)
-    elseif cmd.command == "FLY" then
+    elseif cmd.command == "FLY" and isMisc() then
         if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = p.Character.HumanoidRootPart
             local bv = hrp:FindFirstChild("RoLinkFly")
@@ -1091,7 +1100,7 @@ function RoLink:Execute(cmd)
                 bv.Velocity = Vector3.new(0,0,0)
             end
         end
-    elseif cmd.command == "NOCLIP" then
+    elseif cmd.command == "NOCLIP" and isMisc() then
          if p and p.Character then
             local attr = "RoLink_Noclip"
             local state = not p.Character:GetAttribute(attr)
@@ -1100,7 +1109,7 @@ function RoLink:Execute(cmd)
                 if v:IsA("BasePart") then v.CanCollide = not state end
             end
          end
-    elseif cmd.command == "INVIS" then
+    elseif cmd.command == "INVIS" and isMisc() then
          if p and p.Character then
             local attr = "RoLink_Invis"
             local state = not p.Character:GetAttribute(attr)
@@ -1112,7 +1121,7 @@ function RoLink:Execute(cmd)
                 p.Character.Head.face.Transparency = state and 1 or 0
             end
          end
-    elseif cmd.command == "GHOST" then
+    elseif cmd.command == "GHOST" and isMisc() then
         if p and p.Character then
             local attr = "RoLink_Ghost"
             local state = not p.Character:GetAttribute(attr)
@@ -1121,7 +1130,7 @@ function RoLink:Execute(cmd)
                  if v:IsA("BasePart") or v:IsA("MeshPart") then v.Material = state and Enum.Material.ForceField or Enum.Material.Plastic end
             end
         end
-    elseif cmd.command == "SET_CHAR" then
+    elseif cmd.command == "SET_CHAR" and isMisc() then
         if p and cmd.args.char_user then
             task.spawn(function()
                  local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(cmd.args.char_user) end)
@@ -1130,26 +1139,26 @@ function RoLink:Execute(cmd)
                  end
             end)
         end
-    elseif cmd.command == "HEAL" then
+    elseif cmd.command == "HEAL" and isMisc() then
         if p and p.Character and p.Character:FindFirstChild("Humanoid") then
             p.Character.Humanoid.Health = p.Character.Humanoid.MaxHealth
         end
-    elseif cmd.command == "KILL" then
+    elseif cmd.command == "KILL" and isMisc() then
         if p and p.Character and p.Character:FindFirstChild("Humanoid") then
             p.Character.Humanoid.Health = 0
         end
-    elseif cmd.command == "RESET" then
+    elseif cmd.command == "RESET" and isMisc() then
         if p then p:LoadCharacter() end
-    elseif cmd.command == "REFRESH" then
+    elseif cmd.command == "REFRESH" and isMisc() then
         if p and p.Character then
             local cf = p.Character:GetPrimaryPartCFrame()
             p:LoadCharacter()
             p.CharacterAdded:Wait()
             p.Character:SetPrimaryPartCFrame(cf)
         end
-	elseif cmd.command == "UPDATE" then
+	elseif cmd.command == "UPDATE" and isAdmin() then
 		for _, p in ipairs(Players:GetPlayers()) do p:Kick("Updating...") end
-	elseif cmd.command == "SHUTDOWN" then
+	elseif cmd.command == "SHUTDOWN" and isAdmin() then
 		if not cmd.args.job_id or cmd.args.job_id == game.JobId then
 			for _, p in ipairs(Players:GetPlayers()) do p:Kick("Shutdown.") end
 		end

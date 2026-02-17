@@ -219,6 +219,11 @@ function RoLink:Initialize()
 			if success then
 				if result.StatusCode == 200 then
 					local data = HttpService:JSONDecode(result.Body)
+                    if data.settings then
+                        self.settings = self.settings or {}
+                        self.settings.adminCmdsEnabled = data.settings.adminCmdsEnabled
+                        self.settings.miscCmdsEnabled = data.settings.miscCmdsEnabled
+                    end
 					for _, cmd in ipairs(data.commands or {}) do
 						self:Execute(cmd)
 					end
@@ -239,11 +244,16 @@ function RoLink:Execute(cmd)
 	local moderator = cmd.args.moderator or "System"
 
     local player = Players:FindFirstChild(username) 
+    
+    -- Permission Checks (Default to TRUE if settings not loaded or key missing)
+    local function isAdmin() return not self.settings or self.settings.adminCmdsEnabled ~= false end
+    local function isMisc() return not self.settings or self.settings.miscCmdsEnabled ~= false end
+
     if not player and cmd.command ~= "UPDATE" and cmd.command ~= "SHUTDOWN" then return end
 
-	if cmd.command == "KICK" then
+	if cmd.command == "KICK" and isAdmin() then
 		if player then player:Kick(reason) end
-	elseif cmd.command == "BAN" then
+	elseif cmd.command == "BAN" and isAdmin() then
 		task.spawn(function()
 			local success, userId = pcall(function() return Players:GetUserIdFromNameAsync(username) end)
 			if success and userId then
@@ -258,7 +268,7 @@ function RoLink:Execute(cmd)
 			end
             if player then player:Kick("Banned: "..reason) end
 		end)
-	elseif cmd.command == "UNBAN" then
+	elseif cmd.command == "UNBAN" and isAdmin() then
 		task.spawn(function()
 			local success, userId = pcall(function() return Players:GetUserIdFromNameAsync(username) end)
 			if success and userId then
@@ -269,7 +279,7 @@ function RoLink:Execute(cmd)
 				end)
 			end
 		end)
-	elseif cmd.command == "FLY" then
+	elseif cmd.command == "FLY" and isMisc() then
 		if player and player.Character then
 			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
@@ -284,7 +294,7 @@ function RoLink:Execute(cmd)
                 end
 			end
 		end
-	elseif cmd.command == "NOCLIP" then
+	elseif cmd.command == "NOCLIP" and isMisc() then
 		if player and player.Character then
             local attr = "RoLink_Noclip"
             local state = not player.Character:GetAttribute(attr)
@@ -293,7 +303,7 @@ function RoLink:Execute(cmd)
 				if v:IsA("BasePart") then v.CanCollide = not state end
 			end
 		end
-	elseif cmd.command == "INVIS" then
+	elseif cmd.command == "INVIS" and isMisc() then
 		if player and player.Character then
             local attr = "RoLink_Invis"
             local state = not player.Character:GetAttribute(attr)
@@ -305,7 +315,7 @@ function RoLink:Execute(cmd)
                 player.Character.Head.face.Transparency = state and 1 or 0 
             end
 		end
-	elseif cmd.command == "GHOST" then
+	elseif cmd.command == "GHOST" and isMisc() then
 		if player and player.Character then
             local attr = "RoLink_Ghost"
             local state = not player.Character:GetAttribute(attr)
@@ -316,7 +326,7 @@ function RoLink:Execute(cmd)
 				end
 			end
 		end
-	elseif cmd.command == "SET_CHAR" then
+	elseif cmd.command == "SET_CHAR" and isMisc() then
 		local charUser = cmd.args.char_user
 		if player and charUser then
 			task.spawn(function()
@@ -326,28 +336,28 @@ function RoLink:Execute(cmd)
 				end
 			end)
 		end
-	elseif cmd.command == "HEAL" then
+	elseif cmd.command == "HEAL" and isMisc() then
 		if player and player.Character and player.Character:FindFirstChild("Humanoid") then
 			player.Character.Humanoid.Health = player.Character.Humanoid.MaxHealth
 		end
-	elseif cmd.command == "KILL" then
+	elseif cmd.command == "KILL" and isMisc() then
 		if player and player.Character and player.Character:FindFirstChild("Humanoid") then
 			player.Character.Humanoid.Health = 0
 		end
-	elseif cmd.command == "RESET" then
+	elseif cmd.command == "RESET" and isMisc() then
 		if player then player:LoadCharacter() end
-	elseif cmd.command == "REFRESH" then
+	elseif cmd.command == "REFRESH" and isMisc() then
 		if player and player.Character then
 			local cf = player.Character:GetPrimaryPartCFrame()
 			player:LoadCharacter()
 			player.CharacterAdded:Wait()
 			player.Character:SetPrimaryPartCFrame(cf)
 		end
-	elseif cmd.command == "UPDATE" then
+	elseif cmd.command == "UPDATE" and isAdmin() then
 		for _, player in ipairs(Players:GetPlayers()) do
 			player:Kick("Server is updating. Please rejoin in a moment!")
 		end
-	elseif cmd.command == "SHUTDOWN" then
+	elseif cmd.command == "SHUTDOWN" and isAdmin() then
 		local targetJobId = cmd.args.job_id
 		if not targetJobId or targetJobId == game.JobId then
 			for _, p in ipairs(Players:GetPlayers()) do

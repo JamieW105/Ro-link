@@ -19,7 +19,7 @@ export async function POST(req: Request) {
         // 1. Validate API Key and get Server ID
         const { data: server, error: serverError } = await supabase
             .from('servers')
-            .select('id')
+            .select('id, admin_cmds_enabled, misc_cmds_enabled')
             .eq('api_key', apiKey)
             .single();
 
@@ -89,7 +89,13 @@ export async function POST(req: Request) {
                 .in('id', ids);
         }
 
-        return NextResponse.json({ commands });
+        return NextResponse.json({
+            commands,
+            settings: {
+                adminCmdsEnabled: server.admin_cmds_enabled !== false,
+                miscCmdsEnabled: server.misc_cmds_enabled !== false
+            }
+        });
 
     } catch (error) {
         console.error(error);
