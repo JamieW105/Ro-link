@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
+import { usePermissions } from "@/context/PermissionsContext";
 
 // Icons
 const ReportIcon = () => (
@@ -20,10 +21,13 @@ const SettingsIcon = () => (
 export default function ReportsPage() {
     const { id } = useParams();
     const { data: session } = useSession();
+    const perms = usePermissions();
 
     // Reports State
     const [reports, setReports] = useState<any[]>([]);
     const [loadingReports, setLoadingReports] = useState(true);
+
+    if (!perms.can_manage_reports) return null;
 
     // Fetch Reports
     useEffect(() => {

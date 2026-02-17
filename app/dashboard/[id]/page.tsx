@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
+import { usePermissions } from "@/context/PermissionsContext";
 
 interface Log {
     id: string;
@@ -96,6 +97,8 @@ export default function ServerDashboard() {
         }
     }, [id]);
 
+    const perms = usePermissions();
+
     if (loading) return null;
 
     return (
@@ -155,18 +158,29 @@ export default function ServerDashboard() {
                         <KeyIcon />
                     </div>
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 block">Security Key</span>
-                    <div className="flex gap-2">
-                        <code className="flex-1 bg-black/40 p-2.5 rounded-lg border border-slate-800 font-mono text-[11px] text-sky-500 truncate select-none">
-                            {apiKey}
-                        </code>
-                        <button
-                            onClick={() => navigator.clipboard.writeText(apiKey || '')}
-                            className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all rounded-lg border border-slate-700 active:scale-95 shadow-sm"
-                        >
-                            <CopyIcon />
-                        </button>
-                    </div>
-                    <p className="text-[9px] text-slate-600 mt-3 font-semibold uppercase tracking-tight">Connect your game using this key.</p>
+
+                    {perms.is_admin ? (
+                        <>
+                            <div className="flex gap-2">
+                                <code className="flex-1 bg-black/40 p-2.5 rounded-lg border border-slate-800 font-mono text-[11px] text-sky-500 truncate select-none">
+                                    {apiKey}
+                                </code>
+                                <button
+                                    onClick={() => navigator.clipboard.writeText(apiKey || '')}
+                                    className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all rounded-lg border border-slate-700 active:scale-95 shadow-sm"
+                                >
+                                    <CopyIcon />
+                                </button>
+                            </div>
+                            <p className="text-[9px] text-slate-600 mt-3 font-semibold uppercase tracking-tight">Connect your game using this key.</p>
+                        </>
+                    ) : (
+                        <div className="py-2">
+                            <p className="text-[10px] text-slate-500 font-medium leading-relaxed italic">
+                                Access to the security key is restricted to server administrators.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
 

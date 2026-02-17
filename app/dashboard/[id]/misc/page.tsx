@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
+import { usePermissions } from "@/context/PermissionsContext";
 
 interface LiveServer {
     id: string;
@@ -66,8 +67,18 @@ export default function MiscPage() {
         return () => clearInterval(interval);
     }, [guildId]);
 
+    const perms = usePermissions();
+
     async function handleAction(target: string, action: string, extraArgs = {}) {
         if (!guildId) return;
+
+        // Final permission check before sending
+        const isAllowed = perms.is_admin || perms.allowed_misc_cmds.includes('*') || perms.allowed_misc_cmds.includes(action);
+        if (!isAllowed) {
+            alert("You do not have permission to use this command.");
+            return;
+        }
+
         setActionLoading(`${target}-${action}`);
 
         const { error } = await supabase
@@ -96,6 +107,10 @@ export default function MiscPage() {
     );
 
     const isManualTarget = searchQuery.length > 0 && !players.some(p => p.name.toLowerCase() === searchQuery.toLowerCase());
+
+    const availableActions = ['FLY', 'NOCLIP', 'INVIS', 'GHOST', 'HEAL', 'KILL', 'RESET', 'REFRESH'].filter(action =>
+        perms.is_admin || perms.allowed_misc_cmds.includes('*') || perms.allowed_misc_cmds.includes(action)
+    );
 
     return (
         <div className="space-y-10 max-w-7xl animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -143,7 +158,7 @@ export default function MiscPage() {
                                     <h3 className="font-bold text-white text-sm">{searchQuery}</h3>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
-                                    {['FLY', 'NOCLIP', 'INVIS', 'GHOST', 'HEAL', 'KILL', 'RESET', 'REFRESH'].map(action => (
+                                    {availableActions.map(action => (
                                         <button
                                             key={action}
                                             disabled={actionLoading === `${searchQuery}-${action}`}
@@ -157,25 +172,27 @@ export default function MiscPage() {
                                         </button>
                                     ))}
                                 </div>
-                                <div className="mt-4 flex gap-2 max-w-md">
-                                    <input
-                                        type="text"
-                                        placeholder="Username to copy appearance..."
-                                        value={charUser}
-                                        onChange={(e) => setCharUser(e.target.value)}
-                                        className="flex-1 bg-black/40 border border-slate-800 rounded-md px-3 py-1.5 text-[11px] text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
-                                    />
-                                    <button
-                                        disabled={!charUser || actionLoading === `${searchQuery}-SET_CHAR`}
-                                        onClick={() => {
-                                            handleAction(searchQuery, 'SET_CHAR', { char_user: charUser });
-                                            setCharUser("");
-                                        }}
-                                        className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-[10px] font-bold uppercase tracking-tight transition-all disabled:opacity-50"
-                                    >
-                                        Set Char
-                                    </button>
-                                </div>
+                                {(perms.is_admin || perms.allowed_misc_cmds.includes('*') || perms.allowed_misc_cmds.includes('SET_CHAR')) && (
+                                    <div className="mt-4 flex gap-2 max-w-md">
+                                        <input
+                                            type="text"
+                                            placeholder="Username to copy appearance..."
+                                            value={charUser}
+                                            onChange={(e) => setCharUser(e.target.value)}
+                                            className="flex-1 bg-black/40 border border-slate-800 rounded-md px-3 py-1.5 text-[11px] text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
+                                        />
+                                        <button
+                                            disabled={!charUser || actionLoading === `${searchQuery}-SET_CHAR`}
+                                            onClick={() => {
+                                                handleAction(searchQuery, 'SET_CHAR', { char_user: charUser });
+                                                setCharUser("");
+                                            }}
+                                            className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-[10px] font-bold uppercase tracking-tight transition-all disabled:opacity-50"
+                                        >
+                                            Set Char
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -198,7 +215,7 @@ export default function MiscPage() {
                                         </div>
 
                                         <div className="flex flex-wrap gap-2">
-                                            {['FLY', 'NOCLIP', 'INVIS', 'GHOST', 'HEAL', 'KILL', 'RESET', 'REFRESH'].map(action => (
+                                            {availableActions.map(action => (
                                                 <button
                                                     key={action}
                                                     disabled={actionLoading === `${player.name}-${action}`}
@@ -215,25 +232,27 @@ export default function MiscPage() {
                                     </div>
 
                                     {/* Set Char Input */}
-                                    <div className="mt-4 flex gap-2 max-w-md">
-                                        <input
-                                            type="text"
-                                            placeholder="Enter Character Username..."
-                                            value={charUser}
-                                            onChange={(e) => setCharUser(e.target.value)}
-                                            className="flex-1 bg-black/40 border border-slate-800 rounded-md px-3 py-1.5 text-[11px] text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
-                                        />
-                                        <button
-                                            disabled={!charUser || actionLoading === `${player.name}-SET_CHAR`}
-                                            onClick={() => {
-                                                handleAction(player.name, 'SET_CHAR', { char_user: charUser });
-                                                setCharUser("");
-                                            }}
-                                            className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-[10px] font-bold uppercase tracking-tight transition-all disabled:opacity-50"
-                                        >
-                                            {actionLoading === `${player.name}-SET_CHAR` ? "..." : "Set Char"}
-                                        </button>
-                                    </div>
+                                    {(perms.is_admin || perms.allowed_misc_cmds.includes('*') || perms.allowed_misc_cmds.includes('SET_CHAR')) && (
+                                        <div className="mt-4 flex gap-2 max-w-md">
+                                            <input
+                                                type="text"
+                                                placeholder="Enter Character Username..."
+                                                value={charUser}
+                                                onChange={(e) => setCharUser(e.target.value)}
+                                                className="flex-1 bg-black/40 border border-slate-800 rounded-md px-3 py-1.5 text-[11px] text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
+                                            />
+                                            <button
+                                                disabled={!charUser || actionLoading === `${player.name}-SET_CHAR`}
+                                                onClick={() => {
+                                                    handleAction(player.name, 'SET_CHAR', { char_user: charUser });
+                                                    setCharUser("");
+                                                }}
+                                                className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-[10px] font-bold uppercase tracking-tight transition-all disabled:opacity-50"
+                                            >
+                                                {actionLoading === `${player.name}-SET_CHAR` ? "..." : "Set Char"}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             ))
                         )}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { usePermissions } from "@/context/PermissionsContext";
 
 // Icons
 const ChevronLeftIcon = () => (
@@ -18,6 +19,8 @@ export default function ReportDetailsPage() {
     const { id, reportId } = useParams();
     const router = useRouter();
     const { data: session } = useSession();
+
+    const perms = usePermissions();
 
     const [report, setReport] = useState<any | null>(null);
     const [profiles, setProfiles] = useState<any | null>(null);
@@ -112,7 +115,19 @@ export default function ReportDetailsPage() {
         }
     }, [report, profiles]);
 
+    if (!perms.can_manage_reports) return null;
+
     const handleAction = async (action: 'KICK' | 'BAN' | 'SOFTBAN', type: 'ROBLOX') => {
+        // Permission Check
+        if (action === 'KICK' && !perms.can_kick) {
+            alert("You do not have permission to KICK users.");
+            return;
+        }
+        if ((action === 'BAN' || action === 'SOFTBAN') && !perms.can_ban) {
+            alert("You do not have permission to BAN users.");
+            return;
+        }
+
         const isDiscordId = /^\d{17,20}$/.test(report.reported_roblox_username);
         const targetUsername = profiles?.roblox_username || report.reported_roblox_username;
 
@@ -439,22 +454,22 @@ export default function ReportDetailsPage() {
 
                             <button
                                 onClick={() => handleAction('KICK', 'ROBLOX')}
-                                disabled={actionLoading}
-                                className="w-full py-3 bg-orange-600/10 border border-orange-500/20 hover:bg-orange-500/20 text-orange-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50"
+                                disabled={actionLoading || !perms.can_kick}
+                                className="w-full py-3 bg-orange-600/10 border border-orange-500/20 hover:bg-orange-500/20 text-orange-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Kick User
                             </button>
                             <button
                                 onClick={() => handleAction('SOFTBAN', 'ROBLOX')}
-                                disabled={actionLoading}
-                                className="w-full py-3 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50"
+                                disabled={actionLoading || !perms.can_ban}
+                                className="w-full py-3 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Soft Ban (12h)
                             </button>
                             <button
                                 onClick={() => handleAction('BAN', 'ROBLOX')}
-                                disabled={actionLoading}
-                                className="w-full py-3 bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/20 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50"
+                                disabled={actionLoading || !perms.can_ban}
+                                className="w-full py-3 bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/20 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Permanent Ban
                             </button>

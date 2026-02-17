@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
+import { PermissionsProvider } from "@/context/PermissionsContext";
 
 // --- PREMIUM SVG ICONS ---
 
@@ -50,48 +51,46 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const { data: session } = useSession();
     const router = useRouter();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [isReadOnly, setIsReadOnly] = useState(true);
+    const [userPermissions, setUserPermissions] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!session) return;
-        const userId = (session?.user as any)?.id;
-        const superUserId = '953414442060746854';
+        if (!session || !id) return;
 
-        fetch('/api/guilds')
-            .then(res => res.json())
-            .then(guilds => {
-                const g = guilds.find((g: any) => g.id === id);
+        async function checkAccess() {
+            setLoading(true);
+            try {
+                // 1. Fetch User Guilds to ensure they are even in the server
+                const guildsRes = await fetch('/api/guilds');
+                const guilds = await guildsRes.json();
+                const g = guilds.find((guild: any) => guild.id === id);
 
-                // Permission Guard
-                if (!g) {
-                    console.log("[Guard] Server not found in user list or superuser monitor.");
+                if (!g || !g.hasBot) {
+                    console.log("[Guard] Access denied or bot not present.");
                     router.push('/dashboard');
                     return;
                 }
 
-                // Bot Presence Guard
-                if (!g.hasBot) {
-                    console.log("[Guard] Bot not present in this server.");
+                // 2. Fetch Detailed Permissions for this specific server
+                const permsRes = await fetch(`/api/user/permissions?serverId=${id}`);
+                const perms = await permsRes.json();
+
+                if (!perms || !perms.can_access_dashboard) {
+                    console.log("[Guard] No dashboard access for this server.");
                     router.push('/dashboard');
                     return;
                 }
 
-                if (userId === superUserId) {
-                    if (g.permissions !== "0") {
-                        setIsReadOnly(false);
-                    } else {
-                        setIsReadOnly(true);
-                    }
-                } else {
-                    setIsReadOnly(false);
-                }
-                setLoading(false);
-            })
-            .catch(err => {
-                console.error("[Guard] Error checking permissions:", err);
+                setUserPermissions(perms);
+            } catch (err) {
+                console.error("[Guard] Error checking access:", err);
                 router.push('/dashboard');
-            });
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        checkAccess();
     }, [session, id, router]);
 
     // Close sidebar on pathname change (mobile)
@@ -99,7 +98,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         setIsSidebarOpen(false);
     }, [pathname]);
 
-    if (loading) return null; // Don't flash sidebar while checking perms
+    if (loading || !userPermissions) return null;
 
     const utilityItems = [
         { label: "Home", icon: <HomeIcon />, href: `/dashboard/${id}` },
@@ -117,7 +116,12 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     ];
 
     const moderationItems = [
-        { label: "Player Lookup", icon: <LookupIcon />, href: `/dashboard/${id}/lookup` },
+        {
+            label: "Player Lookup",
+            icon: <LookupIcon />,
+            href: `/dashboard/${id}/lookup`,
+            hide: !userPermissions.can_lookup
+        },
         {
             label: "Reports",
             icon: (
@@ -127,10 +131,16 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                     <line x1="12" y1="17" x2="12.01" y2="17" />
                 </svg>
             ),
-            href: `/dashboard/${id}/reports`
+            href: `/dashboard/${id}/reports`,
+            hide: !userPermissions.can_manage_reports
         },
-        { label: "Misc Actions", icon: <MagicIcon />, href: `/dashboard/${id}/misc` },
-    ];
+        {
+            label: "Misc Actions",
+            icon: <MagicIcon />,
+            href: `/dashboard/${id}/misc`,
+            hide: !userPermissions.is_admin && (!userPermissions.allowed_misc_cmds || userPermissions.allowed_misc_cmds.length === 0)
+        },
+    ].filter(i => !i.hide);
 
     const ScrollIcon = () => (
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 21h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z" /><path d="M12 11V7" /><path d="M12 17v-2" /><path d="M8 7h8" /><path d="M8 11h8" /><path d="M8 15h8" /></svg>
@@ -145,9 +155,14 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 </svg>
             ),
             href: `/dashboard/${id}/settings`,
-            hide: isReadOnly
+            hide: !userPermissions.can_manage_settings
         },
-        { label: "Logs", icon: <ScrollIcon />, href: `/dashboard/${id}/settings/logs`, hide: isReadOnly },
+        {
+            label: "Logs",
+            icon: <ScrollIcon />,
+            href: `/dashboard/${id}/settings/logs`,
+            hide: !userPermissions.can_manage_settings
+        },
     ].filter(item => !item.hide);
 
     const allItems = [...utilityItems, ...moderationItems, ...settingItems];
@@ -298,7 +313,9 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 </header>
 
                 <div className="p-4 md:p-10 flex-1 bg-gradient-to-tr from-[#020617] via-[#020617] to-sky-950/5">
-                    {children}
+                    <PermissionsProvider permissions={userPermissions}>
+                        {children}
+                    </PermissionsProvider>
                 </div>
             </main>
         </div>

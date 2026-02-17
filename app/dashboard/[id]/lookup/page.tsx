@@ -4,6 +4,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
+import { usePermissions } from "@/context/PermissionsContext";
 
 interface RobloxPlayer {
     id: number;
@@ -49,7 +50,7 @@ export default function PlayerLookup() {
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const isReadOnly = (session?.user as any)?.id === '953414442060746854';
+    const perms = usePermissions();
 
     // Fetch Server Config (Place ID)
     useEffect(() => {
@@ -132,8 +133,14 @@ export default function PlayerLookup() {
     async function handleAction(action: 'KICK' | 'BAN' | 'UNBAN') {
         if (!player || !id) return;
 
-        if (isReadOnly) {
-            alert("You do not have permission to perform this action (Read-only access).");
+        // Permission Checks
+        if (action === 'KICK' && !perms.can_kick) {
+            alert("You do not have permission to KICK players.");
+            return;
+        }
+
+        if ((action === 'BAN' || action === 'UNBAN') && !perms.can_ban) {
+            alert(`You do not have permission to ${action} players.`);
             return;
         }
 
@@ -362,22 +369,22 @@ export default function PlayerLookup() {
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <button
                                     onClick={() => handleAction('KICK')}
-                                    disabled={actionLoading}
-                                    className="px-6 py-4 bg-orange-600/10 border border-orange-500/20 hover:bg-orange-500/20 text-orange-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest"
+                                    disabled={actionLoading || !perms.can_kick}
+                                    className="px-6 py-4 bg-orange-600/10 border border-orange-500/20 hover:bg-orange-500/20 text-orange-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     KICK PLAYER
                                 </button>
                                 <button
                                     onClick={() => handleAction('BAN')}
-                                    disabled={actionLoading}
-                                    className="px-6 py-4 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest"
+                                    disabled={actionLoading || !perms.can_ban}
+                                    className="px-6 py-4 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     BAN PLAYER
                                 </button>
                                 <button
                                     onClick={() => handleAction('UNBAN')}
-                                    disabled={actionLoading}
-                                    className="px-6 py-4 bg-emerald-600/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest"
+                                    disabled={actionLoading || !perms.can_ban}
+                                    className="px-6 py-4 bg-emerald-600/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     UNBAN PLAYER
                                 </button>
