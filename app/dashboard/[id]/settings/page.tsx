@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 
+// Icons
 const SettingsIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
 );
@@ -21,6 +22,35 @@ const InfoIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
 );
 
+const ShieldIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+);
+
+const TrashIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+);
+
+interface DiscordRole {
+    id: string;
+    name: string;
+    color: number;
+}
+
+interface DashboardRole {
+    id: string; // UUID
+    discord_role_id: string;
+    role_name: string;
+    can_access_dashboard: boolean;
+    can_kick: boolean;
+    can_ban: boolean;
+    can_timeout: boolean;
+    can_mute: boolean;
+    can_lookup: boolean;
+    can_manage_settings: boolean;
+    can_manage_reports: boolean;
+    allowed_misc_cmds: string[];
+}
+
 export default function SettingsPage() {
     const { id } = useParams();
     const { data: session } = useSession();
@@ -31,8 +61,15 @@ export default function SettingsPage() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
+    // General Settings
     const [adminCmds, setAdminCmds] = useState(true);
     const [miscCmds, setMiscCmds] = useState(true);
+
+    // Role Management
+    const [discordRoles, setDiscordRoles] = useState<DiscordRole[]>([]);
+    const [dashboardRoles, setDashboardRoles] = useState<DashboardRole[]>([]);
+    const [selectedRoleForAdd, setSelectedRoleForAdd] = useState("");
+    const [addingRole, setAddingRole] = useState(false);
 
     useEffect(() => {
         async function fetchData() {
@@ -56,8 +93,28 @@ export default function SettingsPage() {
                 .single();
 
             if (data && !dbError) {
-                setAdminCmds(data.admin_cmds_enabled !== false); // Default to true if null
-                setMiscCmds(data.misc_cmds_enabled !== false);   // Default to true if null
+                setAdminCmds(data.admin_cmds_enabled !== false);
+                setMiscCmds(data.misc_cmds_enabled !== false);
+            }
+
+            // 3. Fetch Discord Roles
+            try {
+                const rolesRes = await fetch(`/api/discord/roles?guildId=${id}`);
+                if (rolesRes.ok) {
+                    setDiscordRoles(await rolesRes.json());
+                }
+            } catch (e) {
+                console.error("Failed to fetch Discord roles", e);
+            }
+
+            // 4. Fetch Configured Dashboard Roles
+            try {
+                const dbRolesRes = await fetch(`/api/settings/roles?serverId=${id}`);
+                if (dbRolesRes.ok) {
+                    setDashboardRoles(await dbRolesRes.json());
+                }
+            } catch (e) {
+                console.error("Failed to fetch configured roles", e);
             }
 
             setLoading(false);
@@ -70,6 +127,7 @@ export default function SettingsPage() {
         setError(null);
         setSuccess(false);
 
+        // Save General Settings
         const { error: dbError } = await supabase
             .from('servers')
             .update({
@@ -78,6 +136,11 @@ export default function SettingsPage() {
             })
             .eq('id', id);
 
+        // Save Roles Logic (In this simplified view, we save roles as they are modified, but general settings on Save)
+        // Actually, let's keep role editing separate to avoid complex state management
+        // Roles are saved immediately when modified in the UI below, or we could batch them.
+        // For simplicity, let's just save general settings here.
+
         if (dbError) {
             setError(dbError.message);
         } else {
@@ -85,6 +148,105 @@ export default function SettingsPage() {
             setTimeout(() => setSuccess(false), 3000);
         }
         setSaving(false);
+    }
+
+    async function handleAddRole() {
+        if (!selectedRoleForAdd) return;
+        setAddingRole(true);
+        const role = discordRoles.find(r => r.id === selectedRoleForAdd);
+        if (!role) return;
+
+        // Check if already exists
+        if (dashboardRoles.some(r => r.discord_role_id === role.id)) {
+            alert("Role already configured!");
+            setAddingRole(false);
+            return;
+        }
+
+        // Add to DB
+        try {
+            const res = await fetch('/api/settings/roles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverId: id,
+                    discordRoleId: role.id,
+                    roleName: role.name,
+                    permissions: {
+                        access_dashboard: false,
+                        kick: false,
+                        ban: false,
+                        timeout: false,
+                        mute: false,
+                        lookup: false,
+                        manage_settings: false,
+                        manage_reports: false
+                    },
+                    miscCmds: []
+                })
+            });
+
+            if (res.ok) {
+                const newRole = await res.json();
+                setDashboardRoles([...dashboardRoles, newRole]);
+                setSelectedRoleForAdd("");
+            } else {
+                alert("Failed to add role");
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        setAddingRole(false);
+    }
+
+    async function handleUpdateRole(role: DashboardRole, field: keyof DashboardRole, value: any) {
+        // Optimistic UI Update
+        const updatedRoles = dashboardRoles.map(r => r.id === role.id ? { ...r, [field]: value } : r);
+        setDashboardRoles(updatedRoles);
+
+        // Current state of the role being updated
+        const targetRole = updatedRoles.find(r => r.id === role.id);
+        if (!targetRole) return;
+
+        // Save to DB
+        try {
+            await fetch('/api/settings/roles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverId: id,
+                    discordRoleId: targetRole.discord_role_id,
+                    roleName: targetRole.role_name,
+                    permissions: {
+                        access_dashboard: targetRole.can_access_dashboard,
+                        kick: targetRole.can_kick,
+                        ban: targetRole.can_ban,
+                        timeout: targetRole.can_timeout,
+                        mute: targetRole.can_mute,
+                        lookup: targetRole.can_lookup,
+                        manage_settings: targetRole.can_manage_settings,
+                        manage_reports: targetRole.can_manage_reports
+                    },
+                    miscCmds: targetRole.allowed_misc_cmds
+                })
+            });
+        } catch (e) {
+            console.error("Failed to update role", e);
+            // Revert on error? For now, we assume success or user refreshes.
+        }
+    }
+
+    async function handleDeleteRole(roleId: string) {
+        if (!confirm("Are you sure you want to remove this role configuration?")) return;
+
+        // Optimistic Remove
+        setDashboardRoles(dashboardRoles.filter(r => r.id !== roleId));
+
+        try {
+            await fetch(`/api/settings/roles?id=${roleId}`, { method: 'DELETE' });
+        } catch (e) {
+            console.error("Failed to delete role", e);
+        }
     }
 
     if (loading) return (
@@ -127,17 +289,142 @@ export default function SettingsPage() {
 
             <div className="grid grid-cols-12 gap-8">
                 {/* Main Settings Column */}
-                <div className="col-span-12 lg:col-span-8 space-y-8">
+                <div className="col-span-12 lg:col-span-8 space-y-12">
+
+                    {/* --- ROLE PERMISSIONS SECTION (NEW) --- */}
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                        <div className="flex items-start gap-6 mb-8">
+                            <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500 border border-purple-500/10">
+                                <ShieldIcon />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Role Permissions</h3>
+                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">
+                                    Assign specific dashboard and in-game capabilities to Discord roles.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Add Role Section */}
+                        <div className="flex gap-4 mb-8 bg-slate-950/50 p-4 rounded-xl border border-slate-800/60">
+                            <select
+                                value={selectedRoleForAdd}
+                                onChange={(e) => setSelectedRoleForAdd(e.target.value)}
+                                className="flex-1 bg-black/40 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500 transition-all font-medium"
+                            >
+                                <option value="">Select a Discord Role...</option>
+                                {discordRoles
+                                    .filter(dr => !dashboardRoles.some(dbr => dbr.discord_role_id === dr.id) && dr.name !== '@everyone')
+                                    .map(role => (
+                                        <option key={role.id} value={role.id} style={{ color: role.color ? `#${role.color.toString(16)}` : 'white' }}>
+                                            {role.name}
+                                        </option>
+                                    ))}
+                            </select>
+                            <button
+                                onClick={handleAddRole}
+                                disabled={!selectedRoleForAdd || addingRole}
+                                className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-2 rounded-lg text-xs transition-all shadow-lg shadow-purple-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {addingRole ? "Adding..." : "Add Role"}
+                            </button>
+                        </div>
+
+                        {/* Roles List */}
+                        <div className="space-y-4">
+                            {dashboardRoles.map(role => (
+                                <div key={role.id} className="bg-slate-950/40 border border-slate-800 rounded-xl p-6 transition-all hover:bg-slate-900/40">
+                                    <div className="flex items-center justify-between mb-6 border-b border-slate-800/50 pb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-700">
+                                                #
+                                            </div>
+                                            <span className="text-sm font-bold text-white tracking-wide">{role.role_name}</span>
+                                        </div>
+                                        <button
+                                            onClick={() => handleDeleteRole(role.id)}
+                                            className="text-slate-500 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-500/10"
+                                            title="Remove Configuration"
+                                        >
+                                            <TrashIcon />
+                                        </button>
+                                    </div>
+
+                                    {/* Permissions Grid */}
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        {[
+                                            { key: 'can_access_dashboard', label: 'Dashboard Access' },
+                                            { key: 'can_manage_settings', label: 'Manage Settings' },
+                                            { key: 'can_manage_reports', label: 'Manage Reports' },
+                                            { key: 'can_lookup', label: 'Lookup Users' },
+                                            { key: 'can_kick', label: 'Kick Users' },
+                                            { key: 'can_ban', label: 'Ban Users' },
+                                            { key: 'can_timeout', label: 'Timeout/Softban' },
+                                            { key: 'can_mute', label: 'Server Mute' },
+                                        ].map((perm) => (
+                                            <label key={perm.key} className="flex items-center gap-3 cursor-pointer group select-none">
+                                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
+                                                    // @ts-ignore
+                                                    role[perm.key] ? 'bg-purple-600 border-purple-500' : 'bg-slate-900 border-slate-700 group-hover:border-slate-500'
+                                                    }`}>
+                                                    {/* @ts-ignore */
+                                                        role[perm.key] && (
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-white"><polyline points="20 6 9 17 4 12" /></svg>
+                                                        )}
+                                                </div>
+                                                <input
+                                                    type="checkbox"
+                                                    className="hidden"
+                                                    // @ts-ignore
+                                                    checked={role[perm.key]}
+                                                    // @ts-ignore
+                                                    onChange={(e) => handleUpdateRole(role, perm.key, e.target.checked)}
+                                                />
+                                                <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${
+                                                    // @ts-ignore
+                                                    role[perm.key] ? 'text-white' : 'text-slate-500 group-hover:text-slate-400'
+                                                    }`}>
+                                                    {perm.label}
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
+
+                                    {/* Misc Commands Input */}
+                                    <div className="mt-6 pt-4 border-t border-slate-800/50">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+                                            Misc Commands (Comma Separated)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={role.allowed_misc_cmds?.join(", ") || ""}
+                                            onChange={(e) => handleUpdateRole(role, 'allowed_misc_cmds', e.target.value.split(",").map(s => s.trim()).filter(s => s))}
+                                            placeholder="e.g. fly, heal, tp (or * for all)"
+                                            className="w-full bg-black/20 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-purple-500 transition-colors"
+                                        />
+                                        <p className="text-[9px] text-slate-600 mt-1.5">Enter specific commands this role can use (e.g., 'fly', 'heal') or '*' for all available misc commands.</p>
+                                    </div>
+                                </div>
+                            ))}
+
+                            {dashboardRoles.length === 0 && (
+                                <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-xl">
+                                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">No roles configured yet.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+
                     {/* Command Config Section */}
                     <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
-
                         <div className="flex items-start gap-6 mb-8">
                             <div className="p-3 bg-sky-500/10 rounded-xl text-sky-500 border border-sky-500/10">
                                 <CommandIcon />
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Command Modules</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Enable or disable specific command categories. Disabled commands will not function in-game.</p>
+                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Global Command Modules</h3>
+                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Enable or disable specific command categories server-wide. Disabled commands will not function in-game regardless of role.</p>
                             </div>
                         </div>
 
