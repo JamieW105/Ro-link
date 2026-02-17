@@ -75,8 +75,20 @@ const commands = [
         options: []
     },
     {
-        name: 'update',
+        name: 'update-servers',
         description: 'Send a global update signal to all Roblox servers (restarts them)',
+    },
+    {
+        name: 'update',
+        description: 'Update your linked Roblox profile and roles',
+        options: [
+            {
+                name: 'user',
+                description: 'The user to update (Moderators only)',
+                type: 6, // USER
+                required: false
+            }
+        ]
     },
     {
         name: 'shutdown',
@@ -373,7 +385,8 @@ client.on('interactionCreate', async interaction => {
                 { name: '/ban', value: 'Permanently ban a user from the Roblox game.' },
                 { name: '/kick', value: 'Kick a user from the game server.' },
                 { name: '/unban', value: 'Unban a user from the Roblox game.' },
-                { name: '/update', value: 'Send a global update signal to all Roblox servers (restarts them).' },
+                { name: '/update', value: 'Update your linked Roblox profile and roles.' },
+                { name: '/update-servers', value: 'Send a global update signal to all Roblox servers (restarts them).' },
                 { name: '/shutdown', value: 'Immediately shut down game servers.' },
                 { name: '/misc', value: 'Access miscellaneous player actions like Fly, Kill, and Heal.' },
                 { name: '/help', value: 'Show info and list of available commands.' }
@@ -460,11 +473,14 @@ client.on('interactionCreate', async interaction => {
             }]),
             interaction.reply(`🔓 **Unbanned** \`${targetUser}\` from Roblox. Command sent to game servers.`)
         ]);
-    } else if (commandName === 'update') {
+    } else if (commandName === 'update-servers') {
+        if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('ManageGuild')) {
+            return interaction.reply({ content: 'You do not have permission to use this command. (Requires Administrator/Manage Server)', ephemeral: true });
+        }
         await Promise.all([
             supabase.from('logs').insert([{
                 server_id: guildId,
-                action: 'UPDATE',
+                action: 'UPDATE_SERVERS',
                 target: 'ALL',
                 moderator: user.tag
             }]),
@@ -476,6 +492,78 @@ client.on('interactionCreate', async interaction => {
             }]),
             interaction.reply(`🚀 **Update Signal Sent**! All game servers will restart shortly.`)
         ]);
+    } else if (commandName === 'update') {
+        const targetUser = interaction.options.getUser('user') || user;
+        const isSelf = targetUser.id === user.id;
+
+        if (!isSelf && !interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('ManageRoles')) {
+            return interaction.reply({ content: 'You do not have permission to update other users.', ephemeral: true });
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+
+        // 1. Fetch from DB
+        const { data: verifiedUser, error: dbError } = await supabase
+            .from('verified_users')
+            .select('*')
+            .eq('discord_id', targetUser.id)
+            .maybeSingle();
+
+        if (dbError || !verifiedUser) {
+            return interaction.editReply(`❌ <@${targetUser.id}> is not linked with Ro-Link. Use \`/verify\` to get started.`);
+        }
+
+        try {
+            // 2. Fetch latest from Roblox
+            const robloxRes = await fetch(`https://users.roproxy.com/v1/users/${verifiedUser.roblox_id}`);
+            const robloxData = await robloxRes.json();
+
+            if (robloxData && robloxData.name) {
+                // 3. Update DB if name changed
+                if (robloxData.name !== verifiedUser.roblox_username) {
+                    await supabase
+                        .from('verified_users')
+                        .update({ roblox_username: robloxData.name })
+                        .eq('discord_id', targetUser.id);
+                }
+
+                // 4. Update Roles/Nickname in this server
+                const { data: serverSettings } = await supabase
+                    .from('servers')
+                    .select('verified_role, nick_template')
+                    .eq('id', guildId)
+                    .single();
+
+                const member = await guild.members.fetch(targetUser.id);
+
+                // Roles
+                if (serverSettings?.verified_role) {
+                    const role = guild.roles.cache.get(serverSettings.verified_role);
+                    if (role && !member.roles.cache.has(role.id)) {
+                        await member.roles.add(role).catch(() => { });
+                    }
+                }
+
+                // Nickname
+                if (serverSettings?.nick_template) {
+                    const nick = serverSettings.nick_template
+                        .replace(/{roblox_username}/g, robloxData.name)
+                        .replace(/{roblox_id}/g, verifiedUser.roblox_id)
+                        .replace(/{discord_name}/g, targetUser.username.substring(0, 16));
+
+                    if (member.manageable) {
+                        await member.setNickname(nick.substring(0, 32)).catch(() => { });
+                    }
+                }
+
+                return interaction.editReply(`✅ **Profile Updated**!\nLinked Account: \`${robloxData.name}\` (\`${verifiedUser.roblox_id}\`)`);
+            } else {
+                return interaction.editReply(`❌ Failed to fetch Roblox data. Please try again later.`);
+            }
+        } catch (e) {
+            console.error(`[UPDATE] Error:`, e.message);
+            return interaction.editReply(`❌ An error occurred while updating the profile.`);
+        }
     } else if (commandName === 'shutdown') {
         const jobId = interaction.options.getString('job_id');
 

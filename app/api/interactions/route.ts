@@ -212,7 +212,7 @@ export async function POST(req: Request) {
                                 fields: [
                                     {
                                         name: '**Management Commands**',
-                                        value: "`/setup` - Initialize the bridge (Owner Only)\n`/update` - Global Server Soft-Shutdown\n`/shutdown` - Emergency Server Shutdown",
+                                        value: "`/setup` - Initialize the bridge (Owner Only)\n`/update-servers` - Global Server Soft-Shutdown\n`/shutdown` - Emergency Server Shutdown",
                                         inline: false
                                     },
                                     {
@@ -222,7 +222,7 @@ export async function POST(req: Request) {
                                     },
                                     {
                                         name: '**Utility Commands**',
-                                        value: "`/get-discord` - Find Discord from Roblox\n`/get-roblox` - Find Roblox from Discord\n`/verify` - Link your account",
+                                        value: "`/get-discord` - Find Discord from Roblox\n`/get-roblox` - Find Roblox from Discord\n`/verify` - Link your account\n`/update` - Sync your linked profile",
                                         inline: false
                                     }
                                 ],
@@ -384,14 +384,23 @@ export async function POST(req: Request) {
             const isKick = name === 'kick';
             const isTimeout = name === 'timeout' || name === 'mute';
             const isLookup = name === 'lookup';
+            const isUpdateServers = name === 'update-servers';
+            const isShutdown = name === 'shutdown';
+            const isUpdate = name === 'update';
 
             let hasPerms = false;
             if (isBan) hasPerms = await checkPermission('can_ban');
             else if (isKick) hasPerms = await checkPermission('can_kick');
             else if (isTimeout) hasPerms = await checkPermission('can_timeout');
             else if (isLookup) hasPerms = await checkPermission('can_lookup');
+            else if (isUpdateServers || isShutdown) {
+                const permissions = BigInt(member?.permissions || '0');
+                hasPerms = (permissions & 0x8n) !== 0n || user.id === '953414442060746854';
+            }
+            else if (isUpdate) {
+                hasPerms = true;
+            }
             else {
-                // For other moderation commands, default to basic admin or manage server check
                 const permissions = BigInt(member?.permissions || '0');
                 hasPerms = (permissions & 0x8n) !== 0n || (permissions & 0x20n) !== 0n;
             }
@@ -434,7 +443,6 @@ export async function POST(req: Request) {
 
             let message = '';
             if (name === 'ban') {
-                // Parallelize Operations
                 const [queueRes] = await Promise.all([
                     supabase.from('command_queue').insert([{
                         server_id: guild_id,
@@ -494,7 +502,7 @@ export async function POST(req: Request) {
                 }
                 message = `🔓 **Unbanned** \`${targetUser}\` from Roblox.`;
             }
-            else if (name === 'update') {
+            else if (name === 'update-servers') {
                 const [queueRes] = await Promise.all([
                     supabase.from('command_queue').insert([{
                         server_id: guild_id,
@@ -503,7 +511,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging('UPDATE', { reason: "Manual Update Triggered", moderator: userTag }, server),
-                    logAction(guild_id, 'UPDATE', 'ALL', userTag)
+                    logAction(guild_id, 'UPDATE_SERVERS', 'ALL', userTag)
                 ]);
 
                 if (queueRes.error) {
@@ -513,6 +521,108 @@ export async function POST(req: Request) {
                     });
                 }
                 message = `🚀 **Update Signal Sent**! All game servers will restart shortly.`;
+            }
+            else if (name === 'update') {
+                const targetUserId = options?.find((o: any) => o.name === 'user')?.value || user.id;
+                const isSelf = targetUserId === user.id;
+
+                if (!isSelf) {
+                    const canManageRoles = (BigInt(member?.permissions || "0") & 0x10000000n) === 0x10000000n; // Manage Roles
+                    const isAdmin = (BigInt(member?.permissions || "0") & 0x8n) === 0x8n;
+                    if (!canManageRoles && !isAdmin) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `❌ You do not have permission to update other users.`, flags: 64 }
+                        });
+                    }
+                }
+
+                // 1. Fetch from DB
+                const { data: verifiedUser, error: dbError } = await supabase
+                    .from('verified_users')
+                    .select('*')
+                    .eq('discord_id', targetUserId)
+                    .maybeSingle();
+
+                if (dbError || !verifiedUser) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ <@${targetUserId}> is not linked with Ro-Link. Use \`/verify\` to get started.`, flags: 64 }
+                    });
+                }
+
+                try {
+                    // 2. Fetch latest from Roblox
+                    const robloxRes = await fetch(`https://users.roproxy.com/v1/users/${verifiedUser.roblox_id}`);
+                    const robloxData = await robloxRes.json();
+
+                    if (robloxData && robloxData.name) {
+                        // 3. Update DB if name changed
+                        if (robloxData.name !== verifiedUser.roblox_username) {
+                            await supabase
+                                .from('verified_users')
+                                .update({ roblox_username: robloxData.name })
+                                .eq('discord_id', targetUserId);
+                        }
+
+                        // 4. Return success (Roles/Nickname updates are best handled by the persistent bot script or via Discord API here if we had full token)
+                        // For the Edge runtime, we'll try to trigger a job or just update DB and inform user.
+                        // Actually, we CAN try to update nickname/roles if we use the BOT token.
+
+                        const memberRes = await fetch(`https://discord.com/api/v10/guilds/${guild_id}/members/${targetUserId}`, {
+                            headers: { 'Authorization': `Bot ${process.env.DISCORD_TOKEN}` }
+                        });
+                        const memberData = await memberRes.json();
+
+                        const { data: serverSettings } = await supabase
+                            .from('servers')
+                            .select('verified_role, nick_template')
+                            .eq('id', guild_id)
+                            .single();
+
+                        if (serverSettings) {
+                            // Add Role
+                            if (serverSettings.verified_role) {
+                                await fetch(`https://discord.com/api/v10/guilds/${guild_id}/members/${targetUserId}/roles/${serverSettings.verified_role}`, {
+                                    method: 'PUT',
+                                    headers: { 'Authorization': `Bot ${process.env.DISCORD_TOKEN}` }
+                                });
+                            }
+
+                            // Update Nickname
+                            if (serverSettings.nick_template) {
+                                const nick = serverSettings.nick_template
+                                    .replace(/{roblox_username}/g, robloxData.name)
+                                    .replace(/{roblox_id}/g, verifiedUser.roblox_id)
+                                    .replace(/{discord_name}/g, (memberData.user?.username || 'User').substring(0, 16));
+
+                                await fetch(`https://discord.com/api/v10/guilds/${guild_id}/members/${targetUserId}`, {
+                                    method: 'PATCH',
+                                    headers: {
+                                        'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({ nick: nick.substring(0, 32) })
+                                }).catch(() => { });
+                            }
+                        }
+
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `✅ **Profile Updated**!\nLinked Account: \`${robloxData.name}\` (\`${verifiedUser.roblox_id}\`)`, flags: 64 }
+                        });
+                    } else {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `❌ Failed to fetch Roblox data. Please try again later.`, flags: 64 }
+                        });
+                    }
+                } catch (e) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ An error occurred while updating the profile.`, flags: 64 }
+                    });
+                }
             }
             else if (name === 'shutdown') {
                 const [queueRes] = await Promise.all([
