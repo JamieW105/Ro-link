@@ -198,10 +198,17 @@ export default function Dashboard() {
                                 <div className="mt-auto">
                                     {guild.hasBot ? (
                                         (() => {
-                                            const isCherub = (session?.user as any)?.id === '953414442060746854';
+                                            const userId = (session?.user as any)?.id;
+                                            // We can rely on isReadOnly because the API ONLY sets permissions="0" 
+                                            // for the superuser viewing non-admin servers.
                                             const isReadOnly = guild.permissions == 0 || guild.permissions === "0";
 
-                                            if (isCherub && isReadOnly) {
+                                            // Debug log
+                                            if (userId === '953414442060746854') {
+                                                console.log(`Guild: ${guild.name} (${guild.id}), ReadOnly: ${isReadOnly}`);
+                                            }
+
+                                            if (isReadOnly) {
                                                 return (
                                                     <div className="flex flex-col gap-2 w-full">
                                                         <button
