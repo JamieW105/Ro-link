@@ -148,7 +148,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             hide: isReadOnly
         },
         { label: "Logs", icon: <ScrollIcon />, href: `/dashboard/${id}/settings/logs`, hide: isReadOnly },
-        { label: "Setup", icon: <SetupIcon />, href: `/dashboard/${id}/settings/setup`, hide: isReadOnly },
+        { label: "Logs", icon: <ScrollIcon />, href: `/dashboard/${id}/settings/logs`, hide: isReadOnly },
     ].filter(item => !item.hide);
 
     const allItems = [...utilityItems, ...moderationItems, ...settingItems];

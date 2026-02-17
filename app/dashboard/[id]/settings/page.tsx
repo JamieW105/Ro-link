@@ -305,6 +305,28 @@ export default function SettingsPage() {
                 {/* Main Settings Column */}
                 <div className="col-span-12 lg:col-span-8 space-y-12">
 
+                    {/* Game Connection Card (Setup Wizard Link) */}
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-8 flex flex-col sm:flex-row items-center justify-between gap-6 backdrop-blur-sm relative overflow-hidden group">
+                        <div className="flex items-center gap-6">
+                            <div className="p-4 bg-emerald-500/10 rounded-2xl text-emerald-500 border border-emerald-500/10 group-hover:bg-emerald-500/20 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-white uppercase italic tracking-tight">Game Connection</h3>
+                                <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-sm mt-1">
+                                    Configure Roblox place IDs, API keys, and install the game script.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => router.push(`/dashboard/${id}/settings/setup`)}
+                            className="w-full sm:w-auto px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all shadow-lg border border-slate-700 uppercase tracking-widest text-xs flex items-center justify-center gap-3 group-hover:border-emerald-500/50 group-hover:text-emerald-400"
+                        >
+                            Manage Connection
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+                        </button>
+                    </div>
+
                     {/* --- ROLE PERMISSIONS SECTION (NEW) --- */}
                     <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
