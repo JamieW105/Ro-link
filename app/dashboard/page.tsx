@@ -239,7 +239,7 @@ export default function Dashboard() {
                                         })()
                                     ) : (
                                         <a
-                                            href={`https://discord.com/api/oauth2/authorize?client_id=1466340007940722750&permissions=8&scope=bot%20applications.commands&guild_id=${guild.id}&disable_guild_select=true`}
+                                            href={`https://discord.com/api/oauth2/authorize?client_id=1466340007940722750&permissions=268536470&scope=bot%20applications.commands&guild_id=${guild.id}&disable_guild_select=true`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-sky-900/10 flex items-center justify-center gap-2"

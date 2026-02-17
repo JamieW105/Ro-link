@@ -96,12 +96,20 @@ export default function PlayerLookup() {
             if (logsRes.data) {
                 setLogs(logsRes.data);
             }
+            if (data.username) {
+                await supabase.from('logs').insert([{
+                    server_id: id,
+                    action: 'LOOKUP',
+                    target: data.username,
+                    moderator: session?.user?.name || 'Web Admin'
+                }]);
+            }
         } catch (err: any) {
             setError(err.message);
         } finally {
             setLoading(false);
         }
-    }, [id]);
+    }, [id, session]);
 
     // Handle initial search from query param
     useEffect(() => {

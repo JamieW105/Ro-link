@@ -224,6 +224,14 @@ export default function ReportDetailsPage() {
             })
             .eq('id', reportId);
 
+        const moderator = (session?.user as any)?.name || 'Web Admin';
+        await supabase.from('logs').insert([{
+            server_id: id,
+            action: 'REPORT_DISMISSED',
+            target: report.reported_roblox_username,
+            moderator: moderator
+        }]);
+
         router.push(`/dashboard/${id}/reports`);
     };
 
