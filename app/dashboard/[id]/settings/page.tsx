@@ -51,6 +51,12 @@ interface DashboardRole {
     allowed_misc_cmds: string[];
 }
 
+interface DiscordChannel {
+    id: string;
+    name: string;
+    type: number;
+}
+
 export default function SettingsPage() {
     const { id } = useParams();
     const { data: session } = useSession();
@@ -64,10 +70,12 @@ export default function SettingsPage() {
     // General Settings
     const [adminCmds, setAdminCmds] = useState(true);
     const [miscCmds, setMiscCmds] = useState(true);
+    const [loggingChannelId, setLoggingChannelId] = useState("");
 
     // Role Management
     const [discordRoles, setDiscordRoles] = useState<DiscordRole[]>([]);
     const [dashboardRoles, setDashboardRoles] = useState<DashboardRole[]>([]);
+    const [channels, setChannels] = useState<DiscordChannel[]>([]);
     const [selectedRoleForAdd, setSelectedRoleForAdd] = useState("");
     const [addingRole, setAddingRole] = useState(false);
 
@@ -88,23 +96,28 @@ export default function SettingsPage() {
             // 2. Fetch Server Settings
             const { data, error: dbError } = await supabase
                 .from('servers')
-                .select('admin_cmds_enabled, misc_cmds_enabled')
+                .select('admin_cmds_enabled, misc_cmds_enabled, logging_channel_id')
                 .eq('id', id)
                 .single();
 
             if (data && !dbError) {
                 setAdminCmds(data.admin_cmds_enabled !== false);
                 setMiscCmds(data.misc_cmds_enabled !== false);
+                setLoggingChannelId(data.logging_channel_id || "");
             }
 
-            // 3. Fetch Discord Roles
+            // 3. Fetch Discord Roles & Channels
             try {
-                const rolesRes = await fetch(`/api/discord/roles?guildId=${id}`);
-                if (rolesRes.ok) {
-                    setDiscordRoles(await rolesRes.json());
-                }
+                const [rolesRes, channelsRes] = await Promise.all([
+                    fetch(`/api/discord/roles?guildId=${id}`),
+                    fetch(`/api/discord/channels?guildId=${id}`)
+                ]);
+
+                if (rolesRes.ok) setDiscordRoles(await rolesRes.json());
+                if (channelsRes.ok) setChannels(await channelsRes.json());
+
             } catch (e) {
-                console.error("Failed to fetch Discord roles", e);
+                console.error("Failed to fetch Discord data", e);
             }
 
             // 4. Fetch Configured Dashboard Roles
@@ -132,7 +145,8 @@ export default function SettingsPage() {
             .from('servers')
             .update({
                 admin_cmds_enabled: adminCmds,
-                misc_cmds_enabled: miscCmds
+                misc_cmds_enabled: miscCmds,
+                logging_channel_id: loggingChannelId || null
             })
             .eq('id', id);
 
@@ -466,6 +480,35 @@ export default function SettingsPage() {
                             >
                                 {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "SAVE SETTINGS"}
                             </button>
+                        </div>
+                    </div>
+
+                    {/* Logging Config Section */}
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                        <div className="flex items-start gap-6 mb-8">
+                            <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-500 border border-indigo-500/10">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Audit Logging</h3>
+                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Select a Discord channel where administrative actions and reports will be logged.</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
+                            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Logging Channel</label>
+                            <select
+                                value={loggingChannelId}
+                                onChange={(e) => setLoggingChannelId(e.target.value)}
+                                className="w-full bg-black/40 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all font-medium"
+                            >
+                                <option value="">Disabled (No Logging)</option>
+                                {channels.map(channel => (
+                                    <option key={channel.id} value={channel.id}>
+                                        #{channel.name}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 
