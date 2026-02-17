@@ -57,6 +57,28 @@ export async function POST(req: Request) {
         const user = interactionUser || member?.user;
         const userTag = user ? `${user.username}${user.discriminator !== '0' ? '#' + user.discriminator : ''}` : 'Unknown';
 
+        // Helper to check permissions against RBAC
+        async function checkPermission(permissionKey: string) {
+            if (!member) return false;
+
+            // Administrator/Owner Bypass
+            const isAdmin = (BigInt(member.permissions || "0") & 0x8n) === 0x8n;
+            if (isAdmin) return true;
+
+            if (!member.roles || member.roles.length === 0) return false;
+
+            const { data: roles } = await supabase
+                .from('dashboard_roles')
+                .select('*')
+                .eq('server_id', guild_id)
+                .in('discord_role_id', member.roles);
+
+            if (!roles) return false;
+
+            // Check if any of the user's roles have the required permission
+            return roles.some((role: any) => role[permissionKey] === true);
+        }
+
         // Helper to trigger Messaging Service
         const triggerMessaging = async (command: string, args: any, serverData: any = null) => {
             if (!guild_id) return;
@@ -358,13 +380,26 @@ export async function POST(req: Request) {
             }
 
 
-            const permissions = BigInt(member?.permissions || '0');
-            const hasPerms = (permissions & 0x2n) !== 0n || (permissions & 0x4n) !== 0n || (permissions & 0x8n) !== 0n || (permissions & 0x20n) !== 0n;
+            const isBan = name === 'ban';
+            const isKick = name === 'kick';
+            const isTimeout = name === 'timeout' || name === 'mute';
+            const isLookup = name === 'lookup';
+
+            let hasPerms = false;
+            if (isBan) hasPerms = await checkPermission('can_ban');
+            else if (isKick) hasPerms = await checkPermission('can_kick');
+            else if (isTimeout) hasPerms = await checkPermission('can_timeout');
+            else if (isLookup) hasPerms = await checkPermission('can_lookup');
+            else {
+                // For other moderation commands, default to basic admin or manage server check
+                const permissions = BigInt(member?.permissions || '0');
+                hasPerms = (permissions & 0x8n) !== 0n || (permissions & 0x20n) !== 0n;
+            }
 
             if (!hasPerms) {
                 return NextResponse.json({
                     type: 4,
-                    data: { content: `❌ You do not have permission to use this command. (Requires Kick/Ban Members or Admin)`, flags: 64 }
+                    data: { content: `❌ You do not have permission to use this command. This action requires specific Ro-Link moderator permissions or Administrator.`, flags: 64 }
                 });
             }
 
@@ -587,15 +622,24 @@ export async function POST(req: Request) {
                 });
             }
 
-            // Permission Check for buttons
-            const permissions = BigInt(member?.permissions || '0');
-            const hasPerms = (permissions & 0x2n) !== 0n || (permissions & 0x4n) !== 0n || (permissions & 0x8n) !== 0n || (permissions & 0x20n) !== 0n;
+            // Permission Check for buttons/components
+            let requiredPerm = 'can_manage_reports'; // Default for most report/moderation buttons
+            const cid = interaction.data.custom_id;
 
+            if (cid === 'misc_menu' || cid.startsWith('misc_modal_')) {
+                // Determine if it should be a misc action check, for now we allow if they have dashboard access
+                requiredPerm = 'can_access_dashboard';
+            } else if (cid === 'report_open' || cid === 'report_submit') {
+                // Anyone can OPEN a report form
+                requiredPerm = '';
+            }
+
+            const hasPerms = requiredPerm === '' ? true : await checkPermission(requiredPerm);
 
             if (!hasPerms) {
                 return NextResponse.json({
                     type: 4,
-                    data: { content: `❌ You do not have permission to use this button.`, flags: 64 }
+                    data: { content: `❌ You do not have permission to perform this action. Requires '${requiredPerm.replace('can_', '').replace('_', ' ')}' permission.`, flags: 64 }
                 });
             }
 
@@ -800,13 +844,23 @@ export async function POST(req: Request) {
                 // 2. Send Notification to Channel (if configured)
                 const { data: server } = await supabase
                     .from('servers')
-                    .select('reports_channel_id, moderator_role_id')
+                    .select('reports_channel_id')
                     .eq('id', guild_id)
                     .single();
 
                 if (server?.reports_channel_id) {
                     console.log(`[REPORTS] Forwarding report to channel: ${server.reports_channel_id}`);
-                    const roleMention = server.moderator_role_id ? `<@&${server.moderator_role_id}>` : '';
+
+                    // Fetch roles with "Manage Reports" permission
+                    const { data: modRoles } = await supabase
+                        .from('dashboard_roles')
+                        .select('discord_role_id')
+                        .eq('server_id', guild_id)
+                        .eq('can_manage_reports', true);
+
+                    const roleMention = modRoles && modRoles.length > 0
+                        ? modRoles.map(r => `<@&${r.discord_role_id}>`).join(' ')
+                        : '';
 
                     fetch(`https://discord.com/api/v10/channels/${server.reports_channel_id}/messages`, {
                         method: 'POST',

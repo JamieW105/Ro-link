@@ -8,16 +8,28 @@ const supabaseParams = {
     }
 };
 
-// Create a single supabase client for interacting with your database
-// Note: This relies on process.env.NEXT_PUBLIC_SUPABASE_URL and process.env.SUPABASE_SERVICE_ROLE_KEY
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    supabaseParams
-);
+let supabaseAdminClient: any = null;
+
+function getSupabaseAdmin() {
+    if (supabaseAdminClient) return supabaseAdminClient;
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !key) {
+        console.warn("Supabase Admin credentials missing. Logging will be disabled.");
+        return null;
+    }
+
+    supabaseAdminClient = createClient(url, key, supabaseParams);
+    return supabaseAdminClient;
+}
 
 export async function logAction(server_id: string, action: string, target: string, moderator: string) {
     try {
+        const supabaseAdmin = getSupabaseAdmin();
+        if (!supabaseAdmin) return;
+
         // 1. Insert into Database
         const { error } = await supabaseAdmin
             .from('logs')

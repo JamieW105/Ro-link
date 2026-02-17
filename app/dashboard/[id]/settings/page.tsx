@@ -71,6 +71,8 @@ export default function SettingsPage() {
     const [adminCmds, setAdminCmds] = useState(true);
     const [miscCmds, setMiscCmds] = useState(true);
     const [loggingChannelId, setLoggingChannelId] = useState("");
+    const [reportsEnabled, setReportsEnabled] = useState(false);
+    const [reportsChannelId, setReportsChannelId] = useState("");
 
     // Role Management
     const [discordRoles, setDiscordRoles] = useState<DiscordRole[]>([]);
@@ -97,7 +99,7 @@ export default function SettingsPage() {
             // 2. Fetch Server Settings
             const { data, error: dbError } = await supabase
                 .from('servers')
-                .select('admin_cmds_enabled, misc_cmds_enabled, logging_channel_id')
+                .select('admin_cmds_enabled, misc_cmds_enabled, logging_channel_id, reports_enabled, reports_channel_id')
                 .eq('id', id)
                 .single();
 
@@ -105,6 +107,8 @@ export default function SettingsPage() {
                 setAdminCmds(data.admin_cmds_enabled !== false);
                 setMiscCmds(data.misc_cmds_enabled !== false);
                 setLoggingChannelId(data.logging_channel_id || "");
+                setReportsEnabled(data.reports_enabled || false);
+                setReportsChannelId(data.reports_channel_id || "");
             }
 
             // 3. Fetch Discord Roles & Channels
@@ -147,7 +151,9 @@ export default function SettingsPage() {
             .update({
                 admin_cmds_enabled: adminCmds,
                 misc_cmds_enabled: miscCmds,
-                logging_channel_id: loggingChannelId || null
+                logging_channel_id: loggingChannelId || null,
+                reports_enabled: reportsEnabled,
+                reports_channel_id: reportsChannelId || null
             })
             .eq('id', id);
 
@@ -523,7 +529,7 @@ export default function SettingsPage() {
                             </div>
                             <div>
                                 <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Audit Logging</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Select a Discord channel where administrative actions and reports will be logged.</p>
+                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Select a Discord channel where administrative actions (kick, ban, etc) will be logged.</p>
                             </div>
                         </div>
 
@@ -541,6 +547,52 @@ export default function SettingsPage() {
                                     </option>
                                 ))}
                             </select>
+                        </div>
+                    </div>
+
+                    {/* Report System Config */}
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                        <div className="flex items-start gap-6 mb-8">
+                            <div className="p-3 bg-red-500/10 rounded-xl text-red-500 border border-red-500/10">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Report System</h3>
+                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Enable player reports via Discord and configure where they are forwarded.</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60 flex items-center justify-between">
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-1">Status</label>
+                                    <span className={`text-sm font-bold ${reportsEnabled ? 'text-red-500' : 'text-slate-500'}`}>
+                                        {reportsEnabled ? 'ENABLED' : 'DISABLED'}
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => setReportsEnabled(!reportsEnabled)}
+                                    className={`w-14 h-7 rounded-full transition-all duration-500 relative border-2 ${reportsEnabled ? 'bg-red-600/20 border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
+                                >
+                                    <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${reportsEnabled ? 'left-8 bg-red-500' : 'left-1.5 bg-slate-500'}`} />
+                                </button>
+                            </div>
+
+                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
+                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-1">Reports Channel</label>
+                                <select
+                                    value={reportsChannelId}
+                                    onChange={(e) => setReportsChannelId(e.target.value)}
+                                    className="w-full bg-black/40 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500 transition-all font-medium"
+                                >
+                                    <option value="">None (Dashboard Only)</option>
+                                    {channels.map(channel => (
+                                        <option key={channel.id} value={channel.id}>
+                                            #{channel.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
                     </div>
 

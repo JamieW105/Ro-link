@@ -21,38 +21,16 @@ export default function ReportsPage() {
     const { id } = useParams();
     const { data: session } = useSession();
 
-    // Config State
-    const [reportsEnabled, setReportsEnabled] = useState(false);
-    const [reportsChannelId, setReportsChannelId] = useState("");
-    const [moderatorRoleId, setModeratorRoleId] = useState("");
-    const [loadingConfig, setLoadingConfig] = useState(true);
-    const [savingConfig, setSavingConfig] = useState(false);
-
     // Reports State
     const [reports, setReports] = useState<any[]>([]);
     const [loadingReports, setLoadingReports] = useState(true);
 
-    // Fetch Config & Reports
+    // Fetch Reports
     useEffect(() => {
         if (!id) return;
 
         async function fetchData() {
-            setLoadingConfig(true);
             setLoadingReports(true);
-
-            // Fetch Settings
-            const { data: serverData } = await supabase
-                .from('servers')
-                .select('reports_enabled, reports_channel_id, moderator_role_id')
-                .eq('id', id)
-                .single();
-
-            if (serverData) {
-                setReportsEnabled(serverData.reports_enabled || false);
-                setReportsChannelId(serverData.reports_channel_id || "");
-                setModeratorRoleId(serverData.moderator_role_id || "");
-            }
-            setLoadingConfig(false);
 
             // Fetch Reports
             const { data: reportData } = await supabase
@@ -71,85 +49,14 @@ export default function ReportsPage() {
         fetchData();
     }, [id]);
 
-    // Save Settings
-    const handleSaveSettings = async () => {
-        setSavingConfig(true);
-        const { error } = await supabase
-            .from('servers')
-            .update({
-                reports_enabled: reportsEnabled,
-                reports_channel_id: reportsChannelId.trim(),
-                moderator_role_id: moderatorRoleId.trim()
-            })
-            .eq('id', id);
-
-        if (error) alert("Failed to save settings: " + error.message);
-        setSavingConfig(false);
-    };
-
     return (
         <div className="space-y-8 max-w-6xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             {/* Header */}
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 mb-8">
                 <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
                     <ReportIcon /> Reports System
                 </h1>
                 <p className="text-slate-500 text-sm font-medium">Manage and review player reports submitted via Discord.</p>
-            </div>
-
-            {/* Settings Card */}
-            <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-md">
-                <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                        <SettingsIcon /> Configuration
-                    </h3>
-                    <button
-                        onClick={handleSaveSettings}
-                        disabled={savingConfig}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-emerald-900/20 disabled:opacity-50"
-                    >
-                        {savingConfig ? "SAVING..." : "SAVE CHANGES"}
-                    </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="flex items-center justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-                        <div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Status</span>
-                            <span className={`text-sm font-bold ${reportsEnabled ? "text-emerald-400" : "text-slate-500"}`}>
-                                {reportsEnabled ? "ENABLED" : "DISABLED"}
-                            </span>
-                        </div>
-                        <button
-                            onClick={() => setReportsEnabled(!reportsEnabled)}
-                            className={`w-12 h-6 rounded-full transition-colors relative ${reportsEnabled ? "bg-emerald-500" : "bg-slate-700"}`}
-                        >
-                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${reportsEnabled ? "left-7" : "left-1"}`}></div>
-                        </button>
-                    </div>
-
-                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Reports Channel ID</span>
-                        <input
-                            type="text"
-                            value={reportsChannelId}
-                            onChange={(e) => setReportsChannelId(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 transition-colors"
-                            placeholder="e.g. 123456789..."
-                        />
-                    </div>
-
-                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Moderator Role ID</span>
-                        <input
-                            type="text"
-                            value={moderatorRoleId}
-                            onChange={(e) => setModeratorRoleId(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 transition-colors"
-                            placeholder="e.g. 987654321..."
-                        />
-                    </div>
-                </div>
             </div>
 
             {/* Reports List */}
