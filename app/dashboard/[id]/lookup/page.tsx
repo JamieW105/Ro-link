@@ -97,12 +97,16 @@ export default function PlayerLookup() {
                 setLogs(logsRes.data);
             }
             if (data.username) {
-                await supabase.from('logs').insert([{
-                    server_id: id,
-                    action: 'LOOKUP',
-                    target: data.username,
-                    moderator: session?.user?.name || 'Web Admin'
-                }]);
+                await fetch('/api/logs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        serverId: id,
+                        action: 'LOOKUP',
+                        target: data.username,
+                        moderator: session?.user?.name || 'Web Admin'
+                    })
+                });
             }
         } catch (err: any) {
             setError(err.message);
@@ -183,12 +187,16 @@ export default function PlayerLookup() {
         } else {
             alert(`${action} signal sent to Roblox! (Instant via Open Cloud)`);
 
-            await supabase.from('logs').insert([{
-                server_id: id,
-                action: action,
-                target: player.username,
-                moderator: 'Web Admin'
-            }]);
+            await fetch('/api/logs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverId: id,
+                    action: action,
+                    target: player.username,
+                    moderator: session?.user?.name || 'Web Admin'
+                })
+            });
 
             // Re-fetch logs
             const { data } = await supabase.from('logs').select('*').eq('server_id', id).eq('target', player.username).order('timestamp', { ascending: false });

@@ -78,6 +78,7 @@ export default function SettingsPage() {
     const [channels, setChannels] = useState<DiscordChannel[]>([]);
     const [selectedRoleForAdd, setSelectedRoleForAdd] = useState("");
     const [addingRole, setAddingRole] = useState(false);
+    const [isRolesCollapsed, setIsRolesCollapsed] = useState(false);
 
     useEffect(() => {
         async function fetchData() {
@@ -328,127 +329,136 @@ export default function SettingsPage() {
                     </div>
 
                     {/* --- ROLE PERMISSIONS SECTION (NEW) --- */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
-                        <div className="flex items-start gap-6 mb-8">
-                            <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500 border border-purple-500/10">
-                                <ShieldIcon />
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden transition-all duration-300">
+                        <div className="flex items-start justify-between mb-8 cursor-pointer" onClick={() => setIsRolesCollapsed(!isRolesCollapsed)}>
+                            <div className="flex items-start gap-6">
+                                <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500 border border-purple-500/10">
+                                    <ShieldIcon />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Role Permissions</h3>
+                                    <p className="text-sm text-slate-500 leading-relaxed max-w-lg">
+                                        Assign specific dashboard and in-game capabilities to Discord roles.
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Role Permissions</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">
-                                    Assign specific dashboard and in-game capabilities to Discord roles.
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Add Role Section */}
-                        <div className="flex gap-4 mb-8 bg-slate-950/50 p-4 rounded-xl border border-slate-800/60">
-                            <select
-                                value={selectedRoleForAdd}
-                                onChange={(e) => setSelectedRoleForAdd(e.target.value)}
-                                className="flex-1 bg-black/40 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500 transition-all font-medium"
-                            >
-                                <option value="">Select a Discord Role...</option>
-                                {discordRoles
-                                    .filter(dr => !dashboardRoles.some(dbr => dbr.discord_role_id === dr.id) && dr.name !== '@everyone')
-                                    .map(role => (
-                                        <option key={role.id} value={role.id} style={{ color: role.color ? `#${role.color.toString(16)}` : 'white' }}>
-                                            {role.name}
-                                        </option>
-                                    ))}
-                            </select>
-                            <button
-                                onClick={handleAddRole}
-                                disabled={!selectedRoleForAdd || addingRole}
-                                className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-2 rounded-lg text-xs transition-all shadow-lg shadow-purple-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {addingRole ? "Adding..." : "Add Role"}
+                            <button className={`p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-all transform ${isRolesCollapsed ? 'rotate-180' : ''}`}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
                             </button>
                         </div>
 
-                        {/* Roles List */}
-                        <div className="space-y-4">
-                            {dashboardRoles.map(role => (
-                                <div key={role.id} className="bg-slate-950/40 border border-slate-800 rounded-xl p-6 transition-all hover:bg-slate-900/40">
-                                    <div className="flex items-center justify-between mb-6 border-b border-slate-800/50 pb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-700">
-                                                #
-                                            </div>
-                                            <span className="text-sm font-bold text-white tracking-wide">{role.role_name}</span>
-                                        </div>
-                                        <button
-                                            onClick={() => handleDeleteRole(role.id)}
-                                            className="text-slate-500 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-500/10"
-                                            title="Remove Configuration"
-                                        >
-                                            <TrashIcon />
-                                        </button>
-                                    </div>
+                        {!isRolesCollapsed && (
+                            <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+                                {/* Add Role Section */}
+                                <div className="flex gap-4 mb-8 bg-slate-950/50 p-4 rounded-xl border border-slate-800/60">
+                                    <select
+                                        value={selectedRoleForAdd}
+                                        onChange={(e) => setSelectedRoleForAdd(e.target.value)}
+                                        className="flex-1 bg-black/40 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500 transition-all font-medium"
+                                    >
+                                        <option value="">Select a Discord Role...</option>
+                                        {discordRoles
+                                            .filter(dr => !dashboardRoles.some(dbr => dbr.discord_role_id === dr.id) && dr.name !== '@everyone')
+                                            .map(role => (
+                                                <option key={role.id} value={role.id} style={{ color: role.color ? `#${role.color.toString(16)}` : 'white' }}>
+                                                    {role.name}
+                                                </option>
+                                            ))}
+                                    </select>
+                                    <button
+                                        onClick={handleAddRole}
+                                        disabled={!selectedRoleForAdd || addingRole}
+                                        className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-2 rounded-lg text-xs transition-all shadow-lg shadow-purple-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {addingRole ? "Adding..." : "Add Role"}
+                                    </button>
+                                </div>
 
-                                    {/* Permissions Grid */}
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                        {[
-                                            { key: 'can_access_dashboard', label: 'Dashboard Access' },
-                                            { key: 'can_manage_settings', label: 'Manage Settings' },
-                                            { key: 'can_manage_reports', label: 'Manage Reports' },
-                                            { key: 'can_lookup', label: 'Lookup Users' },
-                                            { key: 'can_kick', label: 'Kick Users' },
-                                            { key: 'can_ban', label: 'Ban Users' },
-                                            { key: 'can_timeout', label: 'Timeout/Softban' },
-                                            { key: 'can_mute', label: 'Server Mute' },
-                                        ].map((perm) => (
-                                            <label key={perm.key} className="flex items-center gap-3 cursor-pointer group select-none">
-                                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
-                                                    // @ts-ignore
-                                                    role[perm.key] ? 'bg-purple-600 border-purple-500' : 'bg-slate-900 border-slate-700 group-hover:border-slate-500'
-                                                    }`}>
-                                                    {/* @ts-ignore */
-                                                        role[perm.key] && (
-                                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-white"><polyline points="20 6 9 17 4 12" /></svg>
-                                                        )}
+                                {/* Roles List */}
+                                <div className="space-y-4">
+                                    {dashboardRoles.map(role => (
+                                        <div key={role.id} className="bg-slate-950/40 border border-slate-800 rounded-xl p-6 transition-all hover:bg-slate-900/40">
+                                            <div className="flex items-center justify-between mb-6 border-b border-slate-800/50 pb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-700">
+                                                        #
+                                                    </div>
+                                                    <span className="text-sm font-bold text-white tracking-wide">{role.role_name}</span>
                                                 </div>
+                                                <button
+                                                    onClick={() => handleDeleteRole(role.id)}
+                                                    className="text-slate-500 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-500/10"
+                                                    title="Remove Configuration"
+                                                >
+                                                    <TrashIcon />
+                                                </button>
+                                            </div>
+
+                                            {/* Permissions Grid */}
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                                {[
+                                                    { key: 'can_access_dashboard', label: 'Dashboard Access' },
+                                                    { key: 'can_manage_settings', label: 'Manage Settings' },
+                                                    { key: 'can_manage_reports', label: 'Manage Reports' },
+                                                    { key: 'can_lookup', label: 'Lookup Users' },
+                                                    { key: 'can_kick', label: 'Kick Users' },
+                                                    { key: 'can_ban', label: 'Ban Users' },
+                                                    { key: 'can_timeout', label: 'Timeout/Softban' },
+                                                    { key: 'can_mute', label: 'Server Mute' },
+                                                ].map((perm) => (
+                                                    <label key={perm.key} className="flex items-center gap-3 cursor-pointer group select-none">
+                                                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
+                                                            // @ts-ignore
+                                                            role[perm.key] ? 'bg-purple-600 border-purple-500' : 'bg-slate-900 border-slate-700 group-hover:border-slate-500'
+                                                            }`}>
+                                                            {/* @ts-ignore */
+                                                                role[perm.key] && (
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-white"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                )}
+                                                        </div>
+                                                        <input
+                                                            type="checkbox"
+                                                            className="hidden"
+                                                            // @ts-ignore
+                                                            checked={role[perm.key]}
+                                                            // @ts-ignore
+                                                            onChange={(e) => handleUpdateRole(role, perm.key, e.target.checked)}
+                                                        />
+                                                        <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${
+                                                            // @ts-ignore
+                                                            role[perm.key] ? 'text-white' : 'text-slate-500 group-hover:text-slate-400'
+                                                            }`}>
+                                                            {perm.label}
+                                                        </span>
+                                                    </label>
+                                                ))}
+                                            </div>
+
+                                            {/* Misc Commands Input */}
+                                            <div className="mt-6 pt-4 border-t border-slate-800/50">
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+                                                    Misc Commands (Comma Separated)
+                                                </label>
                                                 <input
-                                                    type="checkbox"
-                                                    className="hidden"
-                                                    // @ts-ignore
-                                                    checked={role[perm.key]}
-                                                    // @ts-ignore
-                                                    onChange={(e) => handleUpdateRole(role, perm.key, e.target.checked)}
+                                                    type="text"
+                                                    value={role.allowed_misc_cmds?.join(", ") || ""}
+                                                    onChange={(e) => handleUpdateRole(role, 'allowed_misc_cmds', e.target.value.split(",").map(s => s.trim()).filter(s => s))}
+                                                    placeholder="e.g. fly, heal, tp (or * for all)"
+                                                    className="w-full bg-black/20 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-purple-500 transition-colors"
                                                 />
-                                                <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${
-                                                    // @ts-ignore
-                                                    role[perm.key] ? 'text-white' : 'text-slate-500 group-hover:text-slate-400'
-                                                    }`}>
-                                                    {perm.label}
-                                                </span>
-                                            </label>
-                                        ))}
-                                    </div>
+                                                <p className="text-[9px] text-slate-600 mt-1.5">Enter specific commands this role can use (e.g., 'fly', 'heal') or '*' for all available misc commands.</p>
+                                            </div>
+                                        </div>
+                                    ))}
 
-                                    {/* Misc Commands Input */}
-                                    <div className="mt-6 pt-4 border-t border-slate-800/50">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">
-                                            Misc Commands (Comma Separated)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={role.allowed_misc_cmds?.join(", ") || ""}
-                                            onChange={(e) => handleUpdateRole(role, 'allowed_misc_cmds', e.target.value.split(",").map(s => s.trim()).filter(s => s))}
-                                            placeholder="e.g. fly, heal, tp (or * for all)"
-                                            className="w-full bg-black/20 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-purple-500 transition-colors"
-                                        />
-                                        <p className="text-[9px] text-slate-600 mt-1.5">Enter specific commands this role can use (e.g., 'fly', 'heal') or '*' for all available misc commands.</p>
-                                    </div>
+                                    {dashboardRoles.length === 0 && (
+                                        <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-xl">
+                                            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">No roles configured yet.</p>
+                                        </div>
+                                    )}
                                 </div>
-                            ))}
-
-                            {dashboardRoles.length === 0 && (
-                                <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-xl">
-                                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">No roles configured yet.</p>
-                                </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
 
 

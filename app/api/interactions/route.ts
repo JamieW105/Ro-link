@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import nacl from 'tweetnacl';
 import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
+import { logAction } from '@/lib/logger';
 
 export const runtime = 'edge';
 
@@ -407,12 +408,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging(name.toUpperCase(), { username: targetUser, reason: 'Discord Command', moderator: userTag }, server),
-                    supabase.from('logs').insert([{
-                        server_id: guild_id,
-                        action: name.toUpperCase(),
-                        target: targetUser,
-                        moderator: userTag
-                    }])
+                    logAction(guild_id, name.toUpperCase(), targetUser, userTag)
                 ]);
 
                 if (queueRes.error) {
@@ -432,12 +428,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging('KICK', { username: targetUser, reason: 'Discord Command', moderator: userTag }, server),
-                    supabase.from('logs').insert([{
-                        server_id: guild_id,
-                        action: 'KICK',
-                        target: targetUser,
-                        moderator: userTag
-                    }])
+                    logAction(guild_id, 'KICK', targetUser, userTag)
                 ]);
 
                 if (queueRes.error) {
@@ -457,12 +448,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging('UNBAN', { username: targetUser, reason: 'Discord Command', moderator: userTag }, server),
-                    supabase.from('logs').insert([{
-                        server_id: guild_id,
-                        action: 'UNBAN',
-                        target: targetUser,
-                        moderator: userTag
-                    }])
+                    logAction(guild_id, 'UNBAN', targetUser, userTag)
                 ]);
 
                 if (queueRes.error) {
@@ -482,12 +468,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging('UPDATE', { reason: "Manual Update Triggered", moderator: userTag }, server),
-                    supabase.from('logs').insert([{
-                        server_id: guild_id,
-                        action: 'UPDATE',
-                        target: 'ALL',
-                        moderator: userTag
-                    }])
+                    logAction(guild_id, 'UPDATE', 'ALL', userTag)
                 ]);
 
                 if (queueRes.error) {
@@ -507,12 +488,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging('SHUTDOWN', { job_id: jobId, moderator: userTag }, server),
-                    supabase.from('logs').insert([{
-                        server_id: guild_id,
-                        action: 'SHUTDOWN',
-                        target: jobId || 'ALL',
-                        moderator: userTag
-                    }])
+                    logAction(guild_id, 'SHUTDOWN', jobId || 'ALL', userTag)
                 ]);
 
                 if (queueRes.error) {
@@ -746,12 +722,7 @@ export async function POST(req: Request) {
                     status: 'PENDING'
                 }]),
                 triggerMessaging(action.toUpperCase(), { username, reason: 'Discord Button Action', moderator: userTag }), // Will fetch server internally
-                supabase.from('logs').insert([{
-                    server_id: guild_id,
-                    action: action.toUpperCase(),
-                    target: username,
-                    moderator: userTag
-                }])
+                logAction(guild_id, action.toUpperCase(), username, userTag)
             ]);
 
             return NextResponse.json({
@@ -790,12 +761,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging(action, args),
-                    supabase.from('logs').insert([{
-                        server_id: guild_id,
-                        action: action,
-                        target: targetUser,
-                        moderator: userTag
-                    }])
+                    logAction(guild_id, action, targetUser, userTag)
                 ]);
 
                 return NextResponse.json({

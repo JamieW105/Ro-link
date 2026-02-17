@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
+import { logAction } from '@/lib/logger';
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
@@ -65,13 +66,8 @@ export async function POST(req: Request) {
         // This is "fire and forget" for speed, but ideally we await it if reliability > latency
         const msgResult = await sendRobloxMessage(server.id, commandName, { ...safeArgs, moderator: modName }, server);
 
-        // 5. Log Action
-        await supabase.from('logs').insert([{
-            server_id: server.id,
-            action: commandName,
-            target: safeArgs.username || 'N/A',
-            moderator: modName
-        }]);
+        // 5. Log Action (via Unified Logger)
+        await logAction(server.id, commandName, safeArgs.username || 'N/A', modName);
 
         return NextResponse.json({
             success: true,

@@ -164,13 +164,17 @@ export default function ReportDetailsPage() {
             console.error("Messaging failed", e);
         }
 
-        // 3. Log the Action
-        await supabase.from('logs').insert([{
-            server_id: id,
-            action: action,
-            target: report.reported_roblox_username,
-            moderator: moderator
-        }]);
+        // 3. Log the Action (via Unified Logger)
+        await fetch('/api/logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                serverId: id,
+                action: action,
+                target: report.reported_roblox_username,
+                moderator: moderator
+            })
+        });
 
         // 4. Resolve the Report
         await supabase
@@ -225,12 +229,16 @@ export default function ReportDetailsPage() {
             .eq('id', reportId);
 
         const moderator = (session?.user as any)?.name || 'Web Admin';
-        await supabase.from('logs').insert([{
-            server_id: id,
-            action: 'REPORT_DISMISSED',
-            target: report.reported_roblox_username,
-            moderator: moderator
-        }]);
+        await fetch('/api/logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                serverId: id,
+                action: 'REPORT_DISMISSED',
+                target: report.reported_roblox_username,
+                moderator: moderator
+            })
+        });
 
         router.push(`/dashboard/${id}/reports`);
     };
