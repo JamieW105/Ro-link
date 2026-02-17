@@ -25,6 +25,7 @@ interface Guild {
     owner: boolean;
     permissions: number | string;
     hasBot?: boolean;
+    isRoleAccess?: boolean;
 }
 
 export default function Dashboard() {
@@ -199,9 +200,10 @@ export default function Dashboard() {
                                     {guild.hasBot ? (
                                         (() => {
                                             const userId = (session?.user as any)?.id;
-                                            // We can rely on isReadOnly because the API ONLY sets permissions="0" 
-                                            // for the superuser viewing non-admin servers.
-                                            const isReadOnly = guild.permissions == 0 || guild.permissions === "0";
+                                            const isSuperUser = userId === '953414442060746854';
+                                            // isReadOnly is ONLY for the superuser to manage bot state in servers they don't own perms in.
+                                            // Everyone else (Admins or RoleAccess users) should see the Console.
+                                            const isReadOnly = isSuperUser && (guild.permissions == 0 || guild.permissions === "0") && !guild.isRoleAccess;
 
                                             // Debug log
                                             if (userId === '953414442060746854') {
