@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS public.management_users (
 -- Blocked Servers
 CREATE TABLE IF NOT EXISTS public.blocked_servers (
     guild_id TEXT PRIMARY KEY,
+    guild_name TEXT,
+    owner_id TEXT,
     reason TEXT NOT NULL,
     blocked_by TEXT NOT NULL, -- discord_id
     blocked_at TIMESTAMPTZ DEFAULT NOW()
