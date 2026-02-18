@@ -53,7 +53,7 @@ export default function MiscPage() {
                 data.forEach((server: LiveServer) => {
                     if (Array.isArray(server.players)) {
                         server.players.forEach(p => {
-                            allPlayers.push({ name: p, serverId: server.id });
+                            if (p) allPlayers.push({ name: String(p), serverId: server.id });
                         });
                     }
                 });
@@ -102,11 +102,12 @@ export default function MiscPage() {
 
     if (loading) return null;
 
+    const query = (searchQuery || "").toLowerCase();
     const filteredPlayers = players.filter(p =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase())
+        (p.name || "").toLowerCase().includes(query)
     );
 
-    const isManualTarget = searchQuery.length > 0 && !players.some(p => p.name.toLowerCase() === searchQuery.toLowerCase());
+    const isManualTarget = query.length > 0 && !players.some(p => (p.name || "").toLowerCase() === query);
 
     const availableActions = ['FLY', 'NOCLIP', 'INVIS', 'GHOST', 'HEAL', 'KILL', 'RESET', 'REFRESH'].filter(action =>
         perms.is_admin || perms.allowed_misc_cmds.includes('*') || perms.allowed_misc_cmds.includes(action)

@@ -22,10 +22,17 @@ export default function ManageServers() {
         fetch('/api/management/servers')
             .then(res => res.json())
             .then(data => {
-                setServers(data);
+                if (Array.isArray(data)) {
+                    setServers(data);
+                } else {
+                    setServers([]);
+                }
                 setLoading(false);
             })
-            .catch(() => setLoading(false));
+            .catch(() => {
+                setServers([]);
+                setLoading(false);
+            });
     }, []);
 
     const handleRemove = async () => {
@@ -61,10 +68,12 @@ export default function ManageServers() {
         }
     };
 
-    const filtered = servers.filter(s =>
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.id.includes(search)
-    );
+    const filtered = Array.isArray(servers) ? servers.filter(s => {
+        const name = (s.name || "").toLowerCase();
+        const id = (s.id || "");
+        const query = (search || "").toLowerCase();
+        return name.includes(query) || id.includes(search);
+    }) : [];
 
     return (
         <div className="space-y-6">
@@ -108,10 +117,10 @@ export default function ManageServers() {
                                                 <img src={`https://cdn.discordapp.com/icons/${server.id}/${server.icon}.png`} className="w-8 h-8 rounded-lg" alt="" />
                                             ) : (
                                                 <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-sky-500 font-bold">
-                                                    {server.name[0]}
+                                                    {(server.name || "?")[0]}
                                                 </div>
                                             )}
-                                            <span className="font-semibold text-white">{server.name}</span>
+                                            <span className="font-semibold text-white">{server.name || "Unknown Server"}</span>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-slate-400 font-mono text-xs">{server.id}</td>

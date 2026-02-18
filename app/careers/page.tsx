@@ -25,18 +25,24 @@ export default function CareersPage() {
         fetch('/api/careers')
             .then(res => res.json())
             .then(data => {
-                setJobs(data);
+                if (Array.isArray(data)) {
+                    setJobs(data);
+                }
                 setLoading(false);
             })
             .catch(() => setLoading(false));
     }, []);
 
-    const filtered = jobs.filter(j => {
-        const matchesSearch = j.title.toLowerCase().includes(search.toLowerCase()) ||
-            j.description.toLowerCase().includes(search.toLowerCase());
-        const matchesTag = !activeTag || j.tags.includes(activeTag);
+    const filtered = Array.isArray(jobs) ? jobs.filter(j => {
+        const title = j.title || "";
+        const description = j.description || "";
+        const query = (search || "").toLowerCase();
+
+        const matchesSearch = title.toLowerCase().includes(query) ||
+            description.toLowerCase().includes(query);
+        const matchesTag = !activeTag || (j.tags && j.tags.includes(activeTag));
         return matchesSearch && matchesTag;
-    });
+    }) : [];
 
     const tags = ['Developer', 'Support', 'Moderation', 'Marketing'];
 
@@ -133,7 +139,7 @@ export default function CareersPage() {
                                         </div>
                                     </div>
                                     <div className="flex flex-wrap gap-2 mb-4">
-                                        {job.tags.map(tag => (
+                                        {(job.tags || []).map(tag => (
                                             <span key={tag} className="px-2 py-0.5 bg-slate-800 text-slate-500 text-[10px] font-bold uppercase tracking-wider rounded border border-slate-700">
                                                 {tag}
                                             </span>
