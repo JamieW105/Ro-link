@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { getManagementUser } from "@/lib/management";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user) {

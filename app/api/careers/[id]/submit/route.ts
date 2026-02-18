@@ -1,12 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { supabase } from "@/lib/supabase";
 
 export async function POST(
-    req: Request,
-    { params }: { params: { id: string } }
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id: applicationId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -18,7 +19,7 @@ export async function POST(
         const { data: existing } = await supabase
             .from('job_submissions')
             .select('id')
-            .eq('application_id', params.id)
+            .eq('application_id', applicationId)
             .eq('discord_id', userId)
             .single();
 
@@ -30,7 +31,7 @@ export async function POST(
         const { data: job } = await supabase
             .from('job_applications')
             .select('title, status, questions')
-            .eq('id', params.id)
+            .eq('id', applicationId)
             .single();
 
         if (!job || job.status !== 'OPEN') {
@@ -41,7 +42,7 @@ export async function POST(
         const { error: subError } = await supabase
             .from('job_submissions')
             .insert({
-                application_id: params.id,
+                application_id: applicationId,
                 discord_id: userId,
                 answers: answers,
                 status: 'PENDING'
@@ -101,7 +102,6 @@ export async function POST(
                 }
             } catch (dmErr) {
                 console.error("Failed to send DM:", dmErr);
-                // Don't fail the whole request if DM fails (e.g. user has DMs closed)
             }
         }
 

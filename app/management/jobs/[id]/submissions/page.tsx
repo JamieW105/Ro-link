@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 
 interface Submission {
@@ -18,7 +18,8 @@ interface Question {
     type: string;
 }
 
-export default function JobSubmissions({ params }: { params: { id: string } }) {
+export default function JobSubmissions({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+    const params = use(paramsPromise);
     const [submissions, setSubmissions] = useState<Submission[]>([]);
     const [questions, setQuestions] = useState<Question[]>([]);
     const [loading, setLoading] = useState(true);
@@ -31,13 +32,11 @@ export default function JobSubmissions({ params }: { params: { id: string } }) {
             fetch(`/api/management/jobs/${params.id}/submissions`).then(res => res.json()),
             fetch(`/api/management/jobs/${params.id}/details`).then(res => res.json())
         ]).then(([subs, job]) => {
-            setSubmissions(subs);
-            setQuestions(job.questions || []);
+            setSubmissions(subs || []);
+            setQuestions(job?.questions || []);
             setLoading(false);
         }).catch(() => setLoading(false));
     }, [params.id]);
-
-    // I need to fix the GET single job path above, but let's assume it works for now or create it.
 
     const handleReview = async (status: 'ACCEPTED' | 'DENIED') => {
         if (!selected || !reason.trim()) return;
@@ -83,14 +82,14 @@ export default function JobSubmissions({ params }: { params: { id: string } }) {
                                     key={sub.id}
                                     onClick={() => setSelected(sub)}
                                     className={`w-full text-left p-4 rounded-2xl border transition-all ${selected?.id === sub.id
-                                        ? 'bg-sky-600/10 border-sky-500/50'
-                                        : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                                            ? 'bg-sky-600/10 border-sky-500/50'
+                                            : 'bg-slate-900 border-slate-800 hover:border-slate-700'
                                         }`}
                                 >
                                     <div className="flex items-center justify-between mb-1">
                                         <span className="font-bold text-white text-sm">{sub.discord_id}</span>
                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${sub.status === 'ACCEPTED' ? 'bg-emerald-500/10 text-emerald-400' :
-                                            sub.status === 'DENIED' ? 'bg-red-500/10 text-red-400' : 'bg-orange-500/10 text-orange-400'
+                                                sub.status === 'DENIED' ? 'bg-red-500/10 text-red-400' : 'bg-orange-500/10 text-orange-400'
                                             }`}>
                                             {sub.status}
                                         </span>
@@ -113,7 +112,7 @@ export default function JobSubmissions({ params }: { params: { id: string } }) {
                                 </div>
                                 <div className="flex gap-2">
                                     <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${selected.status === 'ACCEPTED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                        selected.status === 'DENIED' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                            selected.status === 'DENIED' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'
                                         }`}>
                                         {selected.status}
                                     </span>

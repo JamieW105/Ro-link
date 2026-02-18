@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession, signIn } from 'next-auth/react';
@@ -21,7 +21,8 @@ interface Job {
     questions: Question[];
 }
 
-export default function ApplicationForm({ params }: { params: { id: string } }) {
+export default function ApplicationForm({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+    const params = use(paramsPromise);
     const { data: session, status } = useSession();
     const router = useRouter();
     const [job, setJob] = useState<Job | null>(null);

@@ -1,13 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { hasPermission } from "@/lib/management";
 import { supabase } from "@/lib/supabase";
 
 export async function PATCH(
-    req: Request,
-    { params }: { params: { id: string } }
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -21,7 +22,7 @@ export async function PATCH(
     const { data, error } = await supabase
         .from('job_applications')
         .update(body)
-        .eq('id', params.id)
+        .eq('id', id)
         .select()
         .single();
 
@@ -30,9 +31,10 @@ export async function PATCH(
 }
 
 export async function DELETE(
-    req: Request,
-    { params }: { params: { id: string } }
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -44,7 +46,7 @@ export async function DELETE(
     const { error } = await supabase
         .from('job_applications')
         .delete()
-        .eq('id', params.id);
+        .eq('id', id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });

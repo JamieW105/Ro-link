@@ -1,14 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from "@/lib/supabase";
 
 export async function GET(
-    req: Request,
-    { params }: { params: { id: string } }
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
     const { data: job, error } = await supabase
         .from('job_applications')
         .select('*')
-        .eq('id', params.id)
+        .eq('id', id)
         .eq('status', 'OPEN')
         .single();
 
