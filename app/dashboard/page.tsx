@@ -136,6 +136,15 @@ export default function Dashboard() {
                     </Link>
 
                     <div className="flex items-center gap-3 sm:gap-4 pl-4 border-l border-slate-800 ml-auto">
+                        {((session?.user as any)?.id === '953414442060746854') && (
+                            <Link
+                                href="/management"
+                                className="hidden md:flex items-center gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-sky-900/20"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M9 3v18" /><path d="M3 9h18" /></svg>
+                                Management
+                            </Link>
+                        )}
                         <div className="text-right hidden sm:block">
                             <p className="text-sm font-semibold text-white leading-none mb-1">{session?.user?.name}</p>
                             <button onClick={() => signOut()} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
