@@ -19,7 +19,7 @@ export async function POST(
     const { reason } = await req.json();
 
     try {
-        const botToken = process.env.DISCORD_BOT_TOKEN;
+        const botToken = process.env.DISCORD_TOKEN;
 
         // 1. Get guild owner to DM them
         const guildRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}`, {

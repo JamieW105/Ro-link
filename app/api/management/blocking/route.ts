@@ -51,7 +51,7 @@ export async function POST(req: Request) {
         await supabase.from('servers').delete().eq('id', guildId);
 
         // 3. Remove bot from guild
-        const botToken = process.env.DISCORD_BOT_TOKEN;
+        const botToken = process.env.DISCORD_TOKEN;
         await fetch(`https://discord.com/api/v10/users/@me/guilds/${guildId}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bot ${botToken}` }
