@@ -50,59 +50,73 @@ export async function POST(
 
         if (subError) throw subError;
 
-        // 4. DM the user
-        const botToken = process.env.DISCORD_BOT_TOKEN;
+        // 4. DM the user (Using DISCORD_TOKEN which is the standard in this repo)
+        const botToken = process.env.DISCORD_TOKEN;
         if (botToken) {
             try {
                 // Create DM channel
                 const dmChannelRes = await fetch(`https://discord.com/api/v10/users/@me/channels`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bot ${botToken}`, 'Content-Type': 'application/json' },
+                    headers: {
+                        'Authorization': `Bot ${botToken}`,
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({ recipient_id: userId })
                 });
-                const dmChannel = await dmChannelRes.json();
 
-                if (dmChannel.id) {
-                    // Embed 1: Confirmation
-                    await fetch(`https://discord.com/api/v10/channels/${dmChannel.id}/messages`, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bot ${botToken}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            embeds: [{
-                                title: 'Application Received!',
-                                description: `Thank you for applying for the **${job.title}** position at Ro-Link!`,
-                                color: 0x0ea5e9,
-                                fields: [
-                                    { name: 'Status', value: 'Under Review' },
-                                    { name: 'Wait Time', value: 'Your application could take up to 1 month to be read after the applications get closed.' },
-                                    { name: 'Note', value: 'Please do not message staff regarding your application status.' }
-                                ],
-                                timestamp: new Date().toISOString()
-                            }]
-                        })
-                    });
+                if (!dmChannelRes.ok) {
+                    const error = await dmChannelRes.json();
+                    console.error("Discord API Error (DM Channel):", error);
+                } else {
+                    const dmChannel = await dmChannelRes.json();
+                    if (dmChannel.id) {
+                        // Embed 1: Confirmation
+                        await fetch(`https://discord.com/api/v10/channels/${dmChannel.id}/messages`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bot ${botToken}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                embeds: [{
+                                    title: 'Application Received!',
+                                    description: `Thank you for applying for the **${job.title}** position at Ro-Link!`,
+                                    color: 0x0ea5e9,
+                                    fields: [
+                                        { name: 'Status', value: 'Under Review' },
+                                        { name: 'Wait Time', value: 'Our team will review your application soon.' },
+                                        { name: 'Note', value: 'Ensure your DMs stay open to receive updates.' }
+                                    ],
+                                    timestamp: new Date().toISOString()
+                                }]
+                            })
+                        });
 
-                    // Embed 2: Answers Summary
-                    const qAndA = (job.questions as any[]).map((q: any) => {
-                        if (q.type === 'section') return null;
-                        return { name: q.label, value: String(answers[q.id] || 'N/A').substring(0, 1024) };
-                    }).filter(Boolean);
+                        // Embed 2: Answers Summary
+                        const qAndA = (job.questions as any[]).map((q: any) => {
+                            if (q.type === 'section') return null;
+                            const answer = answers[q.id];
+                            return {
+                                name: q.label,
+                                value: String(answer || 'N/A').substring(0, 1024)
+                            };
+                        }).filter(Boolean);
 
-                    await fetch(`https://discord.com/api/v10/channels/${dmChannel.id}/messages`, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bot ${botToken}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            embeds: [{
-                                title: 'Your Application Answers',
-                                fields: qAndA,
-                                color: 0x64748b
-                            }]
-                        })
-                    });
+                        await fetch(`https://discord.com/api/v10/channels/${dmChannel.id}/messages`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bot ${botToken}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                embeds: [{
+                                    title: 'Your Application Answers',
+                                    fields: qAndA,
+                                    color: 0x64748b
+                                }]
+                            })
+                        });
+                    }
                 }
             } catch (dmErr) {
                 console.error("Failed to send DM:", dmErr);
             }
+        } else {
+            console.warn("DISCORD_TOKEN not found in environment variables.");
         }
 
         return NextResponse.json({ success: true });

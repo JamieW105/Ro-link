@@ -35,8 +35,8 @@ export async function PATCH(
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // DM the user with the result
-    const botToken = process.env.DISCORD_BOT_TOKEN;
+    // DM the user with the result (Using DISCORD_TOKEN)
+    const botToken = process.env.DISCORD_TOKEN;
     if (botToken) {
         try {
             const dmChannelRes = await fetch(`https://discord.com/api/v10/users/@me/channels`, {

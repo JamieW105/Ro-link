@@ -19,6 +19,7 @@ interface Job {
     description: string;
     requirements: string;
     questions: Question[];
+    hasSubmitted?: boolean;
 }
 
 export default function ApplicationForm({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
@@ -84,6 +85,24 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
         </div>
     );
 
+    if (job.hasSubmitted) return (
+        <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-white px-6">
+            <div className="bg-slate-900 border border-slate-800 p-12 rounded-3xl max-w-lg text-center shadow-2xl">
+                <div className="w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                </div>
+                <h1 className="text-3xl font-bold mb-2">Already Submitted</h1>
+                <p className="text-slate-400 mb-8 leading-relaxed">
+                    You have already submitted an application for the <span className="text-white font-bold">{job.title}</span> position.
+                    Please wait for our team to review your request.
+                </p>
+                <Link href="/careers" className="bg-sky-600 hover:bg-sky-500 text-white px-8 py-3 rounded-xl font-bold transition-all inline-block">
+                    Return to Careers
+                </Link>
+            </div>
+        </div>
+    );
+
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200 pb-32">
             <nav className="sticky top-0 z-50 bg-[#020617]/80 backdrop-blur-md border-b border-slate-800">
@@ -92,21 +111,29 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                         Back
                     </Link>
-                    <span className="font-bold text-white truncate max-w-[200px]">{job.title}</span>
+                    <div className="flex flex-col items-end">
+                        <span className="font-bold text-white truncate max-w-[200px]">{job.title}</span>
+                        {session?.user && (
+                            <span className="text-[10px] text-slate-500 font-medium">Submitting an application for {session.user.name}</span>
+                        )}
+                    </div>
                 </div>
             </nav>
 
             <main className="max-w-3xl mx-auto px-6 mt-12">
                 <header className="mb-12 bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-10 rounded-3xl shadow-2xl">
-                    <h1 className="text-4xl font-extrabold text-white tracking-tight mb-4">{job.title}</h1>
+                    <div className="flex items-center justify-between mb-2">
+                        <h1 className="text-4xl font-extrabold text-white tracking-tight">{job.title}</h1>
+                        <div className="bg-sky-500/10 text-sky-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-sky-500/20">Now Hiring</div>
+                    </div>
                     <div className="space-y-6">
                         <div>
-                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Description</h3>
+                            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Position Description</h3>
                             <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{job.description}</p>
                         </div>
                         {job.requirements && (
                             <div>
-                                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Requirements</h3>
+                                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Expectations & Requirements</h3>
                                 <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{job.requirements}</p>
                             </div>
                         )}
@@ -197,8 +224,8 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
                                 {submitting ? "Submitting Application..." : "Submit Application"}
                             </button>
                         )}
-                        <p className="text-slate-500 text-xs text-center max-w-md">
-                            By submitting, your Discord ID and profile will be shared with the Ro-Link management team. You may only submit one application per opening.
+                        <p className="text-slate-500 text-[10px] text-center max-w-md uppercase tracking-widest font-bold">
+                            Submission logged for {session?.user?.name || "Guest"}
                         </p>
                     </div>
                 </form>
