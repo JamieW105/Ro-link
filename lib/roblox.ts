@@ -10,10 +10,10 @@ export async function sendRobloxMessage(serverId: string, command: string, args:
                 .select('universe_id, open_cloud_key')
                 .eq('id', serverId)
                 .single();
-            
+
             if (serverError) {
                 console.error('[MESSAGING] Failed to fetch server credentials:', serverError);
-                 return { success: false, error: 'Failed to fetch credentials' };
+                return { success: false, error: 'Failed to fetch credentials' };
             }
             server = dbServer;
         }
@@ -35,7 +35,7 @@ export async function sendRobloxMessage(serverId: string, command: string, args:
             {
                 method: 'POST',
                 headers: {
-                    'x-api-key': server.open_cloud_key,
+                    'x-api-key': server.open_cloud_key.trim(),
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ message: messageBody })
@@ -44,8 +44,8 @@ export async function sendRobloxMessage(serverId: string, command: string, args:
 
         if (!robloxRes.ok) {
             const errorText = await robloxRes.text();
-            console.error('[OPEN CLOUD ERROR]', errorText);
-            return { success: false, error: errorText };
+            console.error(`[OPEN CLOUD ERROR] Status: ${robloxRes.status} | Universe: ${server.universe_id}`, errorText);
+            return { success: false, error: `Roblox API Error: ${robloxRes.status}` };
         }
 
         return { success: true };

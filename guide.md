@@ -157,3 +157,14 @@ RoLink:Initialize()
 -   **Bot Offline?**: The Vercel integration is serverless, so the bot won't show as "Online" unless you run `npm run bot` on a VPS or local machine. However, commands will still work perfectly via slash commands.
 -   **Commands Not Working?**: Ensure the `Intents` are enabled in the Developer Portal.
 -   **Database Errors**: Check your Supabase tables and RLS (Row Level Security) policies.
+-   **PermissionDenied (Roblox API)**: Ensure your Open Cloud API Key belongs to the **owner** of the experience (or the Group if it's a group game). Contributors with "Edit" access cannot authorize API keys for games they don't own.
+
+---
+
+## 🔑 Roblox API Key Ownership
+
+To ensure the Messaging Service and other Open Cloud features work correctly:
+
+1.  **Personal Games**: The API key must be created by the user who owns the game.
+2.  **Group Games**: The API key must be a **Group API Key**. You can create this by switching the "Owner" scope to the Group at the top of the [Roblox Credentials](https://create.roblox.com/dashboard/credentials) page.
+3.  **Permissions**: Ensure the key has `messaging-service:publish` and `user:read` permissions enabled for the specific Universe ID.

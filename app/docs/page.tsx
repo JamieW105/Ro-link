@@ -224,7 +224,7 @@ const pages = [
                     <div className="space-y-6">
                         <div>
                             <h3 className="text-white font-medium mb-2">Required Permissions</h3>
-                            <div className="grid sm:grid-cols-2 gap-3 mb-4">
+                            <div className="grid sm:grid-cols-2 gap-3 mb-6">
                                 <div className="p-3 bg-slate-950 border border-slate-800 rounded text-sm text-slate-300">
                                     <span className="block text-xs font-bold text-sky-500 uppercase">Messaging Service</span>
                                     Publish
@@ -234,6 +234,14 @@ const pages = [
                                     Read
                                 </div>
                             </div>
+
+                            <InfoBox title="Ownership Requirement">
+                                The API Key **must** be created by the owner of the Experience.
+                                <br /><br />
+                                • If the game is owned by a **Group**, you must create a **Group API Key** by switching the owner scope at the top of the Credentials page.
+                                <br />
+                                • Keys created by contributors with "Edit" access will return a <Highlight type="variable">PermissionDenied</Highlight> error unless they are the owner.
+                            </InfoBox>
                         </div>
                     </div>
                 </section>

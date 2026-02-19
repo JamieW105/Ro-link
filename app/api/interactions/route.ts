@@ -1040,9 +1040,9 @@ export async function POST(req: Request) {
                     return row ? row.components.find((ic: any) => ic.custom_id === id).value : '';
                 };
 
-                const placeId = getField('place_id');
-                const universeId = getField('universe_id');
-                const openCloudKey = getField('api_key');
+                const placeId = getField('place_id').trim();
+                const universeId = getField('universe_id').trim();
+                const openCloudKey = getField('api_key').trim();
                 const generatedKey = 'rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
                 const { error: dbError } = await supabase
