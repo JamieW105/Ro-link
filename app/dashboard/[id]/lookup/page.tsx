@@ -56,8 +56,8 @@ export default function PlayerLookup() {
     useEffect(() => {
         async function fetchConfig() {
             if (!id) return;
-            const { data } = await supabase.from('servers').select('linked_place_id').eq('id', id).single();
-            if (data) setLinkedPlaceId(data.linked_place_id);
+            const { data } = await supabase.from('servers').select('place_id').eq('id', id).single();
+            if (data) setLinkedPlaceId(data.place_id);
         }
         fetchConfig();
     }, [id]);

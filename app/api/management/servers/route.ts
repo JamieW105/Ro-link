@@ -48,21 +48,19 @@ export async function GET() {
                 name: guild.name,
                 icon: guild.icon,
                 created_at: dbServer?.created_at || new Date().toISOString(),
-                owner_id: dbServer?.owner_id || "Unknown",
                 is_setup: !!dbServer
             };
         });
 
-        // Add any servers in DB that the bot is NO LONGER in (optional, but good for cleanup visibility)
+        // Add any servers in DB that the bot is NO LONGER in
         const botGuildIds = new Set(botGuilds.map(g => g.id));
         dbServers?.forEach(s => {
             if (!botGuildIds.has(s.id)) {
                 merged.push({
                     id: s.id,
-                    name: s.name || "Unknown (Left)",
-                    icon: s.icon,
+                    name: "Unknown (Bot Left)",
+                    icon: null,
                     created_at: s.created_at,
-                    owner_id: s.owner_id,
                     is_setup: true,
                     bot_present: false
                 } as any);

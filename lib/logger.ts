@@ -36,10 +36,10 @@ export async function logAction(server_id: string, action: string, target: strin
             console.log("[LOGGER] Database log inserted successfully");
         }
 
-        // 2. Fetch Logging Channel ID & Server Name
+        // 2. Fetch Logging Channel ID
         const { data: serverData, error: serverError } = await client
             .from('servers')
-            .select('logging_channel_id, name')
+            .select('logging_channel_id')
             .eq('id', server_id)
             .maybeSingle();
 
@@ -54,7 +54,7 @@ export async function logAction(server_id: string, action: string, target: strin
 
         // 3. Send to Discord
         const channelId = serverData.logging_channel_id;
-        const serverName = serverData.name || "Unknown Server";
+        const serverName = "Managed Server";
 
         const botToken = process.env.DISCORD_TOKEN;
         if (!botToken) {
