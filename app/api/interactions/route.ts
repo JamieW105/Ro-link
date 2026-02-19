@@ -447,11 +447,11 @@ export async function POST(req: Request) {
                     supabase.from('command_queue').insert([{
                         server_id: guild_id,
                         command: name.toUpperCase(),
-                        args: { username: targetUser, reason: 'Discord Command', moderator: userTag },
+                        args: { username: targetUser, reason: reason, moderator: userTag },
                         status: 'PENDING'
                     }]),
-                    triggerMessaging(name.toUpperCase(), { username: targetUser, reason: 'Discord Command', moderator: userTag }, server),
-                    logAction(guild_id, name.toUpperCase(), targetUser, userTag)
+                    triggerMessaging(name.toUpperCase(), { username: targetUser, reason: reason, moderator: userTag }, server),
+                    logAction(guild_id, name.toUpperCase(), targetUser, userTag, reason)
                 ]);
 
                 if (queueRes.error) {
@@ -467,11 +467,11 @@ export async function POST(req: Request) {
                     supabase.from('command_queue').insert([{
                         server_id: guild_id,
                         command: 'KICK',
-                        args: { username: targetUser, reason: 'Discord Command', moderator: userTag },
+                        args: { username: targetUser, reason: reason, moderator: userTag },
                         status: 'PENDING'
                     }]),
-                    triggerMessaging('KICK', { username: targetUser, reason: 'Discord Command', moderator: userTag }, server),
-                    logAction(guild_id, 'KICK', targetUser, userTag)
+                    triggerMessaging('KICK', { username: targetUser, reason: reason, moderator: userTag }, server),
+                    logAction(guild_id, 'KICK', targetUser, userTag, reason)
                 ]);
 
                 if (queueRes.error) {
@@ -487,11 +487,11 @@ export async function POST(req: Request) {
                     supabase.from('command_queue').insert([{
                         server_id: guild_id,
                         command: 'UNBAN',
-                        args: { username: targetUser, reason: 'Discord Command', moderator: userTag },
+                        args: { username: targetUser, reason: reason, moderator: userTag },
                         status: 'PENDING'
                     }]),
-                    triggerMessaging('UNBAN', { username: targetUser, reason: 'Discord Command', moderator: userTag }, server),
-                    logAction(guild_id, 'UNBAN', targetUser, userTag)
+                    triggerMessaging('UNBAN', { username: targetUser, reason: reason, moderator: userTag }, server),
+                    logAction(guild_id, 'UNBAN', targetUser, userTag, reason)
                 ]);
 
                 if (queueRes.error) {
@@ -511,7 +511,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging('UPDATE', { reason: "Manual Update Triggered", moderator: userTag }, server),
-                    logAction(guild_id, 'UPDATE_SERVERS', 'ALL', userTag)
+                    logAction(guild_id, 'UPDATE_SERVERS', 'ALL', userTag, "Manual Update Triggered")
                 ]);
 
                 if (queueRes.error) {
@@ -606,6 +606,8 @@ export async function POST(req: Request) {
                                 }).catch(() => { });
                             }
                         }
+
+                        await logAction(guild_id, 'PROFILE_UPDATE', (memberData.user?.username || targetUserId), userTag, `Updated linked Roblox account: ${robloxData.name}`);
 
                         return NextResponse.json({
                             type: 4,
@@ -876,7 +878,7 @@ export async function POST(req: Request) {
                     status: 'PENDING'
                 }]),
                 triggerMessaging(action.toUpperCase(), { username, reason: 'Discord Button Action', moderator: userTag }), // Will fetch server internally
-                logAction(guild_id, action.toUpperCase(), username, userTag)
+                logAction(guild_id, action.toUpperCase(), username, userTag, 'Discord Button Action')
             ]);
 
             return NextResponse.json({
@@ -915,7 +917,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging(action, args),
-                    logAction(guild_id, action, targetUser, userTag)
+                    logAction(guild_id, action, targetUser, userTag, action === 'SET_CHAR' ? `Set character to ${args.char_user}` : 'Misc Action')
                 ]);
 
                 return NextResponse.json({

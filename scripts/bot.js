@@ -20,51 +20,6 @@ const client = new Client({
     ],
 });
 
-async function logAction(guildId, action, target, moderator) {
-    try {
-        // 1. Insert into DB
-        await supabase.from('logs').insert([{
-            server_id: guildId,
-            action: action,
-            target: target,
-            moderator: moderator
-        }]);
-
-        // 2. Fetch Logging Channel Info
-        const { data: server } = await supabase
-            .from('servers')
-            .select('logging_channel_id, name')
-            .eq('id', guildId)
-            .single();
-
-        if (!server || !server.logging_channel_id) return;
-
-        const channel = await client.channels.fetch(server.logging_channel_id).catch(() => null);
-        if (!channel || !channel.isTextBased()) return;
-
-        let color = 0x3498db;
-        if (action.includes('BAN')) color = 0xe74c3c;
-        else if (action.includes('KICK')) color = 0xe67e22;
-        else if (action.includes('MUTE') || action.includes('TIMEOUT')) color = 0xf1c40f;
-
-        const embed = new EmbedBuilder()
-            .setTitle(`Action Log: \${action}`)
-            .setColor(color)
-            .addFields(
-                { name: 'Target', value: target || 'N/A', inline: true },
-                { name: 'Moderator', value: moderator || 'System', inline: true },
-                { name: 'Server', value: server.name || 'Unknown', inline: true }
-            )
-            .setTimestamp()
-            .setFooter({ text: 'Ro-Link Global Logger' });
-
-        await channel.send({ embeds: [embed] }).catch(err => console.error(`[LOGGING] Failed to send log:`, err.message));
-
-    } catch (e) {
-        console.error(`[LOGGING] Error:`, e.message);
-    }
-}
-
 const commands = [
     {
         name: 'ban',
@@ -467,7 +422,12 @@ client.on('interactionCreate', async interaction => {
         const reason = interaction.options.getString('reason') || 'No reason provided';
 
         await Promise.all([
-            logAction(guildId, 'BAN', targetUser, user.tag),
+            supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'BAN',
+                target: targetUser,
+                moderator: user.tag
+            }]),
             supabase.from('command_queue').insert([{
                 server_id: guildId,
                 command: 'BAN',
@@ -481,7 +441,12 @@ client.on('interactionCreate', async interaction => {
         const reason = interaction.options.getString('reason') || 'No reason provided';
 
         await Promise.all([
-            logAction(guildId, 'KICK', targetUser, user.tag),
+            supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'KICK',
+                target: targetUser,
+                moderator: user.tag
+            }]),
             supabase.from('command_queue').insert([{
                 server_id: guildId,
                 command: 'KICK',
@@ -494,7 +459,12 @@ client.on('interactionCreate', async interaction => {
         const targetUser = interaction.options.getString('username');
 
         await Promise.all([
-            logAction(guildId, 'UNBAN', targetUser, user.tag),
+            supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'UNBAN',
+                target: targetUser,
+                moderator: user.tag
+            }]),
             supabase.from('command_queue').insert([{
                 server_id: guildId,
                 command: 'UNBAN',
@@ -508,7 +478,12 @@ client.on('interactionCreate', async interaction => {
             return interaction.reply({ content: 'You do not have permission to use this command. (Requires Administrator/Manage Server)', ephemeral: true });
         }
         await Promise.all([
-            logAction(guildId, 'UPDATE_SERVERS', 'ALL', user.tag),
+            supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'UPDATE_SERVERS',
+                target: 'ALL',
+                moderator: user.tag
+            }]),
             supabase.from('command_queue').insert([{
                 server_id: guildId,
                 command: 'UPDATE',
@@ -593,7 +568,12 @@ client.on('interactionCreate', async interaction => {
         const jobId = interaction.options.getString('job_id');
 
         await Promise.all([
-            logAction(guildId, 'SHUTDOWN', jobId || 'ALL', user.tag),
+            supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'SHUTDOWN',
+                target: jobId || 'ALL',
+                moderator: user.tag
+            }]),
             supabase.from('command_queue').insert([{
                 server_id: guildId,
                 command: 'SHUTDOWN',
@@ -844,15 +824,19 @@ client.on('interactionCreate', async interaction => {
 
         await interaction.reply({ content: msgContent, ephemeral: true });
 
-        await Promise.all([
-            supabase.from('command_queue').insert([{
-                server_id: interaction.guildId,
-                command: action,
-                args: args,
-                status: 'PENDING'
-            }]),
-            logAction(interaction.guildId, action, targetUser, interaction.user.tag)
-        ]);
+        await supabase.from('command_queue').insert([{
+            server_id: interaction.guildId,
+            command: action,
+            args: args,
+            status: 'PENDING'
+        }]);
+
+        await supabase.from('logs').insert([{
+            server_id: interaction.guildId,
+            action: action,
+            target: targetUser,
+            moderator: interaction.user.tag
+        }]);
     }
 });
 
@@ -959,7 +943,12 @@ client.on('interactionCreate', async interaction => {
     }
 
     // Log the action
-    await logAction(guildId, action.toUpperCase(), username, interaction.user.tag);
+    await supabase.from('logs').insert([{
+        server_id: guildId,
+        action: action.toUpperCase(),
+        target: username,
+        moderator: interaction.user.tag
+    }]);
 
     await interaction.editReply(`**${action.toUpperCase()}** command queued for \`${username}\`.`);
 });
