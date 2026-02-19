@@ -8,52 +8,43 @@ const supabaseParams = {
     }
 };
 
-let supabaseAdminClient: any = null;
-
-function getSupabaseAdmin() {
-    if (supabaseAdminClient) return supabaseAdminClient;
-
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!url || !key) {
-        console.warn("Supabase Admin credentials missing. Logging will be disabled.");
-        return null;
-    }
-
-    supabaseAdminClient = createClient(url, key, supabaseParams);
-    return supabaseAdminClient;
-}
+import { supabase } from './supabase';
 
 export async function logAction(server_id: string, action: string, target: string, moderator: string) {
     try {
-        const supabaseAdmin = getSupabaseAdmin();
-        if (!supabaseAdmin) return;
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+        // Use service role client if available, otherwise fallback to standard client
+        const client = (url && serviceKey) ? createClient(url, serviceKey, supabaseParams) : supabase;
 
         // 1. Insert into Database
-        const { error } = await supabaseAdmin
+        const { error: dbError } = await client
             .from('logs')
             .insert([{
                 server_id,
                 action,
                 target,
                 moderator,
-                timestamp: new Date().toISOString() // Ensure timestamp is set if not defaulted
+                timestamp: new Date().toISOString()
             }]);
 
-        if (error) {
-            console.error("Failed to insert log into DB:", error);
-            // Don't throw, try to log to Discord anyway ideally, or return failure.
+        if (dbError) {
+            console.error("Failed to insert log into DB:", dbError);
         }
 
-        // 2. Fetch Logging Channel ID
-        const { data: serverData, error: serverError } = await supabaseAdmin
+        // 2. Fetch Logging Channel ID & Server Name
+        const { data: serverData, error: serverError } = await client
             .from('servers')
             .select('logging_channel_id, name')
             .eq('id', server_id)
-            .single();
+            .maybeSingle();
 
-        if (serverError || !serverData || !serverData.logging_channel_id) {
+        if (serverError) {
+            console.error("Error fetching server logging config:", serverError);
+            return;
+        }
+        if (!serverData?.logging_channel_id) {
             return; // No logging channel configured
         }
 
@@ -62,7 +53,10 @@ export async function logAction(server_id: string, action: string, target: strin
         const serverName = serverData.name || "Unknown Server";
 
         const botToken = process.env.DISCORD_TOKEN;
-        if (!botToken) return;
+        if (!botToken) {
+            console.error("Missing DISCORD_TOKEN for logging");
+            return;
+        }
 
         // Determine Color based on Action
         let color = 0x3498db; // Blue (Default)
