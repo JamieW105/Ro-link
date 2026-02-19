@@ -41,8 +41,8 @@ export default function ReportDetailsPage() {
             const { data: serverInfo } = await supabase
                 .from('servers')
                 .select('name')
-                .eq('id', id)
-                .single();
+                .eq('id', String(id))
+                .maybeSingle();
 
             if (serverInfo && serverInfo.name) {
                 setServerName(serverInfo.name);
@@ -79,13 +79,17 @@ export default function ReportDetailsPage() {
 
             // 3. Fetch Global Moderation Logs
             // Search logs for the reported target OR the linked Roblox username if found
+            // Use server_id explicit join to avoid 400 errors on some Supabase setups
+            const searchTargets = [reportData.reported_roblox_username];
+            if (profileData?.roblox_username) searchTargets.push(profileData.roblox_username);
+
             const { data: logsData } = await supabase
                 .from('logs')
                 .select(`
                     *,
-                    servers ( name )
+                    servers!server_id ( name )
                 `)
-                .or(`target.eq.${reportData.reported_roblox_username}${profileData?.roblox_username ? `,target.eq.${profileData.roblox_username}` : ''}`)
+                .in('target', searchTargets)
                 .order('timestamp', { ascending: false });
 
             if (logsData) {

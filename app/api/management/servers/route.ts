@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { hasPermission } from "@/lib/management";
 import { supabase } from "@/lib/supabase";
+import { REST } from '@discordjs/rest';
+import { Routes } from 'discord-api-types/v10';
 
 export async function GET() {
     const session = await getServerSession(authOptions);
@@ -13,11 +15,63 @@ export async function GET() {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { data, error } = await supabase
-        .from('servers')
-        .select('*')
-        .order('created_at', { ascending: false });
+    try {
+        // 1. Fetch all guilds the bot is in (Discord API)
+        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN!);
+        let botGuilds: any[] = [];
+        let after = '0';
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data);
+        while (true) {
+            const data: any = await rest.get(Routes.userGuilds(), {
+                query: new URLSearchParams({ after, limit: '100' })
+            });
+            if (!Array.isArray(data) || data.length === 0) break;
+            botGuilds = [...botGuilds, ...data];
+            after = data[data.length - 1].id;
+            if (data.length < 100) break;
+        }
+
+        // 2. Fetch servers from our database
+        const { data: dbServers, error: dbError } = await supabase
+            .from('servers')
+            .select('*');
+
+        if (dbError) throw dbError;
+
+        // 3. Merge data
+        const dbMap = new Map(dbServers?.map(s => [s.id, s]));
+
+        const merged = botGuilds.map(guild => {
+            const dbServer = dbMap.get(guild.id);
+            return {
+                id: guild.id,
+                name: guild.name,
+                icon: guild.icon,
+                created_at: dbServer?.created_at || new Date().toISOString(),
+                owner_id: dbServer?.owner_id || "Unknown",
+                is_setup: !!dbServer
+            };
+        });
+
+        // Add any servers in DB that the bot is NO LONGER in (optional, but good for cleanup visibility)
+        const botGuildIds = new Set(botGuilds.map(g => g.id));
+        dbServers?.forEach(s => {
+            if (!botGuildIds.has(s.id)) {
+                merged.push({
+                    id: s.id,
+                    name: s.name || "Unknown (Left)",
+                    icon: s.icon,
+                    created_at: s.created_at,
+                    owner_id: s.owner_id,
+                    is_setup: true,
+                    bot_present: false
+                } as any);
+            }
+        });
+
+        return NextResponse.json(merged);
+    } catch (error: any) {
+        console.error("[Management/Servers] Error:", error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 }

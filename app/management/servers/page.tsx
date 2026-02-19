@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 interface Server {
     id: string;
@@ -8,6 +9,8 @@ interface Server {
     icon: string;
     owner_id: string;
     created_at: string;
+    is_setup: boolean;
+    bot_present?: boolean;
 }
 
 export default function ManageServers() {
@@ -103,6 +106,7 @@ export default function ManageServers() {
                         <thead className="bg-slate-800/50 text-slate-400 font-medium uppercase text-[10px] tracking-widest border-b border-slate-800">
                             <tr>
                                 <th className="px-6 py-4">Server</th>
+                                <th className="px-6 py-4">Status</th>
                                 <th className="px-6 py-4">ID</th>
                                 <th className="px-6 py-4">Added At</th>
                                 <th className="px-6 py-4 text-right">Actions</th>
@@ -123,10 +127,34 @@ export default function ManageServers() {
                                             <span className="font-semibold text-white">{server.name || "Unknown Server"}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-slate-400 font-mono text-xs">{server.id}</td>
-                                    <td className="px-6 py-4 text-slate-400">{new Date(server.created_at).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-1.5 h-1.5 rounded-full ${server.bot_present !== false ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                                                <span className={`text-[10px] font-bold uppercase tracking-tight ${server.bot_present !== false ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                    {server.bot_present !== false ? 'Bot Present' : 'Bot Left'}
+                                                </span>
+                                            </div>
+                                            {server.is_setup ? (
+                                                <span className="text-[9px] font-bold text-sky-400 uppercase tracking-tighter bg-sky-400/10 px-1.5 py-0.5 rounded border border-sky-400/20 w-fit">Set Up</span>
+                                            ) : (
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 w-fit">Pending Setup</span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-slate-400 font-mono text-[11px]">{server.id}</td>
+                                    <td className="px-6 py-4 text-slate-400 whitespace-nowrap">{new Date(server.created_at).toLocaleDateString()}</td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-2">
+                                            {server.is_setup && (
+                                                <Link
+                                                    href={`/dashboard/${server.id}`}
+                                                    className="p-2 text-sky-400 hover:bg-sky-400/10 rounded-lg transition-all"
+                                                    title="Open Dashboard"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                </Link>
+                                            )}
                                             <button
                                                 onClick={() => handleJoin(server.id)}
                                                 className="p-2 text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all"
