@@ -3,11 +3,11 @@ import { pluginStore } from '../../../store';
 
 export async function GET(
     request: Request,
-    { params }: { params: { gameId: string } }
+    { params }: { params: Promise<{ gameId: string }> }
 ) {
     try {
         const authHeader = request.headers.get('Authorization');
-        const gameId = params.gameId;
+        const { gameId } = await params;
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
