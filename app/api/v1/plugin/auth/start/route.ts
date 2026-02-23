@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { supabase } from '@/lib/supabase';
+import { pluginStore } from '../../store';
 
 export async function POST(request: Request) {
     try {
@@ -18,17 +18,20 @@ export async function POST(request: Request) {
         // The URL the developer must visit to verify their Roblox Studio session
         const loginUrl = `${protocol}://${host}/dashboard/plugin/verify?session=${sessionId}`;
 
-        const { error } = await supabase
-            .from('plugin_sessions')
-            .insert([{ session_id: sessionId, studio_user_id: studioUserId, status: 'pending' }]);
-
-        if (error) {
-            console.warn("Table 'plugin_sessions' might not exist, creating placeholder session:", error);
-        }
+        // Store session in memory
+        pluginStore.sessions.set(sessionId, {
+            studio_user_id: studioUserId,
+            status: 'pending',
+            token: null
+        });
 
         return NextResponse.json({ sessionId, loginUrl });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
+}
+
+export async function OPTIONS(request: Request) {
+    return NextResponse.json({}, { headers: { 'Allow': 'POST, OPTIONS' } });
 }

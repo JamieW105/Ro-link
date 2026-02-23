@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { pluginStore } from '../../store';
 
 export async function GET(request: Request) {
     try {
@@ -10,14 +10,9 @@ export async function GET(request: Request) {
         }
 
         const token = authHeader.split(' ')[1];
+        const tokenData = pluginStore.tokens.get(token);
 
-        const { data, error } = await supabase
-            .from('plugin_sessions')
-            .select('status')
-            .eq('token', token)
-            .single();
-
-        if (error || !data || data.status !== 'approved') {
+        if (!tokenData || tokenData.status !== 'approved') {
             return NextResponse.json({ verified: false, error: 'Invalid token' }, { status: 401 });
         }
 
@@ -27,4 +22,8 @@ export async function GET(request: Request) {
         console.error(error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
+}
+
+export async function OPTIONS(request: Request) {
+    return NextResponse.json({}, { headers: { 'Allow': 'GET, OPTIONS' } });
 }

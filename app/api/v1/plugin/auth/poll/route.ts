@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { pluginStore } from '../../store';
 
 export async function GET(request: Request) {
     try {
@@ -10,23 +10,23 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 });
         }
 
-        const { data, error } = await supabase
-            .from('plugin_sessions')
-            .select('status, token')
-            .eq('session_id', sessionId)
-            .single();
+        const session = pluginStore.sessions.get(sessionId);
 
-        if (error || !data) {
+        if (!session) {
             return NextResponse.json({ status: 'pending' });
         }
 
-        if (data.status === 'approved' && data.token) {
-            return NextResponse.json({ token: data.token });
+        if (session.status === 'approved' && session.token) {
+            return NextResponse.json({ token: session.token });
         }
 
-        return NextResponse.json({ status: data.status });
+        return NextResponse.json({ status: session.status });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
+}
+
+export async function OPTIONS(request: Request) {
+    return NextResponse.json({}, { headers: { 'Allow': 'GET, OPTIONS' } });
 }
