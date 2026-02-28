@@ -126,21 +126,21 @@ export default function Home() {
             V1.5 Simple & Powerful
           </div>
 
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight mb-8 text-white leading-[1.1]">
-            Reliable Management for <br />
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight mb-8 text-white leading-tight">
+            Reliable Management for <br className="hidden sm:block" />
             <span className="text-slate-400">Roblox Communities</span>
           </h1>
 
-          <p className="max-w-2xl text-lg text-slate-400 mb-12 leading-relaxed">
+          <p className="max-w-2xl text-base md:text-lg text-slate-400 mb-12 leading-relaxed px-4">
             Connect your Discord to Roblox. Moderate your game and see live server data instantly.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto justify-center px-6">
             <a
               href="https://discord.com/api/oauth2/authorize?client_id=1466340007940722750&permissions=8&scope=bot%20applications.commands"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-slate-900 rounded-lg font-bold text-sm hover:bg-slate-100 transition-all"
+              className="flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-slate-900 rounded-lg font-bold text-sm hover:bg-slate-100 transition-all w-full sm:w-auto"
             >
               <DiscordIcon />
               Add to Discord
@@ -148,7 +148,7 @@ export default function Home() {
           </div>
 
           {/* Social Proof / Stats */}
-          <div className="mt-16 md:mt-24 pt-12 border-t border-slate-800/50 w-full grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="mt-16 md:mt-24 pt-12 border-t border-slate-800/50 w-full grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-4">
             <StatItem label="Servers" value={serverCount !== null ? serverCount.toLocaleString() : "0"} />
             <StatItem label="Commands" value={commandCount !== null ? commandCount.toLocaleString() : "0"} />
             <StatItem label="Response" value="< 45ms" />
@@ -156,7 +156,7 @@ export default function Home() {
           </div>
 
           {/* Features Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mt-24 md:mt-40 w-full text-left">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mt-24 md:mt-40 w-full text-left px-2">
             <FeatureCard
               icon={<ZapIcon />}
               title="Real-time Execution"

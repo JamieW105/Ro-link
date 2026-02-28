@@ -61,8 +61,76 @@ export async function GET(req: Request) {
 
         if (dbError) throw dbError;
 
-        // 4. Update roles for existing servers (Optional: trigger a global role update)
-        // For now, it will apply when they join or if they run a command.
+        // 4. Update roles for existing servers
+        const discordToken = process.env.DISCORD_TOKEN;
+        const accessToken = (session as any).accessToken;
+        const discordId = (session.user as any).id;
+
+        if (accessToken && discordToken && discordId) {
+            try {
+                // Fetch user's guilds
+                const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
+                    headers: { Authorization: `Bearer ${accessToken}` },
+                });
+
+                if (guildsRes.ok) {
+                    const userGuilds = await guildsRes.json();
+                    const userGuildIds = userGuilds.map((g: any) => g.id);
+
+                    if (userGuildIds.length > 0) {
+                        // Find matching servers in our DB that have verified_role or nick_template set
+                        const { data: dbServers } = await supabase
+                            .from('servers')
+                            .select('id, verified_role, nick_template')
+                            .in('id', userGuildIds);
+
+                        if (dbServers && dbServers.length > 0) {
+                            for (const server of dbServers) {
+                                if (!server.verified_role && !server.nick_template) continue;
+
+                                // Fetch the Discord member object first to get their username for the template
+                                let memberData: any = null;
+                                if (server.nick_template) {
+                                    const memberRes = await fetch(`https://discord.com/api/v10/guilds/${server.id}/members/${discordId}`, {
+                                        headers: { Authorization: `Bot ${discordToken}` }
+                                    });
+                                    if (memberRes.ok) {
+                                        memberData = await memberRes.json();
+                                    }
+                                }
+
+                                if (server.verified_role) {
+                                    await fetch(`https://discord.com/api/v10/guilds/${server.id}/members/${discordId}/roles/${server.verified_role}`, {
+                                        method: 'PUT',
+                                        headers: { Authorization: `Bot ${discordToken}` },
+                                    }).catch(() => { });
+                                }
+
+                                if (server.nick_template && memberData) {
+                                    const username = memberData.user?.username || session.user?.name || 'User';
+                                    const nick = server.nick_template
+                                        .replace(/{roblox_username}/g, robloxUsername)
+                                        .replace(/{roblox_id}/g, robloxId)
+                                        .replace(/{discord_name}/g, username)
+                                        .substring(0, 32);
+
+                                    await fetch(`https://discord.com/api/v10/guilds/${server.id}/members/${discordId}`, {
+                                        method: 'PATCH',
+                                        headers: {
+                                            Authorization: `Bot ${discordToken}`,
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify({ nick })
+                                    }).catch(() => { });
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('[ROBLOX OAUTH] Failed to auto-role user:', err);
+            }
+        }
 
         return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/verify?success=true`);
 

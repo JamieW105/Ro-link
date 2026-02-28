@@ -152,7 +152,7 @@ export default function VerificationPage() {
                 {/* Main Settings Column */}
                 <div className="col-span-12 lg:col-span-8 space-y-8">
                     {/* Primary Config Section */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-10 backdrop-blur-sm relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-8 opacity-[0.02] text-white">
                             <ShieldIcon />
                         </div>

@@ -199,25 +199,25 @@ export default function ServerDashboard() {
                     </span>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="table-responsive custom-scrollbar">
                     {logs.length === 0 ? (
-                        <div className="p-20 text-center text-slate-600 font-bold uppercase text-[10px] tracking-widest">
+                        <div className="p-20 text-center text-slate-600 font-bold uppercase text-[10px] tracking-widest text-nowrap">
                             Waiting for activity...
                         </div>
                     ) : (
-                        <table className="w-full text-left text-xs">
+                        <table className="w-full text-left text-xs min-w-[600px]">
                             <thead className="text-slate-500 uppercase text-[10px] font-bold tracking-widest bg-slate-800/30">
                                 <tr>
-                                    <th className="px-8 py-3">Action</th>
-                                    <th className="px-8 py-3">Server</th>
-                                    <th className="px-8 py-3">Moderator</th>
-                                    <th className="px-8 py-3 text-right">Time</th>
+                                    <th className="px-4 md:px-8 py-3">Action</th>
+                                    <th className="px-4 md:px-8 py-3">Server</th>
+                                    <th className="px-4 md:px-8 py-3">Moderator</th>
+                                    <th className="px-4 md:px-8 py-3 text-right">Time</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800/50">
                                 {logs.map((log) => (
                                     <tr key={log.id} className="hover:bg-sky-500/5 transition-all group">
-                                        <td className="px-8 py-4">
+                                        <td className="px-4 md:px-8 py-4">
                                             <span className={`px-2 py-0.5 rounded text-[9px] font-bold tracking-tight border inline-block ${log.action === 'BAN' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
                                                 log.action === 'KICK' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
                                                     'bg-sky-500/10 text-sky-500 border-sky-500/20'
@@ -225,9 +225,9 @@ export default function ServerDashboard() {
                                                 {log.action}
                                             </span>
                                         </td>
-                                        <td className="px-8 py-4 font-semibold text-white">{log.target}</td>
-                                        <td className="px-8 py-4 text-slate-400 font-medium">{log.moderator}</td>
-                                        <td className="px-8 py-4 text-right text-slate-600 font-mono text-[10px] font-bold">
+                                        <td className="px-4 md:px-8 py-4 font-semibold text-white">{log.target}</td>
+                                        <td className="px-4 md:px-8 py-4 text-slate-400 font-medium">{log.moderator}</td>
+                                        <td className="px-4 md:px-8 py-4 text-right text-slate-600 font-mono text-[10px] font-bold">
                                             {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                         </td>
                                     </tr>

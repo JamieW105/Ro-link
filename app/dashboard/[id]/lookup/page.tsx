@@ -220,8 +220,8 @@ export default function PlayerLookup() {
             </div>
 
             {/* Search Bar */}
-            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-6 backdrop-blur-md">
-                <form onSubmit={handleSearch} className="flex gap-4">
+            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4 md:p-6 backdrop-blur-md">
+                <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
                     <div className="relative flex-1 group">
                         <div className="absolute inset-y-0 left-4 flex items-center text-slate-500 group-focus-within:text-sky-500 transition-colors">
                             <SearchIcon />
@@ -237,7 +237,7 @@ export default function PlayerLookup() {
                     <button
                         type="submit"
                         disabled={loading || !query}
-                        className="bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-500 text-white px-8 py-3 rounded-lg text-sm font-bold transition-all shadow-lg shadow-sky-900/20 flex items-center gap-2"
+                        className="bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-500 text-white px-8 py-3 rounded-lg text-sm font-bold transition-all shadow-lg shadow-sky-900/20 flex items-center justify-center gap-2 w-full sm:w-auto"
                     >
                         {loading ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : "SEARCH"}
                     </button>

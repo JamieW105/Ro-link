@@ -2,12 +2,15 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import React from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
 interface LiveServer {
     id: string;
     server_id: string;
     player_count: number;
+    players?: string[];
     updated_at: string;
 }
 
@@ -18,6 +21,10 @@ const SignalIcon = () => (
 
 const UsersIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+);
+
+const UserSmallIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
 );
 
 const CpuIcon = () => (
@@ -45,6 +52,7 @@ export default function ServersPage() {
     const [liveServers, setLiveServers] = useState<LiveServer[]>([]);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
+    const [expandedServerId, setExpandedServerId] = useState<string | null>(null);
 
     useEffect(() => {
         async function fetchData() {
@@ -174,32 +182,65 @@ export default function ServersPage() {
                             </thead>
                             <tbody className="divide-y divide-slate-800/50">
                                 {liveServers.map((server) => (
-                                    <tr key={server.id} className="hover:bg-sky-500/5 transition-all group">
-                                        <td className="px-8 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-                                                <span className="text-[10px] font-bold text-emerald-500 tracking-tight uppercase">Nominal</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-4 px-8 py-4 font-mono text-[10px] text-slate-400 flex items-center gap-2">
-                                            <HashIcon />
-                                            {server.id.substring(0, 16).toUpperCase()}...
-                                        </td>
-                                        <td className="px-8 py-4">
-                                            <div className="flex items-center justify-center gap-4">
-                                                <div className="w-32 bg-slate-800/50 h-1.5 rounded-full overflow-hidden border border-white/5">
-                                                    <div
-                                                        className="bg-sky-600 h-full transition-all duration-1000 ease-out"
-                                                        style={{ width: `${Math.min((server.player_count / 50) * 100, 100)}%` }}
-                                                    ></div>
+                                    <React.Fragment key={server.id}>
+                                        <tr
+                                            className="hover:bg-sky-500/5 transition-all group cursor-pointer"
+                                            onClick={() => setExpandedServerId(expandedServerId === server.id ? null : server.id)}
+                                        >
+                                            <td className="px-8 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                                                    <span className="text-[10px] font-bold text-emerald-500 tracking-tight uppercase">Nominal</span>
                                                 </div>
-                                                <span className="font-bold text-white w-4 text-center">{server.player_count}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-4 text-right text-slate-500 font-mono text-[10px] font-bold">
-                                            {new Date(server.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                                        </td>
-                                    </tr>
+                                            </td>
+                                            <td className="px-8 py-4 px-8 py-4 font-mono text-[10px] text-slate-400 flex items-center gap-2">
+                                                <HashIcon />
+                                                {server.id.substring(0, 16).toUpperCase()}...
+                                            </td>
+                                            <td className="px-8 py-4">
+                                                <div className="flex items-center justify-center gap-4">
+                                                    <div className="w-32 bg-slate-800/50 h-1.5 rounded-full overflow-hidden border border-white/5">
+                                                        <div
+                                                            className="bg-sky-600 h-full transition-all duration-1000 ease-out"
+                                                            style={{ width: `${Math.min((server.player_count / 50) * 100, 100)}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <span className="font-bold text-white w-4 text-center">{server.player_count}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-4 text-right text-slate-500 font-mono text-[10px] font-bold">
+                                                {new Date(server.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                            </td>
+                                        </tr>
+                                        {expandedServerId === server.id && (
+                                            <tr className="bg-slate-900/40">
+                                                <td colSpan={4} className="px-8 py-6 border-t border-slate-800/50">
+                                                    <div className="flex flex-col gap-4">
+                                                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                                            <UsersIcon />
+                                                            <span>Live Players ({server.players?.length || 0})</span>
+                                                        </div>
+                                                        {server.players && server.players.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {server.players.map((p) => (
+                                                                    <Link
+                                                                        key={p}
+                                                                        href={`/dashboard/${id}/lookup?username=${p}`}
+                                                                        className="px-3 py-1.5 bg-slate-800 hover:bg-sky-600/20 text-slate-300 hover:text-sky-500 rounded-lg text-xs font-semibold transition-all border border-slate-700 hover:border-sky-500/50 flex items-center gap-1.5"
+                                                                    >
+                                                                        <UserSmallIcon />
+                                                                        {p}
+                                                                    </Link>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-xs text-slate-500 font-medium italic">No players detected or server is empty.</p>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
                                 ))}
                             </tbody>
                         </table>
