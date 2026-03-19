@@ -269,12 +269,17 @@ client.on('guildMemberAdd', async member => {
 
         if (error || !server || !server.verification_enabled) return;
 
+        async function addConfiguredRole(roleId, label) {
+            if (!roleId || member.roles.cache.has(roleId)) return;
+
+            await member.roles.add(roleId).catch(e => {
+                console.error(`[ROLES] Failed to add ${label}:`, e.message);
+            });
+        }
+
         // 2. Give On Join Role if it exists
         if (server.on_join_role) {
-            const role = guild.roles.cache.get(server.on_join_role);
-            if (role) {
-                await member.roles.add(role).catch(e => console.error(`[ROLES] Failed to add on-join role:`, e.message));
-            }
+            await addConfiguredRole(server.on_join_role, 'on-join role');
         }
 
         // 3. Check if user is verified
@@ -285,10 +290,7 @@ client.on('guildMemberAdd', async member => {
             .maybeSingle();
 
         if (verifiedUser && server.verified_role) {
-            const role = guild.roles.cache.get(server.verified_role);
-            if (role) {
-                await member.roles.add(role).catch(e => console.error(`[ROLES] Failed to add verified role:`, e.message));
-            }
+            await addConfiguredRole(server.verified_role, 'verified role');
         }
     } catch (e) {
         console.error(`[JOIN] Error handling member join:`, e.message);
