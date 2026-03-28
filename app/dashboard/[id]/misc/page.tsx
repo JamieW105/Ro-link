@@ -2,8 +2,8 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { hasAdminPanelCommandAccess, MISC_ACTION_COMMAND_IDS } from "@/lib/adminPanelCommands";
 import { supabase } from "@/lib/supabase";
-import { useSession } from "next-auth/react";
 import { usePermissions } from "@/context/PermissionsContext";
 
 interface LiveServer {
@@ -33,7 +33,6 @@ const SearchIcon = () => (
 
 export default function MiscPage() {
     const { id: guildId } = useParams();
-    const { data: session } = useSession();
     const [players, setPlayers] = useState<{ name: string; serverId: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -73,7 +72,7 @@ export default function MiscPage() {
         if (!guildId) return;
 
         // Final permission check before sending
-        const isAllowed = perms.is_admin || perms.allowed_misc_cmds.includes('*') || perms.allowed_misc_cmds.includes(action);
+        const isAllowed = perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, action);
         if (!isAllowed) {
             alert("You do not have permission to use this command.");
             return;
@@ -81,21 +80,22 @@ export default function MiscPage() {
 
         setActionLoading(`${target}-${action}`);
 
-        const { error } = await supabase
-            .from('command_queue')
-            .insert([{
-                server_id: guildId,
+        const res = await fetch('/api/dashboard/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                serverId: guildId,
                 command: action,
                 args: {
                     username: target,
-                    moderator: session?.user?.name || "Dashboard",
                     ...extraArgs
-                },
-                status: 'PENDING'
-            }]);
+                }
+            })
+        });
 
-        if (error) {
-            alert("Error: " + error.message);
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            alert("Error: " + (data.error || 'Failed to send command.'));
         }
         setActionLoading(null);
     }
@@ -109,8 +109,8 @@ export default function MiscPage() {
 
     const isManualTarget = query.length > 0 && !players.some(p => (p.name || "").toLowerCase() === query);
 
-    const availableActions = ['FLY', 'NOCLIP', 'INVIS', 'GHOST', 'HEAL', 'KILL', 'RESET', 'REFRESH'].filter(action =>
-        perms.is_admin || perms.allowed_misc_cmds.includes('*') || perms.allowed_misc_cmds.includes(action)
+    const availableActions = [...MISC_ACTION_COMMAND_IDS].filter(action =>
+        perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, action)
     );
 
     return (
@@ -173,7 +173,7 @@ export default function MiscPage() {
                                         </button>
                                     ))}
                                 </div>
-                                {(perms.is_admin || perms.allowed_misc_cmds.includes('*') || perms.allowed_misc_cmds.includes('SET_CHAR')) && (
+                                {(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'SET_CHAR')) && (
                                     <div className="mt-4 flex gap-2 max-w-md">
                                         <input
                                             type="text"
@@ -233,7 +233,7 @@ export default function MiscPage() {
                                     </div>
 
                                     {/* Set Char Input */}
-                                    {(perms.is_admin || perms.allowed_misc_cmds.includes('*') || perms.allowed_misc_cmds.includes('SET_CHAR')) && (
+                                    {(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'SET_CHAR')) && (
                                         <div className="mt-4 flex gap-2 max-w-md">
                                             <input
                                                 type="text"

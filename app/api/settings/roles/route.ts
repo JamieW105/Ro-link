@@ -1,5 +1,6 @@
 
 import { NextResponse } from 'next/server';
+import { normalizeAdminPanelCommandList } from '@/lib/adminPanelCommands';
 import { supabase } from '@/lib/supabase';
 
 // GET ALL ROLES FOR A SERVER
@@ -21,7 +22,10 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json((data || []).map((role) => ({
+        ...role,
+        allowed_misc_cmds: normalizeAdminPanelCommandList(role.allowed_misc_cmds),
+    })));
 }
 
 // CREATE OR UPDATE ROLE (UPSERT)
@@ -32,13 +36,16 @@ export async function POST(req: Request) {
         discordRoleId,
         roleName,
         permissions,
-        miscCmds
+        miscCmds,
+        panelCmds,
     } = body;
 
     // Validate
     if (!serverId || !discordRoleId) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+
+    const normalizedPanelCommands = normalizeAdminPanelCommandList(panelCmds ?? miscCmds);
 
     const { data, error } = await supabase
         .from('dashboard_roles')
@@ -54,7 +61,7 @@ export async function POST(req: Request) {
             can_lookup: permissions.lookup,
             can_manage_settings: permissions.manage_settings,
             can_manage_reports: permissions.manage_reports,
-            allowed_misc_cmds: miscCmds || []
+            allowed_misc_cmds: normalizedPanelCommands
         }, { onConflict: 'server_id, discord_role_id' }) // Constraint name might be needed or handled automatically if standard UNIQUE INDEX exists
         .select()
         .single();
@@ -63,7 +70,10 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({
+        ...data,
+        allowed_misc_cmds: normalizeAdminPanelCommandList(data?.allowed_misc_cmds),
+    });
 }
 
 // DELETE ROLE

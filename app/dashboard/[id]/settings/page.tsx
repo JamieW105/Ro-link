@@ -2,6 +2,12 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import {
+    ADMIN_PANEL_COMMAND_GROUPS,
+    ADMIN_PANEL_COMMAND_IDS,
+    hasAdminPanelCommandAccess,
+    normalizeAdminPanelCommandList,
+} from "@/lib/adminPanelCommands";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 
@@ -51,6 +57,27 @@ interface DashboardRole {
     allowed_misc_cmds: string[];
 }
 
+type DashboardRoleBooleanField =
+    | 'can_access_dashboard'
+    | 'can_manage_settings'
+    | 'can_manage_reports'
+    | 'can_lookup'
+    | 'can_kick'
+    | 'can_ban'
+    | 'can_timeout'
+    | 'can_mute';
+
+const ROLE_PERMISSION_OPTIONS: Array<{ key: DashboardRoleBooleanField; label: string }> = [
+    { key: 'can_access_dashboard', label: 'Dashboard Access' },
+    { key: 'can_manage_settings', label: 'Manage Settings' },
+    { key: 'can_manage_reports', label: 'Manage Reports' },
+    { key: 'can_lookup', label: 'Lookup Users' },
+    { key: 'can_kick', label: 'Kick Users' },
+    { key: 'can_ban', label: 'Ban Users' },
+    { key: 'can_timeout', label: 'Timeout/Softban' },
+    { key: 'can_mute', label: 'Server Mute' },
+];
+
 interface DiscordChannel {
     id: string;
     name: string;
@@ -81,6 +108,52 @@ export default function SettingsPage() {
     const [selectedRoleForAdd, setSelectedRoleForAdd] = useState("");
     const [addingRole, setAddingRole] = useState(false);
     const [isRolesCollapsed, setIsRolesCollapsed] = useState(false);
+
+    function getRolePanelCommands(role: DashboardRole) {
+        return normalizeAdminPanelCommandList(role.allowed_misc_cmds);
+    }
+
+    function handleReplaceRoleCommands(role: DashboardRole, commands: string[]) {
+        handleUpdateRole(role, 'allowed_misc_cmds', normalizeAdminPanelCommandList(commands));
+    }
+
+    function handleToggleRoleAllCommands(role: DashboardRole) {
+        const currentCommands = getRolePanelCommands(role);
+        if (currentCommands.includes('*')) {
+            handleReplaceRoleCommands(role, []);
+            return;
+        }
+
+        handleReplaceRoleCommands(role, ['*']);
+    }
+
+    function handleToggleRoleCommand(role: DashboardRole, commandId: string) {
+        const currentCommands = getRolePanelCommands(role);
+
+        if (currentCommands.includes('*')) {
+            handleReplaceRoleCommands(
+                role,
+                ADMIN_PANEL_COMMAND_IDS.filter((id) => id !== commandId),
+            );
+            return;
+        }
+
+        if (currentCommands.includes(commandId)) {
+            handleReplaceRoleCommands(
+                role,
+                currentCommands.filter((id) => id !== commandId),
+            );
+            return;
+        }
+
+        const nextCommands = [...currentCommands, commandId];
+        if (nextCommands.length >= ADMIN_PANEL_COMMAND_IDS.length) {
+            handleReplaceRoleCommands(role, ['*']);
+            return;
+        }
+
+        handleReplaceRoleCommands(role, nextCommands);
+    }
 
     useEffect(() => {
         async function fetchData() {
@@ -203,7 +276,7 @@ export default function SettingsPage() {
                         manage_settings: false,
                         manage_reports: false
                     },
-                    miscCmds: []
+                    panelCmds: []
                 })
             });
 
@@ -248,7 +321,7 @@ export default function SettingsPage() {
                         manage_settings: targetRole.can_manage_settings,
                         manage_reports: targetRole.can_manage_reports
                     },
-                    miscCmds: targetRole.allowed_misc_cmds
+                    panelCmds: normalizeAdminPanelCommandList(targetRole.allowed_misc_cmds)
                 })
             });
         } catch (e) {
@@ -382,7 +455,11 @@ export default function SettingsPage() {
 
                                 {/* Roles List */}
                                 <div className="space-y-4">
-                                    {dashboardRoles.map(role => (
+                                    {dashboardRoles.map((role) => {
+                                        const roleCommands = getRolePanelCommands(role);
+                                        const hasAllCommands = roleCommands.includes('*');
+
+                                        return (
                                         <div key={role.id} className="bg-slate-950/40 border border-slate-800 rounded-xl p-6 transition-all hover:bg-slate-900/40">
                                             <div className="flex items-center justify-between mb-6 border-b border-slate-800/50 pb-4">
                                                 <div className="flex items-center gap-3">
@@ -402,36 +479,22 @@ export default function SettingsPage() {
 
                                             {/* Permissions Grid */}
                                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                                {[
-                                                    { key: 'can_access_dashboard', label: 'Dashboard Access' },
-                                                    { key: 'can_manage_settings', label: 'Manage Settings' },
-                                                    { key: 'can_manage_reports', label: 'Manage Reports' },
-                                                    { key: 'can_lookup', label: 'Lookup Users' },
-                                                    { key: 'can_kick', label: 'Kick Users' },
-                                                    { key: 'can_ban', label: 'Ban Users' },
-                                                    { key: 'can_timeout', label: 'Timeout/Softban' },
-                                                    { key: 'can_mute', label: 'Server Mute' },
-                                                ].map((perm) => (
+                                                {ROLE_PERMISSION_OPTIONS.map((perm) => (
                                                     <label key={perm.key} className="flex items-center gap-3 cursor-pointer group select-none">
                                                         <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
-                                                            // @ts-ignore
                                                             role[perm.key] ? 'bg-purple-600 border-purple-500' : 'bg-slate-900 border-slate-700 group-hover:border-slate-500'
                                                             }`}>
-                                                            {/* @ts-ignore */
-                                                                role[perm.key] && (
+                                                            {role[perm.key] && (
                                                                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-white"><polyline points="20 6 9 17 4 12" /></svg>
                                                                 )}
                                                         </div>
                                                         <input
                                                             type="checkbox"
                                                             className="hidden"
-                                                            // @ts-ignore
                                                             checked={role[perm.key]}
-                                                            // @ts-ignore
                                                             onChange={(e) => handleUpdateRole(role, perm.key, e.target.checked)}
                                                         />
                                                         <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${
-                                                            // @ts-ignore
                                                             role[perm.key] ? 'text-white' : 'text-slate-500 group-hover:text-slate-400'
                                                             }`}>
                                                             {perm.label}
@@ -440,22 +503,89 @@ export default function SettingsPage() {
                                                 ))}
                                             </div>
 
-                                            {/* Misc Commands Input */}
-                                            <div className="mt-6 pt-4 border-t border-slate-800/50">
-                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">
-                                                    Misc Commands (Comma Separated)
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={role.allowed_misc_cmds?.join(", ") || ""}
-                                                    onChange={(e) => handleUpdateRole(role, 'allowed_misc_cmds', e.target.value.split(",").map(s => s.trim()).filter(s => s))}
-                                                    placeholder="e.g. fly, heal, tp (or * for all)"
-                                                    className="w-full bg-black/20 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-purple-500 transition-colors"
-                                                />
-                                                <p className="text-[9px] text-slate-600 mt-1.5">Enter specific commands this role can use (e.g., 'fly', 'heal') or '*' for all available misc commands.</p>
+                                            <div className="mt-6 pt-6 border-t border-slate-800/50 space-y-5">
+                                                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                                    <div>
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+                                                            Roblox Admin Panel Commands
+                                                        </label>
+                                                        <p className="text-[11px] text-slate-500 max-w-xl leading-relaxed">
+                                                            Choose exactly which Ro-Link in-game panel commands this role can run. The dashboard and live Roblox panel both use this same command list.
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleRoleAllCommands(role)}
+                                                        className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-[0.18em] transition-all border ${
+                                                            hasAllCommands
+                                                                ? 'bg-purple-600 text-white border-purple-500 shadow-lg shadow-purple-900/20'
+                                                                : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-purple-500/50 hover:text-white'
+                                                        }`}
+                                                    >
+                                                        {hasAllCommands ? 'All Commands Enabled' : 'Enable All Commands'}
+                                                    </button>
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    {ADMIN_PANEL_COMMAND_GROUPS.map((group) => {
+                                                        const selectedCount = hasAllCommands
+                                                            ? group.commands.length
+                                                            : group.commands.filter((command) => hasAdminPanelCommandAccess(roleCommands, command.id)).length;
+
+                                                        return (
+                                                            <div key={group.category} className="rounded-xl border border-slate-800/70 bg-slate-950/40 p-4">
+                                                                <div className="flex items-center justify-between mb-4">
+                                                                    <div>
+                                                                        <h4 className="text-xs font-bold text-white uppercase tracking-[0.18em]">{group.category}</h4>
+                                                                        <p className="text-[10px] text-slate-600 mt-1">{selectedCount}/{group.commands.length} selected</p>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                                    {group.commands.map((command) => {
+                                                                        const enabled = hasAllCommands || hasAdminPanelCommandAccess(roleCommands, command.id);
+
+                                                                        return (
+                                                                            <button
+                                                                                key={command.id}
+                                                                                type="button"
+                                                                                onClick={() => handleToggleRoleCommand(role, command.id)}
+                                                                                className={`text-left rounded-xl border px-4 py-3 transition-all ${
+                                                                                    enabled
+                                                                                        ? 'bg-purple-600/10 border-purple-500/40 shadow-[0_0_0_1px_rgba(168,85,247,0.12)]'
+                                                                                        : 'bg-black/20 border-slate-800 hover:border-slate-600'
+                                                                                }`}
+                                                                            >
+                                                                                <div className="flex items-start gap-3">
+                                                                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                                                                                        enabled
+                                                                                            ? 'bg-purple-600 border-purple-500 text-white'
+                                                                                            : 'bg-slate-900 border-slate-700 text-slate-700'
+                                                                                    }`}>
+                                                                                        {enabled ? (
+                                                                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                                        ) : null}
+                                                                                    </div>
+                                                                                    <div className="min-w-0">
+                                                                                        <div className={`text-xs font-bold uppercase tracking-[0.16em] ${enabled ? 'text-white' : 'text-slate-300'}`}>
+                                                                                            {command.label}
+                                                                                        </div>
+                                                                                        <p className={`mt-1 text-[11px] leading-relaxed ${enabled ? 'text-slate-300' : 'text-slate-500'}`}>
+                                                                                            {command.description}
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         </div>
-                                    ))}
+                                    )})}
 
                                     {dashboardRoles.length === 0 && (
                                         <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-xl">

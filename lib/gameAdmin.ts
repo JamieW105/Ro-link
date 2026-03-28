@@ -1,6 +1,7 @@
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
+import { normalizeAdminPanelCommandList } from './adminPanelCommands';
 import { supabase } from './supabase';
 
 export interface DashboardPermissions {
@@ -146,7 +147,7 @@ function computeIsAdmin(
     return (effectivePermissions & ADMINISTRATOR_PERMISSION) === ADMINISTRATOR_PERMISSION;
 }
 
-function aggregateDashboardPermissions(isAdmin: boolean, dashboardRoles: DashboardRoleRecord[]) {
+export function aggregateDashboardPermissions(isAdmin: boolean, dashboardRoles: DashboardRoleRecord[]) {
     if (isAdmin) {
         return {
             can_access_dashboard: true,
@@ -174,17 +175,35 @@ function aggregateDashboardPermissions(isAdmin: boolean, dashboardRoles: Dashboa
         if (role.can_manage_settings) finalPerms.can_manage_settings = true;
         if (role.can_manage_reports) finalPerms.can_manage_reports = true;
 
-        if (Array.isArray(role.allowed_misc_cmds)) {
-            for (const rawCommand of role.allowed_misc_cmds) {
-                const command = String(rawCommand || '').trim().toUpperCase();
-                if (command && !finalPerms.allowed_misc_cmds.includes(command)) {
-                    finalPerms.allowed_misc_cmds.push(command);
-                }
+        for (const command of normalizeAdminPanelCommandList(role.allowed_misc_cmds)) {
+            if (!finalPerms.allowed_misc_cmds.includes(command)) {
+                finalPerms.allowed_misc_cmds.push(command);
             }
         }
     }
 
     return finalPerms;
+}
+
+export async function resolveDashboardUserPermissions(serverId: string, discordUserId: string) {
+    const guildContext = await getGuildContext(serverId, discordUserId);
+
+    const isAdmin = computeIsAdmin(
+        guildContext.guild,
+        guildContext.member,
+        Array.isArray(guildContext.guildRoles) ? guildContext.guildRoles : [],
+        discordUserId,
+    );
+
+    const memberRoles = Array.isArray(guildContext.member?.roles) ? guildContext.member.roles : [];
+
+    const { data: dashboardRoles } = await supabase
+        .from('dashboard_roles')
+        .select('*')
+        .eq('server_id', serverId)
+        .in('discord_role_id', memberRoles);
+
+    return aggregateDashboardPermissions(isAdmin, dashboardRoles || []);
 }
 
 export async function getServerByApiKey(apiKey: string) {

@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS public.dashboard_roles (
     can_manage_settings BOOLEAN DEFAULT FALSE,
     can_manage_reports BOOLEAN DEFAULT FALSE,
     
-    -- Misc Commands (Flexible)
-    allowed_misc_cmds TEXT[] DEFAULT '{}', -- e.g. ['fly', 'heal'] or ['*'] for all
+    -- Roblox Admin Panel Commands
+    allowed_misc_cmds TEXT[] DEFAULT '{}', -- Stores in-game admin command ids, e.g. ['KICK', 'HEAL'] or ['*'] for all
     
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),

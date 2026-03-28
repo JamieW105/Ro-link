@@ -3,6 +3,7 @@
 import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { hasAnyAdminPanelCommand, MISC_ACTION_COMMAND_IDS } from "@/lib/adminPanelCommands";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 import { PermissionsProvider } from "@/context/PermissionsContext";
@@ -138,7 +139,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             label: "Misc Actions",
             icon: <MagicIcon />,
             href: `/dashboard/${id}/misc`,
-            hide: !userPermissions.is_admin && (!userPermissions.allowed_misc_cmds || userPermissions.allowed_misc_cmds.length === 0)
+            hide: !userPermissions.is_admin && !hasAnyAdminPanelCommand(userPermissions.allowed_misc_cmds, MISC_ACTION_COMMAND_IDS)
         },
     ].filter(i => !i.hide);
 

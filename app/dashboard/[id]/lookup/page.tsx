@@ -2,6 +2,7 @@
 
 import { useParams, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
+import { hasAdminPanelCommandAccess } from "@/lib/adminPanelCommands";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@/context/PermissionsContext";
@@ -133,13 +134,15 @@ export default function PlayerLookup() {
     async function handleAction(action: 'KICK' | 'BAN' | 'UNBAN') {
         if (!player || !id) return;
 
+        const hasCommandPermission = perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, action);
+
         // Permission Checks
-        if (action === 'KICK' && !perms.can_kick) {
+        if (action === 'KICK' && !hasCommandPermission) {
             alert("You do not have permission to KICK players.");
             return;
         }
 
-        if ((action === 'BAN' || action === 'UNBAN') && !perms.can_ban) {
+        if ((action === 'BAN' || action === 'UNBAN') && !hasCommandPermission) {
             alert(`You do not have permission to ${action} players.`);
             return;
         }
@@ -154,56 +157,26 @@ export default function PlayerLookup() {
 
         setActionLoading(true);
 
-        // 1. Queue in Database (Fallback & History)
-        const { error: dbError } = await supabase
-            .from('command_queue')
-            .insert([{
-                server_id: id,
+        const response = await fetch('/api/dashboard/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                serverId: id,
                 command: action,
                 args: {
                     username: player.username,
                     job_id: action === 'KICK' ? presence?.jobId : null,
                     reason: 'Dashboard Action',
-                    moderator: 'Web Admin'
-                },
-                status: 'PENDING'
-            }]);
+                }
+            })
+        });
 
-        // 2. Trigger Messaging Service (Instant Action)
-        try {
-            await fetch('/api/roblox/message', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    serverId: id,
-                    command: action,
-                    args: {
-                        username: player.username,
-                        job_id: action === 'KICK' ? presence?.jobId : null,
-                        reason: 'Dashboard Action',
-                        moderator: 'Web Admin'
-                    }
-                })
-            });
-        } catch (msgError) {
-            console.error('Messaging Service failed, falling back to polling.', msgError);
-        }
+        const payload = await response.json().catch(() => ({}));
 
-        if (dbError) {
-            alert("Error: " + dbError.message);
+        if (!response.ok) {
+            alert("Error: " + (payload.error || 'Failed to send command.'));
         } else {
             alert(`${action} signal sent to Roblox! (Instant via Open Cloud)`);
-
-            await fetch('/api/logs', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    serverId: id,
-                    action: action,
-                    target: player.username,
-                    moderator: session?.user?.name || 'Web Admin'
-                })
-            });
 
             // Re-fetch logs
             const { data } = await supabase.from('logs').select('*').eq('server_id', id).eq('target', player.username).order('timestamp', { ascending: false });
@@ -369,21 +342,21 @@ export default function PlayerLookup() {
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <button
                                     onClick={() => handleAction('KICK')}
-                                    disabled={actionLoading || !perms.can_kick}
+                                    disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'KICK'))}
                                     className="px-6 py-4 bg-orange-600/10 border border-orange-500/20 hover:bg-orange-500/20 text-orange-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     KICK PLAYER
                                 </button>
                                 <button
                                     onClick={() => handleAction('BAN')}
-                                    disabled={actionLoading || !perms.can_ban}
+                                    disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'BAN'))}
                                     className="px-6 py-4 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     BAN PLAYER
                                 </button>
                                 <button
                                     onClick={() => handleAction('UNBAN')}
-                                    disabled={actionLoading || !perms.can_ban}
+                                    disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'UNBAN'))}
                                     className="px-6 py-4 bg-emerald-600/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     UNBAN PLAYER

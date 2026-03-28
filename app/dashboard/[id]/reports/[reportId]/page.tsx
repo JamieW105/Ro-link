@@ -1,6 +1,7 @@
 'use client';
 
 import { supabase } from "@/lib/supabase";
+import { hasAdminPanelCommandAccess } from "@/lib/adminPanelCommands";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -122,12 +123,14 @@ export default function ReportDetailsPage() {
     if (!perms.can_manage_reports) return null;
 
     const handleAction = async (action: 'KICK' | 'BAN' | 'SOFTBAN', type: 'ROBLOX') => {
+        const hasCommandPermission = perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, action);
+
         // Permission Check
-        if (action === 'KICK' && !perms.can_kick) {
+        if (action === 'KICK' && !hasCommandPermission) {
             alert("You do not have permission to KICK users.");
             return;
         }
-        if ((action === 'BAN' || action === 'SOFTBAN') && !perms.can_ban) {
+        if ((action === 'BAN' || action === 'SOFTBAN') && !hasCommandPermission) {
             alert("You do not have permission to BAN users.");
             return;
         }
@@ -146,56 +149,27 @@ export default function ReportDetailsPage() {
         const moderator = (session?.user as any)?.name || 'Web Admin';
         const moderatorId = (session?.user as any)?.id;
 
-        // 1. Queue Roblox Command
-        const { error: dbError } = await supabase.from('command_queue').insert([{
-            server_id: id,
-            command: action,
-            args: {
-                username: targetUsername,
-                reason: reason,
-                moderator: moderator
-            },
-            status: 'PENDING'
-        }]);
-
-        if (dbError) {
-            alert("Database Error: " + dbError.message);
-            setActionLoading(false);
-            return;
-        }
-
-        // 2. Trigger Real-time Messaging
-        try {
-            await fetch('/api/roblox/message', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    serverId: id,
-                    command: action,
-                    args: {
-                        username: report.reported_roblox_username,
-                        reason: reason,
-                        moderator: moderator
-                    }
-                })
-            });
-        } catch (e) {
-            console.error("Messaging failed", e);
-        }
-
-        // 3. Log the Action (via Unified Logger)
-        await fetch('/api/logs', {
+        const commandResponse = await fetch('/api/dashboard/command', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 serverId: id,
-                action: action,
-                target: report.reported_roblox_username,
-                moderator: moderator
+                command: action,
+                args: {
+                    username: targetUsername,
+                    reason: reason,
+                }
             })
         });
 
-        // 4. Resolve the Report
+        const commandResult = await commandResponse.json().catch(() => ({}));
+        if (!commandResponse.ok) {
+            alert("Error: " + (commandResult.error || 'Failed to send command.'));
+            setActionLoading(false);
+            return;
+        }
+
+        // 2. Resolve the Report
         await supabase
             .from('reports')
             .update({
@@ -206,7 +180,7 @@ export default function ReportDetailsPage() {
             })
             .eq('id', reportId);
 
-        // 5. Notify User via Discord DM
+        // 3. Notify User via Discord DM
         if (profiles?.discord_id) {
             try {
                 await fetch('/api/discord/dm', {
@@ -457,22 +431,22 @@ export default function ReportDetailsPage() {
                             </div>
 
                             <button
-                                onClick={() => handleAction('KICK', 'ROBLOX')}
-                                disabled={actionLoading || !perms.can_kick}
+                            onClick={() => handleAction('KICK', 'ROBLOX')}
+                                disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'KICK'))}
                                 className="w-full py-3 bg-orange-600/10 border border-orange-500/20 hover:bg-orange-500/20 text-orange-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Kick User
                             </button>
                             <button
                                 onClick={() => handleAction('SOFTBAN', 'ROBLOX')}
-                                disabled={actionLoading || !perms.can_ban}
+                                disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'SOFTBAN'))}
                                 className="w-full py-3 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Soft Ban (12h)
                             </button>
                             <button
                                 onClick={() => handleAction('BAN', 'ROBLOX')}
-                                disabled={actionLoading || !perms.can_ban}
+                                disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'BAN'))}
                                 className="w-full py-3 bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/20 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Permanent Ban
