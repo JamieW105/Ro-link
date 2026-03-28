@@ -1,6 +1,21 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+interface QueuedCommand {
+    id: string;
+    args?: {
+        job_id?: string;
+    } | null;
+}
+
+function trimString(value: unknown) {
+    return String(value ?? '').trim();
+}
+
+function getCommandTargetJobId(command: QueuedCommand) {
+    return trimString(command?.args?.job_id);
+}
+
 export async function GET() {
     return NextResponse.json({
         status: 'API Active',
@@ -49,7 +64,7 @@ export async function POST(req: Request) {
                             players: players || [],
                             updated_at: new Date().toISOString()
                         }, { onConflict: 'id' });
-                } catch (upsertError) {
+                } catch {
                     await supabase
                         .from('live_servers')
                         .upsert({
@@ -81,8 +96,13 @@ export async function POST(req: Request) {
         if (commandError) throw commandError;
 
         // 4. Mark as Processed
-        if (commands.length > 0) {
-            const ids = commands.map(c => c.id);
+        const relevantCommands = ((commands || []) as QueuedCommand[]).filter((command) => {
+            const targetJobId = getCommandTargetJobId(command);
+            return !targetJobId || targetJobId === trimString(jobId);
+        });
+
+        if (relevantCommands.length > 0) {
+            const ids = relevantCommands.map((command) => command.id);
             await supabase
                 .from('command_queue')
                 .update({ status: 'PROCESSED' })
@@ -90,7 +110,7 @@ export async function POST(req: Request) {
         }
 
         return NextResponse.json({
-            commands,
+            commands: relevantCommands,
             settings: {
                 adminCmdsEnabled: server.admin_cmds_enabled !== false,
                 miscCmdsEnabled: server.misc_cmds_enabled !== false

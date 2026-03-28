@@ -2,11 +2,92 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { ADMIN_PANEL_COMMAND_IDS, hasAdminPanelCommandAccess, normalizeAdminPanelCommand } from '@/lib/adminPanelCommands';
+import {
+    ADMIN_PANEL_COMMAND_IDS,
+    GLOBAL_COMMAND_IDS,
+    hasAdminPanelCommandAccess,
+    normalizeAdminPanelCommand,
+} from '@/lib/adminPanelCommands';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
 import { logAction } from '@/lib/logger';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { supabase } from '@/lib/supabase';
+
+const GLOBAL_COMMAND_LOOKUP = new Set<string>(GLOBAL_COMMAND_IDS);
+const LIVE_SERVER_FRESHNESS_MS = 2 * 60 * 1000;
+
+type CommandArgs = Record<string, unknown>;
+type DeliveryTarget = {
+    deliveryId: string;
+    jobId: string | null;
+    scope: 'COMMAND' | 'SERVER' | 'GLOBAL';
+};
+
+function trimString(value: unknown) {
+    return String(value ?? '').trim();
+}
+
+function buildDeliveryArgs(baseArgs: CommandArgs, target: DeliveryTarget) {
+    const nextArgs: CommandArgs = { ...baseArgs };
+    nextArgs.delivery_id = target.deliveryId;
+
+    if (target.jobId) {
+        nextArgs.job_id = target.jobId;
+    } else {
+        delete nextArgs.job_id;
+    }
+
+    if (target.scope !== 'COMMAND') {
+        nextArgs.target_scope = target.scope;
+    } else if (!trimString(nextArgs.target_scope)) {
+        delete nextArgs.target_scope;
+    }
+
+    return nextArgs;
+}
+
+async function resolveDeliveryTargets(serverId: string, command: string, args: CommandArgs) {
+    const requestedJobId = trimString(args.job_id);
+    if (requestedJobId) {
+        return [{
+            deliveryId: crypto.randomUUID(),
+            jobId: requestedJobId,
+            scope: 'SERVER',
+        }] satisfies DeliveryTarget[];
+    }
+
+    const requestedScope = trimString(args.target_scope).toUpperCase();
+    if (requestedScope !== 'GLOBAL' || !GLOBAL_COMMAND_LOOKUP.has(command)) {
+        return [{
+            deliveryId: crypto.randomUUID(),
+            jobId: null,
+            scope: 'COMMAND',
+        }] satisfies DeliveryTarget[];
+    }
+
+    const freshAfter = new Date(Date.now() - LIVE_SERVER_FRESHNESS_MS).toISOString();
+    const { data: liveServers, error } = await supabase
+        .from('live_servers')
+        .select('id')
+        .eq('server_id', serverId)
+        .gte('updated_at', freshAfter);
+
+    if (error) {
+        throw new Error(error.message);
+    }
+
+    const jobIds = Array.from(new Set(
+        (liveServers || [])
+            .map((server) => trimString((server as { id?: string }).id))
+            .filter(Boolean),
+    ));
+
+    return jobIds.map((jobId) => ({
+        deliveryId: crypto.randomUUID(),
+        jobId,
+        scope: 'GLOBAL',
+    })) satisfies DeliveryTarget[];
+}
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
@@ -16,9 +97,10 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json();
-        const serverId = String(body?.serverId || '').trim();
+        const serverId = trimString(body?.serverId);
         const command = normalizeAdminPanelCommand(body?.command);
-        const args = typeof body?.args === 'object' && body?.args ? body.args : {};
+        const rawArgs = typeof body?.args === 'object' && body?.args ? body.args : {};
+        const args: CommandArgs = { ...rawArgs };
 
         if (!serverId || !command) {
             return NextResponse.json({ error: 'Missing serverId or command' }, { status: 400 });
@@ -27,7 +109,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Unknown command' }, { status: 400 });
         }
 
-        const discordUserId = String((session.user as { id?: string }).id || '');
+        const discordUserId = trimString((session.user as { id?: string }).id);
         const permissions = await resolveDashboardUserPermissions(serverId, discordUserId);
         if (!permissions.is_admin && !permissions.can_access_dashboard) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -37,47 +119,67 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'You do not have permission to use that Roblox admin command.' }, { status: 403 });
         }
 
-        const moderator = String(session.user?.name || 'Web Admin');
-        const queuedArgs = {
+        const moderator = trimString(session.user?.name) || 'Web Admin';
+        const baseArgs: CommandArgs = {
             ...args,
             moderator,
         };
 
+        const deliveryTargets = await resolveDeliveryTargets(serverId, command, baseArgs);
+        if (deliveryTargets.length === 0) {
+            return NextResponse.json({ error: 'No live servers are available for that command target.' }, { status: 400 });
+        }
+
+        const queueRows = deliveryTargets.map((target) => ({
+            server_id: serverId,
+            command,
+            args: buildDeliveryArgs(baseArgs, target),
+            status: 'PENDING',
+        }));
+
         const { error: queueError } = await supabase
             .from('command_queue')
-            .insert([{
-                server_id: serverId,
-                command,
-                args: queuedArgs,
-                status: 'PENDING',
-            }]);
+            .insert(queueRows);
 
         if (queueError) {
             return NextResponse.json({ error: queueError.message }, { status: 500 });
         }
 
-        const messageResult = await sendRobloxMessage(serverId, command, queuedArgs);
+        const realtimeResults = await Promise.all(
+            deliveryTargets.map((target) => sendRobloxMessage(
+                serverId,
+                command,
+                buildDeliveryArgs(baseArgs, target),
+            )),
+        );
+
+        const realtimeSuccess = realtimeResults.some((result) => result.success);
+        const realtimeWarnings = realtimeResults
+            .filter((result) => !result.success)
+            .map((result) => trimString(result.error))
+            .filter(Boolean);
+
+        const logTarget = trimString(
+            args.username
+            || args.userIdentity
+            || args.target_label
+            || (deliveryTargets.length > 1 ? 'global' : deliveryTargets[0]?.jobId || 'server'),
+        );
+
         await logAction(
             serverId,
             command,
-            String(args.username || args.userIdentity || 'server'),
+            logTarget || 'server',
             moderator,
-            String(args.reason || 'Dashboard action'),
+            trimString(args.reason || args.message || 'Dashboard action'),
         );
-
-        if (!messageResult.success) {
-            return NextResponse.json({
-                success: true,
-                queued: true,
-                realtime: false,
-                warning: messageResult.error,
-            });
-        }
 
         return NextResponse.json({
             success: true,
             queued: true,
-            realtime: true,
+            realtime: realtimeSuccess,
+            warning: realtimeWarnings.length > 0 ? realtimeWarnings.join(' | ') : null,
+            deliveredTargets: deliveryTargets.length,
         });
     } catch (error) {
         console.error('[Dashboard Command API] Error:', error);

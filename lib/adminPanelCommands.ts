@@ -53,6 +53,7 @@ export const ADMIN_PANEL_COMMAND_GROUPS = ADMIN_PANEL_COMMANDS.reduce<Array<{ ca
 export const ADMIN_PANEL_COMMAND_IDS = ADMIN_PANEL_COMMANDS.map((command) => command.id);
 
 export const MISC_ACTION_COMMAND_IDS = ['FLY', 'NOCLIP', 'INVIS', 'GHOST', 'HEAL', 'KILL', 'RESET', 'REFRESH', 'SET_CHAR'] as const;
+export const GLOBAL_COMMAND_IDS = ['BROADCAST', 'GRAVITY', 'BRIGHTNESS', 'UPDATE', 'SHUTDOWN'] as const;
 
 const KNOWN_COMMAND_IDS = new Set<string>(ADMIN_PANEL_COMMAND_IDS);
 
