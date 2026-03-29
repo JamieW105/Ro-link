@@ -1,13 +1,25 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 
 type ConnectState = 'idle' | 'authorizing' | 'authorized' | 'error';
 
-export default function PluginConnectPage() {
+function PluginConnectFallback() {
+    return (
+        <main className="min-h-screen bg-[#07111f] text-white flex items-center justify-center px-6 py-12">
+            <section className="w-full max-w-xl rounded-[28px] border border-sky-900/40 bg-slate-950/80 shadow-[0_30px_80px_rgba(2,6,23,0.55)] backdrop-blur-xl p-10">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-5 py-4 text-sm text-slate-300">
+                    Loading Studio connection details...
+                </div>
+            </section>
+        </main>
+    );
+}
+
+function PluginConnectPageContent() {
     const { data: session, status } = useSession();
     const searchParams = useSearchParams();
     const sessionId = useMemo(() => searchParams.get('sessionId')?.trim() || '', [searchParams]);
@@ -120,5 +132,13 @@ export default function PluginConnectPage() {
                 ) : null}
             </section>
         </main>
+    );
+}
+
+export default function PluginConnectPage() {
+    return (
+        <Suspense fallback={<PluginConnectFallback />}>
+            <PluginConnectPageContent />
+        </Suspense>
     );
 }

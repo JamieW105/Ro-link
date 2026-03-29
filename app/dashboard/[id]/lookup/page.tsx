@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useSearchParams } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { hasAdminPanelCommandAccess } from "@/lib/adminPanelCommands";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
@@ -38,7 +38,18 @@ const LiveIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" fill="currentColor" /></svg>
 );
 
-export default function PlayerLookup() {
+function PlayerLookupFallback() {
+    return (
+        <div className="space-y-8 max-w-5xl animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="flex flex-col gap-1">
+                <h1 className="text-2xl font-bold text-white tracking-tight">Player Lookup</h1>
+                <p className="text-slate-500 text-sm font-medium">Loading lookup parameters...</p>
+            </div>
+        </div>
+    );
+}
+
+function PlayerLookupContent() {
     const { id } = useParams();
     const { data: session } = useSession();
     const searchParams = useSearchParams();
@@ -391,5 +402,13 @@ export default function PlayerLookup() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function PlayerLookup() {
+    return (
+        <Suspense fallback={<PlayerLookupFallback />}>
+            <PlayerLookupContent />
+        </Suspense>
     );
 }
