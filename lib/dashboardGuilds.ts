@@ -159,7 +159,14 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
                 }
             });
 
-            roleAccessGuilds = (await Promise.all(checks)).filter((guild): guild is VisibleDashboardGuild => Boolean(guild));
+            const resolvedChecks = await Promise.all(checks);
+
+            roleAccessGuilds = [];
+            for (const guild of resolvedChecks) {
+                if (guild) {
+                    roleAccessGuilds.push(guild);
+                }
+            }
         }
     }
 
