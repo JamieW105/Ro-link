@@ -54,6 +54,8 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [userPermissions, setUserPermissions] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [apiLatencyMs, setApiLatencyMs] = useState<number | null>(null);
+    const [apiLatencyState, setApiLatencyState] = useState<'measuring' | 'ready' | 'error'>('measuring');
 
     useEffect(() => {
         if (!session || !id) return;
@@ -94,12 +96,81 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         checkAccess();
     }, [session, id, router]);
 
+    useEffect(() => {
+        let cancelled = false;
+        let inFlight = false;
+
+        async function measureApiLatency() {
+            if (cancelled || inFlight) return;
+
+            inFlight = true;
+            setApiLatencyState((current) => current === 'ready' ? current : 'measuring');
+
+            const startedAt = performance.now();
+
+            try {
+                const response = await fetch(`/api/ping?ts=${Date.now()}`, {
+                    cache: 'no-store',
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Ping failed with ${response.status}`);
+                }
+
+                const durationMs = Math.max(1, Math.round(performance.now() - startedAt));
+                if (!cancelled) {
+                    setApiLatencyMs(durationMs);
+                    setApiLatencyState('ready');
+                }
+            } catch (error) {
+                console.error('[Dashboard] Failed to measure API latency:', error);
+                if (!cancelled) {
+                    setApiLatencyState('error');
+                }
+            } finally {
+                inFlight = false;
+            }
+        }
+
+        const intervalId = window.setInterval(measureApiLatency, 30000);
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                measureApiLatency();
+            }
+        };
+
+        measureApiLatency();
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            cancelled = true;
+            window.clearInterval(intervalId);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
+
     // Close sidebar on pathname change (mobile)
     useEffect(() => {
         setIsSidebarOpen(false);
     }, [pathname]);
 
     if (loading || !userPermissions) return null;
+
+    const networkState = apiLatencyState === 'error'
+        ? { label: 'Unavailable', className: 'text-red-400' }
+        : apiLatencyMs !== null && apiLatencyMs > 600
+            ? { label: 'Degraded', className: 'text-red-400' }
+            : apiLatencyMs !== null && apiLatencyMs > 250
+                ? { label: 'Elevated', className: 'text-amber-400' }
+                : apiLatencyState === 'measuring'
+                    ? { label: 'Measuring', className: 'text-slate-400' }
+                    : { label: 'Nominal', className: 'text-emerald-500' };
+
+    const apiLatencyLabel = apiLatencyState === 'error'
+        ? 'Unavailable'
+        : apiLatencyMs !== null
+            ? `${apiLatencyMs}ms`
+            : '...';
 
     const utilityItems = [
         { label: "Home", icon: <HomeIcon />, href: `/dashboard/${id}` },
@@ -305,11 +376,18 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
                     <div className="flex items-center gap-3 sm:gap-6 text-[10px] font-bold text-slate-600 uppercase tracking-widest">
                         <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_12px_rgba(16,185,129,0.5)]"></div>
-                            <span className="hidden xs:inline">Network:</span> <span className="text-emerald-500">Nominal</span>
+                            <div className={`w-1.5 h-1.5 rounded-full shadow-[0_0_12px_rgba(16,185,129,0.5)] ${networkState.className === 'text-emerald-500'
+                                ? 'bg-emerald-500'
+                                : networkState.className === 'text-amber-400'
+                                    ? 'bg-amber-400'
+                                    : networkState.className === 'text-red-400'
+                                        ? 'bg-red-400'
+                                        : 'bg-slate-400'
+                                }`}></div>
+                            <span className="hidden xs:inline">Network:</span> <span className={networkState.className}>{networkState.label}</span>
                         </div>
                         <div className="h-3 w-[1px] bg-slate-800 hidden sm:block"></div>
-                        <span className="hidden sm:inline">API Latency:</span> <span className="text-sky-500 hidden sm:inline">12ms</span>
+                        <span className="hidden sm:inline">API Latency:</span> <span className={`hidden sm:inline ${apiLatencyState === 'error' ? 'text-red-400' : 'text-sky-500'}`}>{apiLatencyLabel}</span>
                     </div>
                 </header>
 
