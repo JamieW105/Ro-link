@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -77,6 +78,9 @@ export default function Home() {
 
           {/* Desktop Links */}
           <div className="hidden md:flex items-center gap-8">
+            <Link href="/posts" className="text-sm font-semibold text-slate-400 hover:text-white transition-colors">
+              Updates
+            </Link>
             <a href="/docs" className="text-sm font-semibold text-slate-400 hover:text-white transition-colors">
               Documentation
             </a>
@@ -105,8 +109,11 @@ export default function Home() {
         </nav>
 
         {/* Mobile Menu */}
-        <div className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-48 opacity-100 mb-8' : 'max-h-0 opacity-0'}`}>
+        <div className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-64 opacity-100 mb-8' : 'max-h-0 opacity-0'}`}>
           <div className="flex flex-col gap-4 bg-slate-900/50 border border-slate-800 p-6 rounded-2xl backdrop-blur-sm">
+            <Link href="/posts" className="text-base font-semibold text-slate-300 hover:text-white transition-colors">
+              Updates
+            </Link>
             <a href="/docs" className="text-base font-semibold text-slate-300 hover:text-white transition-colors">
               Documentation
             </a>
@@ -178,8 +185,9 @@ export default function Home() {
         <footer className="mt-24 md:mt-40 py-12 border-t border-slate-800/50 flex flex-col md:flex-row items-center justify-between text-slate-500">
           <p className="text-sm font-medium">© {new Date().getFullYear()} Ro-Link Systems Group</p>
           <div className="flex gap-8 mt-6 md:mt-0">
-            <a href="#" className="text-xs hover:text-white transition-colors">Legal</a>
-            <a href="#" className="text-xs hover:text-white transition-colors">Privacy</a>
+            <Link href="/posts" className="text-xs hover:text-white transition-colors">Updates</Link>
+            <Link href="/terms" className="text-xs hover:text-white transition-colors">Legal</Link>
+            <Link href="/privacy" className="text-xs hover:text-white transition-colors">Privacy</Link>
             <a href="#" className="text-xs hover:text-white transition-colors">Status</a>
           </div>
         </footer>

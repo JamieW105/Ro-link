@@ -4,6 +4,7 @@ export type ManagementPermission =
     | 'RO_LINK_DASHBOARD'
     | 'MANAGE_SERVERS'
     | 'POST_JOB_APPLICATION'
+    | 'POST_UPDATES'
     | 'BLOCK_SERVERS'
     | 'MANAGE_RO_LINK';
 
@@ -18,6 +19,7 @@ export async function getManagementUser(discordId: string) {
                     'RO_LINK_DASHBOARD',
                     'MANAGE_SERVERS',
                     'POST_JOB_APPLICATION',
+                    'POST_UPDATES',
                     'BLOCK_SERVERS',
                     'MANAGE_RO_LINK'
                 ] as ManagementPermission[]

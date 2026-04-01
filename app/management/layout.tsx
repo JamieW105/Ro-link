@@ -20,7 +20,7 @@ export default function ManagementLayout({
             const userId = (session.user as any).id;
             // Cherubdude check
             if (userId === '953414442060746854') {
-                setPerms(['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'BLOCK_SERVERS', 'MANAGE_RO_LINK']);
+                setPerms(['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'POST_UPDATES', 'BLOCK_SERVERS', 'MANAGE_RO_LINK']);
                 setLoading(false);
                 return;
             }
@@ -62,6 +62,7 @@ export default function ManagementLayout({
         { name: 'Overview', href: '/management', icon: 'M3 9h18M9 3v18', perm: 'RO_LINK_DASHBOARD' },
         { name: 'Servers', href: '/management/servers', icon: 'M5 12h14M12 5l7 7-7 7', perm: 'MANAGE_SERVERS' },
         { name: 'Job Apps', href: '/management/jobs', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', perm: 'POST_JOB_APPLICATION' },
+        { name: 'Updates', href: '/management/posts', icon: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01', perm: 'POST_UPDATES' },
         { name: 'Blocking', href: '/management/blocking', icon: 'M18.36 6.64a9 9 0 11-12.73 0M12 2v10', perm: 'BLOCK_SERVERS' },
         { name: 'People', href: '/management/people', icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m11-10a4 4 0 11-8 0 4 4 0 018 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zm-2 4v2', perm: 'MANAGE_RO_LINK' },
     ];
@@ -78,21 +79,25 @@ export default function ManagementLayout({
                 </div>
 
                 <nav className="flex-1 p-4 space-y-1">
-                    {filteredNav.map((item) => (
-                        <Link
-                            key={item.name}
-                            href={item.href}
-                            className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${pathname === item.href
+                    {filteredNav.map((item) => {
+                        const isActive = pathname === item.href || (item.href !== '/management' && pathname.startsWith(`${item.href}/`));
+
+                        return (
+                            <Link
+                                key={item.name}
+                                href={item.href}
+                                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive
                                     ? 'bg-sky-600/10 text-sky-400 border border-sky-500/20'
                                     : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                                }`}
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} />
-                            </svg>
-                            {item.name}
-                        </Link>
-                    ))}
+                                    }`}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} />
+                                </svg>
+                                {item.name}
+                            </Link>
+                        );
+                    })}
                 </nav>
 
                 <div className="p-4 border-t border-slate-800">

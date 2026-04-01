@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS public.management_roles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL UNIQUE,
-    permissions TEXT[] DEFAULT '{}', -- ['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'BLOCK_SERVERS', 'MANAGE_RO_LINK']
+    permissions TEXT[] DEFAULT '{}', -- ['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'POST_UPDATES', 'BLOCK_SERVERS', 'MANAGE_RO_LINK']
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -49,10 +49,33 @@ CREATE TABLE IF NOT EXISTS public.job_submissions (
     UNIQUE(application_id, discord_id) -- Only 1 submission per application per user
 );
 
+-- Update Posts
+CREATE TABLE IF NOT EXISTS public.update_posts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slug TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    major_features JSONB NOT NULL DEFAULT '[]',
+    minor_updates TEXT[] NOT NULL DEFAULT '{}',
+    qol_updates TEXT[] NOT NULL DEFAULT '{}',
+    bug_fixes TEXT[] NOT NULL DEFAULT '{}',
+    author_discord_id TEXT,
+    published_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Insert initial Admin role for cherubdude
 INSERT INTO public.management_roles (name, permissions)
-VALUES ('Super Admin', ARRAY['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'BLOCK_SERVERS', 'MANAGE_RO_LINK'])
+VALUES ('Super Admin', ARRAY['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'POST_UPDATES', 'BLOCK_SERVERS', 'MANAGE_RO_LINK'])
 ON CONFLICT (name) DO NOTHING;
+
+UPDATE public.management_roles
+SET permissions = ARRAY(
+    SELECT DISTINCT permission
+    FROM unnest(COALESCE(permissions, ARRAY[]::TEXT[]) || ARRAY['POST_UPDATES']) AS permission
+)
+WHERE name = 'Super Admin';
 
 -- Assign cherubdude to the initial role (id will be fetched or we can use a subquery)
 INSERT INTO public.management_users (discord_id, role_id)

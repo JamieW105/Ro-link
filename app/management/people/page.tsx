@@ -18,6 +18,7 @@ const ALL_PERMISSIONS = [
     { id: 'RO_LINK_DASHBOARD', name: 'Ro-Link Dashboard' },
     { id: 'MANAGE_SERVERS', name: 'Manage Servers' },
     { id: 'POST_JOB_APPLICATION', name: 'Post Job Application' },
+    { id: 'POST_UPDATES', name: 'Post Updates' },
     { id: 'BLOCK_SERVERS', name: 'Block Servers' },
     { id: 'MANAGE_RO_LINK', name: 'Manage Ro-Link (Full Admin)' },
 ];
