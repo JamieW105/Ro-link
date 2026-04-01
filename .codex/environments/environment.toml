@@ -23,3 +23,14 @@ git add .
 git commit -m "Auto Commit"
 git push
 '''
+
+[[actions]]
+name = "Push to main"
+icon = "tool"
+command = '''
+git checkout main
+
+git add .
+git commit -m "Main Push"
+git push
+'''
