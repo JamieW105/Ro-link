@@ -182,7 +182,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             <aside className={`
                 fixed inset-y-0 left-0 w-[85vw] max-w-72 bg-[#020617] border-r border-slate-800 z-[70] 
                 transform transition-transform duration-300 ease-in-out flex flex-col
-                md:max-w-none md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+                md:w-72 md:max-w-none md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
                 <div className="p-6 flex flex-col h-full">
                     <div className="flex items-center justify-between mb-8">
