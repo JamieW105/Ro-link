@@ -178,8 +178,8 @@ export default function Home() {
         <footer className="mt-24 md:mt-40 py-12 border-t border-slate-800/50 flex flex-col md:flex-row items-center justify-between text-slate-500">
           <p className="text-sm font-medium">© {new Date().getFullYear()} Ro-Link Systems Group</p>
           <div className="flex gap-8 mt-6 md:mt-0">
-            <a href="#" className="text-xs hover:text-white transition-colors">Legal</a>
-            <a href="#" className="text-xs hover:text-white transition-colors">Privacy</a>
+            <a href="/terms" className="text-xs hover:text-white transition-colors">Legal</a>
+            <a href="/privacy" className="text-xs hover:text-white transition-colors">Privacy</a>
             <a href="#" className="text-xs hover:text-white transition-colors">Status</a>
           </div>
         </footer>
