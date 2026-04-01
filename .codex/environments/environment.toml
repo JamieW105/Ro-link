@@ -12,25 +12,25 @@ command = "npm run bot"
 
 [[actions]]
 name = "Run app"
-icon = "tool"
+icon = "run"
 command = "npm run dev"
 
 [[actions]]
-name = "PushTo git"
+name = "Push as preview"
 icon = "tool"
 command = '''
 git add .
 git commit -m "Auto Commit"
+git checkout Preview
 git push
 '''
 
 [[actions]]
-name = "Push to main"
+name = "Push as main"
 icon = "tool"
 command = '''
-git checkout main
-
 git add .
-git commit -m "Main Push"
+git commit -m "Auto Commit"
+git checkout main
 git push
 '''
