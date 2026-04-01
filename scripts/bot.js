@@ -1,9 +1,15 @@
 const { Client, GatewayIntentBits, ActivityType, REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
 const { setGlobalDispatcher, Agent } = require('undici');
-require('dotenv').config({ path: '.env.local' });
+require('dotenv').config({ path: '.env.local', quiet: true });
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const hasSupabaseConfig = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL
+    && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+const supabase = hasSupabaseConfig
+    ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    : null;
 
 setGlobalDispatcher(new Agent({
     connect: { timeout: 60_000 },
@@ -96,7 +102,6 @@ const commands = [
         options: [
             {
                 name: 'user',
-                description: 'The user to update (Moderators only)',
                 type: 6, // USER
                 required: false
             }
@@ -177,6 +182,8 @@ async function refreshCommands() {
 let statusIndex = 0;
 
 async function syncStats() {
+    if (!supabase) return;
+
     let serverCount = client.guilds.cache.size;
     try {
         await supabase
@@ -188,6 +195,8 @@ async function syncStats() {
 }
 
 async function cleanupLiveServers() {
+    if (!supabase) return;
+
     try {
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
         const { error, count } = await supabase
@@ -401,6 +410,9 @@ client.once('ready', () => {
     console.log(`✅ Logged in as ${client.user.tag}!`);
     let serverCount = client.guilds.cache.size;
     console.log(`The bot is in ${serverCount} servers.`);
+    if (!supabase) {
+        console.warn('[BOT] Missing NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY. Running in Discord-only mode for command registration.');
+    }
 
     updateStatus();
     refreshCommands();
@@ -422,6 +434,8 @@ client.on('guildDelete', guild => {
 });
 
 client.on('guildMemberAdd', async member => {
+    if (!supabase) return;
+
     const { guild, id: userId } = member;
 
     try {
@@ -463,6 +477,8 @@ client.on('guildMemberAdd', async member => {
 });
 
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isChatInputCommand()) return;
 
     const { commandName, guildId, user, guild } = interaction;
@@ -985,6 +1001,8 @@ client.on('interactionCreate', async interaction => {
 
 // Handle Select Menu Interactions
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isStringSelectMenu()) return;
 
     if (interaction.customId === 'misc_menu') {
@@ -1020,6 +1038,8 @@ client.on('interactionCreate', async interaction => {
 
 // Handle Modal Submissions (Misc)
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isModalSubmit()) return;
 
     if (interaction.customId.startsWith('misc_modal_')) {
@@ -1057,6 +1077,8 @@ client.on('interactionCreate', async interaction => {
 
 // Handle Button Interactions
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isButton()) return;
 
     const customId = interaction.customId;
@@ -1168,6 +1190,8 @@ client.on('interactionCreate', async interaction => {
 
 // Handle Modal Submissions
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isModalSubmit()) return;
 
     if (interaction.customId === 'setup_modal') {
@@ -1366,6 +1390,8 @@ return RoLink`;
 
 // Handle Report Button
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isButton()) return;
     if (interaction.customId !== 'report_open') return;
 
@@ -1401,6 +1427,8 @@ client.on('interactionCreate', async interaction => {
 
 // Handle Report Submission
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isModalSubmit()) return;
     if (interaction.customId !== 'report_submit') return;
 

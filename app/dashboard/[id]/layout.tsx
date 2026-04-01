@@ -169,7 +169,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const allItems = [...utilityItems, ...moderationItems, ...settingItems];
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-200 flex flex-col md:flex-row font-sans">
+        <div className="min-h-screen bg-[#020617] text-slate-200 flex min-w-0 flex-col md:flex-row font-sans">
             {/* Sidebar Overlay (Mobile) */}
             {isSidebarOpen && (
                 <div
@@ -180,9 +180,9 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
             {/* Sidebar (Desktop & Mobile Drawer) */}
             <aside className={`
-                fixed inset-y-0 left-0 w-72 bg-[#020617] border-r border-slate-800 z-[70] 
+                fixed inset-y-0 left-0 w-[85vw] max-w-72 bg-[#020617] border-r border-slate-800 z-[70] 
                 transform transition-transform duration-300 ease-in-out flex flex-col
-                md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+                md:max-w-none md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
                 <div className="p-6 flex flex-col h-full">
                     <div className="flex items-center justify-between mb-8">
@@ -284,9 +284,9 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             </aside>
 
             {/* Main Content Area */}
-            <main className="flex-1 md:ml-72 min-h-screen flex flex-col">
-                <header className="h-16 border-b border-slate-800 bg-[#020617]/80 backdrop-blur-md flex items-center justify-between px-4 md:px-10 sticky top-0 z-50">
-                    <div className="flex items-center gap-3">
+            <main className="flex-1 min-w-0 md:ml-72 min-h-screen flex flex-col">
+                <header className="sticky top-0 z-50 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-[#020617]/80 px-4 py-3 backdrop-blur-md md:h-16 md:flex-nowrap md:px-10 md:py-0">
+                    <div className="flex min-w-0 items-center gap-3">
                         <button
                             onClick={() => setIsSidebarOpen(true)}
                             className="md:hidden p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
@@ -294,16 +294,16 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                         </button>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
                             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest hidden sm:block">Server ID</span>
                             <div className="h-4 w-[1px] bg-slate-800 mx-2 hidden sm:block"></div>
-                            <code className="text-[10px] font-mono text-sky-400 bg-sky-400/5 px-2 py-1 rounded border border-sky-400/10 uppercase tracking-wider truncate max-w-[100px] sm:max-w-none">
+                            <code className="max-w-[180px] truncate rounded border border-sky-400/10 bg-sky-400/5 px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-sky-400 sm:max-w-none">
                                 {id}
                             </code>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3 sm:gap-6 text-[10px] font-bold text-slate-600 uppercase tracking-widest">
+                    <div className="flex w-full items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-600 sm:w-auto sm:justify-end sm:gap-6">
                         <div className="flex items-center gap-2">
                             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_12px_rgba(16,185,129,0.5)]"></div>
                             <span className="hidden xs:inline">Network:</span> <span className="text-emerald-500">Nominal</span>
@@ -313,7 +313,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                     </div>
                 </header>
 
-                <div className="p-4 md:p-10 flex-1 bg-gradient-to-tr from-[#020617] via-[#020617] to-sky-950/5">
+                <div className="min-w-0 flex-1 bg-gradient-to-tr from-[#020617] via-[#020617] to-sky-950/5 p-4 md:p-10">
                     <PermissionsProvider permissions={userPermissions}>
                         {children}
                     </PermissionsProvider>

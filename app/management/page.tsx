@@ -30,9 +30,9 @@ export default function ManagementOverview() {
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6 md:space-y-8">
             <header>
-                <h1 className="text-3xl font-extrabold text-white tracking-tight">Management Overview</h1>
+                <h1 className="text-2xl font-extrabold tracking-tight text-white md:text-3xl">Management Overview</h1>
                 <p className="text-slate-400 mt-1">Global statistics and status for Ro-Link.</p>
             </header>
 
@@ -43,7 +43,7 @@ export default function ManagementOverview() {
                     { label: 'Job Submissions', value: stats.totalSubmissions, color: 'text-purple-400', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
                     { label: 'Blocked Servers', value: stats.blockedServers, color: 'text-red-400', icon: 'M18.36 6.64a9 9 0 11-12.73 0M12 2v10' },
                 ].map((stat) => (
-                    <div key={stat.label} className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl">
+                    <div key={stat.label} className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 md:p-6">
                         <div className="flex items-center justify-between mb-4">
                             <div className={`p-2 rounded-lg bg-slate-800 ${stat.color}`}>
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -57,8 +57,8 @@ export default function ManagementOverview() {
                 ))}
             </div>
 
-            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8">
-                <h2 className="text-xl font-bold text-white mb-4">Developer Note</h2>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6 md:p-8">
+                <h2 className="mb-4 text-lg font-bold text-white md:text-xl">Developer Note</h2>
                 <p className="text-slate-400 leading-relaxed">
                     This dashboard is restricted to authorized personnel. You can manage servers, block abusive communities, and handle job applications for the Ro-Link team.
                     Be careful with deletions as they are permanent.

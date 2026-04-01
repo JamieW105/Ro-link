@@ -101,8 +101,9 @@ export default function ManageServers() {
                     <div className="w-8 h-8 border-2 border-sky-600 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             ) : (
-                <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
-                    <table className="w-full text-left text-sm">
+                <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50">
+                    <div className="table-responsive">
+                    <table className="w-full min-w-[720px] text-left text-sm">
                         <thead className="bg-slate-800/50 text-slate-400 font-medium uppercase text-[10px] tracking-widest border-b border-slate-800">
                             <tr>
                                 <th className="px-6 py-4">Server</th>
@@ -175,6 +176,7 @@ export default function ManageServers() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             )}
 
