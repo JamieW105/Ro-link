@@ -11,7 +11,7 @@ export default function TermsPage() {
                 </Link>
 
                 <h1 className="text-5xl font-black text-white mb-4 tracking-tight uppercase italic">Terms of Service</h1>
-                <p className="text-slate-500 text-sm font-bold uppercase tracking-[0.3em] mb-12">Last Updated: February 13, 2026</p>
+                <p className="text-slate-500 text-sm font-bold uppercase tracking-[0.3em] mb-12">Last Updated: March 30, 2026</p>
 
                 <div className="space-y-12 leading-relaxed">
                     <section>
