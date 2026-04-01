@@ -249,7 +249,18 @@ function RoLink:Execute(cmd)
     local function isAdmin() return not self.settings or self.settings.adminCmdsEnabled ~= false end
     local function isMisc() return not self.settings or self.settings.miscCmdsEnabled ~= false end
 
-    if not player and cmd.command ~= "UPDATE" and cmd.command ~= "SHUTDOWN" then return end
+    local commandsWithoutLiveTarget = {
+        UPDATE = true,
+        SHUTDOWN = true,
+        BAN = true,
+        UNBAN = true,
+        SOFTBAN = true,
+        BROADCAST = true,
+        GRAVITY = true,
+        BRIGHTNESS = true
+    }
+
+    if not player and not commandsWithoutLiveTarget[cmd.command] then return end
 
 	if cmd.command == "KICK" and isAdmin() then
 		if player then player:Kick(reason) end
@@ -279,6 +290,22 @@ function RoLink:Execute(cmd)
 				end)
 			end
 		end)
+    elseif cmd.command == "SOFTBAN" and isAdmin() then
+        task.spawn(function()
+            local success, userId = pcall(function() return Players:GetUserIdFromNameAsync(username) end)
+            local durationSeconds = tonumber(cmd.args.duration_seconds) or 3600
+            if success and userId then
+                pcall(function()
+                    return Players:BanAsync({
+                        UserIds = {userId},
+                        Duration = durationSeconds,
+                        DisplayReason = reason,
+                        PrivateReason = "RoLink Kernel (Temporary): " .. moderator
+                    })
+                end)
+            end
+            if player then player:Kick("Temporarily banned: " .. reason) end
+        end)
 	elseif cmd.command == "FLY" and isMisc() then
 		if player and player.Character then
 			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
@@ -340,6 +367,34 @@ function RoLink:Execute(cmd)
 		if player and player.Character and player.Character:FindFirstChild("Humanoid") then
 			player.Character.Humanoid.Health = player.Character.Humanoid.MaxHealth
 		end
+    elseif cmd.command == "DAMAGE" and isMisc() then
+        local amount = tonumber(cmd.args.amount)
+        local humanoid = player and player.Character and player.Character:FindFirstChild("Humanoid")
+        if humanoid and amount then
+            humanoid:TakeDamage(math.max(amount, 0))
+        end
+    elseif cmd.command == "MAX_HEALTH" and isMisc() then
+        local amount = tonumber(cmd.args.amount)
+        local humanoid = player and player.Character and player.Character:FindFirstChild("Humanoid")
+        if humanoid and amount then
+            humanoid.MaxHealth = math.max(amount, 1)
+            if humanoid.Health > humanoid.MaxHealth then
+                humanoid.Health = humanoid.MaxHealth
+            end
+        end
+    elseif cmd.command == "WALK_SPEED" and isMisc() then
+        local amount = tonumber(cmd.args.amount)
+        local humanoid = player and player.Character and player.Character:FindFirstChild("Humanoid")
+        if humanoid and amount then
+            humanoid.WalkSpeed = amount
+        end
+    elseif cmd.command == "JUMP_POWER" and isMisc() then
+        local amount = tonumber(cmd.args.amount)
+        local humanoid = player and player.Character and player.Character:FindFirstChild("Humanoid")
+        if humanoid and amount then
+            humanoid.UseJumpPower = true
+            humanoid.JumpPower = amount
+        end
 	elseif cmd.command == "KILL" and isMisc() then
 		if player and player.Character and player.Character:FindFirstChild("Humanoid") then
 			player.Character.Humanoid.Health = 0
@@ -353,15 +408,75 @@ function RoLink:Execute(cmd)
 			player.CharacterAdded:Wait()
 			player.Character:SetPrimaryPartCFrame(cf)
 		end
+    elseif cmd.command == "FREEZE" and isMisc() then
+        local hrp = player and player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.Anchored = true
+        end
+    elseif cmd.command == "UNFREEZE" and isMisc() then
+        local hrp = player and player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.Anchored = false
+        end
+    elseif cmd.command == "BRING_TO_SPAWN" and isMisc() then
+        local hrp = player and player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        local spawnLocation = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
+        if hrp and spawnLocation then
+            hrp.CFrame = spawnLocation.CFrame + Vector3.new(0, 5, 0)
+        end
+    elseif cmd.command == "TELEPORT_TO_ME" and isMisc() then
+        local hrp = player and player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        local moderatorPlayer = Players:FindFirstChild(cmd.args.moderator_roblox_username or "")
+        local moderatorRoot = moderatorPlayer and moderatorPlayer.Character and moderatorPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp and moderatorRoot then
+            hrp.CFrame = moderatorRoot.CFrame * CFrame.new(2, 0, 0)
+        end
+    elseif cmd.command == "FORCEFIELD_ADD" and isMisc() then
+        if player and player.Character and not player.Character:FindFirstChildOfClass("ForceField") then
+            local forceField = Instance.new("ForceField")
+            forceField.Parent = player.Character
+        end
+    elseif cmd.command == "FORCEFIELD_REMOVE" and isMisc() then
+        if player and player.Character then
+            for _, child in ipairs(player.Character:GetChildren()) do
+                if child:IsA("ForceField") then
+                    child:Destroy()
+                end
+            end
+        end
+    elseif cmd.command == "BROADCAST" and isAdmin() then
+        local message = tostring(cmd.args.message or reason)
+        if message ~= "" then
+            local hint = Instance.new("Hint")
+            hint.Name = "RoLinkBroadcast"
+            hint.Text = message
+            hint.Parent = workspace
+            task.delay(10, function()
+                if hint and hint.Parent then
+                    hint:Destroy()
+                end
+            end)
+        end
+    elseif cmd.command == "GRAVITY" and isAdmin() then
+        local amount = tonumber(cmd.args.amount)
+        if amount then
+            workspace.Gravity = amount
+        end
+    elseif cmd.command == "BRIGHTNESS" and isAdmin() then
+        local amount = tonumber(cmd.args.amount)
+        if amount then
+            game:GetService("Lighting").Brightness = amount
+        end
 	elseif cmd.command == "UPDATE" and isAdmin() then
+        local updateMessage = reason ~= "" and reason or "Server is updating. Please rejoin in a moment!"
 		for _, player in ipairs(Players:GetPlayers()) do
-			player:Kick("Server is updating. Please rejoin in a moment!")
+			player:Kick(updateMessage)
 		end
 	elseif cmd.command == "SHUTDOWN" and isAdmin() then
 		local targetJobId = cmd.args.job_id
 		if not targetJobId or targetJobId == game.JobId then
 			for _, p in ipairs(Players:GetPlayers()) do
-				p:Kick("This server has been shut down by a moderator.")
+				p:Kick(reason ~= "" and reason or "This server has been shut down by a moderator.")
 			end
 		end
 	end

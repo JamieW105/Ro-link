@@ -52,8 +52,35 @@ export const ADMIN_PANEL_COMMAND_GROUPS = ADMIN_PANEL_COMMANDS.reduce<Array<{ ca
 
 export const ADMIN_PANEL_COMMAND_IDS = ADMIN_PANEL_COMMANDS.map((command) => command.id);
 
-export const MISC_ACTION_COMMAND_IDS = ['FLY', 'NOCLIP', 'INVIS', 'GHOST', 'HEAL', 'KILL', 'RESET', 'REFRESH', 'SET_CHAR'] as const;
+export const MODERATION_COMMAND_IDS = ['KICK', 'BAN', 'UNBAN', 'SOFTBAN'] as const;
+export const VALUE_INPUT_COMMAND_IDS = ['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED', 'JUMP_POWER'] as const;
+export const MISC_ACTION_COMMAND_IDS = [
+    'FLY',
+    'NOCLIP',
+    'INVIS',
+    'GHOST',
+    'HEAL',
+    'KILL',
+    'RESET',
+    'REFRESH',
+    'SET_CHAR',
+    'DAMAGE',
+    'MAX_HEALTH',
+    'WALK_SPEED',
+    'JUMP_POWER',
+    'FREEZE',
+    'UNFREEZE',
+    'BRING_TO_SPAWN',
+    'TELEPORT_TO_ME',
+    'FORCEFIELD_ADD',
+    'FORCEFIELD_REMOVE',
+] as const;
 export const GLOBAL_COMMAND_IDS = ['BROADCAST', 'GRAVITY', 'BRIGHTNESS', 'UPDATE', 'SHUTDOWN'] as const;
+
+export function getAdminPanelCommandDefinition(commandId: string) {
+    const normalizedCommand = normalizeAdminPanelCommand(commandId);
+    return ADMIN_PANEL_COMMANDS.find((command) => command.id === normalizedCommand) || null;
+}
 
 const KNOWN_COMMAND_IDS = new Set<string>(ADMIN_PANEL_COMMAND_IDS);
 

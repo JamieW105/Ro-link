@@ -119,11 +119,28 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'You do not have permission to use that Roblox admin command.' }, { status: 403 });
         }
 
+        const { data: verifiedUser } = await supabase
+            .from('verified_users')
+            .select('roblox_username')
+            .eq('discord_id', discordUserId)
+            .maybeSingle<{ roblox_username?: string | null }>();
+
+        const moderatorRobloxUsername = trimString(verifiedUser?.roblox_username);
+        if (command === 'TELEPORT_TO_ME' && !moderatorRobloxUsername) {
+            return NextResponse.json({
+                error: 'Link your Discord account to Roblox before using Teleport To Me from the dashboard.',
+            }, { status: 400 });
+        }
+
         const moderator = trimString(session.user?.name) || 'Web Admin';
         const baseArgs: CommandArgs = {
             ...args,
             moderator,
         };
+
+        if (moderatorRobloxUsername) {
+            baseArgs.moderator_roblox_username = moderatorRobloxUsername;
+        }
 
         const deliveryTargets = await resolveDeliveryTargets(serverId, command, baseArgs);
         if (deliveryTargets.length === 0) {

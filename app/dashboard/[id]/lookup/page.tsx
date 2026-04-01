@@ -2,7 +2,7 @@
 
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect, useCallback } from "react";
-import { hasAdminPanelCommandAccess } from "@/lib/adminPanelCommands";
+import { getAdminPanelCommandDefinition, hasAdminPanelCommandAccess, MODERATION_COMMAND_IDS } from "@/lib/adminPanelCommands";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@/context/PermissionsContext";
@@ -61,8 +61,14 @@ function PlayerLookupContent() {
     const [loading, setLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [reasonText, setReasonText] = useState("Dashboard action");
+    const [softBanDurationMinutes, setSoftBanDurationMinutes] = useState("60");
 
     const perms = usePermissions();
+
+    function hasActionAccess(action: string) {
+        return perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, action);
+    }
 
     // Fetch Server Config (Place ID)
     useEffect(() => {
@@ -142,24 +148,29 @@ function PlayerLookupContent() {
         performSearch(query);
     }
 
-    async function handleAction(action: 'KICK' | 'BAN' | 'UNBAN') {
+    async function handleAction(action: typeof MODERATION_COMMAND_IDS[number]) {
         if (!player || !id) return;
 
-        const hasCommandPermission = perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, action);
-
-        // Permission Checks
-        if (action === 'KICK' && !hasCommandPermission) {
-            alert("You do not have permission to KICK players.");
+        if (!hasActionAccess(action)) {
+            alert(`You do not have permission to ${getAdminPanelCommandDefinition(action)?.label || action}.`);
             return;
         }
 
-        if ((action === 'BAN' || action === 'UNBAN') && !hasCommandPermission) {
-            alert(`You do not have permission to ${action} players.`);
+        if (action === 'KICK' && !presence?.inGame) {
+            alert("Kick only works while the target is in a live server.");
             return;
         }
+
+        const reason = reasonText.trim() || 'Dashboard action';
+        const softBanMinutes = Number(softBanDurationMinutes);
+        const softBanSeconds = Number.isFinite(softBanMinutes) && softBanMinutes > 0
+            ? String(Math.round(softBanMinutes * 60))
+            : '3600';
 
         const confirmMsg = action === 'BAN'
             ? `Are you sure you want to PERMANENTLY BAN ${player.username}?`
+            : action === 'SOFTBAN'
+                ? `Soft ban ${player.username} for ${Math.round(Number(softBanSeconds) / 60)} minute(s)?`
             : action === 'KICK'
                 ? `Kick ${player.username} from the game?`
                 : `Unban ${player.username}?`;
@@ -177,7 +188,8 @@ function PlayerLookupContent() {
                 args: {
                     username: player.username,
                     job_id: action === 'KICK' ? presence?.jobId : null,
-                    reason: 'Dashboard Action',
+                    reason,
+                    ...(action === 'SOFTBAN' ? { duration_seconds: softBanSeconds } : {}),
                 }
             })
         });
@@ -187,7 +199,7 @@ function PlayerLookupContent() {
         if (!response.ok) {
             alert("Error: " + (payload.error || 'Failed to send command.'));
         } else {
-            alert(`${action} signal sent to Roblox! (Instant via Open Cloud)`);
+            alert(`${getAdminPanelCommandDefinition(action)?.label || action} signal sent to Roblox.`);
 
             // Re-fetch logs
             const { data } = await supabase.from('logs').select('*').eq('server_id', id).eq('target', player.username).order('timestamp', { ascending: false });
@@ -324,7 +336,7 @@ function PlayerLookupContent() {
                                     {logs.map((log) => (
                                         <div key={log.id} className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4 flex items-center justify-between group hover:bg-slate-800/50 transition-all">
                                             <div className="flex items-center gap-4">
-                                                <div className={`w-2 h-2 rounded-full ${log.action === 'BAN' ? 'bg-red-500' : log.action === 'KICK' ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
+                                                <div className={`w-2 h-2 rounded-full ${log.action === 'BAN' ? 'bg-red-500' : log.action === 'SOFTBAN' ? 'bg-rose-400' : log.action === 'KICK' ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
                                                 <div>
                                                     <span className="text-[10px] font-bold text-white uppercase tracking-wider">{log.action}</span>
                                                     <p className="text-[11px] text-slate-500 mt-1 font-medium">By {log.moderator} • {new Date(log.timestamp).toLocaleDateString()}</p>
@@ -350,24 +362,56 @@ function PlayerLookupContent() {
                                 </div>
                                 Quick Actions
                             </h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_180px] gap-4 mb-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Reason</label>
+                                    <textarea
+                                        value={reasonText}
+                                        onChange={(event) => setReasonText(event.target.value)}
+                                        rows={3}
+                                        className="w-full bg-black/40 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all resize-none"
+                                        placeholder="Why are you taking this action?"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Soft Ban Minutes</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={softBanDurationMinutes}
+                                        onChange={(event) => setSoftBanDurationMinutes(event.target.value)}
+                                        className="w-full bg-black/40 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all"
+                                    />
+                                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                                        Used only for Soft Ban.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                                 <button
                                     onClick={() => handleAction('KICK')}
-                                    disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'KICK'))}
+                                    disabled={actionLoading || !hasActionAccess('KICK') || !presence?.inGame}
                                     className="px-6 py-4 bg-orange-600/10 border border-orange-500/20 hover:bg-orange-500/20 text-orange-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     KICK PLAYER
                                 </button>
                                 <button
                                     onClick={() => handleAction('BAN')}
-                                    disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'BAN'))}
+                                    disabled={actionLoading || !hasActionAccess('BAN')}
                                     className="px-6 py-4 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     BAN PLAYER
                                 </button>
                                 <button
+                                    onClick={() => handleAction('SOFTBAN')}
+                                    disabled={actionLoading || !hasActionAccess('SOFTBAN')}
+                                    className="px-6 py-4 bg-rose-600/10 border border-rose-500/20 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    SOFT BAN
+                                </button>
+                                <button
                                     onClick={() => handleAction('UNBAN')}
-                                    disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'UNBAN'))}
+                                    disabled={actionLoading || !hasActionAccess('UNBAN')}
                                     className="px-6 py-4 bg-emerald-600/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     UNBAN PLAYER
