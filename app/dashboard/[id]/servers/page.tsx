@@ -6,13 +6,14 @@ import { useParams } from "next/navigation";
 
 import { usePermissions } from "@/context/PermissionsContext";
 import { hasAdminPanelCommandAccess } from "@/lib/adminPanelCommands";
+import { normalizeLivePlayerList } from "@/lib/livePlayers";
 import { supabase } from "@/lib/supabase";
 
 interface LiveServer {
     id: string;
     server_id: string;
     player_count: number;
-    players?: string[];
+    players?: unknown;
     updated_at: string;
 }
 
@@ -25,6 +26,10 @@ const GLOBAL_TARGET_VALUE = 'GLOBAL';
 
 function trimString(value: unknown) {
     return String(value ?? '').trim();
+}
+
+function formatServerId(serverId: string) {
+    return `${serverId.slice(0, 8).toUpperCase()}...`;
 }
 
 export default function ServersPage() {
@@ -90,9 +95,21 @@ export default function ServersPage() {
     const canShutdown = perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'SHUTDOWN');
     const hasGlobalControls = canBroadcast || canGravity || canBrightness || canRestart || canShutdown;
 
-    const totalPlayers = liveServers.reduce((sum, server) => sum + server.player_count, 0);
+    const normalizedServers = liveServers.map((server) => {
+        const players = normalizeLivePlayerList(server.players).sort((left, right) =>
+            left.username.localeCompare(right.username, undefined, { sensitivity: 'base' }),
+        );
+
+        return {
+            ...server,
+            players,
+            visiblePlayerCount: players.length > 0 ? players.length : Number(server.player_count || 0),
+        };
+    });
+
+    const totalPlayers = normalizedServers.reduce((sum, server) => sum + server.visiblePlayerCount, 0);
     const targetIsGlobal = selectedTarget === GLOBAL_TARGET_VALUE;
-    const targetLabel = targetIsGlobal ? 'all live servers' : `server ${selectedTarget.slice(0, 8).toUpperCase()}...`;
+    const targetLabel = targetIsGlobal ? 'all live servers' : `server ${formatServerId(selectedTarget)}`;
 
     function buildTargetArgs(extraArgs: Record<string, unknown> = {}) {
         return {
@@ -146,7 +163,7 @@ export default function ServersPage() {
         <div className="space-y-8 max-w-7xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="flex flex-col gap-2">
                 <h1 className="text-2xl font-bold text-white tracking-tight">Live Servers</h1>
-                <p className="text-slate-500 text-sm font-medium">Monitor live jobs and run Ro-Link world and server commands with per-role permission gates.</p>
+                <p className="text-slate-500 text-sm font-medium">Monitor live jobs, expand each server roster, and drill into any active Roblox player.</p>
             </div>
 
             {hasGlobalControls && (
@@ -160,14 +177,14 @@ export default function ServersPage() {
                                 className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
                             >
                                 <option value={GLOBAL_TARGET_VALUE}>Global (all live servers)</option>
-                                {liveServers.map((server) => (
+                                {normalizedServers.map((server) => (
                                     <option key={server.id} value={server.id}>
-                                        Server {server.id.slice(0, 8).toUpperCase()}... ({server.player_count} players)
+                                        Server {formatServerId(server.id)} ({server.visiblePlayerCount} players)
                                     </option>
                                 ))}
                             </select>
                             <div className="h-[42px] rounded-lg border border-slate-800 bg-black/30 px-4 flex items-center text-sm text-slate-300 font-medium">
-                                {targetIsGlobal ? 'All live servers' : `One live server: ${selectedTarget.slice(0, 8).toUpperCase()}...`}
+                                {targetIsGlobal ? 'All live servers' : `One live server: ${formatServerId(selectedTarget)}`}
                             </div>
                         </div>
                     </div>
@@ -204,7 +221,7 @@ export default function ServersPage() {
                                         }
                                         sendCommand('BROADCAST', { message }, undefined, `Broadcast queued for ${targetLabel}.`);
                                     }}
-                                    disabled={actionLoading === 'BROADCAST' || liveServers.length === 0}
+                                    disabled={actionLoading === 'BROADCAST' || normalizedServers.length === 0}
                                     className="w-full px-4 py-2.5 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
                                 >
                                     {actionLoading === 'BROADCAST' ? 'Sending Broadcast...' : 'Send Broadcast'}
@@ -230,7 +247,7 @@ export default function ServersPage() {
                                             />
                                             <button
                                                 onClick={() => sendCommand('GRAVITY', { amount: trimString(gravityValue) }, undefined, `Gravity queued for ${targetLabel}.`)}
-                                                disabled={actionLoading === 'GRAVITY' || liveServers.length === 0}
+                                                disabled={actionLoading === 'GRAVITY' || normalizedServers.length === 0}
                                                 className="px-4 py-2.5 bg-slate-800 hover:bg-sky-600 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
                                             >
                                                 {actionLoading === 'GRAVITY' ? '...' : 'Apply'}
@@ -250,7 +267,7 @@ export default function ServersPage() {
                                             />
                                             <button
                                                 onClick={() => sendCommand('BRIGHTNESS', { amount: trimString(brightnessValue) }, undefined, `Brightness queued for ${targetLabel}.`)}
-                                                disabled={actionLoading === 'BRIGHTNESS' || liveServers.length === 0}
+                                                disabled={actionLoading === 'BRIGHTNESS' || normalizedServers.length === 0}
                                                 className="px-4 py-2.5 bg-slate-800 hover:bg-sky-600 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
                                             >
                                                 {actionLoading === 'BRIGHTNESS' ? '...' : 'Apply'}
@@ -278,7 +295,7 @@ export default function ServersPage() {
                                         />
                                         <button
                                             onClick={() => sendCommand('UPDATE', { reason: trimString(restartReason) }, `Restart ${targetLabel}? Players will be moved through a reserved server and then back into public servers.`, `Restart queued for ${targetLabel}.`)}
-                                            disabled={actionLoading === 'UPDATE' || liveServers.length === 0}
+                                            disabled={actionLoading === 'UPDATE' || normalizedServers.length === 0}
                                             className="w-full px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
                                         >
                                             {actionLoading === 'UPDATE' ? 'Queueing Restart...' : 'Restart Target'}
@@ -296,7 +313,7 @@ export default function ServersPage() {
                                         />
                                         <button
                                             onClick={() => sendCommand('SHUTDOWN', { reason: trimString(shutdownReason) }, `Shut down ${targetLabel}? Players in the targeted live servers will be disconnected.`, `Shutdown queued for ${targetLabel}.`)}
-                                            disabled={actionLoading === 'SHUTDOWN' || liveServers.length === 0}
+                                            disabled={actionLoading === 'SHUTDOWN' || normalizedServers.length === 0}
                                             className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
                                         >
                                             {actionLoading === 'SHUTDOWN' ? 'Queueing Shutdown...' : 'Shutdown Target'}
@@ -312,7 +329,7 @@ export default function ServersPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5">
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Live Servers</span>
-                    <h3 className="text-3xl font-bold text-white mt-1">{liveServers.length}</h3>
+                    <h3 className="text-3xl font-bold text-white mt-1">{normalizedServers.length}</h3>
                 </div>
                 <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5">
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Concurrent Users</span>
@@ -320,76 +337,135 @@ export default function ServersPage() {
                 </div>
                 <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5">
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Avg Players</span>
-                    <h3 className="text-3xl font-bold text-slate-200 mt-1">{liveServers.length > 0 ? (totalPlayers / liveServers.length).toFixed(1) : "0.0"}</h3>
+                    <h3 className="text-3xl font-bold text-slate-200 mt-1">{normalizedServers.length > 0 ? (totalPlayers / normalizedServers.length).toFixed(1) : "0.0"}</h3>
                 </div>
             </div>
 
             <div className="bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden">
                 <div className="px-6 py-5 border-b border-slate-800 flex justify-between items-center bg-slate-950/20">
-                    <h2 className="text-sm font-bold text-white uppercase tracking-wider">Servers List</h2>
+                    <h2 className="text-sm font-bold text-white uppercase tracking-wider">Server List</h2>
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Update: 10s</span>
                 </div>
 
-                {liveServers.length === 0 ? (
+                {normalizedServers.length === 0 ? (
                     <div className="p-24 text-center text-slate-600 font-bold uppercase text-[10px] tracking-widest">
                         No live servers found.
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                            <thead className="text-slate-500 uppercase text-[10px] font-bold tracking-widest bg-slate-800/30">
-                                <tr>
-                                    <th className="px-8 py-3">Status</th>
-                                    <th className="px-8 py-3">Server ID</th>
-                                    <th className="px-8 py-3 text-center">Players</th>
-                                    <th className="px-8 py-3 text-right">Last Seen</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/50">
-                                {liveServers.map((server) => (
-                                    <React.Fragment key={server.id}>
-                                        <tr
-                                            className="hover:bg-sky-500/5 transition-all cursor-pointer"
-                                            onClick={() => setExpandedServerId(expandedServerId === server.id ? null : server.id)}
-                                        >
-                                            <td className="px-8 py-4 text-emerald-500 font-bold uppercase text-[10px]">Nominal</td>
-                                            <td className="px-8 py-4 font-mono text-[10px] text-slate-400">{server.id.substring(0, 16).toUpperCase()}...</td>
-                                            <td className="px-8 py-4 text-center font-bold text-white">{server.player_count}</td>
-                                            <td className="px-8 py-4 text-right text-slate-500 font-mono text-[10px] font-bold">
-                                                {new Date(server.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                                            </td>
-                                        </tr>
-                                        {expandedServerId === server.id && (
-                                            <tr className="bg-slate-900/40">
-                                                <td colSpan={4} className="px-8 py-6 border-t border-slate-800/50">
-                                                    {server.players && server.players.length > 0 ? (
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {server.players.map((playerName) => (
-                                                                <Link
-                                                                    key={playerName}
-                                                                    href={`/dashboard/${id}/lookup?username=${playerName}`}
-                                                                    className="px-3 py-1.5 bg-slate-800 hover:bg-sky-600/20 text-slate-300 hover:text-sky-500 rounded-lg text-xs font-semibold transition-all border border-slate-700 hover:border-sky-500/50"
-                                                                >
-                                                                    {playerName}
-                                                                </Link>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-xs text-slate-500 font-medium italic">No players detected or server is empty.</p>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </React.Fragment>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="divide-y divide-slate-800/60">
+                        {normalizedServers.map((server) => {
+                            const isExpanded = expandedServerId === server.id;
+
+                            return (
+                                <div key={server.id} className="bg-slate-950/10">
+                                    <button
+                                        type="button"
+                                        onClick={() => setExpandedServerId(isExpanded ? null : server.id)}
+                                        className="w-full px-5 py-5 text-left transition-all hover:bg-sky-500/5"
+                                    >
+                                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                            <div className="flex items-start gap-4">
+                                                <div className={`mt-1 flex h-10 w-10 items-center justify-center rounded-xl border text-sm font-black transition-transform ${isExpanded
+                                                    ? 'border-sky-500/30 bg-sky-500/10 text-sky-400 rotate-180'
+                                                    : 'border-slate-800 bg-black/30 text-slate-500'
+                                                    }`}>
+                                                    <span>v</span>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-400">
+                                                            Nominal
+                                                        </span>
+                                                        <span className="rounded-full border border-slate-800 bg-black/30 px-2 py-1 text-[10px] font-mono uppercase tracking-widest text-slate-400">
+                                                            {formatServerId(server.id)}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-sm font-medium text-slate-400">
+                                                        Expand this live server to inspect every connected Roblox user and open their full command page.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:min-w-[360px]">
+                                                <div className="rounded-xl border border-slate-800 bg-black/20 px-4 py-3">
+                                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Players</p>
+                                                    <p className="mt-1 text-xl font-bold text-white">{server.visiblePlayerCount}</p>
+                                                </div>
+                                                <div className="rounded-xl border border-slate-800 bg-black/20 px-4 py-3">
+                                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Last Seen</p>
+                                                    <p className="mt-1 text-sm font-semibold text-slate-300">
+                                                        {new Date(server.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                    </p>
+                                                </div>
+                                                <div className="rounded-xl border border-slate-800 bg-black/20 px-4 py-3 col-span-2 sm:col-span-1">
+                                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Roster</p>
+                                                    <p className="mt-1 text-sm font-semibold text-slate-300">
+                                                        {server.players.length > 0 ? `${server.players.length} resolved` : 'Legacy names only'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    {isExpanded && (
+                                        <div className="border-t border-slate-800/60 px-5 pb-5">
+                                            {server.players.length > 0 ? (
+                                                <div className="grid gap-3 pt-5">
+                                                    {server.players.map((player) => (
+                                                        <Link
+                                                            key={`${server.id}-${player.userId || player.username}`}
+                                                            href={`/dashboard/${id}/players/${encodeURIComponent(player.username)}`}
+                                                            className="group flex flex-col gap-4 rounded-2xl border border-slate-800 bg-black/20 p-4 transition-all hover:border-sky-500/30 hover:bg-sky-500/5 md:flex-row md:items-center md:justify-between"
+                                                        >
+                                                            <div className="flex items-center gap-4 min-w-0">
+                                                                {player.avatarUrl ? (
+                                                                    <img
+                                                                        src={player.avatarUrl}
+                                                                        alt={player.username}
+                                                                        className="h-14 w-14 rounded-2xl border border-slate-800 bg-slate-900 object-cover"
+                                                                    />
+                                                                ) : (
+                                                                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-lg font-black text-slate-500">
+                                                                        {player.username.slice(0, 1).toUpperCase()}
+                                                                    </div>
+                                                                )}
+
+                                                                <div className="min-w-0 space-y-1">
+                                                                    <p className="truncate text-base font-bold text-white">{player.displayName}</p>
+                                                                    <p className="truncate text-sm font-medium text-slate-400">@{player.username}</p>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex flex-col gap-3 md:items-end">
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    <span className="rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                                        User ID {player.userId || 'Unknown'}
+                                                                    </span>
+                                                                    <span className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-sky-400">
+                                                                        Open Player Page
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-[11px] font-medium text-slate-500 group-hover:text-slate-300">
+                                                                    View Roblox info, moderation history, and live commands for this user.
+                                                                </p>
+                                                            </div>
+                                                        </Link>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="pt-5 text-xs text-slate-500 font-medium italic">No players detected or this server is running an older bridge payload.</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
 
             <div className="p-5 bg-slate-900 border border-slate-800 rounded-xl text-[11px] text-slate-500 font-medium">
-                Servers that stop sending data are automatically removed from this list. Restart commands now bounce players through a reserved server before returning them to a public server.
+                Servers that stop sending data are automatically removed from this list. Player cards stay compatible with the older flat roster format while the Roblox bridge updates.
             </div>
         </div>
     );

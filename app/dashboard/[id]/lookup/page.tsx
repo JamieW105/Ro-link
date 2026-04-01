@@ -2,7 +2,8 @@
 
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect, useCallback } from "react";
-import { hasAdminPanelCommandAccess } from "@/lib/adminPanelCommands";
+import { canUseDashboardCommand } from "@/lib/adminPanelCommands";
+import { findLivePlayer } from "@/lib/livePlayers";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@/context/PermissionsContext";
@@ -96,9 +97,7 @@ function PlayerLookupContent() {
             ]);
 
             if (serversRes.data) {
-                const activeServer = serversRes.data.find((s: any) =>
-                    s.players?.some((p: string) => p.toLowerCase() === data.username.toLowerCase())
-                );
+                const activeServer = serversRes.data.find((s: any) => findLivePlayer(s.players, data.username) || findLivePlayer(s.players, String(data.id)));
                 if (activeServer) {
                     setPresence({ inGame: true, jobId: activeServer.id });
                 } else {
@@ -145,7 +144,7 @@ function PlayerLookupContent() {
     async function handleAction(action: 'KICK' | 'BAN' | 'UNBAN') {
         if (!player || !id) return;
 
-        const hasCommandPermission = perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, action);
+        const hasCommandPermission = canUseDashboardCommand(perms, action);
 
         // Permission Checks
         if (action === 'KICK' && !hasCommandPermission) {
@@ -353,21 +352,21 @@ function PlayerLookupContent() {
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <button
                                     onClick={() => handleAction('KICK')}
-                                    disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'KICK'))}
+                                    disabled={actionLoading || !canUseDashboardCommand(perms, 'KICK')}
                                     className="px-6 py-4 bg-orange-600/10 border border-orange-500/20 hover:bg-orange-500/20 text-orange-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     KICK PLAYER
                                 </button>
                                 <button
                                     onClick={() => handleAction('BAN')}
-                                    disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'BAN'))}
+                                    disabled={actionLoading || !canUseDashboardCommand(perms, 'BAN')}
                                     className="px-6 py-4 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     BAN PLAYER
                                 </button>
                                 <button
                                     onClick={() => handleAction('UNBAN')}
-                                    disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'UNBAN'))}
+                                    disabled={actionLoading || !canUseDashboardCommand(perms, 'UNBAN')}
                                     className="px-6 py-4 bg-emerald-600/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     UNBAN PLAYER

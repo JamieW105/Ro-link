@@ -52,8 +52,20 @@ export const ADMIN_PANEL_COMMAND_GROUPS = ADMIN_PANEL_COMMANDS.reduce<Array<{ ca
 
 export const ADMIN_PANEL_COMMAND_IDS = ADMIN_PANEL_COMMANDS.map((command) => command.id);
 
+export const MODERATION_COMMAND_IDS = ['KICK', 'BAN', 'UNBAN', 'SOFTBAN'] as const;
 export const MISC_ACTION_COMMAND_IDS = ['FLY', 'NOCLIP', 'INVIS', 'GHOST', 'HEAL', 'KILL', 'RESET', 'REFRESH', 'SET_CHAR'] as const;
 export const GLOBAL_COMMAND_IDS = ['BROADCAST', 'GRAVITY', 'BRIGHTNESS', 'UPDATE', 'SHUTDOWN'] as const;
+export const VALUE_INPUT_COMMAND_IDS = ['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED', 'JUMP_POWER'] as const;
+export const TARGETED_PLAYER_COMMANDS = ADMIN_PANEL_COMMANDS.filter((command) =>
+    command.requiresTarget && !MODERATION_COMMAND_IDS.includes(command.id as typeof MODERATION_COMMAND_IDS[number]),
+);
+
+export interface DashboardCommandPermissionShape {
+    is_admin?: boolean;
+    can_kick?: boolean;
+    can_ban?: boolean;
+    allowed_misc_cmds?: unknown;
+}
 
 const KNOWN_COMMAND_IDS = new Set<string>(ADMIN_PANEL_COMMAND_IDS);
 
@@ -124,4 +136,25 @@ export function hasAnyAdminPanelCommand(rawCommands: unknown, commandIds?: reado
 
     const subset = new Set(commandIds.map((commandId) => normalizeAdminPanelCommand(commandId)));
     return commands.some((commandId) => subset.has(commandId));
+}
+
+export function canUseDashboardCommand(permissions: DashboardCommandPermissionShape | null | undefined, commandId: string) {
+    if (!permissions) {
+        return false;
+    }
+
+    if (permissions.is_admin) {
+        return true;
+    }
+
+    const normalizedCommand = normalizeAdminPanelCommand(commandId);
+    if (normalizedCommand === 'KICK') {
+        return permissions.can_kick === true;
+    }
+
+    if (normalizedCommand === 'BAN' || normalizedCommand === 'UNBAN' || normalizedCommand === 'SOFTBAN') {
+        return permissions.can_ban === true;
+    }
+
+    return hasAdminPanelCommandAccess(permissions.allowed_misc_cmds, normalizedCommand);
 }

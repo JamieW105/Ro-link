@@ -3,6 +3,7 @@ import nacl from 'tweetnacl';
 import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { logAction } from '@/lib/logger';
+import { findLivePlayer } from '@/lib/livePlayers';
 
 export const runtime = 'edge';
 
@@ -175,10 +176,7 @@ async function fetchRobloxLookup(username: string, serverId: string, openCloudKe
 
     const liveServers = Array.isArray(liveServersRes.data) ? liveServersRes.data : [];
     const moderationHistory = Array.isArray(logsRes.data) ? logsRes.data : [];
-    const activeServer = liveServers.find((liveServer: any) =>
-        Array.isArray(liveServer?.players)
-        && liveServer.players.some((player: string) => String(player || '').toLowerCase() === resolvedUsername.toLowerCase())
-    );
+    const activeServer = liveServers.find((liveServer: any) => findLivePlayer(liveServer?.players, resolvedUsername));
 
     return {
         id: matchedUser.id,
@@ -1375,7 +1373,21 @@ function RoLink:Initialize()
 					Url = URL .. "/api/roblox/poll",
 					Method = "POST",
 					Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. KEY },
-					Body = Http:JSONEncode({ jobId = id, playerCount = #Players:GetPlayers(), players = (function() local l = {} for _, p in ipairs(Players:GetPlayers()) do table.insert(l, p.Name) end return l end)() })
+					Body = Http:JSONEncode({
+						jobId = id,
+						playerCount = #Players:GetPlayers(),
+						players = (function()
+							local list = {}
+							for _, p in ipairs(Players:GetPlayers()) do
+								table.insert(list, {
+									username = p.Name,
+									displayName = p.DisplayName,
+									userId = p.UserId
+								})
+							end
+							return list
+						end)()
+					})
 				})
 			end)
 			if s and r.StatusCode == 200 then

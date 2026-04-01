@@ -1,18 +1,27 @@
 'use client';
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { hasAdminPanelCommandAccess, MISC_ACTION_COMMAND_IDS } from "@/lib/adminPanelCommands";
+
+import { canUseDashboardCommand, MISC_ACTION_COMMAND_IDS } from "@/lib/adminPanelCommands";
+import { normalizeLivePlayerList } from "@/lib/livePlayers";
 import { supabase } from "@/lib/supabase";
 import { usePermissions } from "@/context/PermissionsContext";
 
 interface LiveServer {
     id: string;
-    players: string[];
-    updated_at?: string;
+    players?: unknown;
 }
 
-// Icons
+interface PlayerSummary {
+    name: string;
+    displayName: string;
+    userId: string | null;
+    avatarUrl: string | null;
+    serverId: string;
+}
+
 const MagicIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" /><path d="M17.8 11.8 19 13" /><path d="M15 9h0" /><path d="M17.8 6.2 19 5" /><path d="m3 21 9-9" /><path d="M12.2 6.2 11 5" />
@@ -33,31 +42,40 @@ const SearchIcon = () => (
 
 export default function MiscPage() {
     const { id: guildId } = useParams();
-    const [players, setPlayers] = useState<{ name: string; serverId: string }[]>([]);
+    const [players, setPlayers] = useState<PlayerSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [charUser, setCharUser] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
 
+    const perms = usePermissions();
+
     useEffect(() => {
         async function fetchPlayers() {
             if (!guildId) return;
+
             const { data, error } = await supabase
                 .from('live_servers')
                 .select('id, players')
                 .eq('server_id', guildId);
 
             if (!error && data) {
-                const allPlayers: { name: string; serverId: string }[] = [];
+                const allPlayers: PlayerSummary[] = [];
                 data.forEach((server: LiveServer) => {
-                    if (Array.isArray(server.players)) {
-                        server.players.forEach(p => {
-                            if (p) allPlayers.push({ name: String(p), serverId: server.id });
+                    normalizeLivePlayerList(server.players).forEach((player) => {
+                        allPlayers.push({
+                            name: player.username,
+                            displayName: player.displayName,
+                            userId: player.userId,
+                            avatarUrl: player.avatarUrl,
+                            serverId: server.id,
                         });
-                    }
+                    });
                 });
+
                 setPlayers(allPlayers);
             }
+
             setLoading(false);
         }
 
@@ -66,14 +84,10 @@ export default function MiscPage() {
         return () => clearInterval(interval);
     }, [guildId]);
 
-    const perms = usePermissions();
-
     async function handleAction(target: string, action: string, extraArgs = {}) {
         if (!guildId) return;
 
-        // Final permission check before sending
-        const isAllowed = perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, action);
-        if (!isAllowed) {
+        if (!canUseDashboardCommand(perms, action)) {
             alert("You do not have permission to use this command.");
             return;
         }
@@ -88,30 +102,30 @@ export default function MiscPage() {
                 command: action,
                 args: {
                     username: target,
-                    ...extraArgs
-                }
-            })
+                    ...extraArgs,
+                },
+            }),
         });
 
         if (!res.ok) {
             const data = await res.json().catch(() => ({}));
             alert("Error: " + (data.error || 'Failed to send command.'));
         }
+
         setActionLoading(null);
     }
 
     if (loading) return null;
 
     const query = (searchQuery || "").toLowerCase();
-    const filteredPlayers = players.filter(p =>
-        (p.name || "").toLowerCase().includes(query)
+    const filteredPlayers = players.filter((player) =>
+        player.name.toLowerCase().includes(query)
+        || player.displayName.toLowerCase().includes(query),
     );
 
-    const isManualTarget = query.length > 0 && !players.some(p => (p.name || "").toLowerCase() === query);
-
-    const availableActions = [...MISC_ACTION_COMMAND_IDS].filter(action =>
-        perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, action)
-    );
+    const isManualTarget = query.length > 0 && !players.some((player) => player.name.toLowerCase() === query);
+    const availableActions = [...MISC_ACTION_COMMAND_IDS].filter((action) => canUseDashboardCommand(perms, action));
+    const canSetCharacter = canUseDashboardCommand(perms, 'SET_CHAR');
 
     return (
         <div className="space-y-10 max-w-7xl animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -126,7 +140,6 @@ export default function MiscPage() {
             </div>
 
             <div className="w-full">
-                {/* Search & Manual Bar */}
                 <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4 items-center">
                     <div className="relative flex-1 w-full">
                         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-500">
@@ -136,13 +149,12 @@ export default function MiscPage() {
                             type="text"
                             placeholder="Search live players or enter username for manual action..."
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onChange={(event) => setSearchQuery(event.target.value)}
                             className="w-full bg-black/40 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
                         />
                     </div>
                 </div>
 
-                {/* Player List */}
                 <div className="bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden shadow-xl min-h-[400px]">
                     <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/20 flex justify-between items-center">
                         <h2 className="text-xs font-bold text-white uppercase tracking-widest">
@@ -151,7 +163,6 @@ export default function MiscPage() {
                     </div>
 
                     <div className="divide-y divide-slate-800/50 max-h-[700px] overflow-y-auto custom-scrollbar">
-                        {/* Manual Target Row (Only shown if searching and no exact match) */}
                         {isManualTarget && (
                             <div className="p-6 bg-sky-500/5 border-b border-sky-500/10">
                                 <div className="flex items-center gap-2 mb-4">
@@ -159,7 +170,7 @@ export default function MiscPage() {
                                     <h3 className="font-bold text-white text-sm">{searchQuery}</h3>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
-                                    {availableActions.map(action => (
+                                    {availableActions.map((action) => (
                                         <button
                                             key={action}
                                             disabled={actionLoading === `${searchQuery}-${action}`}
@@ -173,13 +184,13 @@ export default function MiscPage() {
                                         </button>
                                     ))}
                                 </div>
-                                {(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'SET_CHAR')) && (
+                                {canSetCharacter && (
                                     <div className="mt-4 flex gap-2 max-w-md">
                                         <input
                                             type="text"
                                             placeholder="Username to copy appearance..."
                                             value={charUser}
-                                            onChange={(e) => setCharUser(e.target.value)}
+                                            onChange={(event) => setCharUser(event.target.value)}
                                             className="flex-1 bg-black/40 border border-slate-800 rounded-md px-3 py-1.5 text-[11px] text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
                                         />
                                         <button
@@ -202,21 +213,37 @@ export default function MiscPage() {
                                 {searchQuery ? "No matching players found." : "No players online."}
                             </div>
                         ) : (
-                            filteredPlayers.map(player => (
+                            filteredPlayers.map((player) => (
                                 <div key={`${player.name}-${player.serverId}`} className="p-6 hover:bg-sky-500/5 transition-all">
                                     <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 border border-slate-700">
-                                                <UserIcon />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-bold text-white text-sm">{player.name}</h3>
-                                                <p className="text-[10px] font-mono text-slate-500 uppercase tracking-tighter">SERVER: {player.serverId.substring(0, 8)}...</p>
+                                        <div className="flex items-center gap-4 min-w-0">
+                                            {player.avatarUrl ? (
+                                                <img
+                                                    src={player.avatarUrl}
+                                                    alt={player.name}
+                                                    className="w-10 h-10 rounded-full border border-slate-700 bg-slate-900 object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 border border-slate-700">
+                                                    <UserIcon />
+                                                </div>
+                                            )}
+
+                                            <div className="min-w-0">
+                                                <Link
+                                                    href={`/dashboard/${guildId}/players/${encodeURIComponent(player.name)}`}
+                                                    className="font-bold text-white text-sm hover:text-sky-400 transition-colors"
+                                                >
+                                                    {player.displayName}
+                                                </Link>
+                                                <p className="truncate text-[10px] font-mono text-slate-500 uppercase tracking-tighter">
+                                                    @{player.name} • {player.userId || 'NO ID'} • SERVER: {player.serverId.substring(0, 8)}...
+                                                </p>
                                             </div>
                                         </div>
 
                                         <div className="flex flex-wrap gap-2">
-                                            {availableActions.map(action => (
+                                            {availableActions.map((action) => (
                                                 <button
                                                     key={action}
                                                     disabled={actionLoading === `${player.name}-${action}`}
@@ -232,14 +259,13 @@ export default function MiscPage() {
                                         </div>
                                     </div>
 
-                                    {/* Set Char Input */}
-                                    {(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'SET_CHAR')) && (
+                                    {canSetCharacter && (
                                         <div className="mt-4 flex gap-2 max-w-md">
                                             <input
                                                 type="text"
                                                 placeholder="Enter Character Username..."
                                                 value={charUser}
-                                                onChange={(e) => setCharUser(e.target.value)}
+                                                onChange={(event) => setCharUser(event.target.value)}
                                                 className="flex-1 bg-black/40 border border-slate-800 rounded-md px-3 py-1.5 text-[11px] text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
                                             />
                                             <button

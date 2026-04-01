@@ -5,7 +5,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import {
     ADMIN_PANEL_COMMAND_IDS,
     GLOBAL_COMMAND_IDS,
-    hasAdminPanelCommandAccess,
+    canUseDashboardCommand,
     normalizeAdminPanelCommand,
 } from '@/lib/adminPanelCommands';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        if (!permissions.is_admin && !hasAdminPanelCommandAccess(permissions.allowed_misc_cmds, command)) {
+        if (!canUseDashboardCommand(permissions, command)) {
             return NextResponse.json({ error: 'You do not have permission to use that Roblox admin command.' }, { status: 403 });
         }
 
