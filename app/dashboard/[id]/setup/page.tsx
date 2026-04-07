@@ -208,7 +208,11 @@ function RoLink:Initialize()
 						players = (function()
 							local pList = {}
 							for _, p in ipairs(Players:GetPlayers()) do
-								table.insert(pList, p.Name)
+								table.insert(pList, {
+									username = p.Name,
+									displayName = p.DisplayName,
+									userId = p.UserId
+								})
 							end
 							return pList
 						end)()

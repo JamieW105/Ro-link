@@ -2,7 +2,8 @@
 
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect, useCallback } from "react";
-import { getAdminPanelCommandDefinition, hasAdminPanelCommandAccess, MODERATION_COMMAND_IDS } from "@/lib/adminPanelCommands";
+import { canUseDashboardCommand, getAdminPanelCommandDefinition, MODERATION_COMMAND_IDS } from "@/lib/adminPanelCommands";
+import { findLivePlayer } from "@/lib/livePlayers";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@/context/PermissionsContext";
@@ -67,7 +68,7 @@ function PlayerLookupContent() {
     const perms = usePermissions();
 
     function hasActionAccess(action: string) {
-        return perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, action);
+        return canUseDashboardCommand(perms, action);
     }
 
     // Fetch Server Config (Place ID)
@@ -102,9 +103,7 @@ function PlayerLookupContent() {
             ]);
 
             if (serversRes.data) {
-                const activeServer = serversRes.data.find((s: any) =>
-                    s.players?.some((p: string) => p.toLowerCase() === data.username.toLowerCase())
-                );
+                const activeServer = serversRes.data.find((s: any) => findLivePlayer(s.players, data.username) || findLivePlayer(s.players, String(data.id)));
                 if (activeServer) {
                     setPresence({ inGame: true, jobId: activeServer.id });
                 } else {

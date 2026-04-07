@@ -31,6 +31,7 @@ export default function ReportDetailsPage() {
     const [reason, setReason] = useState("");
     const [discordUser, setDiscordUser] = useState<any | null>(null); // For fetching Discord profile data (avatar, etc)
     const [serverName, setServerName] = useState<string>("this server");
+    const [guildNameMap, setGuildNameMap] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (!id || !reportId) return;
@@ -38,15 +39,24 @@ export default function ReportDetailsPage() {
         async function fetchData() {
             setLoading(true);
 
-            // Fetch Server Name
-            const { data: serverInfo } = await supabase
-                .from('servers')
-                .select('name')
-                .eq('id', String(id))
-                .maybeSingle();
+            // Fetch guild names from Discord-backed API instead of assuming servers.name exists in Supabase.
+            try {
+                const guildsRes = await fetch('/api/guilds');
+                const guildsData = await guildsRes.json();
 
-            if (serverInfo && serverInfo.name) {
-                setServerName(serverInfo.name);
+                if (Array.isArray(guildsData)) {
+                    const nextGuildNameMap = Object.fromEntries(
+                        guildsData.map((guild: any) => [String(guild.id), guild.name || String(guild.id)])
+                    );
+                    setGuildNameMap(nextGuildNameMap);
+
+                    const currentGuild = guildsData.find((guild: any) => String(guild.id) === String(id));
+                    if (currentGuild?.name) {
+                        setServerName(currentGuild.name);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to fetch guild names:", error);
             }
 
             // 1. Fetch Report Details
@@ -79,17 +89,14 @@ export default function ReportDetailsPage() {
             setProfiles(profileData);
 
             // 3. Fetch Global Moderation Logs
-            // Search logs for the reported target OR the linked Roblox username if found
-            // Use server_id explicit join to avoid 400 errors on some Supabase setups
+            // Search logs for the reported target OR the linked Roblox username if found.
+            // Do not join against servers here; some deployments do not expose a usable logs->servers relationship.
             const searchTargets = [reportData.reported_roblox_username];
             if (profileData?.roblox_username) searchTargets.push(profileData.roblox_username);
 
             const { data: logsData } = await supabase
                 .from('logs')
-                .select(`
-                    *,
-                    servers!server_id ( name )
-                `)
+                .select('*')
                 .in('target', searchTargets)
                 .order('timestamp', { ascending: false });
 
@@ -323,7 +330,9 @@ export default function ReportDetailsPage() {
                                             <div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[10px] font-bold text-white uppercase tracking-wider">{log.action}</span>
-                                                    <span className="text-[9px] font-bold text-slate-500 px-1.5 py-px bg-slate-800 rounded border border-slate-700">{log.servers?.name || "Unknown Server"}</span>
+                                                    <span className="text-[9px] font-bold text-slate-500 px-1.5 py-px bg-slate-800 rounded border border-slate-700">
+                                                        {guildNameMap[String(log.server_id)] || (log.server_id ? `Server ${String(log.server_id).slice(0, 8)}` : "Unknown Server")}
+                                                    </span>
                                                 </div>
                                                 <p className="text-[11px] text-slate-500 mt-1 font-medium">By {log.moderator} • {new Date(log.timestamp).toLocaleDateString()}</p>
                                             </div>

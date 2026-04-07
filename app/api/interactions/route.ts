@@ -3,6 +3,7 @@ import nacl from 'tweetnacl';
 import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { logAction } from '@/lib/logger';
+import { findLivePlayer } from '@/lib/livePlayers';
 
 export const runtime = 'edge';
 
@@ -40,6 +41,156 @@ async function verifyDiscordRequest(request: Request) {
         console.error('Verify Exception:', e);
         return { isValid: false };
     }
+}
+
+type LookupHistoryEntry = {
+    action?: string | null;
+    moderator?: string | null;
+    timestamp?: string | null;
+};
+
+type RobloxLookupResult = {
+    id: number | string;
+    username: string;
+    displayName: string;
+    description: string;
+    created: string;
+    isBanned: boolean;
+    avatarUrl: string;
+    hasApiKey: boolean;
+    inGame: boolean;
+    jobId: string | null;
+    moderationHistory: LookupHistoryEntry[];
+};
+
+function truncateText(value: unknown, maxLength = 1024) {
+    const text = String(value ?? '').trim();
+    if (!text) {
+        return '';
+    }
+
+    if (text.length <= maxLength) {
+        return text;
+    }
+
+    return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function formatDiscordTimestamp(value?: string | null, style = 'f') {
+    const timestamp = Date.parse(value || '');
+    if (Number.isNaN(timestamp)) {
+        return 'Unknown';
+    }
+
+    return `<t:${Math.floor(timestamp / 1000)}:${style}>`;
+}
+
+function formatModerationHistory(entries: LookupHistoryEntry[]) {
+    if (!Array.isArray(entries) || entries.length === 0) {
+        return 'No prior moderation history found.';
+    }
+
+    return entries.slice(0, 5).map((entry) => {
+        const action = truncateText(entry?.action || 'UNKNOWN', 24);
+        const moderator = truncateText(entry?.moderator || 'Unknown Moderator', 48);
+        return `• \`${action}\` by **${moderator}** ${formatDiscordTimestamp(entry?.timestamp, 'R')}`;
+    }).join('\n');
+}
+
+async function fetchRobloxLookup(username: string, serverId: string, openCloudKey?: string | null): Promise<RobloxLookupResult> {
+    const searchUsername = String(username ?? '').trim();
+    if (!searchUsername) {
+        throw new Error('Please provide a Roblox username to lookup.');
+    }
+
+    const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(searchUsername)}&limit=10`, {
+        headers: {
+            'User-Agent': 'Ro-Link/1.0',
+        }
+    });
+
+    if (!searchRes.ok) {
+        if (searchRes.status === 429) {
+            throw new Error('Roblox rate limited the lookup. Try again in a moment.');
+        }
+
+        throw new Error(`Roblox search failed (${searchRes.status}).`);
+    }
+
+    const searchData = await searchRes.json();
+    const matches = Array.isArray(searchData?.data) ? searchData.data : [];
+    const exactMatch = matches.find((candidate: any) =>
+        String(candidate?.name || '').toLowerCase() === searchUsername.toLowerCase()
+    );
+    const matchedUser = exactMatch || matches[0];
+
+    if (!matchedUser?.id) {
+        throw new Error('Player not found.');
+    }
+
+    const apiKey = String(openCloudKey ?? '').trim();
+    const [legacyProfileRes, cloudProfile, thumbnailData] = await Promise.all([
+        fetch(`https://users.roblox.com/v1/users/${matchedUser.id}`, {
+            headers: {
+                'User-Agent': 'Ro-Link/1.0',
+            }
+        }),
+        apiKey
+            ? fetch(`https://apis.roblox.com/cloud/v2/users/${matchedUser.id}`, {
+                headers: {
+                    'x-api-key': apiKey,
+                }
+            }).then((response) => response.ok ? response.json() : null).catch(() => null)
+            : Promise.resolve(null),
+        fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${matchedUser.id}&size=150x150&format=Png&isCircular=false`, {
+            headers: {
+                'User-Agent': 'Ro-Link/1.0',
+            }
+        }).then((response) => response.ok ? response.json() : { data: [] }).catch(() => ({ data: [] })),
+    ]);
+
+    if (!legacyProfileRes.ok) {
+        throw new Error(`Roblox profile lookup failed (${legacyProfileRes.status}).`);
+    }
+
+    const legacyProfile = await legacyProfileRes.json();
+    const resolvedUsername = legacyProfile?.name || matchedUser.name || searchUsername;
+
+    const [liveServersRes, logsRes] = await Promise.all([
+        supabase
+            .from('live_servers')
+            .select('id, players')
+            .eq('server_id', serverId),
+        supabase
+            .from('logs')
+            .select('action, moderator, timestamp')
+            .eq('server_id', serverId)
+            .ilike('target', resolvedUsername)
+            .order('timestamp', { ascending: false })
+            .limit(5),
+    ]);
+
+    if (logsRes.error) {
+        throw new Error('Failed to load moderation history.');
+    }
+
+    const liveServers = Array.isArray(liveServersRes.data) ? liveServersRes.data : [];
+    const moderationHistory = Array.isArray(logsRes.data) ? logsRes.data : [];
+    const activeServer = liveServers.find((liveServer: any) => findLivePlayer(liveServer?.players, resolvedUsername));
+
+    return {
+        id: matchedUser.id,
+        username: resolvedUsername,
+        displayName: legacyProfile?.displayName || matchedUser.displayName || resolvedUsername,
+        description: legacyProfile?.description || cloudProfile?.about || '',
+        created: legacyProfile?.created || cloudProfile?.createTime || '',
+        isBanned: Boolean(legacyProfile?.isBanned),
+        avatarUrl: thumbnailData?.data?.[0]?.imageUrl || '',
+        hasApiKey: Boolean(apiKey),
+        inGame: Boolean(activeServer),
+        jobId: activeServer?.id || null,
+        moderationHistory,
+    };
 }
 
 
@@ -217,7 +368,7 @@ export async function POST(req: Request) {
                                     },
                                     {
                                         name: '**Moderation Commands**',
-                                        value: "`/ban` - Permanently ban a user\n`/kick` - Kick a user from the server\n`/unban` - Revoke a ban\n`/misc` - Player actions (Fly, Heal, etc.)",
+                                        value: "`/ban` - Permanently ban a user\n`/kick` - Kick a user from the server\n`/unban` - Revoke a ban\n`/lookup` - Roblox profile + moderation history\n`/misc` - Player actions (Fly, Heal, etc.)",
                                         inline: false
                                     },
                                     {
@@ -440,6 +591,49 @@ export async function POST(req: Request) {
             const targetUser = options?.find((o: any) => o.name === 'username')?.value;
             const jobId = options?.find((o: any) => o.name === 'job_id')?.value;
             const reason = options?.find((o: any) => o.name === 'reason')?.value || 'No reason provided';
+
+            if (name === 'lookup') {
+                try {
+                    const lookup = await fetchRobloxLookup(String(targetUser || ''), guild_id, server.open_cloud_key);
+                    const profileUrl = `https://www.roblox.com/users/${lookup.id}/profile`;
+
+                    await logAction(guild_id, 'LOOKUP', lookup.username, userTag, 'Discord lookup command');
+
+                    return NextResponse.json({
+                        type: 4,
+                        data: {
+                            flags: 64,
+                            embeds: [{
+                                title: `Roblox Lookup: ${lookup.username}`,
+                                url: profileUrl,
+                                color: lookup.isBanned ? 0xef4444 : lookup.inGame ? 0x10b981 : 0x0ea5e9,
+                                thumbnail: lookup.avatarUrl ? { url: lookup.avatarUrl } : undefined,
+                                fields: [
+                                    { name: 'Username', value: `[${lookup.username}](${profileUrl})`, inline: true },
+                                    { name: 'Display Name', value: truncateText(lookup.displayName || lookup.username, 256), inline: true },
+                                    { name: 'Roblox ID', value: `\`${lookup.id}\``, inline: true },
+                                    { name: 'Account Created', value: lookup.created ? formatDiscordTimestamp(lookup.created, 'F') : 'Unknown', inline: true },
+                                    { name: 'Status', value: lookup.isBanned ? 'Banned' : lookup.inGame ? 'In Game' : 'Offline', inline: true },
+                                    { name: 'Profile Source', value: lookup.hasApiKey ? 'Public Roblox API + configured Open Cloud key' : 'Public Roblox API', inline: true },
+                                    { name: 'Description', value: truncateText(lookup.description || 'No description provided.', 1024), inline: false },
+                                    { name: 'Moderation History', value: formatModerationHistory(lookup.moderationHistory), inline: false },
+                                    ...(lookup.inGame && lookup.jobId
+                                        ? [{ name: 'Live Server', value: `User is active in job \`${lookup.jobId}\``, inline: false }]
+                                        : []),
+                                ],
+                                footer: { text: `Ro-Link Systems • Lookup Service • ${lookup.moderationHistory.length} prior action(s)` },
+                                timestamp: new Date().toISOString(),
+                            }]
+                        }
+                    });
+                } catch (error: any) {
+                    console.error('[LOOKUP] Error:', error);
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ ${error?.message || 'Failed to lookup that Roblox user.'}`, flags: 64 }
+                    });
+                }
+            }
 
             let message = '';
             if (name === 'ban') {
@@ -1179,7 +1373,21 @@ function RoLink:Initialize()
 					Url = URL .. "/api/roblox/poll",
 					Method = "POST",
 					Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. KEY },
-					Body = Http:JSONEncode({ jobId = id, playerCount = #Players:GetPlayers(), players = (function() local l = {} for _, p in ipairs(Players:GetPlayers()) do table.insert(l, p.Name) end return l end)() })
+					Body = Http:JSONEncode({
+						jobId = id,
+						playerCount = #Players:GetPlayers(),
+						players = (function()
+							local list = {}
+							for _, p in ipairs(Players:GetPlayers()) do
+								table.insert(list, {
+									username = p.Name,
+									displayName = p.DisplayName,
+									userId = p.UserId
+								})
+							end
+							return list
+						end)()
+					})
 				})
 			end)
 			if s and r.StatusCode == 200 then

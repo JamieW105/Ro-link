@@ -246,8 +246,8 @@ export default function ManagePeople() {
                         <div className="p-6 border-b border-slate-800">
                             <h3 className="text-sm font-bold text-white uppercase tracking-widest">Authorized Users</h3>
                         </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
+                        <div className="table-responsive">
+                            <table className="w-full min-w-[560px] text-left text-sm">
                                 <thead className="bg-slate-800/10 text-slate-500 font-bold uppercase text-[10px] tracking-widest">
                                     <tr>
                                         <th className="px-6 py-4">Discord ID</th>

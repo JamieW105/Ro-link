@@ -14,6 +14,7 @@ export default function ManagementLayout({
     const pathname = usePathname();
     const [perms, setPerms] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isNavOpen, setIsNavOpen] = useState(false);
 
     useEffect(() => {
         if (session?.user) {
@@ -37,6 +38,10 @@ export default function ManagementLayout({
             setLoading(false);
         }
     }, [session, status]);
+
+    useEffect(() => {
+        setIsNavOpen(false);
+    }, [pathname]);
 
     if (status === "loading" || loading) {
         return (
@@ -70,15 +75,31 @@ export default function ManagementLayout({
     const filteredNav = navItems.filter(item => perms.includes(item.perm) || perms.includes('MANAGE_RO_LINK'));
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-200 flex flex-col md:flex-row">
+        <div className="min-h-screen bg-[#020617] text-slate-200 flex">
+            {isNavOpen && (
+                <div
+                    className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+                    onClick={() => setIsNavOpen(false)}
+                />
+            )}
+
             {/* Sidebar */}
-            <aside className="w-full md:w-64 bg-[#020617] border-r border-slate-800 flex flex-col">
+            <aside className={`fixed inset-y-0 left-0 z-50 w-[85vw] max-w-72 bg-[#020617] border-r border-slate-800 flex flex-col transform transition-transform duration-300 ease-in-out md:static md:w-64 md:max-w-none md:translate-x-0 ${isNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="p-6 border-b border-slate-800 flex items-center gap-3">
                     <img src="/Media/Ro-LinkIcon.png" alt="" className="w-8 h-8 rounded-lg" />
                     <span className="font-bold text-white tracking-tight">Management</span>
+                    <button
+                        onClick={() => setIsNavOpen(false)}
+                        className="ml-auto rounded-lg border border-slate-800 p-2 text-slate-400 hover:text-white md:hidden"
+                        aria-label="Close navigation"
+                    >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 6l12 12M18 6 6 18" />
+                        </svg>
+                    </button>
                 </div>
 
-                <nav className="flex-1 p-4 space-y-1">
+                <nav className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
                     {filteredNav.map((item) => {
                         const isActive = pathname === item.href || (item.href !== '/management' && pathname.startsWith(`${item.href}/`));
 
@@ -111,8 +132,25 @@ export default function ManagementLayout({
             </aside>
 
             {/* Content */}
-            <main className="flex-1 overflow-auto bg-[#020617] p-4 md:p-8">
-                {children}
+            <main className="flex-1 min-w-0 bg-[#020617] md:ml-0">
+                <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-800 bg-[#020617]/90 px-4 py-4 backdrop-blur-md md:hidden">
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">Ro-Link</p>
+                        <h1 className="text-sm font-bold text-white">Management</h1>
+                    </div>
+                    <button
+                        onClick={() => setIsNavOpen(true)}
+                        className="rounded-xl border border-slate-800 bg-slate-900/60 p-2 text-slate-300 hover:text-white"
+                        aria-label="Open navigation"
+                    >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M3 12h18M3 18h18" />
+                        </svg>
+                    </button>
+                </header>
+                <div className="min-w-0 p-4 md:p-8">
+                    {children}
+                </div>
             </main>
         </div>
     );

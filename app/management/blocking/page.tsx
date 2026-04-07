@@ -109,8 +109,9 @@ export default function BlockServers() {
 
                 {/* List */}
                 <div className="lg:col-span-2">
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
-                        <table className="w-full text-left text-sm">
+                    <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50">
+                        <div className="table-responsive">
+                        <table className="w-full min-w-[640px] text-left text-sm">
                             <thead className="bg-slate-800/50 text-slate-400 font-medium uppercase text-[10px] tracking-widest border-b border-slate-800">
                                 <tr>
                                     <th className="px-6 py-4">Guild ID</th>
@@ -143,6 +144,7 @@ export default function BlockServers() {
                                 )}
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 </div>
             </div>

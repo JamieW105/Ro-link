@@ -11,7 +11,7 @@ export default function TermsPage() {
                 </Link>
 
                 <h1 className="text-5xl font-black text-white mb-4 tracking-tight uppercase italic">Terms of Service</h1>
-                <p className="text-slate-500 text-sm font-bold uppercase tracking-[0.3em] mb-12">Last Updated: February 13, 2026</p>
+                <p className="text-slate-500 text-sm font-bold uppercase tracking-[0.3em] mb-12">Last Updated: March 30, 2026</p>
 
                 <div className="space-y-12 leading-relaxed">
                     <section>
@@ -22,6 +22,7 @@ export default function TermsPage() {
                     <section>
                         <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">2. Description of Service</h2>
                         <p>Ro-Link provides integration services between Roblox and Discord platforms, including but not limited to account verification, role synchronization, and server management automation.</p>
+                        <p className="mt-4">By using Ro-Link in your Discord server or Roblox experience, you acknowledge and agree that trusted Ro-Link staff may join servers where Ro-Link is installed when reasonably necessary for support, moderation review, diagnostics, abuse prevention, or service maintenance.</p>
                     </section>
 
                     <section>
@@ -30,12 +31,17 @@ export default function TermsPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">4. Limitations of Liability</h2>
+                        <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">4. Prohibited Content and Communities</h2>
+                        <p>Ro-Link may not be used in connection with communities, servers, or experiences that use, promote, distribute, or are primarily associated with NSFW, sexual, or otherwise inappropriate content. Any server found to be using NSFW content or clearly associated with NSFW content may have Ro-Link removed from that server without notice.</p>
+                    </section>
+
+                    <section>
+                        <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">5. Limitations of Liability</h2>
                         <p>Ro-Link is provided "as is" without any warranties. We are not responsible for any damage, loss of data, or service interruptions caused by the use of our services, or actions taken by the Roblox or Discord platforms that may affect our functionality.</p>
                     </section>
 
                     <section>
-                        <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">5. Termination</h2>
+                        <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">6. Termination</h2>
                         <p>We reserve the right to terminate or suspend access to our services immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms.</p>
                     </section>
                 </div>

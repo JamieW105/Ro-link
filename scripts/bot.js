@@ -1,9 +1,15 @@
 const { Client, GatewayIntentBits, ActivityType, REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
 const { setGlobalDispatcher, Agent } = require('undici');
-require('dotenv').config({ path: '.env.local' });
+require('dotenv').config({ path: '.env.local', quiet: true });
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const hasSupabaseConfig = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL
+    && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+const supabase = hasSupabaseConfig
+    ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    : null;
 
 setGlobalDispatcher(new Agent({
     connect: { timeout: 60_000 },
@@ -70,6 +76,18 @@ const commands = [
         ]
     },
     {
+        name: 'lookup',
+        description: 'Lookup a Roblox user and review prior moderation history',
+        options: [
+            {
+                name: 'username',
+                description: 'The Roblox username to lookup',
+                type: 3,
+                required: true,
+            }
+        ]
+    },
+    {
         name: 'misc',
         description: 'Perform miscellaneous player actions (Fly, Noclip, etc.)',
         options: []
@@ -84,7 +102,6 @@ const commands = [
         options: [
             {
                 name: 'user',
-                description: 'The user to update (Moderators only)',
                 type: 6, // USER
                 required: false
             }
@@ -165,6 +182,8 @@ async function refreshCommands() {
 let statusIndex = 0;
 
 async function syncStats() {
+    if (!supabase) return;
+
     let serverCount = client.guilds.cache.size;
     try {
         await supabase
@@ -176,6 +195,8 @@ async function syncStats() {
 }
 
 async function cleanupLiveServers() {
+    if (!supabase) return;
+
     try {
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
         const { error, count } = await supabase
@@ -232,10 +253,166 @@ async function updateStatus() {
     syncStats();
 }
 
+function truncateText(value, maxLength = 1024) {
+    const text = String(value ?? '').trim();
+    if (!text) {
+        return '';
+    }
+
+    if (text.length <= maxLength) {
+        return text;
+    }
+
+    return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function formatDiscordTimestamp(value, style = 'f') {
+    const timestamp = Date.parse(value || '');
+    if (Number.isNaN(timestamp)) {
+        return 'Unknown';
+    }
+
+    return `<t:${Math.floor(timestamp / 1000)}:${style}>`;
+}
+
+function formatModerationHistory(entries) {
+    if (!Array.isArray(entries) || entries.length === 0) {
+        return 'No prior moderation history found.';
+    }
+
+    return entries.slice(0, 5).map((entry) => {
+        const action = truncateText(entry?.action || 'UNKNOWN', 24);
+        const moderator = truncateText(entry?.moderator || 'Unknown Moderator', 48);
+        return `• \`${action}\` by **${moderator}** ${formatDiscordTimestamp(entry?.timestamp, 'R')}`;
+    }).join('\n');
+}
+
+async function fetchRobloxLookup(username, serverId) {
+    const searchUsername = String(username ?? '').trim();
+    if (!searchUsername) {
+        throw new Error('Please provide a Roblox username to lookup.');
+    }
+
+    const { data: serverSettings, error: serverError } = await supabase
+        .from('servers')
+        .select('open_cloud_key')
+        .eq('id', serverId)
+        .maybeSingle();
+
+    if (serverError) {
+        throw new Error('Failed to load this server configuration.');
+    }
+
+    const apiKey = typeof serverSettings?.open_cloud_key === 'string'
+        ? serverSettings.open_cloud_key.trim()
+        : '';
+
+    const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(searchUsername)}&limit=10`, {
+        headers: {
+            'User-Agent': 'Ro-Link Bot/1.0',
+        }
+    });
+
+    if (!searchRes.ok) {
+        if (searchRes.status === 429) {
+            throw new Error('Roblox rate limited the lookup. Try again in a moment.');
+        }
+
+        throw new Error(`Roblox search failed (${searchRes.status}).`);
+    }
+
+    const searchData = await searchRes.json();
+    const matches = Array.isArray(searchData?.data) ? searchData.data : [];
+    const exactMatch = matches.find((candidate) =>
+        String(candidate?.name || '').toLowerCase() === searchUsername.toLowerCase()
+    );
+    const matchedUser = exactMatch || matches[0];
+
+    if (!matchedUser?.id) {
+        throw new Error('Player not found.');
+    }
+
+    let cloudProfile = null;
+    if (apiKey) {
+        try {
+            const cloudRes = await fetch(`https://apis.roblox.com/cloud/v2/users/${matchedUser.id}`, {
+                headers: {
+                    'x-api-key': apiKey,
+                }
+            });
+
+            if (cloudRes.ok) {
+                cloudProfile = await cloudRes.json();
+            }
+        } catch (error) {
+            console.warn('[LOOKUP] Open Cloud profile fetch failed:', error?.message || error);
+        }
+    }
+
+    const legacyProfileRes = await fetch(`https://users.roblox.com/v1/users/${matchedUser.id}`, {
+        headers: {
+            'User-Agent': 'Ro-Link Bot/1.0',
+        }
+    });
+
+    if (!legacyProfileRes.ok) {
+        throw new Error(`Roblox profile lookup failed (${legacyProfileRes.status}).`);
+    }
+
+    const [legacyProfile, thumbnailData] = await Promise.all([
+        legacyProfileRes.json(),
+        fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${matchedUser.id}&size=150x150&format=Png&isCircular=false`, {
+            headers: {
+                'User-Agent': 'Ro-Link Bot/1.0',
+            }
+        }).then((response) => response.ok ? response.json() : { data: [] }).catch(() => ({ data: [] })),
+    ]);
+
+    const resolvedUsername = legacyProfile?.name || matchedUser.name || searchUsername;
+
+    const [liveServersRes, logsRes] = await Promise.all([
+        supabase
+            .from('live_servers')
+            .select('id, players')
+            .eq('server_id', serverId),
+        supabase
+            .from('logs')
+            .select('id, action, moderator, timestamp, target')
+            .eq('server_id', serverId)
+            .ilike('target', resolvedUsername)
+            .order('timestamp', { ascending: false })
+            .limit(5),
+    ]);
+
+    const liveServers = Array.isArray(liveServersRes.data) ? liveServersRes.data : [];
+    const moderationHistory = Array.isArray(logsRes.data) ? logsRes.data : [];
+    const activeServer = liveServers.find((server) =>
+        Array.isArray(server.players)
+        && server.players.some((player) => String(player || '').toLowerCase() === resolvedUsername.toLowerCase())
+    );
+
+    return {
+        id: matchedUser.id,
+        username: resolvedUsername,
+        displayName: legacyProfile?.displayName || matchedUser.displayName || resolvedUsername,
+        description: legacyProfile?.description || cloudProfile?.about || '',
+        created: legacyProfile?.created || cloudProfile?.createTime || '',
+        isBanned: Boolean(legacyProfile?.isBanned),
+        avatarUrl: thumbnailData?.data?.[0]?.imageUrl || '',
+        hasApiKey: Boolean(apiKey),
+        inGame: Boolean(activeServer),
+        jobId: activeServer?.id || null,
+        moderationHistory,
+    };
+}
+
 client.once('ready', () => {
     console.log(`✅ Logged in as ${client.user.tag}!`);
     let serverCount = client.guilds.cache.size;
     console.log(`The bot is in ${serverCount} servers.`);
+    if (!supabase) {
+        console.warn('[BOT] Missing NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY. Running in Discord-only mode for command registration.');
+    }
 
     updateStatus();
     refreshCommands();
@@ -257,6 +434,8 @@ client.on('guildDelete', guild => {
 });
 
 client.on('guildMemberAdd', async member => {
+    if (!supabase) return;
+
     const { guild, id: userId } = member;
 
     try {
@@ -298,6 +477,8 @@ client.on('guildMemberAdd', async member => {
 });
 
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isChatInputCommand()) return;
 
     const { commandName, guildId, user, guild } = interaction;
@@ -387,6 +568,7 @@ client.on('interactionCreate', async interaction => {
                 { name: '/ban', value: 'Permanently ban a user from the Roblox game.' },
                 { name: '/kick', value: 'Kick a user from the game server.' },
                 { name: '/unban', value: 'Unban a user from the Roblox game.' },
+                { name: '/lookup', value: 'Lookup a Roblox user and review their moderation history.' },
                 { name: '/update', value: 'Update your linked Roblox profile and roles.' },
                 { name: '/update-servers', value: 'Send a global update signal to all Roblox servers (restarts them).' },
                 { name: '/shutdown', value: 'Immediately shut down game servers.' },
@@ -475,6 +657,51 @@ client.on('interactionCreate', async interaction => {
             }]),
             interaction.reply(`🔓 **Unbanned** \`\${targetUser}\` from Roblox. Command sent to game servers.`)
         ]);
+    } else if (commandName === 'lookup') {
+        const targetUser = interaction.options.getString('username');
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+            const lookup = await fetchRobloxLookup(targetUser, guildId);
+            const profileUrl = `https://www.roblox.com/users/${lookup.id}/profile`;
+            const lookupEmbed = new EmbedBuilder()
+                .setTitle('ðŸ” Roblox User Lookup')
+                .setURL(profileUrl)
+                .setColor(lookup.isBanned ? '#ef4444' : lookup.inGame ? '#10b981' : '#0ea5e9')
+                .setThumbnail(lookup.avatarUrl || null)
+                .addFields(
+                    { name: 'Username', value: `[${lookup.username}](${profileUrl})`, inline: true },
+                    { name: 'Display Name', value: truncateText(lookup.displayName || lookup.username, 256), inline: true },
+                    { name: 'Roblox ID', value: `\`${lookup.id}\``, inline: true },
+                    { name: 'Account Created', value: lookup.created ? formatDiscordTimestamp(lookup.created, 'F') : 'Unknown', inline: true },
+                    { name: 'Status', value: lookup.isBanned ? 'Banned' : lookup.inGame ? 'In Game' : 'Offline', inline: true },
+                    { name: 'Profile Source', value: lookup.hasApiKey ? 'Public Roblox API + configured Open Cloud key' : 'Public Roblox API', inline: true },
+                    { name: 'Description', value: truncateText(lookup.description || 'No description provided.', 1024), inline: false },
+                    { name: 'Moderation History', value: formatModerationHistory(lookup.moderationHistory), inline: false }
+                )
+                .setFooter({ text: `Ro-Link Utility System • ${lookup.moderationHistory.length} prior action(s)` });
+
+            if (lookup.inGame && lookup.jobId) {
+                lookupEmbed.addFields({
+                    name: 'Live Server',
+                    value: `User is active in job \`${lookup.jobId}\``,
+                    inline: false,
+                });
+            }
+
+            await interaction.editReply({ embeds: [lookupEmbed] });
+
+            await supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'LOOKUP',
+                target: lookup.username,
+                moderator: user.tag
+            }]);
+        } catch (e) {
+            console.error('[LOOKUP] Error:', e.message);
+            return interaction.editReply(`âŒ ${e.message || 'Failed to lookup that Roblox user.'}`);
+        }
     } else if (commandName === 'update-servers') {
         if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('ManageGuild')) {
             return interaction.reply({ content: 'You do not have permission to use this command. (Requires Administrator/Manage Server)', ephemeral: true });
@@ -774,6 +1001,8 @@ client.on('interactionCreate', async interaction => {
 
 // Handle Select Menu Interactions
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isStringSelectMenu()) return;
 
     if (interaction.customId === 'misc_menu') {
@@ -809,6 +1038,8 @@ client.on('interactionCreate', async interaction => {
 
 // Handle Modal Submissions (Misc)
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isModalSubmit()) return;
 
     if (interaction.customId.startsWith('misc_modal_')) {
@@ -846,6 +1077,8 @@ client.on('interactionCreate', async interaction => {
 
 // Handle Button Interactions
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isButton()) return;
 
     const customId = interaction.customId;
@@ -957,6 +1190,8 @@ client.on('interactionCreate', async interaction => {
 
 // Handle Modal Submissions
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isModalSubmit()) return;
 
     if (interaction.customId === 'setup_modal') {
@@ -1270,6 +1505,8 @@ return RoLink`;
 
 // Handle Report Button
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isButton()) return;
     if (interaction.customId !== 'report_open') return;
 
@@ -1305,6 +1542,8 @@ client.on('interactionCreate', async interaction => {
 
 // Handle Report Submission
 client.on('interactionCreate', async interaction => {
+    if (!supabase) return;
+
     if (!interaction.isModalSubmit()) return;
     if (interaction.customId !== 'report_submit') return;
 

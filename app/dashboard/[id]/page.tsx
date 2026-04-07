@@ -104,7 +104,7 @@ export default function ServerDashboard() {
     return (
         <div className="space-y-8 max-w-6xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             {/* Welcome Section */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 pb-2 border-b border-slate-800/50">
+            <div className="flex flex-col items-start gap-4 border-b border-slate-800/50 pb-2 sm:flex-row sm:items-center sm:gap-6">
                 <img
                     src={session?.user?.image || ""}
                     alt=""
@@ -114,7 +114,7 @@ export default function ServerDashboard() {
                     <h1 className="text-2xl font-bold text-white tracking-tight">
                         Welcome, <span className="text-sky-500">{session?.user?.name}</span>
                     </h1>
-                    <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-500">
                         Currently managing <span className="text-slate-300 font-bold px-2 py-0.5 bg-slate-800 rounded-md border border-slate-700/50">{serverName}</span>
                     </p>
                 </div>
@@ -123,7 +123,7 @@ export default function ServerDashboard() {
             {/* Metric Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-6 backdrop-blur-sm">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                             <ActivityIcon />
                             Health
@@ -140,7 +140,7 @@ export default function ServerDashboard() {
                 </div>
 
                 <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-6 backdrop-blur-sm">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                             <GlobeIcon />
                             Activity
@@ -186,7 +186,7 @@ export default function ServerDashboard() {
 
             {/* Activity Stream */}
             <div className="bg-slate-900/40 border border-slate-800 rounded-xl shadow-xl relative overflow-hidden backdrop-blur-md">
-                <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between">
+                <div className="flex flex-col gap-3 border-b border-slate-800 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-3">
                         <span className="p-2 bg-sky-600/10 rounded-lg text-sky-500 border border-sky-500/10">
                             <ScrollIcon />
@@ -201,7 +201,7 @@ export default function ServerDashboard() {
 
                 <div className="table-responsive custom-scrollbar">
                     {logs.length === 0 ? (
-                        <div className="p-20 text-center text-slate-600 font-bold uppercase text-[10px] tracking-widest text-nowrap">
+                        <div className="p-10 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 sm:p-20">
                             Waiting for activity...
                         </div>
                     ) : (

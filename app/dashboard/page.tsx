@@ -129,13 +129,13 @@ export default function Dashboard() {
         <div className="min-h-screen bg-[#020617] text-slate-200">
             {/* Sticky Professional Navbar */}
             <nav className="sticky top-0 z-50 bg-[#020617]/80 backdrop-blur-md border-b border-slate-800">
-                <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 md:h-20 flex items-center justify-between">
+                <div className="max-w-7xl mx-auto flex min-h-16 items-center justify-between gap-3 px-4 py-3 sm:px-8 md:h-20 md:py-0">
                     <Link href="/" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
                         <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 md:w-9 md:h-9 rounded-lg object-contain shadow-lg border border-white/5" />
-                        <span className="text-lg md:text-xl font-bold tracking-tight text-white hidden xs:block">Ro-Link</span>
+                        <span className="text-base md:text-xl font-bold tracking-tight text-white">Ro-Link</span>
                     </Link>
 
-                    <div className="flex items-center gap-2 sm:gap-4 pl-3 md:pl-4 border-l border-slate-800 ml-auto">
+                    <div className="ml-auto flex items-center gap-2 border-l border-slate-800 pl-3 sm:gap-4 md:pl-4">
                         {((session?.user as any)?.id === '953414442060746854') && (
                             <Link
                                 href="/management"
@@ -178,10 +178,10 @@ export default function Dashboard() {
                         <p className="text-slate-500 text-sm font-medium animate-pulse">Loading servers...</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
                         {guilds.map(guild => (
-                            <div key={guild.id} className="bg-slate-900/40 border border-slate-800 rounded-xl p-6 hover:border-sky-500/30 transition-all flex flex-col group relative overflow-hidden">
-                                <div className="flex items-start justify-between mb-6">
+                            <div key={guild.id} className="group relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40 p-5 transition-all hover:border-sky-500/30 sm:p-6">
+                                <div className="mb-5 flex flex-col items-start gap-4 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
                                     <div className="relative">
                                         {guild.icon ? (
                                             <img
@@ -198,12 +198,12 @@ export default function Dashboard() {
                                             <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-[#020617] z-20 shadow-lg"></div>
                                         )}
                                     </div>
-                                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50">
+                                    <div className="break-all rounded-md border border-slate-700/50 bg-slate-800/50 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                         ID: {guild.id.substring(0, 8)}
                                     </div>
                                 </div>
 
-                                <h3 className="font-bold text-lg text-white truncate w-full mb-8 tracking-tight">{guild.name}</h3>
+                                <h3 className="mb-6 w-full break-words text-lg font-bold tracking-tight text-white sm:mb-8">{guild.name}</h3>
 
                                 <div className="mt-auto">
                                     {guild.hasBot ? (
@@ -282,7 +282,7 @@ export default function Dashboard() {
                                 placeholder="Reason for removal (required)..."
                             />
 
-                            <div className="flex items-center justify-end gap-3">
+                            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
                                 <button
                                     onClick={() => {
                                         setRemoveModal(null);
