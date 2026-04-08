@@ -96,6 +96,9 @@ export async function logAction(server_id: string, action: string, target: strin
         if (!res.ok) {
             const errBody = await res.text();
             console.error(`[LOGGER] Discord API Error: ${res.status} - ${errBody}`);
+            if (res.status === 403) {
+                console.error(`[LOGGER] Bot cannot send to configured logging channel ${channelId} for server ${server_id}. Grant View Channel + Send Messages or pick a different channel in dashboard settings.`);
+            }
         } else {
             console.log("[LOGGER] Discord log sent successfully");
         }

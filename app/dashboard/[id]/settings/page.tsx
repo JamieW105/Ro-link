@@ -115,6 +115,9 @@ export default function SettingsPage() {
     const [isRolesCollapsed, setIsRolesCollapsed] = useState(false);
     const [collapsedRoleIds, setCollapsedRoleIds] = useState<string[]>([]);
 
+    const isLoggingChannelAccessible = !loggingChannelId || channels.some(channel => channel.id === loggingChannelId);
+    const isReportsChannelAccessible = !reportsChannelId || channels.some(channel => channel.id === reportsChannelId);
+
     function getRolePanelCommands(role: DashboardRole) {
         return normalizeAdminPanelCommandList(role.allowed_misc_cmds);
     }
@@ -726,6 +729,11 @@ export default function SettingsPage() {
                                     </option>
                                 ))}
                             </select>
+                            {!isLoggingChannelAccessible && (
+                                <p className="mt-3 text-[11px] font-medium text-amber-400">
+                                    The saved logging channel is no longer accessible to the bot. Pick a visible channel the bot can send to, then save again.
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -771,6 +779,11 @@ export default function SettingsPage() {
                                         </option>
                                     ))}
                                 </select>
+                                {!isReportsChannelAccessible && (
+                                    <p className="mt-3 text-[11px] font-medium text-amber-400">
+                                        The saved reports channel is no longer accessible to the bot. Choose a different channel or restore the bot’s permissions there.
+                                    </p>
+                                )}
                             </div>
                         </div>
                     </div>
