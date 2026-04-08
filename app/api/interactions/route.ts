@@ -1569,6 +1569,8 @@ export async function POST(req: Request) {
                     .eq('id', guild_id)
                     .single();
 
+                let reportForwardWarning = '';
+
                 if (server?.reports_channel_id) {
                     console.log(`[REPORTS] Forwarding report to channel: ${server.reports_channel_id}`);
 
@@ -1583,7 +1585,7 @@ export async function POST(req: Request) {
                         ? modRoles.map((r: { discord_role_id?: string | null }) => `<@&${r.discord_role_id}>`).join(' ')
                         : '';
 
-                    fetch(`https://discord.com/api/v10/channels/${server.reports_channel_id}/messages`, {
+                    const forwardResponse = await fetch(`https://discord.com/api/v10/channels/${server.reports_channel_id}/messages`, {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
@@ -1604,15 +1606,32 @@ export async function POST(req: Request) {
                             }],
                             components: buildReportChannelComponents(createdReport.id, targetInput, 'discord')
                         })
-                    }).then(res => {
-                        if (!res.ok) {
-                            console.error(`[REPORTS] Failed to send to channel ${server.reports_channel_id}: ${res.status}`);
-                        } else {
-                            console.log(`[REPORTS] Successfully forwarded report to channel ${server.reports_channel_id}`);
-                        }
-                    }).catch(err => console.error('[REPORTS] Error forwarding report to Discord:', err));
+                    }).catch((err) => {
+                        console.error('[REPORTS] Error forwarding report to Discord:', err);
+                        return null;
+                    });
+
+                    if (!forwardResponse) {
+                        reportForwardWarning = ' Your report was saved, but forwarding it to the reports channel failed.';
+                    } else if (!forwardResponse.ok) {
+                        const forwardErrorBody = await forwardResponse.text().catch(() => '');
+                        console.error(`[REPORTS] Failed to send to channel ${server.reports_channel_id}: ${forwardResponse.status}${forwardErrorBody ? ` - ${forwardErrorBody}` : ''}`);
+                        reportForwardWarning = ' Your report was saved, but the reports channel notification failed.';
+                    } else {
+                        console.log(`[REPORTS] Successfully forwarded report to channel ${server.reports_channel_id}`);
+                    }
                 } else {
                     console.log(`[REPORTS] No reports channel configured for guild ${guild_id}`);
+                }
+
+                if (reportForwardWarning) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: {
+                            content: `Report Submitted!${reportForwardWarning}`,
+                            flags: 64
+                        }
+                    });
                 }
 
                 return NextResponse.json({
