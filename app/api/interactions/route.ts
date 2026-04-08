@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { logAction } from '@/lib/logger';
 import { findLivePlayer } from '@/lib/livePlayers';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const runtime = 'edge';
 
@@ -62,6 +63,23 @@ type RobloxLookupResult = {
     jobId: string | null;
     moderationHistory: LookupHistoryEntry[];
 };
+
+type ReportChannelMode = 'discord' | 'roblox';
+type ReportChannelAction =
+    | 'switch_discord'
+    | 'switch_roblox'
+    | 'discord_kick'
+    | 'discord_ban'
+    | 'roblox_kick'
+    | 'roblox_ban'
+    | 'dismiss';
+type ParsedReportChannelAction = {
+    action: ReportChannelAction;
+    reportId: string;
+    target: string;
+};
+
+const REPORT_CUSTOM_ID_PREFIX = 'report|';
 
 function truncateText(value: unknown, maxLength = 1024) {
     const text = String(value ?? '').trim();
@@ -191,6 +209,138 @@ async function fetchRobloxLookup(username: string, serverId: string, openCloudKe
         jobId: activeServer?.id || null,
         moderationHistory,
     };
+}
+
+function buildReportCustomId(action: ReportChannelAction, reportId: string, target: string) {
+    return `${REPORT_CUSTOM_ID_PREFIX}${action}|${reportId}|${encodeURIComponent(String(target ?? '').trim())}`;
+}
+
+function parseReportCustomId(customId: string): ParsedReportChannelAction | null {
+    if (!customId.startsWith(REPORT_CUSTOM_ID_PREFIX)) {
+        return null;
+    }
+
+    const [, action = '', reportId = '', encodedTarget = ''] = customId.split('|');
+    if (!action || !reportId || !encodedTarget) {
+        return null;
+    }
+
+    const allowedActions = new Set<ReportChannelAction>([
+        'switch_discord',
+        'switch_roblox',
+        'discord_kick',
+        'discord_ban',
+        'roblox_kick',
+        'roblox_ban',
+        'dismiss',
+    ]);
+
+    if (!allowedActions.has(action as ReportChannelAction)) {
+        return null;
+    }
+
+    return {
+        action: action as ReportChannelAction,
+        reportId,
+        target: decodeURIComponent(encodedTarget),
+    };
+}
+
+function buildReportChannelComponents(reportId: string, target: string, mode: ReportChannelMode = 'discord', disabled = false) {
+    const primaryButtons = mode === 'roblox'
+        ? [
+            { type: 2, style: 2, label: 'Kick (Roblox)', custom_id: buildReportCustomId('roblox_kick', reportId, target) },
+            { type: 2, style: 4, label: 'Ban (Roblox)', custom_id: buildReportCustomId('roblox_ban', reportId, target) },
+            { type: 2, style: 1, label: 'Discord Actions', custom_id: buildReportCustomId('switch_discord', reportId, target) },
+        ]
+        : [
+            { type: 2, style: 2, label: 'Kick (Discord)', custom_id: buildReportCustomId('discord_kick', reportId, target) },
+            { type: 2, style: 4, label: 'Ban (Discord)', custom_id: buildReportCustomId('discord_ban', reportId, target) },
+            { type: 2, style: 1, label: 'Roblox Actions', custom_id: buildReportCustomId('switch_roblox', reportId, target) },
+        ];
+
+    return [{
+        type: 1,
+        components: [
+            ...primaryButtons,
+            {
+                type: 2,
+                style: 2,
+                label: 'Dismiss',
+                custom_id: buildReportCustomId('dismiss', reportId, target),
+            },
+        ].map((button) => ({
+            ...button,
+            disabled,
+        })),
+    }];
+}
+
+async function findPendingReportIdByTarget(serverId: string, target: string) {
+    const client = getSupabaseAdmin();
+    const { data, error } = await client
+        .from('reports')
+        .select('id')
+        .eq('server_id', serverId)
+        .eq('status', 'PENDING')
+        .ilike('reported_roblox_username', String(target ?? '').trim())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (error) {
+        console.error('[REPORTS] Failed to find pending report by target:', error);
+        return null;
+    }
+
+    return data?.id || null;
+}
+
+async function updateReportFromChannel(
+    reportId: string,
+    serverId: string,
+    moderatorId: string,
+    moderatorNote: string,
+    status: 'RESOLVED' | 'DISMISSED',
+) {
+    const client = getSupabaseAdmin();
+    const { error } = await client
+        .from('reports')
+        .update({
+            status,
+            moderator_id: moderatorId,
+            moderator_note: moderatorNote,
+            resolved_at: new Date().toISOString(),
+        })
+        .eq('server_id', serverId)
+        .eq('id', reportId);
+
+    if (error) {
+        throw new Error(error.message);
+    }
+}
+
+async function resolveDiscordTargetId(target: string) {
+    let targetId = String(target ?? '').trim();
+    if (!targetId) {
+        return null;
+    }
+
+    if (targetId.includes('<@')) {
+        targetId = targetId.replace(/[<@!>]/g, '');
+    }
+
+    if (Number.isNaN(Number(targetId))) {
+        const { data } = await supabase
+            .from('verified_users')
+            .select('discord_id')
+            .ilike('roblox_username', targetId)
+            .maybeSingle<{ discord_id?: string | null }>();
+
+        targetId = String(data?.discord_id ?? '').trim();
+    }
+
+    return Number.isNaN(Number(targetId)) ? null : targetId;
 }
 
 
@@ -949,6 +1099,262 @@ export async function POST(req: Request) {
                 });
             }
 
+            const parsedReportAction = parseReportCustomId(cid);
+            if (parsedReportAction) {
+                const currentGuildId = String(guild_id || '').trim();
+                if (!currentGuildId) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `âŒ Reports can only be managed from a server channel.`, flags: 64 }
+                    });
+                }
+
+                const { action: reportAction, target } = parsedReportAction;
+                const resolvedReportId = parsedReportAction.reportId || await findPendingReportIdByTarget(currentGuildId, target);
+                if (!resolvedReportId) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `âŒ The matching pending report could not be found for \`${target}\`.`, flags: 64 }
+                    });
+                }
+
+                if (reportAction === 'switch_roblox' || reportAction === 'switch_discord') {
+                    return NextResponse.json({
+                        type: 7,
+                        data: {
+                            components: buildReportChannelComponents(
+                                resolvedReportId,
+                                target,
+                                reportAction === 'switch_roblox' ? 'roblox' : 'discord',
+                            ),
+                        },
+                    });
+                }
+
+                if (reportAction === 'dismiss') {
+                    try {
+                        await updateReportFromChannel(
+                            resolvedReportId,
+                            currentGuildId,
+                            String(user?.id || ''),
+                            `Dismissed from reports Discord channel by ${userTag}`,
+                            'DISMISSED',
+                        );
+                        await logAction(currentGuildId, 'REPORT_DISMISSED', target, userTag, 'Dismissed from reports Discord channel');
+                    } catch (error) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `âŒ Failed to dismiss report: ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
+                        });
+                    }
+
+                    return NextResponse.json({
+                        type: 7,
+                        data: {
+                            components: buildReportChannelComponents(resolvedReportId, target, 'discord', true),
+                        },
+                    });
+                }
+
+                if (reportAction === 'discord_kick' || reportAction === 'discord_ban') {
+                    const targetId = await resolveDiscordTargetId(target);
+                    if (!targetId) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `âŒ Could not resolve Discord ID for \`${target}\`.`, flags: 64 }
+                        });
+                    }
+
+                    const discordAction = reportAction === 'discord_ban' ? 'ban' : 'kick';
+                    const res = await fetch(`https://discord.com/api/v10/guilds/${currentGuildId}/${discordAction === 'ban' ? 'bans' : 'members'}/${targetId}`, {
+                        method: discordAction === 'ban' ? 'PUT' : 'DELETE',
+                        headers: {
+                            'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: discordAction === 'ban' ? JSON.stringify({ reason: 'Ro-Link Reporting Action' }) : undefined
+                    });
+
+                    if (!res.ok) {
+                        const err = await res.text();
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `âŒ Failed to ${discordAction} user: ${err}`, flags: 64 }
+                        });
+                    }
+
+                    try {
+                        await updateReportFromChannel(
+                            resolvedReportId,
+                            currentGuildId,
+                            String(user?.id || ''),
+                            `${discordAction.toUpperCase()} (Discord) executed from reports channel by ${userTag}`,
+                            'RESOLVED',
+                        );
+                        await logAction(currentGuildId, discordAction.toUpperCase(), target, userTag, 'Reports Discord channel action');
+                    } catch (error) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `âŒ The moderation action succeeded, but updating the report failed: ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
+                        });
+                    }
+
+                    return NextResponse.json({
+                        type: 7,
+                        data: {
+                            components: buildReportChannelComponents(resolvedReportId, target, 'discord', true),
+                        },
+                    });
+                }
+
+                const command = reportAction === 'roblox_ban' ? 'BAN' : 'KICK';
+                try {
+                    await Promise.all([
+                        supabase.from('command_queue').insert([{
+                            server_id: currentGuildId,
+                            command,
+                            args: { username: target, reason: 'Reports Discord Channel Action', moderator: userTag },
+                            status: 'PENDING'
+                        }]),
+                        triggerMessaging(command, { username: target, reason: 'Reports Discord Channel Action', moderator: userTag }),
+                        logAction(currentGuildId, command, target, userTag, 'Reports Discord channel action'),
+                    ]);
+
+                    await updateReportFromChannel(
+                        resolvedReportId,
+                        currentGuildId,
+                        String(user?.id || ''),
+                        `${command} (Roblox) executed from reports channel by ${userTag}`,
+                        'RESOLVED',
+                    );
+                } catch (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `âŒ Failed to queue ${command} for \`${target}\`: ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
+                    });
+                }
+
+                return NextResponse.json({
+                    type: 7,
+                    data: {
+                        components: buildReportChannelComponents(resolvedReportId, target, 'roblox', true),
+                    },
+                });
+            }
+
+            if (cid.startsWith('switch_')) {
+                const currentGuildId = String(guild_id || '').trim();
+                const target = interaction.data.custom_id.split('_').pop() || '';
+                const fallbackReportId = currentGuildId ? await findPendingReportIdByTarget(currentGuildId, target) : null;
+
+                if (fallbackReportId) {
+                    return NextResponse.json({
+                        type: 7,
+                        data: {
+                            components: buildReportChannelComponents(
+                                fallbackReportId,
+                                target,
+                                cid.startsWith('switch_roblox') ? 'roblox' : 'discord',
+                            ),
+                        },
+                    });
+                }
+            }
+
+            if (cid.startsWith('discord_')) {
+                const parts = cid.split('_');
+                const discAction = parts[1];
+                const target = parts.slice(2).join('_');
+                const currentGuildId = String(guild_id || '').trim();
+                const targetId = await resolveDiscordTargetId(target);
+
+                if (!targetId) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `âŒ Could not resolve Discord ID for \`${target}\`.`, flags: 64 }
+                    });
+                }
+
+                const res = await fetch(`https://discord.com/api/v10/guilds/${currentGuildId}/${discAction === 'ban' ? 'bans' : 'members'}/${targetId}`, {
+                    method: discAction === 'ban' ? 'PUT' : 'DELETE',
+                    headers: {
+                        'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: discAction === 'ban' ? JSON.stringify({ reason: 'Ro-Link Reporting Action' }) : undefined
+                });
+
+                if (!res.ok) {
+                    const err = await res.text();
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `âŒ Failed to ${discAction} user: ${err}`, flags: 64 }
+                    });
+                }
+
+                const fallbackReportId = currentGuildId ? await findPendingReportIdByTarget(currentGuildId, target) : null;
+                if (fallbackReportId && currentGuildId) {
+                    try {
+                        await updateReportFromChannel(
+                            fallbackReportId,
+                            currentGuildId,
+                            String(user?.id || ''),
+                            `${discAction.toUpperCase()} (Discord) executed from reports channel by ${userTag}`,
+                            'RESOLVED',
+                        );
+                    } catch (error) {
+                        console.error('[REPORTS] Failed to resolve legacy Discord report action:', error);
+                    }
+                }
+
+                await logAction(currentGuildId, discAction.toUpperCase(), target, userTag, 'Reports Discord channel action');
+
+                return NextResponse.json({
+                    type: 4,
+                    data: { content: `âœ… Successfully **${discAction.toUpperCase()}ED** <@${targetId}> from the server.`, flags: 64 }
+                });
+            }
+
+            if (cid.startsWith('KICK_0_') || cid.startsWith('BAN_0_')) {
+                const currentGuildId = String(guild_id || '').trim();
+                const action = cid.startsWith('BAN_0_') ? 'BAN' : 'KICK';
+                const username = cid.split('_').slice(2).join('_');
+                const fallbackReportId = currentGuildId ? await findPendingReportIdByTarget(currentGuildId, username) : null;
+
+                if (fallbackReportId) {
+                    try {
+                        await Promise.all([
+                            supabase.from('command_queue').insert([{
+                                server_id: currentGuildId,
+                                command: action,
+                                args: { username, reason: 'Discord Button Action', moderator: userTag },
+                                status: 'PENDING'
+                            }]),
+                            triggerMessaging(action, { username, reason: 'Discord Button Action', moderator: userTag }),
+                            logAction(currentGuildId, action, username, userTag, 'Discord Button Action')
+                        ]);
+
+                        await updateReportFromChannel(
+                            fallbackReportId,
+                            currentGuildId,
+                            String(user?.id || ''),
+                            `${action} (Roblox) executed from reports channel by ${userTag}`,
+                            'RESOLVED',
+                        );
+                    } catch (error) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `âŒ Failed to queue ${action} for \`${username}\`: ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
+                        });
+                    }
+
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `âœ… **${action}** command queued for \`${username}\`.`, flags: 64 }
+                    });
+                }
+            }
+
             if (interaction.data.custom_id === 'misc_menu') {
                 const action = interaction.data.values[0];
 
@@ -1130,14 +1536,15 @@ export async function POST(req: Request) {
                 const reason = getField('reason');
 
                 // 1. Save to Database
-                const { error: dbError } = await supabase.from('reports').insert([{
+                const reportClient = getSupabaseAdmin();
+                const { data: createdReport, error: dbError } = await reportClient.from('reports').insert([{
                     server_id: guild_id,
                     reporter_discord_id: member?.user?.id || interactionUser?.id,
                     reporter_roblox_username: null,
                     reported_roblox_username: targetInput,
                     reason: reason,
                     status: 'PENDING'
-                }]);
+                }]).select('id').single();
 
                 if (dbError) {
                     console.error('Report DB Error:', dbError);
@@ -1147,8 +1554,16 @@ export async function POST(req: Request) {
                     });
                 }
 
+                if (!createdReport?.id) {
+                    console.error('Report DB Error: missing report id after insert');
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `âŒ Failed to create the report record. Please try again later.`, flags: 64 }
+                    });
+                }
+
                 // 2. Send Notification to Channel (if configured)
-                const { data: server } = await supabase
+                const { data: server } = await reportClient
                     .from('servers')
                     .select('reports_channel_id')
                     .eq('id', guild_id)
@@ -1158,14 +1573,14 @@ export async function POST(req: Request) {
                     console.log(`[REPORTS] Forwarding report to channel: ${server.reports_channel_id}`);
 
                     // Fetch roles with "Manage Reports" permission
-                    const { data: modRoles } = await supabase
+                    const { data: modRoles } = await reportClient
                         .from('dashboard_roles')
                         .select('discord_role_id')
                         .eq('server_id', guild_id)
                         .eq('can_manage_reports', true);
 
                     const roleMention = modRoles && modRoles.length > 0
-                        ? modRoles.map(r => `<@&${r.discord_role_id}>`).join(' ')
+                        ? modRoles.map((r: { discord_role_id?: string | null }) => `<@&${r.discord_role_id}>`).join(' ')
                         : '';
 
                     fetch(`https://discord.com/api/v10/channels/${server.reports_channel_id}/messages`, {
@@ -1187,29 +1602,7 @@ export async function POST(req: Request) {
                                 footer: { text: `Ro-Link Systems • ID: ${guild_id}` },
                                 timestamp: new Date().toISOString()
                             }],
-                            components: [{
-                                type: 1,
-                                components: [
-                                    {
-                                        type: 2,
-                                        style: 2,
-                                        label: 'Kick (Discord)',
-                                        custom_id: `discord_kick_${targetInput}`
-                                    },
-                                    {
-                                        type: 2,
-                                        style: 4,
-                                        label: 'Ban (Discord)',
-                                        custom_id: `discord_ban_${targetInput}`
-                                    },
-                                    {
-                                        type: 2,
-                                        style: 1,
-                                        label: 'Roblox Actions',
-                                        custom_id: `switch_roblox_${targetInput}`
-                                    }
-                                ]
-                            }]
+                            components: buildReportChannelComponents(createdReport.id, targetInput, 'discord')
                         })
                     }).then(res => {
                         if (!res.ok) {

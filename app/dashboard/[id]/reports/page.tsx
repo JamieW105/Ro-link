@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { useSession } from "next-auth/react";
 import { usePermissions } from "@/context/PermissionsContext";
 
 // Icons
@@ -20,7 +18,6 @@ const SettingsIcon = () => (
 
 export default function ReportsPage() {
     const { id } = useParams();
-    const { data: session } = useSession();
     const perms = usePermissions();
 
     // Reports State
@@ -36,17 +33,26 @@ export default function ReportsPage() {
         async function fetchData() {
             setLoadingReports(true);
 
-            // Fetch Reports
-            const { data: reportData } = await supabase
-                .from('reports')
-                .select('*')
-                .eq('server_id', id)
-                .eq('status', 'PENDING')
-                .order('created_at', { ascending: false });
+            try {
+                const response = await fetch(`/api/reports?serverId=${encodeURIComponent(String(id))}&status=PENDING`, {
+                    cache: 'no-store',
+                });
 
-            if (reportData) {
-                setReports(reportData);
+                if (!response.ok) {
+                    throw new Error(`Failed to load reports (${response.status})`);
+                }
+
+                const reportData = await response.json();
+                if (Array.isArray(reportData)) {
+                    setReports(reportData);
+                } else {
+                    setReports([]);
+                }
+            } catch (error) {
+                console.error("Failed to fetch reports:", error);
+                setReports([]);
             }
+
             setLoadingReports(false);
         }
 

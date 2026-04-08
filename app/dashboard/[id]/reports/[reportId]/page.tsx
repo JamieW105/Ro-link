@@ -60,17 +60,17 @@ export default function ReportDetailsPage() {
             }
 
             // 1. Fetch Report Details
-            const { data: reportData, error: reportError } = await supabase
-                .from('reports')
-                .select('*')
-                .eq('id', reportId)
-                .single();
+            const reportResponse = await fetch(`/api/reports/${encodeURIComponent(String(reportId))}?serverId=${encodeURIComponent(String(id))}`, {
+                cache: 'no-store',
+            });
 
-            if (reportError || !reportData) {
+            if (!reportResponse.ok) {
                 alert("Report not found");
                 router.push(`/dashboard/${id}/reports`);
                 return;
             }
+
+            const reportData = await reportResponse.json();
             setReport(reportData);
             setReason(`Re: Report #${reportData.id.slice(0, 8)} - ${reportData.reason}`);
 
@@ -177,15 +177,21 @@ export default function ReportDetailsPage() {
         }
 
         // 2. Resolve the Report
-        await supabase
-            .from('reports')
-            .update({
+        const reportUpdateResponse = await fetch(`/api/reports/${encodeURIComponent(String(reportId))}?serverId=${encodeURIComponent(String(id))}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
                 status: 'RESOLVED',
-                moderator_id: moderatorId,
-                moderator_note: `Action: ${action} - ${reason}`,
-                resolved_at: new Date().toISOString()
-            })
-            .eq('id', reportId);
+                moderatorNote: `Action: ${action} - ${reason}`,
+            }),
+        });
+
+        if (!reportUpdateResponse.ok) {
+            const reportUpdateResult = await reportUpdateResponse.json().catch(() => ({}));
+            alert("Report action succeeded, but resolving the report failed: " + (reportUpdateResult.error || 'Unknown error.'));
+            setActionLoading(false);
+            return;
+        }
 
         // 3. Notify User via Discord DM
         if (profiles?.discord_id) {
@@ -219,14 +225,20 @@ export default function ReportDetailsPage() {
     const handleDismiss = async () => {
         if (!confirm("Dismiss this report without action?")) return;
 
-        await supabase
-            .from('reports')
-            .update({
+        const dismissResponse = await fetch(`/api/reports/${encodeURIComponent(String(reportId))}?serverId=${encodeURIComponent(String(id))}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
                 status: 'DISMISSED',
-                moderator_id: (session?.user as any)?.id,
-                resolved_at: new Date().toISOString()
-            })
-            .eq('id', reportId);
+                moderatorNote: 'Dismissed from dashboard',
+            }),
+        });
+
+        if (!dismissResponse.ok) {
+            const dismissResult = await dismissResponse.json().catch(() => ({}));
+            alert("Failed to dismiss report: " + (dismissResult.error || 'Unknown error.'));
+            return;
+        }
 
         const moderator = (session?.user as any)?.name || 'Web Admin';
         await fetch('/api/logs', {
