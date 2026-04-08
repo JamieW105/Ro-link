@@ -245,6 +245,18 @@ export default function SettingsPage() {
         setError(null);
         setSuccess(false);
 
+        if (loggingChannelId && !channels.some((channel) => channel.id === loggingChannelId)) {
+            setError('The selected logging channel is not accessible to the bot anymore. Choose another channel and save again.');
+            setSaving(false);
+            return;
+        }
+
+        if (reportsChannelId && !channels.some((channel) => channel.id === reportsChannelId)) {
+            setError('The selected reports channel is not accessible to the bot anymore. Choose another channel and save again.');
+            setSaving(false);
+            return;
+        }
+
         // Save General Settings
         const { error: dbError } = await supabase
             .from('servers')
