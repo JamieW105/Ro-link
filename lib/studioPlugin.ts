@@ -469,70 +469,85 @@ export async function requireAuthorizedStudioPluginSession(req: Request) {
 }
 
 export async function getStudioPluginServers(req: Request, session: StudioPluginSessionRecord): Promise<StudioPluginServerListPayload> {
-    const client = getSupabaseAdmin();
-    const baseUrl = buildPublicBaseUrl(req);
-    const manageableGuilds = await getManageableGuildsForPlugin(session);
-    const guildIds = manageableGuilds.map((guild) => guild.id);
+    try {
+        const client = getSupabaseAdmin();
+        const baseUrl = buildPublicBaseUrl(req);
+        const manageableGuilds = await getManageableGuildsForPlugin(session);
+        const guildIds = manageableGuilds.map((guild) => guild.id);
 
-    const [{ data: serverRows, error: serverRowsError }, { data: verifiedUser, error: verifiedUserError }] = await Promise.all([
-        guildIds.length > 0
-            ? client.from('servers').select('id, place_id, universe_id, open_cloud_key, api_key').in('id', guildIds)
-            : Promise.resolve({ data: [] as ServerSetupRecord[], error: null }),
-        client.from('verified_users').select('discord_id, roblox_id, roblox_username').eq('discord_id', session.discord_user_id).maybeSingle<VerifiedUserRecord>(),
-    ]);
+        const [{ data: serverRows, error: serverRowsError }, { data: verifiedUser, error: verifiedUserError }] = await Promise.all([
+            guildIds.length > 0
+                ? client.from('servers').select('id, place_id, universe_id, open_cloud_key, api_key').in('id', guildIds)
+                : Promise.resolve({ data: [] as ServerSetupRecord[], error: null }),
+            client.from('verified_users').select('discord_id, roblox_id, roblox_username').eq('discord_id', session.discord_user_id).maybeSingle<VerifiedUserRecord>(),
+        ]);
 
-    if (serverRowsError) {
-        console.warn('[PLUGIN][SERVERS] Failed to load stored server setup rows. Continuing with defaults.', {
-            sessionId: session.id,
-            discordUserId: session.discord_user_id || null,
-            error: serverRowsError.message,
-        });
-    }
+        if (serverRowsError) {
+            console.warn('[PLUGIN][SERVERS] Failed to load stored server setup rows. Continuing with defaults.', {
+                sessionId: session.id,
+                discordUserId: session.discord_user_id || null,
+                error: serverRowsError.message,
+            });
+        }
 
-    if (verifiedUserError) {
-        console.warn('[PLUGIN][SERVERS] Failed to load verified Roblox account. Continuing as unlinked.', {
-            sessionId: session.id,
-            discordUserId: session.discord_user_id || null,
-            error: verifiedUserError.message,
-        });
-    }
+        if (verifiedUserError) {
+            console.warn('[PLUGIN][SERVERS] Failed to load verified Roblox account. Continuing as unlinked.', {
+                sessionId: session.id,
+                discordUserId: session.discord_user_id || null,
+                error: verifiedUserError.message,
+            });
+        }
 
-    const serversById = new Map(((serverRows || []) as ServerSetupRecord[]).map((row) => [row.id, row]));
+        const serversById = new Map(((serverRows || []) as ServerSetupRecord[]).map((row) => [row.id, row]));
 
-    const servers = manageableGuilds.map((guild) => {
-        const setup = serversById.get(guild.id);
-        const placeId = typeof setup?.place_id === 'string' ? setup.place_id : '';
-        const universeId = typeof setup?.universe_id === 'string' ? setup.universe_id : '';
-        const hasOpenCloudKey = Boolean(setup?.open_cloud_key?.trim());
-        const hasApiKey = Boolean(setup?.api_key?.trim());
+        const servers = manageableGuilds.map((guild) => {
+            const setup = serversById.get(guild.id);
+            const placeId = typeof setup?.place_id === 'string' ? setup.place_id : '';
+            const universeId = typeof setup?.universe_id === 'string' ? setup.universe_id : '';
+            const hasOpenCloudKey = Boolean(setup?.open_cloud_key?.trim());
+            const hasApiKey = Boolean(setup?.api_key?.trim());
+
+            return {
+                id: guild.id,
+                name: guild.name,
+                icon: guild.icon,
+                iconUrl: buildDiscordIconUrl(guild.id, guild.icon),
+                owner: Boolean(guild.owner),
+                hasBot: guild.hasBot,
+                placeId,
+                universeId,
+                hasOpenCloudKey,
+                hasApiKey,
+                isConfigured: Boolean(placeId && universeId && hasOpenCloudKey && hasApiKey),
+                setupUrl: `${baseUrl}/dashboard/${guild.id}/settings/setup`,
+            } satisfies StudioPluginServerSummary;
+        }).sort((left, right) => String(left.name ?? '').localeCompare(String(right.name ?? '')));
 
         return {
-            id: guild.id,
-            name: guild.name,
-            icon: guild.icon,
-            iconUrl: buildDiscordIconUrl(guild.id, guild.icon),
-            owner: Boolean(guild.owner),
-            hasBot: guild.hasBot,
-            placeId,
-            universeId,
-            hasOpenCloudKey,
-            hasApiKey,
-            isConfigured: Boolean(placeId && universeId && hasOpenCloudKey && hasApiKey),
-            setupUrl: `${baseUrl}/dashboard/${guild.id}/settings/setup`,
-        } satisfies StudioPluginServerSummary;
-    }).sort((left, right) => String(left.name ?? '').localeCompare(String(right.name ?? '')));
-
-    return {
-        user: {
-            discordUserId: session.discord_user_id || '',
-            discordUsername: session.discord_username || 'Unknown User',
-            robloxLinked: !verifiedUserError && Boolean(verifiedUser),
-            robloxId: verifiedUserError ? null : verifiedUser?.roblox_id || null,
-            robloxUsername: verifiedUserError ? null : verifiedUser?.roblox_username || null,
-            verifyUrl: `${baseUrl}/verify`,
-        },
-        servers,
-    };
+            user: {
+                discordUserId: session.discord_user_id || '',
+                discordUsername: session.discord_username || 'Unknown User',
+                robloxLinked: !verifiedUserError && Boolean(verifiedUser),
+                robloxId: verifiedUserError ? null : verifiedUser?.roblox_id || null,
+                robloxUsername: verifiedUserError ? null : verifiedUser?.roblox_username || null,
+                verifyUrl: `${baseUrl}/verify`,
+            },
+            servers,
+        };
+    } catch (error) {
+        if (error instanceof StudioPluginError) {
+            throw error;
+        }
+        console.error('[PLUGIN][SERVERS] getStudioPluginServers unexpected failure', {
+            sessionId: session.id,
+            error: error instanceof Error ? error.message : error,
+            stack: error instanceof Error ? error.stack : undefined,
+        });
+        throw new StudioPluginError(
+            error instanceof Error ? error.message : 'Failed to load Ro-Link servers for the Studio plugin.',
+            502,
+        );
+    }
 }
 
 export async function installStudioPluginServer(req: Request, session: StudioPluginSessionRecord, input: {
