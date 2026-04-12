@@ -465,14 +465,22 @@ export async function getStudioPluginServers(req: Request, session: StudioPlugin
     ]);
 
     if (serverRowsError) {
-        throw new StudioPluginError(`Failed to load Ro-Link server records. ${serverRowsError.message}`, 500);
+        console.warn('[PLUGIN][SERVERS] Failed to load stored server setup rows. Continuing with defaults.', {
+            sessionId: session.id,
+            discordUserId: session.discord_user_id || null,
+            error: serverRowsError.message,
+        });
     }
 
     if (verifiedUserError) {
-        throw new StudioPluginError(`Failed to load the linked Roblox account. ${verifiedUserError.message}`, 500);
+        console.warn('[PLUGIN][SERVERS] Failed to load verified Roblox account. Continuing as unlinked.', {
+            sessionId: session.id,
+            discordUserId: session.discord_user_id || null,
+            error: verifiedUserError.message,
+        });
     }
 
-    const serversById = new Map((serverRows || []).map((row) => [row.id, row]));
+    const serversById = new Map(((serverRows || []) as ServerSetupRecord[]).map((row) => [row.id, row]));
 
     const servers = manageableGuilds.map((guild) => {
         const setup = serversById.get(guild.id);
@@ -501,9 +509,9 @@ export async function getStudioPluginServers(req: Request, session: StudioPlugin
         user: {
             discordUserId: session.discord_user_id || '',
             discordUsername: session.discord_username || 'Unknown User',
-            robloxLinked: Boolean(verifiedUser),
-            robloxId: verifiedUser?.roblox_id || null,
-            robloxUsername: verifiedUser?.roblox_username || null,
+            robloxLinked: !verifiedUserError && Boolean(verifiedUser),
+            robloxId: verifiedUserError ? null : verifiedUser?.roblox_id || null,
+            robloxUsername: verifiedUserError ? null : verifiedUser?.roblox_username || null,
             verifyUrl: `${baseUrl}/verify`,
         },
         servers,

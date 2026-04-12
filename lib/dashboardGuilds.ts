@@ -64,10 +64,6 @@ export function hasDiscordGuildManagePermission(permissionBits?: string | null, 
 }
 
 export async function listVisibleGuildsForDiscordSession(accessToken: string, discordUserId: string) {
-    if (!rest) {
-        throw new Error('Missing DISCORD_TOKEN');
-    }
-
     const userGuilds: DiscordGuildRecord[] = [];
     let after = '0';
 
@@ -103,25 +99,33 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
     const botGuilds: BotGuildRecord[] = [];
     let botAfter = '0';
 
-    try {
-        while (true) {
-            const data = await rest.get(Routes.userGuilds(), {
-                query: new URLSearchParams({ after: botAfter, limit: '100' }),
-            }) as BotGuildRecord[];
+    const discordRest = rest;
 
-            if (!Array.isArray(data) || data.length === 0) {
-                break;
+    if (!discordRest) {
+        console.warn('[DASHBOARD][GUILDS] Missing DISCORD_TOKEN while loading bot guilds. Returning user guilds without bot matches.');
+    } else {
+        try {
+            while (true) {
+                const data = await discordRest.get(Routes.userGuilds(), {
+                    query: new URLSearchParams({ after: botAfter, limit: '100' }),
+                }) as BotGuildRecord[];
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    break;
+                }
+
+                botGuilds.push(...data);
+                botAfter = data[data.length - 1].id;
+
+                if (data.length < 100) {
+                    break;
+                }
             }
-
-            botGuilds.push(...data);
-            botAfter = data[data.length - 1].id;
-
-            if (data.length < 100) {
-                break;
-            }
+        } catch (error) {
+            console.warn('[DASHBOARD][GUILDS] Failed to load bot guilds. Returning user guilds without bot matches.', {
+                error: error instanceof Error ? error.message : error,
+            });
         }
-    } catch (error) {
-        throw new Error(`Failed to fetch bot guilds. ${error instanceof Error ? error.message : 'Unknown Discord REST error.'}`);
     }
 
     const botGuildIds = new Set(botGuilds.map((guild) => guild.id));
@@ -133,7 +137,7 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
 
     let roleAccessGuilds: VisibleDashboardGuild[] = [];
 
-    if (potentialRoleAccessGuilds.length > 0) {
+    if (discordRest && potentialRoleAccessGuilds.length > 0) {
         const { data: accessRoles } = await supabase
             .from('dashboard_roles')
             .select('server_id, discord_role_id')
@@ -151,7 +155,7 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
 
             const checks = Object.entries(rolesByServer).map(async ([serverId, permittedRoles]) => {
                 try {
-                    const member = await rest.get(Routes.guildMember(serverId, discordUserId)) as GuildMemberRecord;
+                    const member = await discordRest.get(Routes.guildMember(serverId, discordUserId)) as GuildMemberRecord;
                     const userRoles = Array.isArray(member.roles) ? member.roles : [];
 
                     if (!userRoles.some((roleId) => permittedRoles.includes(roleId))) {
