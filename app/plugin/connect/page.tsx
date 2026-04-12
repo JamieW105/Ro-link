@@ -1,11 +1,26 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useEffectEvent, useState } from 'react';
 import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 
 type ConnectState = 'idle' | 'authorizing' | 'authorized' | 'error';
+
+function buildCallbackUrl(sessionId: string, code: string) {
+    const params = new URLSearchParams();
+
+    if (sessionId) {
+        params.set('sessionId', sessionId);
+    }
+
+    if (code) {
+        params.set('code', code);
+    }
+
+    const query = params.toString();
+    return query ? `/plugin/connect?${query}` : '/plugin/connect';
+}
 
 function PluginConnectFallback() {
     return (
@@ -22,22 +37,17 @@ function PluginConnectFallback() {
 function PluginConnectPageContent() {
     const { data: session, status } = useSession();
     const searchParams = useSearchParams();
-    const sessionId = useMemo(() => searchParams.get('sessionId')?.trim() || '', [searchParams]);
-    const code = useMemo(() => searchParams.get('code')?.trim() || '', [searchParams]);
+    const sessionId = searchParams.get('sessionId')?.trim() || '';
+    const code = searchParams.get('code')?.trim() || '';
+    const callbackUrl = buildCallbackUrl(sessionId, code);
     const [connectState, setConnectState] = useState<ConnectState>('idle');
     const [message, setMessage] = useState('Approve this Studio connection to continue in Roblox Studio.');
 
-    useEffect(() => {
-        if (status !== 'authenticated' || !sessionId || !code || connectState === 'authorizing' || connectState === 'authorized') {
-            return;
-        }
+    const authorizeStudioSession = useEffectEvent(async () => {
+        setConnectState('authorizing');
+        setMessage('Authorizing Roblox Studio with your Ro-Link account...');
 
-        let cancelled = false;
-
-        async function authorize() {
-            setConnectState('authorizing');
-            setMessage('Authorizing Roblox Studio with your Ro-Link account...');
-
+        try {
             const response = await fetch('/api/plugin/session/authorize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -45,10 +55,6 @@ function PluginConnectPageContent() {
             });
 
             const payload = await response.json().catch(() => ({}));
-            if (cancelled) {
-                return;
-            }
-
             if (!response.ok) {
                 setConnectState('error');
                 setMessage(payload.error || 'Studio authorization failed.');
@@ -57,13 +63,17 @@ function PluginConnectPageContent() {
 
             setConnectState('authorized');
             setMessage('Roblox Studio is connected. Return to the Ro-Link plugin window to continue setup.');
+        } catch {
+            setConnectState('error');
+            setMessage('The Studio authorization request failed before the server responded. Try again from this page.');
         }
+    });
 
-        authorize();
-
-        return () => {
-            cancelled = true;
-        };
+    useEffect(() => {
+        if (status !== 'authenticated' || !sessionId || !code || connectState !== 'idle') {
+            return;
+        }
+        void authorizeStudioSession();
     }, [status, sessionId, code, connectState]);
 
     const missingSessionParams = !sessionId || !code;
@@ -100,7 +110,7 @@ function PluginConnectPageContent() {
                         </p>
                         <button
                             type="button"
-                            onClick={() => signIn('discord')}
+                            onClick={() => signIn('discord', { callbackUrl })}
                             className="inline-flex items-center justify-center rounded-2xl bg-[#5865F2] px-5 py-3 text-sm font-black uppercase tracking-[0.22em] text-white transition hover:bg-[#4752C4]"
                         >
                             Sign In With Discord
@@ -124,6 +134,19 @@ function PluginConnectPageContent() {
                         }`}>
                             {message}
                         </div>
+
+                        {connectState === 'error' ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setConnectState('idle');
+                                    setMessage('Approve this Studio connection to continue in Roblox Studio.');
+                                }}
+                                className="inline-flex items-center justify-center rounded-2xl border border-slate-700 bg-slate-900/70 px-5 py-3 text-xs font-black uppercase tracking-[0.22em] text-white transition hover:border-sky-400/40 hover:bg-slate-900"
+                            >
+                                Retry Authorization
+                            </button>
+                        ) : null}
 
                         <p className="text-xs uppercase tracking-[0.22em] text-slate-500 font-bold">
                             Studio Session: {sessionId || 'missing'} / Code: {code || 'missing'}
