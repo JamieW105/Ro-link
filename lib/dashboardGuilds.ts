@@ -103,21 +103,25 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
     const botGuilds: BotGuildRecord[] = [];
     let botAfter = '0';
 
-    while (true) {
-        const data = await rest.get(Routes.userGuilds(), {
-            query: new URLSearchParams({ after: botAfter, limit: '100' }),
-        }) as BotGuildRecord[];
+    try {
+        while (true) {
+            const data = await rest.get(Routes.userGuilds(), {
+                query: new URLSearchParams({ after: botAfter, limit: '100' }),
+            }) as BotGuildRecord[];
 
-        if (!Array.isArray(data) || data.length === 0) {
-            break;
+            if (!Array.isArray(data) || data.length === 0) {
+                break;
+            }
+
+            botGuilds.push(...data);
+            botAfter = data[data.length - 1].id;
+
+            if (data.length < 100) {
+                break;
+            }
         }
-
-        botGuilds.push(...data);
-        botAfter = data[data.length - 1].id;
-
-        if (data.length < 100) {
-            break;
-        }
+    } catch (error) {
+        throw new Error(`Failed to fetch bot guilds. ${error instanceof Error ? error.message : 'Unknown Discord REST error.'}`);
     }
 
     const botGuildIds = new Set(botGuilds.map((guild) => guild.id));

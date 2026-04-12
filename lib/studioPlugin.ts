@@ -53,6 +53,12 @@ interface VerifiedUserRecord {
     roblox_username: string;
 }
 
+interface DiscordTokenState {
+    accessToken: string;
+    refreshToken?: string;
+    accessTokenExpiresAt?: number;
+}
+
 export interface StudioPluginServerSummary {
     id: string;
     name: string;
@@ -134,6 +140,100 @@ function getBearerToken(req: Request) {
     return header.slice('Bearer '.length).trim();
 }
 
+function parseDiscordTokenState(serialized: string | null | undefined): DiscordTokenState | null {
+    const value = typeof serialized === 'string' ? serialized.trim() : '';
+    if (!value) {
+        return null;
+    }
+
+    if (!value.startsWith('{')) {
+        return { accessToken: value };
+    }
+
+    try {
+        const parsed = JSON.parse(value) as Partial<DiscordTokenState>;
+        if (typeof parsed.accessToken !== 'string' || parsed.accessToken.trim() === '') {
+            return null;
+        }
+
+        return {
+            accessToken: parsed.accessToken,
+            refreshToken: typeof parsed.refreshToken === 'string' && parsed.refreshToken.trim() !== '' ? parsed.refreshToken : undefined,
+            accessTokenExpiresAt: typeof parsed.accessTokenExpiresAt === 'number' ? parsed.accessTokenExpiresAt : undefined,
+        };
+    } catch {
+        return { accessToken: value };
+    }
+}
+
+function serializeDiscordTokenState(tokenState: DiscordTokenState) {
+    return JSON.stringify(tokenState);
+}
+
+function isDiscordTokenExpired(tokenState: DiscordTokenState) {
+    return typeof tokenState.accessTokenExpiresAt === 'number'
+        && Date.now() >= tokenState.accessTokenExpiresAt - 60_000;
+}
+
+async function refreshDiscordTokenState(tokenState: DiscordTokenState) {
+    if (!tokenState.refreshToken) {
+        throw new StudioPluginError('Discord sign-in expired. Sign in with Discord again to reconnect Studio.', 401);
+    }
+
+    const response = await fetch('https://discord.com/api/oauth2/token', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            client_id: process.env.DISCORD_CLIENT_ID || '',
+            client_secret: process.env.DISCORD_CLIENT_SECRET || '',
+            grant_type: 'refresh_token',
+            refresh_token: tokenState.refreshToken,
+        }),
+        cache: 'no-store',
+    });
+
+    const payload = await response.json().catch(() => ({})) as {
+        access_token?: string;
+        refresh_token?: string;
+        expires_in?: number;
+        error?: string;
+        error_description?: string;
+    };
+
+    if (!response.ok || !payload.access_token) {
+        if (response.status === 400 || response.status === 401) {
+            throw new StudioPluginError('Discord sign-in expired. Sign in with Discord again to reconnect Studio.', 401);
+        }
+
+        throw new StudioPluginError(
+            payload.error_description || payload.error || 'Failed to refresh the Discord access token for the Studio plugin.',
+            500,
+        );
+    }
+
+    return {
+        accessToken: payload.access_token,
+        refreshToken: payload.refresh_token || tokenState.refreshToken,
+        accessTokenExpiresAt: Date.now() + Number(payload.expires_in || 0) * 1000,
+    } satisfies DiscordTokenState;
+}
+
+async function saveDiscordTokenState(sessionId: string, tokenState: DiscordTokenState) {
+    const client = getSupabaseAdmin();
+    const { error } = await client
+        .from('studio_plugin_sessions')
+        .update({
+            discord_access_token: serializeDiscordTokenState(tokenState),
+        })
+        .eq('id', sessionId);
+
+    if (error) {
+        throw new StudioPluginError(`Failed to update the Studio plugin Discord token. ${error.message}`, 500);
+    }
+}
+
 async function getPluginSessionByIdAndCode(sessionId: string, code: string) {
     const client = getSupabaseAdmin();
     const { data, error } = await client
@@ -186,15 +286,27 @@ async function getManageableGuildsForPlugin(session: StudioPluginSessionRecord) 
         throw new StudioPluginError('Studio plugin is missing Discord auth. Reconnect the plugin.', 401);
     }
 
+    let tokenState = parseDiscordTokenState(session.discord_access_token);
+    if (!tokenState?.accessToken) {
+        throw new StudioPluginError('Studio plugin is missing Discord auth. Reconnect the plugin.', 401);
+    }
+
+    if (isDiscordTokenExpired(tokenState)) {
+        tokenState = await refreshDiscordTokenState(tokenState);
+        await saveDiscordTokenState(session.id, tokenState);
+    }
+
     let visibleGuilds;
     try {
-        visibleGuilds = await listVisibleGuildsForDiscordSession(session.discord_access_token, session.discord_user_id);
+        visibleGuilds = await listVisibleGuildsForDiscordSession(tokenState.accessToken, session.discord_user_id);
     } catch (error) {
         if (error instanceof DiscordAccessTokenError) {
-            throw new StudioPluginError('Discord sign-in expired. Sign in with Discord again to reconnect Studio.', 401);
+            tokenState = await refreshDiscordTokenState(tokenState);
+            await saveDiscordTokenState(session.id, tokenState);
+            visibleGuilds = await listVisibleGuildsForDiscordSession(tokenState.accessToken, session.discord_user_id);
+        } else {
+            throw error;
         }
-
-        throw error;
     }
 
     const botGuilds = visibleGuilds.filter((guild) => guild.hasBot);
@@ -247,7 +359,7 @@ export async function createStudioPluginSession(req: Request) {
     };
 }
 
-export async function authorizeStudioPluginSession(sessionId: string, code: string, discordUserId: string, discordUsername: string, discordAccessToken: string) {
+export async function authorizeStudioPluginSession(sessionId: string, code: string, discordUserId: string, discordUsername: string, discordTokenState: DiscordTokenState) {
     const client = getSupabaseAdmin();
     const existing = await getPluginSessionByIdAndCode(sessionId, code);
 
@@ -264,7 +376,7 @@ export async function authorizeStudioPluginSession(sessionId: string, code: stri
             status: 'AUTHORIZED',
             discord_user_id: discordUserId,
             discord_username: discordUsername,
-            discord_access_token: discordAccessToken,
+            discord_access_token: serializeDiscordTokenState(discordTokenState),
             plugin_token: pluginToken,
             authorized_at: new Date().toISOString(),
             token_expires_at: tokenExpiresAt,
@@ -312,12 +424,20 @@ export async function getStudioPluginServers(req: Request, session: StudioPlugin
     const manageableGuilds = await getManageableGuildsForPlugin(session);
     const guildIds = manageableGuilds.map((guild) => guild.id);
 
-    const [{ data: serverRows }, { data: verifiedUser }] = await Promise.all([
+    const [{ data: serverRows, error: serverRowsError }, { data: verifiedUser, error: verifiedUserError }] = await Promise.all([
         guildIds.length > 0
             ? client.from('servers').select('id, place_id, universe_id, open_cloud_key, api_key').in('id', guildIds)
-            : Promise.resolve({ data: [] as ServerSetupRecord[] }),
+            : Promise.resolve({ data: [] as ServerSetupRecord[], error: null }),
         client.from('verified_users').select('discord_id, roblox_id, roblox_username').eq('discord_id', session.discord_user_id).maybeSingle<VerifiedUserRecord>(),
     ]);
+
+    if (serverRowsError) {
+        throw new StudioPluginError(`Failed to load Ro-Link server records. ${serverRowsError.message}`, 500);
+    }
+
+    if (verifiedUserError) {
+        throw new StudioPluginError(`Failed to load the linked Roblox account. ${verifiedUserError.message}`, 500);
+    }
 
     const serversById = new Map((serverRows || []).map((row) => [row.id, row]));
 

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { getServerSession } from 'next-auth';
 import type { Session } from 'next-auth';
+import { getToken } from 'next-auth/jwt';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { authorizeStudioPluginSession, StudioPluginError } from '@/lib/studioPlugin';
@@ -38,12 +40,28 @@ export async function POST(req: Request) {
     }
 
     try {
+        const cookieStore = await cookies();
+        const token = await getToken({
+            req: {
+                headers: req.headers,
+                cookies: cookieStore,
+            } as never,
+            secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+        });
+
+        const refreshToken = typeof token?.refreshToken === 'string' ? token.refreshToken : undefined;
+        const accessTokenExpiresAt = typeof token?.accessTokenExpires === 'number' ? token.accessTokenExpires : undefined;
+
         const result = await authorizeStudioPluginSession(
             sessionId,
             code,
             session.user.id,
             session.user.name || session.user.email || 'Discord User',
-            session.accessToken,
+            {
+                accessToken: session.accessToken,
+                refreshToken,
+                accessTokenExpiresAt,
+            },
         );
 
         console.info('[PLUGIN][AUTHORIZE] Studio plugin session authorized', {
