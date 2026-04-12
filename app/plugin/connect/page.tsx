@@ -48,7 +48,12 @@ function PluginConnectPageContent() {
         setMessage('Authorizing Roblox Studio with your Ro-Link account...');
 
         try {
-            const response = await fetch('/api/plugin/session/authorize', {
+            const authorizeParams = new URLSearchParams({
+                sessionId,
+                code,
+            });
+
+            const response = await fetch(`/api/plugin/session/authorize?${authorizeParams.toString()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sessionId, code }),
