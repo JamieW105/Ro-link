@@ -197,11 +197,14 @@ export async function resolveDashboardUserPermissions(serverId: string, discordU
 
     const memberRoles = Array.isArray(guildContext.member?.roles) ? guildContext.member.roles : [];
 
-    const { data: dashboardRoles } = await supabase
-        .from('dashboard_roles')
-        .select('*')
-        .eq('server_id', serverId)
-        .in('discord_role_id', memberRoles);
+    // PostgREST rejects `.in(column, [])`; with no roles, no dashboard role rows can match.
+    const dashboardRoles = memberRoles.length === 0
+        ? []
+        : (await supabase
+            .from('dashboard_roles')
+            .select('*')
+            .eq('server_id', serverId)
+            .in('discord_role_id', memberRoles)).data;
 
     return aggregateDashboardPermissions(isAdmin, dashboardRoles || []);
 }
@@ -281,11 +284,13 @@ export async function resolveRoLinkAdminAccess(
 
     const memberRoles = Array.isArray(guildContext.member?.roles) ? guildContext.member.roles : [];
 
-    const { data: dashboardRoles } = await supabase
-        .from('dashboard_roles')
-        .select('*')
-        .eq('server_id', server.id)
-        .in('discord_role_id', memberRoles);
+    const dashboardRoles = memberRoles.length === 0
+        ? []
+        : (await supabase
+            .from('dashboard_roles')
+            .select('*')
+            .eq('server_id', server.id)
+            .in('discord_role_id', memberRoles)).data;
 
     const permissions = aggregateDashboardPermissions(isAdmin, dashboardRoles || []);
 

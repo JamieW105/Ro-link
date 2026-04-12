@@ -318,9 +318,26 @@ async function getManageableGuildsForPlugin(session: StudioPluginSessionRecord) 
         if (error instanceof DiscordAccessTokenError) {
             tokenState = await refreshDiscordTokenState(tokenState);
             await saveDiscordTokenState(session.id, tokenState);
-            visibleGuilds = await listVisibleGuildsForDiscordSession(tokenState.accessToken, session.discord_user_id);
-        } else {
+            try {
+                visibleGuilds = await listVisibleGuildsForDiscordSession(tokenState.accessToken, session.discord_user_id);
+            } catch (retryError) {
+                if (retryError instanceof StudioPluginError) {
+                    throw retryError;
+                }
+                console.error('[PLUGIN] listVisibleGuildsForDiscordSession failed after token refresh', retryError);
+                throw new StudioPluginError(
+                    retryError instanceof Error ? retryError.message : 'Discord did not return your server list. Try again in a moment.',
+                    502,
+                );
+            }
+        } else if (error instanceof StudioPluginError) {
             throw error;
+        } else {
+            console.error('[PLUGIN] listVisibleGuildsForDiscordSession failed', error);
+            throw new StudioPluginError(
+                error instanceof Error ? error.message : 'Discord did not return your server list. Try again in a moment.',
+                502,
+            );
         }
     }
 
@@ -503,7 +520,7 @@ export async function getStudioPluginServers(req: Request, session: StudioPlugin
             isConfigured: Boolean(placeId && universeId && hasOpenCloudKey && hasApiKey),
             setupUrl: `${baseUrl}/dashboard/${guild.id}/settings/setup`,
         } satisfies StudioPluginServerSummary;
-    }).sort((left, right) => left.name.localeCompare(right.name));
+    }).sort((left, right) => String(left.name ?? '').localeCompare(String(right.name ?? '')));
 
     return {
         user: {
