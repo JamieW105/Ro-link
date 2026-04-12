@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS public.studio_plugin_sessions (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     expires_at TIMESTAMPTZ NOT NULL,
     authorized_at TIMESTAMPTZ,
-    token_expires_at TIMESTAMPTZ
+    token_expires_at TIMESTAMPTZ,
+    guild_snapshot JSONB
 );
 
 CREATE INDEX IF NOT EXISTS idx_studio_plugin_sessions_expires_at

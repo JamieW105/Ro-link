@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getServerSession } from 'next-auth/next';
 import type { Session } from 'next-auth';
-import { getToken } from 'next-auth/jwt';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { authorizeStudioPluginSession, StudioPluginError } from '@/lib/studioPlugin';
+import { authorizeStudioPluginFromBrowserSession } from '@/lib/studioPluginBrowserAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,72 +15,41 @@ type SessionWithDiscord = Session & {
     };
 };
 
+/** Legacy POST — prefer server-side authorize on `/plugin/connect`. Kept for older clients. */
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions) as SessionWithDiscord | null;
-    if (!session?.user || !session.user.id || !session.accessToken) {
+    const url = new URL(req.url);
+    const body = await req.json().catch(() => null) as { sessionId?: string; code?: string } | null;
+    const sessionId = body?.sessionId?.trim() || url.searchParams.get('sessionId')?.trim() || '';
+    const code = body?.code?.trim() || url.searchParams.get('code')?.trim() || '';
+
+    const cookieStore = await cookies();
+    const outcome = await authorizeStudioPluginFromBrowserSession({
+        sessionId,
+        code,
+        session,
+        cookieStore,
+        requestHeaders: req.headers,
+    });
+
+    if (outcome.kind === 'missing_params') {
+        return NextResponse.json({ error: 'sessionId and code are required.' }, { status: 400 });
+    }
+
+    if (outcome.kind === 'need_discord') {
         console.warn('[PLUGIN][AUTHORIZE] Missing Discord session for Studio plugin authorization');
         return NextResponse.json({ error: 'You need to sign in with Discord first.' }, { status: 401 });
     }
 
-    const url = new URL(req.url);
-    const body = await req.json().catch(() => null) as { sessionId?: string; code?: string } | null;
-    const sessionId = body?.sessionId?.trim() || url.searchParams.get('sessionId')?.trim();
-    const code = body?.code?.trim() || url.searchParams.get('code')?.trim();
-
-    if (!sessionId || !code) {
-        console.warn('[PLUGIN][AUTHORIZE] Missing session parameters', {
-            sessionId: sessionId || null,
-            hasCode: Boolean(code),
-            discordUserId: session.user.id,
-            url: req.url,
-            bodyKeys: body && typeof body === 'object' ? Object.keys(body) : [],
-        });
-        return NextResponse.json({ error: 'sessionId and code are required.' }, { status: 400 });
+    if (outcome.kind === 'error') {
+        return NextResponse.json({ error: outcome.message }, { status: outcome.status });
     }
 
-    try {
-        const cookieStore = await cookies();
-        const token = await getToken({
-            req: {
-                headers: req.headers,
-                cookies: cookieStore,
-            } as never,
-            secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
-        });
+    console.info('[PLUGIN][AUTHORIZE] Studio plugin session authorized (POST)', { sessionId });
 
-        const refreshToken = typeof token?.refreshToken === 'string' ? token.refreshToken : undefined;
-        const accessTokenExpiresAt = typeof token?.accessTokenExpires === 'number' ? token.accessTokenExpires : undefined;
-
-        const result = await authorizeStudioPluginSession(
-            sessionId,
-            code,
-            session.user.id,
-            session.user.name || session.user.email || 'Discord User',
-            {
-                accessToken: session.accessToken,
-                refreshToken,
-                accessTokenExpiresAt,
-            },
-        );
-
-        console.info('[PLUGIN][AUTHORIZE] Studio plugin session authorized', {
-            sessionId,
-            discordUserId: session.user.id,
-        });
-
-        return NextResponse.json({
-            status: 'authorized',
-            ...result,
-        });
-    } catch (error) {
-        console.error('[PLUGIN][AUTHORIZE] Failed to authorize Studio plugin session', {
-            sessionId,
-            discordUserId: session.user.id,
-            error: error instanceof Error ? error.message : error,
-        });
-
-        return NextResponse.json({
-            error: error instanceof Error ? error.message : 'Failed to authorize Studio plugin session.',
-        }, { status: error instanceof StudioPluginError ? error.status : 500 });
-    }
+    return NextResponse.json({
+        status: 'authorized',
+        pluginToken: outcome.pluginToken,
+        tokenExpiresAt: outcome.tokenExpiresAt,
+    });
 }

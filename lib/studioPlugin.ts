@@ -3,7 +3,12 @@ import { randomBytes, randomUUID } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 
 import { resolveDashboardUserPermissions } from './gameAdmin';
-import { DiscordAccessTokenError, hasDiscordGuildManagePermission, listVisibleGuildsForDiscordSession } from './dashboardGuilds';
+import {
+    DiscordAccessTokenError,
+    hasDiscordGuildManagePermission,
+    listVisibleGuildsForDiscordSession,
+    type VisibleDashboardGuild,
+} from './dashboardGuilds';
 import { supabase } from './supabase';
 
 const PLUGIN_SESSION_TTL_MS = 60 * 60 * 1000;
@@ -37,6 +42,8 @@ interface StudioPluginSessionRecord {
     expires_at: string;
     token_expires_at?: string | null;
     authorized_at?: string | null;
+    /** Cached manageable guilds (JSON) — avoids Discord on every GET /api/plugin/servers */
+    guild_snapshot?: unknown;
 }
 
 interface ServerSetupRecord {
@@ -129,6 +136,68 @@ function buildDiscordIconUrl(serverId: string, icon?: string | null) {
     }
 
     return `https://cdn.discordapp.com/icons/${serverId}/${icon}.png?size=128`;
+}
+
+function snapshotGuildPayload(guilds: VisibleDashboardGuild[]) {
+    return guilds.map((guild) => ({
+        id: guild.id,
+        name: guild.name,
+        icon: guild.icon ?? null,
+        owner: Boolean(guild.owner),
+        hasBot: Boolean(guild.hasBot),
+    }));
+}
+
+function parseGuildSnapshot(raw: unknown): VisibleDashboardGuild[] | null {
+    if (raw == null) {
+        return null;
+    }
+
+    if (!Array.isArray(raw)) {
+        return null;
+    }
+
+    if (raw.length === 0) {
+        return [];
+    }
+
+    const guilds: VisibleDashboardGuild[] = [];
+
+    for (const item of raw) {
+        if (!item || typeof item !== 'object') {
+            continue;
+        }
+
+        const row = item as Record<string, unknown>;
+        const id = typeof row.id === 'string' ? row.id : '';
+        if (!id) {
+            continue;
+        }
+
+        guilds.push({
+            id,
+            name: typeof row.name === 'string' ? row.name : 'Server',
+            icon: typeof row.icon === 'string' ? row.icon : null,
+            permissions: '0',
+            owner: Boolean(row.owner),
+            hasBot: Boolean(row.hasBot),
+        });
+    }
+
+    return guilds;
+}
+
+async function persistGuildSnapshot(sessionId: string, guilds: VisibleDashboardGuild[]) {
+    const client = getSupabaseAdmin();
+    const payload = snapshotGuildPayload(guilds);
+    const { error } = await client
+        .from('studio_plugin_sessions')
+        .update({ guild_snapshot: payload })
+        .eq('id', sessionId);
+
+    if (error) {
+        console.warn('[PLUGIN] Failed to persist guild snapshot', { sessionId, message: error.message });
+    }
 }
 
 function getBearerToken(req: Request) {
@@ -363,6 +432,26 @@ async function getManageableGuildsForPlugin(session: StudioPluginSessionRecord) 
     return (await Promise.all(checks)).filter((guild): guild is NonNullable<typeof guild> => Boolean(guild));
 }
 
+async function resolveManageableGuildsForSession(
+    session: StudioPluginSessionRecord,
+    mode: 'prefer_snapshot' | 'refresh',
+): Promise<VisibleDashboardGuild[]> {
+    if (mode === 'refresh') {
+        const live = await getManageableGuildsForPlugin(session);
+        await persistGuildSnapshot(session.id, live);
+        return live;
+    }
+
+    const fromSnapshot = parseGuildSnapshot(session.guild_snapshot);
+    if (fromSnapshot !== null) {
+        return fromSnapshot;
+    }
+
+    const live = await getManageableGuildsForPlugin(session);
+    await persistGuildSnapshot(session.id, live);
+    return live;
+}
+
 export async function createStudioPluginSession(req: Request) {
     const client = getSupabaseAdmin();
     const id = randomUUID();
@@ -419,6 +508,27 @@ export async function authorizeStudioPluginSession(sessionId: string, code: stri
         throw new StudioPluginError(`Failed to authorize Studio plugin session. ${error.message}`, 500);
     }
 
+    const authorizedSession: StudioPluginSessionRecord = {
+        ...existing,
+        status: 'AUTHORIZED',
+        discord_user_id: discordUserId,
+        discord_username: discordUsername,
+        discord_access_token: serializeDiscordTokenState(discordTokenState),
+        plugin_token: pluginToken,
+        token_expires_at: tokenExpiresAt,
+        authorized_at: new Date().toISOString(),
+    };
+
+    try {
+        const guilds = await getManageableGuildsForPlugin(authorizedSession);
+        await persistGuildSnapshot(existing.id, guilds);
+    } catch (snapshotError) {
+        console.warn('[PLUGIN][AUTHORIZE] Guild snapshot failed; /servers will compute live', {
+            sessionId: existing.id,
+            error: snapshotError instanceof Error ? snapshotError.message : snapshotError,
+        });
+    }
+
     return {
         pluginToken,
         tokenExpiresAt,
@@ -472,7 +582,9 @@ export async function getStudioPluginServers(req: Request, session: StudioPlugin
     try {
         const client = getSupabaseAdmin();
         const baseUrl = buildPublicBaseUrl(req);
-        const manageableGuilds = await getManageableGuildsForPlugin(session);
+        const url = new URL(req.url);
+        const refreshList = url.searchParams.get('refresh') === '1' || url.searchParams.get('refresh') === 'true';
+        const manageableGuilds = await resolveManageableGuildsForSession(session, refreshList ? 'refresh' : 'prefer_snapshot');
         const guildIds = manageableGuilds.map((guild) => guild.id);
 
         const [{ data: serverRows, error: serverRowsError }, { data: verifiedUser, error: verifiedUserError }] = await Promise.all([
@@ -558,7 +670,7 @@ export async function installStudioPluginServer(req: Request, session: StudioPlu
 }) {
     const client = getSupabaseAdmin();
     const baseUrl = buildPublicBaseUrl(req);
-    const manageableGuilds = await getManageableGuildsForPlugin(session);
+    const manageableGuilds = await resolveManageableGuildsForSession(session, 'prefer_snapshot');
     const selectedGuild = manageableGuilds.find((guild) => guild.id === input.serverId);
 
     if (!selectedGuild) {
