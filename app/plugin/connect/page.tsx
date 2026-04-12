@@ -1,11 +1,14 @@
 'use client';
 
-import { Suspense, useEffect, useEffectEvent, useState } from 'react';
+import { Suspense, useEffect, useEffectEvent, useRef, useState } from 'react';
 import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 
 type ConnectState = 'idle' | 'authorizing' | 'authorized' | 'error';
+
+const AUTHORIZE_TIMEOUT_MS = 45_000;
+const SLOW_HINT_AFTER_MS = 15_000;
 
 function buildCallbackUrl(sessionId: string, code: string) {
     const params = new URLSearchParams();
@@ -43,10 +46,31 @@ function PluginConnectPageContent() {
     const needsDiscordReauth = status === 'authenticated' && (!session?.accessToken || Boolean(session.error));
     const [connectState, setConnectState] = useState<ConnectState>('idle');
     const [message, setMessage] = useState('Approve this Studio connection to continue in Roblox Studio.');
+    const [showSlowHint, setShowSlowHint] = useState(false);
+    const authorizationInFlightRef = useRef(false);
+
+    useEffect(() => {
+        if (connectState !== 'authorizing') {
+            setShowSlowHint(false);
+            return;
+        }
+
+        setShowSlowHint(false);
+        const timer = window.setTimeout(() => setShowSlowHint(true), SLOW_HINT_AFTER_MS);
+        return () => window.clearTimeout(timer);
+    }, [connectState]);
 
     const authorizeStudioSession = useEffectEvent(async () => {
+        if (authorizationInFlightRef.current) {
+            return;
+        }
+        authorizationInFlightRef.current = true;
+
         setConnectState('authorizing');
         setMessage('Authorizing Roblox Studio with your Ro-Link account...');
+
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), AUTHORIZE_TIMEOUT_MS);
 
         try {
             const authorizeParams = new URLSearchParams({
@@ -57,7 +81,9 @@ function PluginConnectPageContent() {
             const response = await fetch(`/api/plugin/session/authorize?${authorizeParams.toString()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ sessionId, code }),
+                signal: controller.signal,
             });
 
             const payload = await response.json().catch(() => ({}));
@@ -69,9 +95,21 @@ function PluginConnectPageContent() {
 
             setConnectState('authorized');
             setMessage('Roblox Studio is connected. Return to the Ro-Link plugin window to continue setup.');
-        } catch {
+        } catch (error) {
+            const isAbort =
+                error instanceof DOMException
+                    ? error.name === 'AbortError'
+                    : error instanceof Error && error.name === 'AbortError';
+            if (isAbort) {
+                setConnectState('error');
+                setMessage('Authorization timed out. Check your connection and click Retry.');
+                return;
+            }
             setConnectState('error');
             setMessage('The Studio authorization request failed before the server responded. Try again from this page.');
+        } finally {
+            window.clearTimeout(timeoutId);
+            authorizationInFlightRef.current = false;
         }
     });
 
@@ -140,7 +178,10 @@ function PluginConnectPageContent() {
                                     ? 'border border-rose-500/30 bg-rose-500/10 text-rose-100'
                                     : 'border border-sky-500/20 bg-sky-500/10 text-slate-100'
                         }`}>
-                            {message}
+                            <p>{message}</p>
+                            {connectState === 'authorizing' && showSlowHint ? (
+                                <p className="mt-3 text-slate-400 text-xs">Still working…</p>
+                            ) : null}
                         </div>
 
                         {connectState === 'error' ? (
