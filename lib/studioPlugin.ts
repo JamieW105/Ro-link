@@ -6,7 +6,7 @@ import { resolveDashboardUserPermissions } from './gameAdmin';
 import { DiscordAccessTokenError, hasDiscordGuildManagePermission, listVisibleGuildsForDiscordSession } from './dashboardGuilds';
 import { supabase } from './supabase';
 
-const PLUGIN_SESSION_TTL_MS = 15 * 60 * 1000;
+const PLUGIN_SESSION_TTL_MS = 60 * 60 * 1000;
 const PLUGIN_TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
 
 const supabaseParams = {
@@ -258,6 +258,21 @@ async function getPluginSessionByIdAndCode(sessionId: string, code: string) {
     return data;
 }
 
+async function getPluginSessionById(sessionId: string) {
+    const client = getSupabaseAdmin();
+    const { data, error } = await client
+        .from('studio_plugin_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .maybeSingle<StudioPluginSessionRecord>();
+
+    if (error) {
+        throw new StudioPluginError(`Failed to load Studio plugin session by id. ${error.message}`, 500);
+    }
+
+    return data;
+}
+
 async function getPluginSessionByToken(pluginToken: string) {
     const client = getSupabaseAdmin();
     const { data, error } = await client
@@ -394,19 +409,37 @@ export async function authorizeStudioPluginSession(sessionId: string, code: stri
 }
 
 export async function getStudioPluginSessionStatus(sessionId: string, code: string) {
-    const session = await getPluginSessionByIdAndCode(sessionId, code);
+    const session = await getPluginSessionById(sessionId);
 
     if (!session) {
-        return null;
+        return {
+            found: false,
+            reason: 'missing',
+        } as const;
+    }
+
+    if (new Date(session.expires_at).getTime() <= Date.now()) {
+        return {
+            found: false,
+            reason: 'expired',
+        } as const;
+    }
+
+    if (session.code !== code) {
+        return {
+            found: false,
+            reason: 'code_mismatch',
+        } as const;
     }
 
     return {
+        found: true,
         status: session.status === 'AUTHORIZED' && session.plugin_token ? 'authorized' : 'pending',
         expiresAt: session.expires_at,
         pluginToken: session.plugin_token || null,
         tokenExpiresAt: session.token_expires_at || null,
         discordUsername: session.discord_username || null,
-    };
+    } as const;
 }
 
 export async function requireAuthorizedStudioPluginSession(req: Request) {
