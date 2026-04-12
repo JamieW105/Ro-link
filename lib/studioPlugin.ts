@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 
 import { resolveDashboardUserPermissions } from './gameAdmin';
-import { hasDiscordGuildManagePermission, listVisibleGuildsForDiscordSession } from './dashboardGuilds';
+import { DiscordAccessTokenError, hasDiscordGuildManagePermission, listVisibleGuildsForDiscordSession } from './dashboardGuilds';
 import { supabase } from './supabase';
 
 const PLUGIN_SESSION_TTL_MS = 15 * 60 * 1000;
@@ -183,10 +183,20 @@ async function getPluginSessionByToken(pluginToken: string) {
 
 async function getManageableGuildsForPlugin(session: StudioPluginSessionRecord) {
     if (!session.discord_access_token || !session.discord_user_id) {
-        throw new Error('Plugin session is missing Discord auth.');
+        throw new StudioPluginError('Studio plugin is missing Discord auth. Reconnect the plugin.', 401);
     }
 
-    const visibleGuilds = await listVisibleGuildsForDiscordSession(session.discord_access_token, session.discord_user_id);
+    let visibleGuilds;
+    try {
+        visibleGuilds = await listVisibleGuildsForDiscordSession(session.discord_access_token, session.discord_user_id);
+    } catch (error) {
+        if (error instanceof DiscordAccessTokenError) {
+            throw new StudioPluginError('Discord sign-in expired. Sign in with Discord again to reconnect Studio.', 401);
+        }
+
+        throw error;
+    }
+
     const botGuilds = visibleGuilds.filter((guild) => guild.hasBot);
 
     const checks = botGuilds.map(async (guild) => {

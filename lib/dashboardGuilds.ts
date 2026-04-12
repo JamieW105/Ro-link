@@ -3,6 +3,13 @@ import { Routes } from 'discord-api-types/v10';
 
 import { supabase } from './supabase';
 
+export class DiscordAccessTokenError extends Error {
+    constructor(message = 'Discord access token expired or was revoked.') {
+        super(message);
+        this.name = 'DiscordAccessTokenError';
+    }
+}
+
 const ADMINISTRATOR_PERMISSION = 0x8n;
 const MANAGE_GUILD_PERMISSION = 0x20n;
 
@@ -71,6 +78,9 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
         });
 
         if (!res.ok) {
+            if (res.status === 401) {
+                throw new DiscordAccessTokenError();
+            }
             if (userGuilds.length === 0) {
                 throw new Error(`Failed to fetch user guilds (${res.status})`);
             }

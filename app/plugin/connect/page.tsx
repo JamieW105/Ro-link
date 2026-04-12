@@ -40,6 +40,7 @@ function PluginConnectPageContent() {
     const sessionId = searchParams.get('sessionId')?.trim() || '';
     const code = searchParams.get('code')?.trim() || '';
     const callbackUrl = buildCallbackUrl(sessionId, code);
+    const needsDiscordReauth = status === 'authenticated' && (!session?.accessToken || Boolean(session.error));
     const [connectState, setConnectState] = useState<ConnectState>('idle');
     const [message, setMessage] = useState('Approve this Studio connection to continue in Roblox Studio.');
 
@@ -75,11 +76,11 @@ function PluginConnectPageContent() {
     });
 
     useEffect(() => {
-        if (status !== 'authenticated' || !sessionId || !code || connectState !== 'idle') {
+        if (status !== 'authenticated' || needsDiscordReauth || !sessionId || !code || connectState !== 'idle') {
             return;
         }
         void authorizeStudioSession();
-    }, [status, sessionId, code, connectState]);
+    }, [status, needsDiscordReauth, sessionId, code, connectState]);
 
     const missingSessionParams = !sessionId || !code;
 
@@ -108,10 +109,12 @@ function PluginConnectPageContent() {
                     </div>
                 ) : null}
 
-                {status === 'unauthenticated' ? (
+                {status === 'unauthenticated' || needsDiscordReauth ? (
                     <div className="space-y-5">
                         <p className="text-sm leading-7 text-slate-300">
-                            Sign in with Discord first. The Studio plugin will use that session to load the Ro-Link servers you can configure.
+                            {needsDiscordReauth
+                                ? 'Your Discord session expired. Sign in again so the Studio plugin can load your Ro-Link servers.'
+                                : 'Sign in with Discord first. The Studio plugin will use that session to load the Ro-Link servers you can configure.'}
                         </p>
                         <button
                             type="button"
@@ -123,7 +126,7 @@ function PluginConnectPageContent() {
                     </div>
                 ) : null}
 
-                {status === 'authenticated' ? (
+                {status === 'authenticated' && !needsDiscordReauth ? (
                     <div className="space-y-5">
                         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-5 py-4">
                             <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold mb-2">Discord Account</p>
