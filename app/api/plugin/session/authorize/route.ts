@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import type { Session } from 'next-auth';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { authorizeStudioPluginSession } from '@/lib/studioPlugin';
+import { authorizeStudioPluginSession, StudioPluginError } from '@/lib/studioPlugin';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,8 +42,14 @@ export async function POST(req: Request) {
             ...result,
         });
     } catch (error) {
+        console.error('[PLUGIN][AUTHORIZE] Failed to authorize Studio plugin session', {
+            sessionId,
+            discordUserId: session.user.id,
+            error: error instanceof Error ? error.message : error,
+        });
+
         return NextResponse.json({
             error: error instanceof Error ? error.message : 'Failed to authorize Studio plugin session.',
-        }, { status: 400 });
+        }, { status: error instanceof StudioPluginError ? error.status : 500 });
     }
 }

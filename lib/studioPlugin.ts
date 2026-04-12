@@ -16,6 +16,16 @@ const supabaseParams = {
     },
 };
 
+export class StudioPluginError extends Error {
+    status: number;
+
+    constructor(message: string, status = 500) {
+        super(message);
+        this.name = 'StudioPluginError';
+        this.status = status;
+    }
+}
+
 interface StudioPluginSessionRecord {
     id: string;
     code: string;
@@ -126,12 +136,16 @@ function getBearerToken(req: Request) {
 
 async function getPluginSessionByIdAndCode(sessionId: string, code: string) {
     const client = getSupabaseAdmin();
-    const { data } = await client
+    const { data, error } = await client
         .from('studio_plugin_sessions')
         .select('*')
         .eq('id', sessionId)
         .eq('code', code)
         .maybeSingle<StudioPluginSessionRecord>();
+
+    if (error) {
+        throw new StudioPluginError(`Failed to load Studio plugin session. ${error.message}`, 500);
+    }
 
     if (!data) {
         return null;
@@ -146,11 +160,15 @@ async function getPluginSessionByIdAndCode(sessionId: string, code: string) {
 
 async function getPluginSessionByToken(pluginToken: string) {
     const client = getSupabaseAdmin();
-    const { data } = await client
+    const { data, error } = await client
         .from('studio_plugin_sessions')
         .select('*')
         .eq('plugin_token', pluginToken)
         .maybeSingle<StudioPluginSessionRecord>();
+
+    if (error) {
+        throw new StudioPluginError(`Failed to load Studio plugin token. ${error.message}`, 500);
+    }
 
     if (!data || !data.token_expires_at) {
         return null;
@@ -224,7 +242,7 @@ export async function authorizeStudioPluginSession(sessionId: string, code: stri
     const existing = await getPluginSessionByIdAndCode(sessionId, code);
 
     if (!existing) {
-        throw new Error('Plugin session was not found or expired.');
+        throw new StudioPluginError('Plugin session was not found or expired.', 404);
     }
 
     const pluginToken = existing.plugin_token || generatePluginToken();
@@ -244,7 +262,7 @@ export async function authorizeStudioPluginSession(sessionId: string, code: stri
         .eq('id', existing.id);
 
     if (error) {
-        throw new Error(error.message);
+        throw new StudioPluginError(`Failed to authorize Studio plugin session. ${error.message}`, 500);
     }
 
     return {
