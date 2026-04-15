@@ -14,6 +14,10 @@ interface VisibleGuild {
 
 interface DashboardPermissions {
     can_access_dashboard: boolean;
+    can_kick: boolean;
+    can_ban: boolean;
+    can_timeout: boolean;
+    can_mute: boolean;
     can_lookup: boolean;
     can_manage_reports: boolean;
     can_manage_settings: boolean;
