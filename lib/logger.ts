@@ -1,5 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
+import { stringifyLogValue } from './logRecords';
 
 const supabaseParams = {
     auth: {
@@ -10,9 +11,14 @@ const supabaseParams = {
 
 import { supabase } from './supabase';
 
-export async function logAction(server_id: string, action: string, target: string, moderator: string, reason: string = 'No reason provided') {
+export async function logAction(server_id: string, action: string, target: unknown, moderator: unknown, reason: unknown = 'No reason provided') {
     try {
-        console.log(`[LOGGER] Starting logAction for server ${server_id}, action ${action}`);
+        const safeAction = stringifyLogValue(action, 'UNKNOWN');
+        const safeTarget = stringifyLogValue(target, 'Unknown Target');
+        const safeModerator = stringifyLogValue(moderator, 'System');
+        const safeReason = stringifyLogValue(reason, 'No reason provided');
+
+        console.log(`[LOGGER] Starting logAction for server ${server_id}, action ${safeAction}`);
         const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -24,9 +30,9 @@ export async function logAction(server_id: string, action: string, target: strin
             .from('logs')
             .insert([{
                 server_id,
-                action,
-                target,
-                moderator,
+                action: safeAction,
+                target: safeTarget,
+                moderator: safeModerator,
                 timestamp: new Date().toISOString()
             }]);
 
@@ -64,11 +70,11 @@ export async function logAction(server_id: string, action: string, target: strin
 
         // Determine Color based on Action
         let color = 0x3498db; // Blue (Default)
-        if (action.includes('BAN')) color = 0xe74c3c; // Red
-        else if (action.includes('KICK')) color = 0xe67e22; // Orange
-        else if (action.includes('MUTE') || action.includes('TIMEOUT')) color = 0xf1c40f; // Yellow
-        else if (action.includes('LOOKUP')) color = 0x9b59b6; // Purple
-        else if (action.includes('REPORT')) color = 0x2ecc71; // Green
+        if (safeAction.includes('BAN')) color = 0xe74c3c; // Red
+        else if (safeAction.includes('KICK')) color = 0xe67e22; // Orange
+        else if (safeAction.includes('MUTE') || safeAction.includes('TIMEOUT')) color = 0xf1c40f; // Yellow
+        else if (safeAction.includes('LOOKUP')) color = 0x9b59b6; // Purple
+        else if (safeAction.includes('REPORT')) color = 0x2ecc71; // Green
 
         console.log(`[LOGGER] Sending Discord log to channel ${channelId}`);
         const res = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
@@ -79,13 +85,13 @@ export async function logAction(server_id: string, action: string, target: strin
             },
             body: JSON.stringify({
                 embeds: [{
-                    title: `Action Log: ${action}`,
+                    title: `Action Log: ${safeAction}`,
                     color: color,
                     fields: [
-                        { name: "Target", value: target || "N/A", inline: true },
-                        { name: "Moderator", value: moderator || "System", inline: true },
+                        { name: "Target", value: safeTarget || "N/A", inline: true },
+                        { name: "Moderator", value: safeModerator || "System", inline: true },
                         { name: "Server", value: serverName, inline: true },
-                        { name: "Reason", value: reason, inline: false }
+                        { name: "Reason", value: safeReason, inline: false }
                     ],
                     timestamp: new Date().toISOString(),
                     footer: { text: "Ro-Link Global Logger" }

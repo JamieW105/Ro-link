@@ -5,14 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@/context/PermissionsContext";
-
-interface Log {
-    id: string;
-    action: string;
-    target: string;
-    moderator: string;
-    timestamp: string;
-}
+import { normalizeDashboardLog, normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
 
 // SVGs
 const ScrollIcon = () => (
@@ -39,7 +32,7 @@ export default function ServerDashboard() {
     const { id } = useParams();
     const { data: session } = useSession();
     const [apiKey, setApiKey] = useState<string | null>(null);
-    const [logs, setLogs] = useState<Log[]>([]);
+    const [logs, setLogs] = useState<NormalizedDashboardLog[]>([]);
     const [serverName, setServerName] = useState<string>("Loading Server...");
     const [loading, setLoading] = useState(true);
 
@@ -70,7 +63,7 @@ export default function ServerDashboard() {
                 .order('timestamp', { ascending: false })
                 .limit(10);
 
-            if (logData) setLogs(logData);
+            if (logData) setLogs(normalizeDashboardLogs(logData));
             setLoading(false);
         }
         fetchData();
@@ -87,7 +80,12 @@ export default function ServerDashboard() {
                     filter: `server_id=eq.${id}`
                 },
                 (payload) => {
-                    setLogs((prev) => [payload.new as Log, ...prev].slice(0, 10));
+                    const nextLog = normalizeDashboardLog(payload.new);
+                    if (!nextLog) {
+                        return;
+                    }
+
+                    setLogs((prev) => [nextLog, ...prev].slice(0, 10));
                 }
             )
             .subscribe();

@@ -12,6 +12,7 @@ import {
     canUseDashboardCommand,
 } from "@/lib/adminPanelCommands";
 import { findLivePlayer } from "@/lib/livePlayers";
+import { normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
 import { supabase } from "@/lib/supabase";
 
 interface RobloxPlayerProfile {
@@ -27,13 +28,6 @@ interface RobloxPlayerProfile {
 interface LiveServerRecord {
     id: string;
     players?: unknown;
-}
-
-interface LogRecord {
-    id: string;
-    action: string;
-    moderator: string;
-    timestamp: string;
 }
 
 type PresenceState = {
@@ -73,7 +67,7 @@ export default function DashboardPlayerPage() {
 
     const [player, setPlayer] = useState<RobloxPlayerProfile | null>(null);
     const [presence, setPresence] = useState<PresenceState>({ inGame: false, jobId: null });
-    const [logs, setLogs] = useState<LogRecord[]>([]);
+    const [logs, setLogs] = useState<NormalizedDashboardLog[]>([]);
     const [linkedPlaceId, setLinkedPlaceId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -145,7 +139,7 @@ export default function DashboardPlayerPage() {
                 jobId: matchingServer?.id || null,
             });
 
-            setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
+            setLogs(normalizeDashboardLogs(logsRes.data));
         } catch (loadError) {
             setError(String(loadError instanceof Error ? loadError.message : loadError));
         } finally {

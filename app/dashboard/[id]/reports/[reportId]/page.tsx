@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@/context/PermissionsContext";
+import { normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
 
 // Icons
 const ChevronLeftIcon = () => (
@@ -25,7 +26,7 @@ export default function ReportDetailsPage() {
 
     const [report, setReport] = useState<any | null>(null);
     const [profiles, setProfiles] = useState<any | null>(null);
-    const [logs, setLogs] = useState<any[]>([]);
+    const [logs, setLogs] = useState<NormalizedDashboardLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [reason, setReason] = useState("");
@@ -101,7 +102,7 @@ export default function ReportDetailsPage() {
                 .order('timestamp', { ascending: false });
 
             if (logsData) {
-                setLogs(logsData);
+                setLogs(normalizeDashboardLogs(logsData));
             }
 
             setLoading(false);

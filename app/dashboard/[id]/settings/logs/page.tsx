@@ -2,15 +2,8 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { normalizeDashboardLog, normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
 import { supabase } from "@/lib/supabase";
-
-interface Log {
-    id: string;
-    action: string;
-    target: string;
-    moderator: string;
-    timestamp: string;
-}
 
 const ScrollIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 21h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z" /><path d="M12 11V7" /><path d="M12 17v-2" /><path d="M8 7h8" /><path d="M8 11h8" /><path d="M8 15h8" /></svg>
@@ -26,7 +19,7 @@ const SortIcon = () => (
 
 export default function LogsPage() {
     const { id } = useParams();
-    const [logs, setLogs] = useState<Log[]>([]);
+    const [logs, setLogs] = useState<NormalizedDashboardLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [sortAsc, setSortAsc] = useState(false);
@@ -42,7 +35,7 @@ export default function LogsPage() {
                 .order('timestamp', { ascending: false })
                 .limit(200);
 
-            if (data) setLogs(data);
+            if (data) setLogs(normalizeDashboardLogs(data));
             setLoading(false);
         }
         fetchLogs();
@@ -58,7 +51,12 @@ export default function LogsPage() {
                     filter: `server_id=eq.${id}`
                 },
                 (payload) => {
-                    setLogs((prev) => [payload.new as Log, ...prev].slice(0, 200));
+                    const nextLog = normalizeDashboardLog(payload.new);
+                    if (!nextLog) {
+                        return;
+                    }
+
+                    setLogs((prev) => [nextLog, ...prev].slice(0, 200));
                 }
             )
             .subscribe();

@@ -4,6 +4,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { canUseDashboardCommand, getAdminPanelCommandDefinition, MODERATION_COMMAND_IDS } from "@/lib/adminPanelCommands";
 import { findLivePlayer } from "@/lib/livePlayers";
+import { normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@/context/PermissionsContext";
@@ -58,7 +59,7 @@ function PlayerLookupContent() {
     const [player, setPlayer] = useState<RobloxPlayer | null>(null);
     const [presence, setPresence] = useState<{ inGame: boolean, jobId?: string } | null>(null);
     const [linkedPlaceId, setLinkedPlaceId] = useState<string | null>(null);
-    const [logs, setLogs] = useState<any[]>([]);
+    const [logs, setLogs] = useState<NormalizedDashboardLog[]>([]);
     const [loading, setLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -112,7 +113,7 @@ function PlayerLookupContent() {
             }
 
             if (logsRes.data) {
-                setLogs(logsRes.data);
+                setLogs(normalizeDashboardLogs(logsRes.data));
             }
             if (data.username) {
                 await fetch('/api/logs', {
@@ -202,7 +203,7 @@ function PlayerLookupContent() {
 
             // Re-fetch logs
             const { data } = await supabase.from('logs').select('*').eq('server_id', id).eq('target', player.username).order('timestamp', { ascending: false });
-            if (data) setLogs(data);
+            if (data) setLogs(normalizeDashboardLogs(data));
         }
         setActionLoading(false);
     }
