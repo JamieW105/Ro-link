@@ -4,9 +4,22 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { hasAnyAdminPanelCommand, MISC_ACTION_COMMAND_IDS } from "@/lib/adminPanelCommands";
-import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 import { PermissionsProvider } from "@/context/PermissionsContext";
+
+interface VisibleGuild {
+    id: string;
+    hasBot?: boolean;
+}
+
+interface DashboardPermissions {
+    can_access_dashboard: boolean;
+    can_lookup: boolean;
+    can_manage_reports: boolean;
+    can_manage_settings: boolean;
+    allowed_misc_cmds: string[];
+    is_admin: boolean;
+}
 
 // --- PREMIUM SVG ICONS ---
 
@@ -28,12 +41,6 @@ const MagicIcon = () => (
     </svg>
 );
 
-const SetupIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" />
-    </svg>
-);
-
 const BackIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="m12 19-7-7 7-7" /><path d="M19 12H5" />
@@ -52,7 +59,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const { data: session } = useSession();
     const router = useRouter();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [userPermissions, setUserPermissions] = useState<any>(null);
+    const [userPermissions, setUserPermissions] = useState<DashboardPermissions | null>(null);
     const [loading, setLoading] = useState(true);
     const [apiLatencyMs, setApiLatencyMs] = useState<number | null>(null);
     const [apiLatencyState, setApiLatencyState] = useState<'measuring' | 'ready' | 'error'>('measuring');
@@ -65,8 +72,8 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             try {
                 // 1. Fetch User Guilds to ensure they are even in the server
                 const guildsRes = await fetch('/api/guilds');
-                const guilds = await guildsRes.json();
-                const g = guilds.find((guild: any) => guild.id === id);
+                const guilds = await guildsRes.json() as VisibleGuild[];
+                const g = guilds.find((guild) => guild.id === id);
 
                 if (!g || !g.hasBot) {
                     console.log("[Guard] Access denied or bot not present.");
@@ -76,7 +83,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
                 // 2. Fetch Detailed Permissions for this specific server
                 const permsRes = await fetch(`/api/user/permissions?serverId=${id}`);
-                const perms = await permsRes.json();
+                const perms = await permsRes.json() as DashboardPermissions | null;
 
                 if (!perms || !perms.can_access_dashboard) {
                     console.log("[Guard] No dashboard access for this server.");
@@ -133,19 +140,11 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         }
 
         const intervalId = window.setInterval(measureApiLatency, 30000);
-        const handleVisibilityChange = () => {
-            if (!document.hidden) {
-                measureApiLatency();
-            }
-        };
-
         measureApiLatency();
-        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
             cancelled = true;
             window.clearInterval(intervalId);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);
 
@@ -236,8 +235,6 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             hide: !userPermissions.can_manage_settings
         },
     ].filter(item => !item.hide);
-
-    const allItems = [...utilityItems, ...moderationItems, ...settingItems];
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200 flex min-w-0 flex-col md:flex-row font-sans">
