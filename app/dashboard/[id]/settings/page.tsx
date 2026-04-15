@@ -98,6 +98,11 @@ export default function SettingsPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
+    const [removeBotOption, setRemoveBotOption] = useState(true);
+    const [deleteDataOption, setDeleteDataOption] = useState(false);
+    const [removingRoLink, setRemovingRoLink] = useState(false);
+    const [removeActionError, setRemoveActionError] = useState<string | null>(null);
 
     // General Settings
     const [adminCmds, setAdminCmds] = useState(true);
@@ -379,6 +384,54 @@ export default function SettingsPage() {
             await fetch(`/api/settings/roles?id=${roleId}`, { method: 'DELETE' });
         } catch (e) {
             console.error("Failed to delete role", e);
+        }
+    }
+
+    function closeRemoveModal() {
+        if (removingRoLink) {
+            return;
+        }
+
+        setIsRemoveModalOpen(false);
+        setRemoveActionError(null);
+    }
+
+    async function handleRemoveRoLink() {
+        if (!removeBotOption && !deleteDataOption) {
+            setRemoveActionError('Select at least one option before continuing.');
+            return;
+        }
+
+        setRemovingRoLink(true);
+        setRemoveActionError(null);
+
+        try {
+            const response = await fetch('/api/dashboard/server/remove', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverId: id,
+                    removeBot: removeBotOption,
+                    deleteData: deleteDataOption,
+                }),
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                setRemoveActionError(String(payload.error || 'Failed to remove Ro-Link from this server.'));
+                return;
+            }
+
+            if (payload.warning) {
+                alert(String(payload.warning));
+            }
+
+            router.push('/dashboard');
+            router.refresh();
+        } catch (removeError) {
+            setRemoveActionError(String(removeError instanceof Error ? removeError.message : removeError));
+        } finally {
+            setRemovingRoLink(false);
         }
     }
 
@@ -819,6 +872,36 @@ export default function SettingsPage() {
                         )}
                         {error && <span className="text-red-500 text-[10px] font-bold uppercase tracking-widest">{error}</span>}
                     </div>
+
+                    {/* Remove Ro-Link */}
+                    <div className="bg-red-950/20 border border-red-500/20 rounded-[2rem] p-10 backdrop-blur-sm">
+                        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                            <div className="flex items-start gap-5">
+                                <div className="p-3 bg-red-500/10 rounded-xl text-red-400 border border-red-500/20">
+                                    <TrashIcon />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Remove Ro-Link</h3>
+                                    <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
+                                        Open a removal panel for this server. You can remove the bot from the Discord server, delete the stored Ro-Link database data, or do both together.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setRemoveBotOption(true);
+                                    setDeleteDataOption(false);
+                                    setRemoveActionError(null);
+                                    setIsRemoveModalOpen(true);
+                                }}
+                                className="w-full md:w-auto px-8 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-red-900/20 text-xs uppercase tracking-widest flex items-center justify-center gap-3"
+                            >
+                                <TrashIcon />
+                                Remove Ro-Link
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Info Column */}
@@ -846,6 +929,102 @@ export default function SettingsPage() {
                     </div>
                 </div>
             </div>
+
+            {isRemoveModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-2xl rounded-[2rem] border border-red-500/20 bg-[#020617] shadow-2xl overflow-hidden">
+                        <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-8 py-6">
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-red-400">Danger Zone</p>
+                                <h3 className="mt-2 text-2xl font-black tracking-tight text-white uppercase italic">Remove Ro-Link</h3>
+                                <p className="mt-2 text-sm text-slate-400 max-w-xl">
+                                    Choose what should happen for this server. You can remove the bot, wipe the saved Ro-Link data, or perform both actions together.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={closeRemoveModal}
+                                disabled={removingRoLink}
+                                className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-slate-500 hover:text-white transition-colors disabled:opacity-50"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <div className="space-y-5 px-8 py-8">
+                            <button
+                                type="button"
+                                onClick={() => setRemoveBotOption((current) => !current)}
+                                className={`w-full rounded-2xl border p-5 text-left transition-all ${removeBotOption ? 'border-red-500/40 bg-red-500/10' : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'}`}
+                            >
+                                <div className="flex items-start gap-4">
+                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${removeBotOption ? 'border-red-500 bg-red-500 text-white' : 'border-slate-700 bg-slate-950 text-transparent'}`}>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold uppercase tracking-[0.16em] text-white">Remove Bot from Server</div>
+                                        <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                                            Makes Ro-Link leave this Discord server. Existing database data stays unless you also enable the delete option below.
+                                        </p>
+                                    </div>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setDeleteDataOption((current) => !current)}
+                                className={`w-full rounded-2xl border p-5 text-left transition-all ${deleteDataOption ? 'border-red-500/40 bg-red-500/10' : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'}`}
+                            >
+                                <div className="flex items-start gap-4">
+                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${deleteDataOption ? 'border-red-500 bg-red-500 text-white' : 'border-slate-700 bg-slate-950 text-transparent'}`}>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold uppercase tracking-[0.16em] text-white">Delete Ro-Link Data</div>
+                                        <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                                            Deletes this server’s stored Ro-Link setup, logs, live server cache, command queue, reports, and dashboard role configuration from the database.
+                                        </p>
+                                    </div>
+                                </div>
+                            </button>
+
+                            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-5 py-4 text-sm text-amber-200">
+                                Deleting data is permanent. If you want a full disconnect, enable both options before confirming.
+                            </div>
+
+                            {removeActionError && (
+                                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
+                                    {removeActionError}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex flex-col-reverse gap-3 border-t border-slate-800 px-8 py-6 sm:flex-row sm:items-center sm:justify-end">
+                            <button
+                                type="button"
+                                onClick={closeRemoveModal}
+                                disabled={removingRoLink}
+                                className="px-5 py-3 text-sm font-semibold text-slate-400 hover:text-white transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleRemoveRoLink}
+                                disabled={removingRoLink || (!removeBotOption && !deleteDataOption)}
+                                className="flex items-center justify-center gap-3 rounded-xl bg-red-600 px-6 py-3 text-sm font-bold uppercase tracking-widest text-white transition-all hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {removingRoLink ? (
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                    <TrashIcon />
+                                )}
+                                Confirm Removal
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
