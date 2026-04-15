@@ -4,9 +4,12 @@ export interface UpdatePostMajorFeature {
     subFeatures: string[];
 }
 
+export const DEFAULT_ROLINK_VERSION = 'V2.01.0';
+
 export interface UpdatePostRecord {
     id: string;
     slug: string;
+    version: string | null;
     title: string;
     description: string;
     major_features: UpdatePostMajorFeature[];
@@ -20,6 +23,7 @@ export interface UpdatePostRecord {
 }
 
 export interface UpdatePostInput {
+    version: string;
     title: string;
     description: string;
     major_features: UpdatePostMajorFeature[];
@@ -76,12 +80,17 @@ export function sanitizeUpdatePostInput(rawBody: unknown) {
         ? rawBody as Record<string, unknown>
         : {};
 
+    const version = trimString(body.version);
     const title = trimString(body.title);
     const description = trimString(body.description);
     const major_features = normalizeMajorFeatures(body.major_features);
     const minor_updates = normalizeUpdateStringList(body.minor_updates);
     const qol_updates = normalizeUpdateStringList(body.qol_updates);
     const bug_fixes = normalizeUpdateStringList(body.bug_fixes);
+
+    if (!version) {
+        return { error: 'Version is required.' } as const;
+    }
 
     if (!title) {
         return { error: 'Title is required.' } as const;
@@ -101,6 +110,7 @@ export function sanitizeUpdatePostInput(rawBody: unknown) {
     }
 
     return {
+        version,
         title,
         description,
         major_features,
@@ -118,6 +128,7 @@ export function normalizeUpdatePost(rawPost: unknown): UpdatePostRecord | null {
     const post = rawPost as Record<string, unknown>;
     const id = trimString(post.id);
     const slug = trimString(post.slug);
+    const version = trimString(post.version) || null;
     const title = trimString(post.title);
     const description = trimString(post.description);
     const published_at = trimString(post.published_at);
@@ -131,6 +142,7 @@ export function normalizeUpdatePost(rawPost: unknown): UpdatePostRecord | null {
     return {
         id,
         slug,
+        version,
         title,
         description,
         major_features: normalizeMajorFeatures(post.major_features),

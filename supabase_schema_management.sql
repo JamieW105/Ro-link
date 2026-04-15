@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS public.job_submissions (
 CREATE TABLE IF NOT EXISTS public.update_posts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slug TEXT NOT NULL UNIQUE,
+    version TEXT NOT NULL DEFAULT 'V2.01.0',
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     major_features JSONB NOT NULL DEFAULT '[]',
@@ -64,6 +65,21 @@ CREATE TABLE IF NOT EXISTS public.update_posts (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'update_posts' AND column_name = 'version'
+    ) THEN
+        ALTER TABLE public.update_posts ADD COLUMN version TEXT NOT NULL DEFAULT 'V2.01.0';
+    END IF;
+END $$;
+
+UPDATE public.update_posts
+SET version = 'V2.01.0'
+WHERE version IS NULL OR btrim(version) = '';
 
 -- Insert initial Admin role for cherubdude
 INSERT INTO public.management_roles (name, permissions)

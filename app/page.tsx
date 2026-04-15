@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { DEFAULT_ROLINK_VERSION } from "@/lib/updatePosts";
 
 // SVGs
 const RocketIcon = () => (
@@ -29,6 +30,7 @@ const DiscordIcon = () => (
 export default function Home() {
   const [serverCount, setServerCount] = useState<number | null>(null);
   const [commandCount, setCommandCount] = useState<number | null>(null);
+  const [latestVersion, setLatestVersion] = useState(DEFAULT_ROLINK_VERSION);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -41,6 +43,19 @@ export default function Home() {
         if (data.guild_count !== undefined) setServerCount(data.guild_count);
       } catch (err) {
         console.error("Failed to fetch server count", err);
+      }
+
+      try {
+        const res = await fetch('/api/posts');
+        const posts = await res.json();
+        if (Array.isArray(posts)) {
+          const latestPostWithVersion = posts.find((post) => typeof post?.version === 'string' && post.version.trim());
+          if (latestPostWithVersion?.version) {
+            setLatestVersion(latestPostWithVersion.version.trim());
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch latest version", err);
       }
 
       // Commands (From DB still OK as per request context?)
@@ -130,7 +145,7 @@ export default function Home() {
         <main className="mt-20 md:mt-32 pb-20 flex flex-col items-center text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/50 border border-slate-700 text-slate-400 text-xs font-medium mb-10">
             <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            V1.5 Simple & Powerful
+            {latestVersion} Simple & Powerful
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight mb-8 text-white leading-tight">

@@ -99,6 +99,11 @@ export default function ManagePostsPage() {
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="space-y-2">
                                         <div className="flex flex-wrap items-center gap-2">
+                                            {post.version && (
+                                                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
+                                                    {post.version}
+                                                </span>
+                                            )}
                                             <span className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-300">
                                                 Published {formatPostDate(post.published_at)}
                                             </span>

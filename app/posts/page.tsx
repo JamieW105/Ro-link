@@ -64,6 +64,11 @@ export default function PostsPage() {
                             return (
                                 <article key={post.id} className="flex h-full flex-col rounded-3xl border border-slate-800 bg-slate-900/50 p-7 transition-all hover:border-slate-700">
                                     <div className="flex flex-wrap items-center gap-2">
+                                        {post.version && (
+                                            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
+                                                {post.version}
+                                            </span>
+                                        )}
                                         <span className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-300">
                                             {formatPostDate(post.published_at)}
                                         </span>
