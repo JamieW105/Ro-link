@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { use, useEffect, useState } from 'react';
 
+import AutoLinkText from '@/components/AutoLinkText';
 import type { UpdatePostRecord } from '@/lib/updatePosts';
 
 function formatPostDate(value: string) {
@@ -31,7 +32,7 @@ function SectionList({
                 {items.map((item, index) => (
                     <li key={`${title}-${index}`} className="flex gap-3 text-sm leading-relaxed text-slate-300">
                         <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
-                        <span>{item}</span>
+                        <AutoLinkText text={item} />
                     </li>
                 ))}
             </ul>
@@ -115,7 +116,11 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
                     </div>
 
                     <h1 className="mt-5 text-4xl font-black tracking-tight text-white sm:text-5xl">{post.title}</h1>
-                    <p className="mt-5 text-base leading-relaxed text-slate-400 sm:text-lg">{post.description}</p>
+                    <AutoLinkText
+                        as="p"
+                        text={post.description}
+                        className="mt-5 text-base leading-relaxed text-slate-400 sm:text-lg"
+                    />
                 </header>
 
                 <div className="mt-14 space-y-8">
@@ -127,13 +132,17 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
                                     <article key={`${feature.title}-${featureIndex}`} className="rounded-3xl border border-slate-800 bg-slate-950/40 p-6">
                                         <h3 className="text-xl font-bold text-white">{feature.title}</h3>
                                         {feature.description && (
-                                            <p className="mt-3 text-sm leading-relaxed text-slate-400">{feature.description}</p>
+                                            <AutoLinkText
+                                                as="p"
+                                                text={feature.description}
+                                                className="mt-3 text-sm leading-relaxed text-slate-400"
+                                            />
                                         )}
                                         <ul className="mt-5 space-y-3">
                                             {feature.subFeatures.map((subFeature, subFeatureIndex) => (
                                                 <li key={`${feature.title}-${subFeatureIndex}`} className="flex gap-3 text-sm leading-relaxed text-slate-300">
                                                     <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
-                                                    <span>{subFeature}</span>
+                                                    <AutoLinkText text={subFeature} />
                                                 </li>
                                             ))}
                                         </ul>

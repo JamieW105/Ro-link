@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import AutoLinkText from '@/components/AutoLinkText';
 import type { UpdatePostRecord } from '@/lib/updatePosts';
 
 function formatPostDate(value: string) {
@@ -80,7 +81,11 @@ export default function PostsPage() {
                                     </div>
 
                                     <h2 className="mt-5 text-2xl font-bold tracking-tight text-white">{post.title}</h2>
-                                    <p className="mt-3 flex-1 text-sm leading-relaxed text-slate-400">{post.description}</p>
+                                    <AutoLinkText
+                                        as="p"
+                                        text={post.description}
+                                        className="mt-3 flex-1 text-sm leading-relaxed text-slate-400"
+                                    />
 
                                     <div className="mt-6 flex flex-wrap gap-2">
                                         {totalSubFeatures > 0 && (
