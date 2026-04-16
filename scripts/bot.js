@@ -1227,6 +1227,7 @@ client.on('interactionCreate', async interaction => {
 // Helper for Setup Instructions
 function getSetupEmbeds(guildId, apiKey) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const installerPluginUrl = 'https://create.roblox.com/store/asset/87859041511603/RoLink-installer';
 
     const embed1 = new EmbedBuilder()
         .setTitle('Studio Setup Instructions')
@@ -1234,10 +1235,10 @@ function getSetupEmbeds(guildId, apiKey) {
         .setURL(`\${baseUrl}/dashboard/\${guildId}`)
         .setImage(`\${baseUrl}/Media/Ro-LinkIcon.png`)
         .addFields(
-            { name: '1. ModuleScript', value: "Create a `ModuleScript` in `ReplicatedStorage` named `RoLink`." },
-            { name: '2. Paste Code', value: "Copy the code from the next message/box and paste it into that script." },
-            { name: '3. Starter Script', value: "Create a `Script` in `ServerScriptService` with:\n```lua\nlocal RoLink = require(game.ReplicatedStorage:WaitForChild('RoLink'))\nRoLink:Initialize()\n```" },
-            { name: '4. Permissions', value: "Enable **HTTP Requests** and **API Services** in Game Settings." },
+            { name: '1. Installer Plugin', value: `[Install the RoLink installer plugin](${installerPluginUrl}) from the Roblox Creator Store.` },
+            { name: '2. Open in Studio', value: "Open your experience in Roblox Studio, then launch **RoLink installer** from the **Plugins** tab." },
+            { name: '3. Security Key', value: "Copy the Security Key from the next embed and paste it into the installer when prompted." },
+            { name: '4. Publish', value: "Let the plugin place the Ro-Link bridge, then enable **HTTP Requests** and **API Services** if your experience requires them before publishing." },
             { name: 'Dashboard', value: `\${baseUrl}/dashboard/\${guildId}` }
         );
 
@@ -1495,9 +1496,9 @@ end
 return RoLink`;
 
     const embed2 = new EmbedBuilder()
-        .setTitle('Core Bridge Code (RoLink Module)')
+        .setTitle('Ro-Link Security Key')
         .setColor('#10b981')
-        .setDescription('```lua\n' + luaCode + '\n```')
+        .setDescription(`Paste this key into the RoLink installer plugin in Roblox Studio.\n\n\`\`\`\n${apiKey}\n\`\`\``)
         .setFooter({ text: 'Keep your Security Key private!' });
 
     return [embed1, embed2];

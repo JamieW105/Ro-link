@@ -47,7 +47,7 @@ Ro-Link consists of three main components:
     - **Status Agent (`scripts/bot.js`)**: A lightweight process that updates the bot's "Playing" status and syncs global stats.
 
 3.  **Roblox Game**:
-    - Contains a `ModuleScript` (RoLink) and a Server Script.
+    - Uses the RoLink installer plugin to place and configure the bridge in Studio.
     - Polls the Next.js API for commands.
     - Listens to Roblox MessagingService for instant updates.
 
@@ -59,7 +59,7 @@ Ro-Link consists of three main components:
 Only the Discord Server Owner can run `/setup` to link a game.
 
 1.  **Run `/setup`**: Enter your Roblox Place ID, Universe ID, and Open Cloud API Key.
-2.  **Install Lua Script**: The bot will generate a secure script. Paste this into your Roblox game (ServerScriptService).
+2.  **Install the Plugin**: Open the [RoLink installer](https://create.roblox.com/store/asset/87859041511603/RoLink-installer) in Roblox Studio and paste in your generated Security Key.
 3.  **Manage**: Use `/ban`, `/kick`, or `/misc` immediately.
 
 ---

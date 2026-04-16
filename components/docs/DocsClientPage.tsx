@@ -28,6 +28,8 @@ type DocPage = {
     content: ReactNode;
 };
 
+const INSTALLER_PLUGIN_URL = 'https://create.roblox.com/store/asset/87859041511603/RoLink-installer';
+
 const Icons = {
     Book: (props: SVGProps<SVGSVGElement>) => (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -405,7 +407,7 @@ const docsPages: DocPage[] = [
         stats: [
             { label: 'Recommended flow', value: 'Discord -> Dashboard -> Roblox' },
             { label: 'First live test', value: 'After one server is active' },
-            { label: 'Primary surfaces', value: 'Dashboard, game loader, Open Cloud' },
+            { label: 'Primary surfaces', value: 'Dashboard, installer plugin, Open Cloud' },
         ],
         toc: [
             { id: 'overview-platform', title: 'What Ro-Link manages' },
@@ -445,13 +447,13 @@ const docsPages: DocPage[] = [
                     id="recommended-rollout"
                     eyebrow="Rollout"
                     title="Recommended rollout order"
-                    description="The cleanest setup sequence is to establish ownership and keys first, wire the game loader second, and only then test live commands. That prevents false negatives caused by missing runtime or permission gaps."
+                    description="The cleanest setup sequence is to establish ownership and keys first, install the Ro-Link Studio plugin second, and only then test live commands. That prevents false negatives caused by missing runtime or permission gaps."
                 >
                     <div className="grid gap-4 xl:grid-cols-2">
                         {[
                             ['01', 'Connect the Discord side', 'Invite Ro-Link, sign into the dashboard, and confirm you are operating on the correct Discord server before editing any configuration.'],
                             ['02', 'Collect Roblox identifiers', 'Gather the Place ID, Universe ID, and the correct owner-scoped Open Cloud key for the experience you are linking.'],
-                            ['03', 'Install the game loader', 'Place the server-side loader in Roblox Studio, publish the game, and verify at least one live server starts successfully.'],
+                            ['03', 'Run the installer plugin', 'Install the RoLink installer plugin in Roblox Studio, paste in your dashboard security key, and let it configure the bridge for you.'],
                             ['04', 'Run a controlled live test', 'Test a low-risk command or lookup first, confirm logging is correct, then move into day-to-day moderation use.'],
                         ].map(([step, title, body]) => (
                             <div key={step} className="rounded-2xl border border-white/10 bg-[#08101f]/70 p-5">
@@ -473,7 +475,7 @@ const docsPages: DocPage[] = [
                         items={[
                             'A Discord server where Ro-Link is installed and where you have permission to configure it.',
                             'A Roblox experience that you own directly, or a group-owned experience where you can create owner-scoped credentials.',
-                            'Access to Roblox Studio so you can add the loader and publish a fresh build.',
+                            'Access to Roblox Studio so you can run the installer plugin and publish a fresh build.',
                             'At least one runtime server you can start for live delivery testing after installation.',
                             'A plan for which staff roles should have moderation access before the dashboard goes live.',
                             'A release version you want staff and users to see on the landing page when update posts are published.',
@@ -718,16 +720,16 @@ const docsPages: DocPage[] = [
         id: 'installation',
         category: 'Configuration',
         eyebrow: 'Game Installation',
-        title: 'Loader Installation',
-        summary: 'Install the Ro-Link server-side loader, publish the game, and run a controlled live verification so you know the runtime is really attached before staff start using it.',
+        title: 'Installer Plugin',
+        summary: 'Use the RoLink installer plugin, publish the game, and run a controlled live verification so you know the runtime is really attached before staff start using it.',
         icon: Icons.Book,
         stats: [
-            { label: 'Install location', value: 'ServerScriptService' },
+            { label: 'Install method', value: 'Roblox Studio plugin' },
+            { label: 'Security input', value: 'Dashboard security key' },
             { label: 'Runtime requirement', value: 'Published server build' },
-            { label: 'First test', value: 'Low-risk action or lookup' },
         ],
         toc: [
-            { id: 'installation-loader', title: 'Loader script' },
+            { id: 'installation-plugin', title: 'Install the plugin' },
             { id: 'installation-config', title: 'Configuration values' },
             { id: 'installation-publish', title: 'Publish checklist' },
             { id: 'installation-verify', title: 'Live verification' },
@@ -735,42 +737,42 @@ const docsPages: DocPage[] = [
         content: (
             <div className="space-y-6">
                 <SectionCard
-                    id="installation-loader"
+                    id="installation-plugin"
                     eyebrow="Runtime"
-                    title="Add the loader to the game"
-                    description="The Ro-Link loader runs server-side and is responsible for attaching your live Roblox runtime to the Ro-Link delivery pipeline."
+                    title="Install the RoLink Studio plugin"
+                    description="Use the installer plugin to place and configure the Ro-Link bridge in Studio instead of wiring the integration by hand."
                 >
-                    <p className="mb-5 text-sm leading-7 text-slate-300">
-                        Create a normal server <InlineCode>Script</InlineCode> inside <InlineCode>ServerScriptService</InlineCode>, name it something obvious like <InlineCode>RoLinkLoader</InlineCode>, and paste the loader below.
-                    </p>
-                    <CodeBlock label="ServerScriptService/RoLinkLoader.lua">
-                        {`-- Ro-Link Loader
-local RoLink = require(123456789) -- Official Ro-Link module
-
-RoLink.Initialize({
-    APIKey = "YOUR_CONFIG_KEY_HERE",
-    Debug = false
-})`}
-                    </CodeBlock>
+                    <div className="space-y-5">
+                        <ResourceCard
+                            href={INSTALLER_PLUGIN_URL}
+                            icon={Icons.Book}
+                            title="RoLink installer"
+                            description="Open the Creator Store listing for the official Ro-Link installer plugin."
+                            external
+                        />
+                        <p className="text-sm leading-7 text-slate-300">
+                            After installing it in Studio, open the plugin from the <InlineCode>Plugins</InlineCode> tab and follow its setup flow. The plugin is now the supported installation path for the runtime bridge.
+                        </p>
+                    </div>
                 </SectionCard>
 
                 <SectionCard
                     id="installation-config"
                     eyebrow="Configuration"
                     title="Use the right value in the right field"
-                    description="Ro-Link uses a dashboard-generated configuration key for the loader. Do not paste the raw Open Cloud credential into your game script."
+                    description="Ro-Link uses a dashboard-generated security key inside the installer plugin. Do not paste the raw Open Cloud credential into random plugin or script fields unless the setup flow explicitly asks for it."
                 >
                     <DataTable
                         headers={['Field', 'Source', 'Notes']}
                         rows={[
-                            ['APIKey', 'Ro-Link dashboard server setup', 'This is the configuration key your loader consumes at runtime.'],
-                            ['Debug', 'Manual flag in the loader', 'Set to true only while diagnosing setup issues or logging behavior.'],
-                            ['Open Cloud key', 'Roblox Creator Dashboard', 'Keep this out of the loader. It belongs in server configuration, not directly in your game code.'],
+                            ['Security key', 'Ro-Link dashboard server setup', 'This is the value you paste into the installer plugin when it asks to connect your game.'],
+                            ['Plugin setup flow', 'RoLink installer', 'Let the plugin place and configure the runtime bridge instead of creating scripts manually.'],
+                            ['Open Cloud key', 'Roblox Creator Dashboard', 'Keep this in server configuration. It is not a replacement for the dashboard security key.'],
                         ]}
                     />
                     <div className="mt-6">
                         <Callout title="Keep credentials separated" tone="warn">
-                            The Open Cloud credential and the loader configuration key serve different jobs. Mixing them is a common setup mistake and can leak a more sensitive credential into game code.
+                            The Open Cloud credential and the dashboard security key serve different jobs. Mixing them is a common setup mistake and can expose a more sensitive credential in the wrong place.
                         </Callout>
                     </div>
                 </SectionCard>
@@ -782,11 +784,13 @@ RoLink.Initialize({
                 >
                     <Checklist
                         items={[
-                            'Save the loader script into ServerScriptService.',
+                            'Install the official RoLink installer plugin from the Creator Store.',
+                            'Open the plugin in Studio and paste the dashboard security key when prompted.',
+                            'Let the plugin finish placing and configuring the bridge files for your game.',
                             'Publish the latest Studio build to Roblox.',
-                            'Open or restart a test server after publishing so the new loader version actually runs.',
+                            'Open or restart a test server after publishing so the new plugin-installed bridge actually runs.',
                             'Confirm the dashboard server record contains the correct Place ID, Universe ID, and credentials.',
-                            'Leave Debug off unless you are actively diagnosing a problem.',
+                            'Enable HTTP Requests and API Services in Game Settings if your Studio/project setup still requires it.',
                         ]}
                     />
                 </SectionCard>
@@ -810,7 +814,7 @@ RoLink.Initialize({
                         </div>
 
                         <Callout title="If the command does not land" tone="info">
-                            Check three things in order: whether a live server is actually running the published loader, whether the server config still matches the correct experience, and whether the Open Cloud key was created under the true owner scope.
+                            Check three things in order: whether a live server is actually running the latest plugin-installed bridge, whether the server config still matches the correct experience, and whether the Open Cloud key was created under the true owner scope.
                         </Callout>
                     </div>
                 </SectionCard>
@@ -1022,12 +1026,12 @@ RoLink.Initialize({
                     id="troubleshooting-command-delivery"
                     eyebrow="Runtime Issues"
                     title="Commands are accepted but nothing happens"
-                    description="A 200 response from Ro-Link means the gateway accepted your request. It does not prove a live server was running the correct loader or that Roblox accepted delivery."
+                    description="A 200 response from Ro-Link means the gateway accepted your request. It does not prove a live server was running the correct plugin-installed bridge or that Roblox accepted delivery."
                 >
                     <Checklist
                         items={[
                             'Confirm at least one live server for the target experience is actually online.',
-                            'Make sure the live server was started after the most recent published loader change.',
+                            'Make sure the live server was started after the most recent installer-plugin change and publish.',
                             'Re-check the Place ID and Universe ID stored in server configuration.',
                             'Inspect logs to verify the command was issued against the expected server or target.',
                             'If all config looks correct, rotate back to the Open Cloud key owner scope and verify permissions again.',

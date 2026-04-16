@@ -1689,6 +1689,7 @@ export async function POST(req: Request) {
 // Helper for Setup Instructions
 function getSetupEmbeds(guildId: string, apiKey: string) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const installerPluginUrl = 'https://create.roblox.com/store/asset/87859041511603/RoLink-installer';
 
     return [
         {
@@ -1697,25 +1698,26 @@ function getSetupEmbeds(guildId: string, apiKey: string) {
             description: "Follow these steps to integrate Ro-Link with your Roblox game.",
             thumbnail: { url: `${baseUrl}/Media/Ro-LinkIcon.png` },
             fields: [
-                { name: '1. ModuleScript', value: "Create a `ModuleScript` in `ReplicatedStorage` named `RoLink`.", inline: false },
-                { name: '2. Paste Code', value: "Copy the **Code Block** below and paste it into the `RoLink` script.", inline: false },
-                { name: '3. Starter Script', value: "Create a `Script` in `ServerScriptService` with:\n```lua\nlocal RoLink = require(game.ReplicatedStorage:WaitForChild('RoLink'))\nRoLink:Initialize()\n```", inline: false },
-                { name: '4. Permissions', value: "Enable **HTTP Requests** and **API Services** in Game Settings.", inline: false },
+                { name: '1. Installer Plugin', value: `[Install the RoLink installer plugin](${installerPluginUrl}) from the Roblox Creator Store.`, inline: false },
+                { name: '2. Open in Studio', value: "Open your experience in Roblox Studio, then launch **RoLink installer** from the **Plugins** tab.", inline: false },
+                { name: '3. Security Key', value: "Copy the Security Key from the next embed and paste it into the installer when prompted.", inline: false },
+                { name: '4. Publish', value: "Let the plugin place the Ro-Link bridge, then enable **HTTP Requests** and **API Services** if your experience requires them before publishing.", inline: false },
                 { name: 'Dashboard', value: `[**Manage Server**](${baseUrl}/dashboard/${guildId})`, inline: false }
             ],
             footer: { text: 'Ro-Link Systems • Setup', icon_url: `${baseUrl}/Media/Ro-LinkIcon.png` },
             timestamp: new Date().toISOString()
         },
         {
-            title: 'Core Bridge Code (RoLink Module)',
+            title: 'Ro-Link Security Key',
             color: 0x2b2d31,
-            description: '```lua\n' + getLuaCode(baseUrl, apiKey) + '\n```',
+            description: `Paste this key into the RoLink installer plugin in Roblox Studio.\n\n\`\`\`\n${apiKey}\n\`\`\``,
             footer: { text: 'KEEP YOUR SECURITY KEY PRIVATE!' },
             timestamp: new Date().toISOString()
         }
     ];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getLuaCode(baseUrl: string, apiKey: string) {
     return `-- RoLink Core Bridge
 local RoLink = {}
