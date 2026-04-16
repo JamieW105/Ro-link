@@ -356,10 +356,10 @@ function NavButton({
             onClick={onClick}
             className={cn(
                 'group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-200',
-                active ? 'bg-indigo-500/15 text-indigo-200 shadow-[inset_0_0_0_1px_rgba(129,140,248,0.18)]' : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
+                active ? 'bg-sky-500/12 text-sky-200 shadow-[inset_0_0_0_1px_rgba(14,165,233,0.2)]' : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
             )}
         >
-            <Icon className={cn('h-4 w-4 shrink-0 transition-colors', active ? 'text-indigo-300' : 'text-slate-500 group-hover:text-slate-300')} />
+            <Icon className={cn('h-4 w-4 shrink-0 transition-colors', active ? 'text-sky-300' : 'text-slate-500 group-hover:text-slate-300')} />
             <span className="truncate">{children}</span>
         </button>
     );
@@ -368,7 +368,7 @@ function NavButton({
 const commandGroups = [
     {
         title: 'Moderation',
-        accent: 'text-emerald-300',
+        accent: 'text-sky-300',
         commands: [
             { name: 'KICK', args: '{ username: string, reason?: string }', description: 'Remove a player from the active server.' },
             { name: 'BAN', args: '{ username: string, reason?: string }', description: 'Ban a player through the Ro-Link moderation pipeline.' },
@@ -385,7 +385,7 @@ const commandGroups = [
     },
     {
         title: 'Player Actions',
-        accent: 'text-violet-300',
+        accent: 'text-sky-300',
         commands: [
             { name: 'FLY / NOCLIP / INVISIBLE', args: '{ username: string }', description: 'Core utility actions commonly used during moderation.' },
             { name: 'SET_CHAR', args: '{ username: string, char_user: string }', description: 'Swap a player into another character model.' },
@@ -1172,11 +1172,11 @@ export default function DocsClientPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#181818] text-slate-100 selection:bg-indigo-400/20">
+        <div className="min-h-screen bg-[#181818] text-slate-100 selection:bg-sky-400/20">
             <header className="fixed inset-x-0 top-0 z-40 border-b border-white/8 bg-[#181818]/92 backdrop-blur-xl">
                 <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
                     <Link href="/" className="flex items-center gap-3">
-                        <div className="rounded-xl border border-indigo-500/25 bg-indigo-500/10 p-2 text-indigo-300">
+                        <div className="rounded-xl border border-sky-500/25 bg-sky-500/10 p-2 text-sky-300">
                             <Icons.Book className="h-4 w-4" />
                         </div>
                         <span className="text-lg font-semibold text-white">Ro-Link</span>
@@ -1249,7 +1249,7 @@ export default function DocsClientPage() {
                                 onClick={() => openSection(item.id)}
                                 className={cn(
                                     'block w-full rounded-xl px-4 py-3 text-left text-sm leading-6 transition-colors',
-                                    activeSectionId === item.id ? 'bg-indigo-500/14 text-indigo-200' : 'text-sky-100/90 hover:text-white',
+                                    activeSectionId === item.id ? 'bg-sky-500/12 text-sky-200' : 'text-sky-100/90 hover:text-white',
                                 )}
                             >
                                 {item.title}
@@ -1262,7 +1262,7 @@ export default function DocsClientPage() {
                     <div className="mx-auto max-w-[880px] px-6 py-10 sm:px-10">
                         <div className="flex flex-col gap-6 border-b border-white/8 pb-10 sm:flex-row sm:items-start sm:justify-between">
                             <div className="max-w-3xl">
-                                <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-indigo-400">{activePage.category}</p>
+                                <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-sky-400">{activePage.category}</p>
                                 <div className="mt-4 flex items-center gap-4">
                                     <ActivePageIcon className="h-10 w-10 text-slate-500" />
                                     <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl">{activePage.title}</h1>
