@@ -5,6 +5,7 @@ import { sendRobloxMessage } from '@/lib/roblox';
 import { logAction } from '@/lib/logger';
 import { findLivePlayer } from '@/lib/livePlayers';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import discordCommands from '@/lib/discordCommands.json';
 
 export const runtime = 'edge';
 
@@ -79,7 +80,30 @@ type ParsedReportChannelAction = {
     target: string;
 };
 
+type DiscordCommandOptionDefinition = {
+    name: string;
+    description: string;
+    type: number;
+    required?: boolean;
+};
+
+type DiscordCommandDefinition = {
+    name: string;
+    description: string;
+    options?: DiscordCommandOptionDefinition[];
+};
+
 const REPORT_CUSTOM_ID_PREFIX = 'report|';
+const commandDefinitions = discordCommands as DiscordCommandDefinition[];
+
+function buildCommandSummary(commandNames: string[]) {
+    return commandNames
+        .map((commandName) => {
+            const description = commandDefinitions.find((command) => command.name === commandName)?.description || 'No description available';
+            return `\`/${commandName}\` - ${description}`;
+        })
+        .join('\n');
+}
 
 function truncateText(value: unknown, maxLength = 1024) {
     const text = String(value ?? '').trim();
@@ -513,17 +537,17 @@ export async function POST(req: Request) {
                                 fields: [
                                     {
                                         name: '**Management Commands**',
-                                        value: "`/setup` - Initialize the bridge (Owner Only)\n`/update-servers` - Global Server Soft-Shutdown\n`/shutdown` - Emergency Server Shutdown",
+                                        value: buildCommandSummary(['setup', 'update-servers', 'shutdown']),
                                         inline: false
                                     },
                                     {
                                         name: '**Moderation Commands**',
-                                        value: "`/ban` - Permanently ban a user\n`/kick` - Kick a user from the server\n`/unban` - Revoke a ban\n`/lookup` - Roblox profile + moderation history\n`/misc` - Player actions (Fly, Heal, etc.)",
+                                        value: buildCommandSummary(['ban', 'kick', 'unban', 'lookup', 'misc']),
                                         inline: false
                                     },
                                     {
                                         name: '**Utility Commands**',
-                                        value: "`/get-discord` - Find Discord from Roblox\n`/get-roblox` - Find Roblox from Discord\n`/verify` - Link your account\n`/update` - Sync your linked profile",
+                                        value: buildCommandSummary(['get-discord', 'get-roblox', 'verify', 'update']),
                                         inline: false
                                     }
                                 ],

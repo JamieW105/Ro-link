@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, ActivityType, REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
 const { setGlobalDispatcher, Agent } = require('undici');
+const discordCommands = require('../lib/discordCommands.json');
 require('dotenv').config({ path: '.env.local', quiet: true });
 
 const hasSupabaseConfig = Boolean(
@@ -26,148 +27,6 @@ const client = new Client({
     ],
 });
 
-const commands = [
-    {
-        name: 'ban',
-        description: 'Permanently ban a user from the Roblox game',
-        options: [
-            {
-                name: 'username',
-                description: 'The Roblox username to ban',
-                type: 3, // STRING
-                required: true,
-            },
-            {
-                name: 'reason',
-                description: 'Reason for the ban',
-                type: 3,
-                required: false,
-            }
-        ]
-    },
-    {
-        name: 'kick',
-        description: 'Kick a user from the game server',
-        options: [
-            {
-                name: 'username',
-                description: 'The Roblox username',
-                type: 3,
-                required: true,
-            },
-            {
-                name: 'reason',
-                description: 'Reason for the kick',
-                type: 3,
-                required: false,
-            }
-        ]
-    },
-    {
-        name: 'unban',
-        description: 'Unban a user from the Roblox game',
-        options: [
-            {
-                name: 'username',
-                description: 'The Roblox username to unban',
-                type: 3,
-                required: true,
-            }
-        ]
-    },
-    {
-        name: 'lookup',
-        description: 'Lookup a Roblox user and review prior moderation history',
-        options: [
-            {
-                name: 'username',
-                description: 'The Roblox username to lookup',
-                type: 3,
-                required: true,
-            }
-        ]
-    },
-    {
-        name: 'misc',
-        description: 'Perform miscellaneous player actions (Fly, Noclip, etc.)',
-        options: []
-    },
-    {
-        name: 'update-servers',
-        description: 'Send a global update signal to all Roblox servers (restarts them)',
-    },
-    {
-        name: 'update',
-        description: 'Update your linked Roblox profile and roles',
-        options: [
-            {
-                name: 'user',
-                description: 'The Discord user to refresh verification data for',
-                type: 6, // USER
-                required: false
-            }
-        ]
-    },
-    {
-        name: 'shutdown',
-        description: 'Immediately shut down game servers',
-        options: [
-            {
-                name: 'job_id',
-                description: 'The specific Roblox JobId to shut down (Leave empty for ALL servers)',
-                type: 3, // STRING
-                required: false,
-            }
-        ]
-    },
-
-    {
-        name: 'ping',
-        description: 'Check the bot response time and connection status',
-    },
-    {
-        name: 'setup',
-        description: 'Initializes Ro-Link for this server (Owner Only)',
-    },
-    {
-        name: 'help',
-        description: 'Show info and list of available commands',
-    },
-    {
-        name: 'verify',
-        description: 'Link your Roblox account with Ro-Link',
-    },
-    {
-        name: 'get-discord',
-        description: 'Find a Discord user from their Roblox account',
-        options: [
-            {
-                name: 'roblox_username',
-                description: 'The Roblox username to lookup',
-                type: 3,
-                required: true
-            }
-        ]
-    },
-    {
-        name: 'get-roblox',
-        description: 'Find a Roblox account from a Discord user',
-        options: [
-            {
-                name: 'discord_user',
-                description: 'The Discord user to lookup',
-                type: 6, // USER
-                required: true
-            }
-        ]
-    },
-    {
-        name: 'report',
-        description: 'Submit a report against a player for rule violations',
-        options: []
-    }
-];
-
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 let metadataSyncEnabled = Boolean(
     process.env.DISCORD_BEARER_TOKEN
@@ -177,7 +36,7 @@ let metadataSyncEnabled = Boolean(
 async function refreshCommands() {
     try {
         console.log('Started refreshing application (/) commands.');
-        await rest.put(Routes.applicationCommands(process.env.DISCORD_CLIENT_ID), { body: commands });
+        await rest.put(Routes.applicationCommands(process.env.DISCORD_CLIENT_ID), { body: discordCommands });
         console.log('Successfully reloaded application (/) commands.');
     } catch (error) {
         console.error(error);

@@ -167,161 +167,176 @@ export default function ServersPage() {
             </div>
 
             {hasGlobalControls && (
-                <div className="space-y-5">
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Command Target</p>
-                        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4">
-                            <select
-                                value={selectedTarget}
-                                onChange={(event) => setSelectedTarget(event.target.value)}
-                                className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
-                            >
-                                <option value={GLOBAL_TARGET_VALUE}>Global (all live servers)</option>
-                                {normalizedServers.map((server) => (
-                                    <option key={server.id} value={server.id}>
-                                        Server {formatServerId(server.id)} ({server.visiblePlayerCount} players)
-                                    </option>
-                                ))}
-                            </select>
-                            <div className="h-[42px] rounded-lg border border-slate-800 bg-black/30 px-4 flex items-center text-sm text-slate-300 font-medium">
-                                {targetIsGlobal ? 'All live servers' : `One live server: ${formatServerId(selectedTarget)}`}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/35 overflow-hidden">
+                    <div className="border-b border-slate-800 bg-slate-950/20 px-5 py-5">
+                        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                            <div className="space-y-1">
+                                <h2 className="text-base font-bold text-white tracking-tight">Server controls</h2>
+                                <p className="text-sm text-slate-500 font-medium">Choose a target once, then send broadcast, world, or lifecycle actions.</p>
+                            </div>
+                            <div className="w-full xl:max-w-md">
+                                <label className="mb-2 block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Target</label>
+                                <select
+                                    value={selectedTarget}
+                                    onChange={(event) => setSelectedTarget(event.target.value)}
+                                    className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
+                                >
+                                    <option value={GLOBAL_TARGET_VALUE}>Global (all live servers)</option>
+                                    {normalizedServers.map((server) => (
+                                        <option key={server.id} value={server.id}>
+                                            Server {formatServerId(server.id)} ({server.visiblePlayerCount} players)
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="mt-2 text-xs text-slate-500">
+                                    {targetIsGlobal
+                                        ? `Applies to ${normalizedServers.length} live servers.`
+                                        : `Applies only to ${formatServerId(selectedTarget)}.`}
+                                </p>
                             </div>
                         </div>
                     </div>
 
-                    {notice && (
-                        <div className={`rounded-xl border px-5 py-4 text-sm font-medium ${notice.type === 'success'
-                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                            : 'bg-red-500/10 border-red-500/20 text-red-400'
-                            }`}>
-                            {notice.text}
+                    <div className="p-5 space-y-5">
+                        {notice && (
+                            <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${notice.type === 'success'
+                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                : 'bg-red-500/10 border-red-500/20 text-red-400'
+                                }`}>
+                                {notice.text}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-5">
+                            {canBroadcast && (
+                                <section className="rounded-xl bg-black/20 border border-slate-800/80 p-5 space-y-4">
+                                    <div className="space-y-1">
+                                        <h3 className="text-sm font-semibold text-white">Broadcast</h3>
+                                        <p className="text-xs text-slate-500">Send one message to the selected live servers.</p>
+                                    </div>
+                                    <textarea
+                                        value={broadcastMessage}
+                                        onChange={(event) => setBroadcastMessage(event.target.value)}
+                                        rows={4}
+                                        placeholder="Type a message..."
+                                        className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium resize-none"
+                                    />
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <p className="text-xs text-slate-500">Roblox may filter or trim certain announcements.</p>
+                                        <button
+                                            onClick={() => {
+                                                const message = trimString(broadcastMessage);
+                                                if (!message) {
+                                                    setNotice({ type: 'error', text: 'Enter a message before broadcasting.' });
+                                                    return;
+                                                }
+                                                sendCommand('BROADCAST', { message }, undefined, `Broadcast queued for ${targetLabel}.`);
+                                            }}
+                                            disabled={actionLoading === 'BROADCAST' || normalizedServers.length === 0}
+                                            className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
+                                        >
+                                            {actionLoading === 'BROADCAST' ? 'Sending...' : 'Send'}
+                                        </button>
+                                    </div>
+                                </section>
+                            )}
+
+                            <div className="space-y-5">
+                                {(canGravity || canBrightness) && (
+                                    <section className="rounded-xl bg-black/20 border border-slate-800/80 p-5 space-y-4">
+                                        <div className="space-y-1">
+                                            <h3 className="text-sm font-semibold text-white">World</h3>
+                                            <p className="text-xs text-slate-500">Adjust live environment values.</p>
+                                        </div>
+                                        {canGravity && (
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Gravity</label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={gravityValue}
+                                                        onChange={(event) => setGravityValue(event.target.value)}
+                                                        className="flex-1 bg-black/40 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
+                                                    />
+                                                    <button
+                                                        onClick={() => sendCommand('GRAVITY', { amount: trimString(gravityValue) }, undefined, `Gravity queued for ${targetLabel}.`)}
+                                                        disabled={actionLoading === 'GRAVITY' || normalizedServers.length === 0}
+                                                        className="px-4 py-2.5 bg-slate-800 hover:bg-sky-600 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
+                                                    >
+                                                        {actionLoading === 'GRAVITY' ? '...' : 'Set'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {canBrightness && (
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Brightness</label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={brightnessValue}
+                                                        onChange={(event) => setBrightnessValue(event.target.value)}
+                                                        className="flex-1 bg-black/40 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
+                                                    />
+                                                    <button
+                                                        onClick={() => sendCommand('BRIGHTNESS', { amount: trimString(brightnessValue) }, undefined, `Brightness queued for ${targetLabel}.`)}
+                                                        disabled={actionLoading === 'BRIGHTNESS' || normalizedServers.length === 0}
+                                                        className="px-4 py-2.5 bg-slate-800 hover:bg-sky-600 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
+                                                    >
+                                                        {actionLoading === 'BRIGHTNESS' ? '...' : 'Set'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </section>
+                                )}
+
+                                {(canRestart || canShutdown) && (
+                                    <section className="rounded-xl bg-black/20 border border-slate-800/80 p-5 space-y-4">
+                                        <div className="space-y-1">
+                                            <h3 className="text-sm font-semibold text-white">Lifecycle</h3>
+                                            <p className="text-xs text-slate-500">Restart or shut down the selected live servers.</p>
+                                        </div>
+                                        {canRestart && (
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Restart message</label>
+                                                <textarea
+                                                    value={restartReason}
+                                                    onChange={(event) => setRestartReason(event.target.value)}
+                                                    rows={2}
+                                                    className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium resize-none"
+                                                />
+                                                <button
+                                                    onClick={() => sendCommand('UPDATE', { reason: trimString(restartReason) }, `Restart ${targetLabel}? Players will be moved through a reserved server and then back into public servers.`, `Restart queued for ${targetLabel}.`)}
+                                                    disabled={actionLoading === 'UPDATE' || normalizedServers.length === 0}
+                                                    className="w-full px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
+                                                >
+                                                    {actionLoading === 'UPDATE' ? 'Queueing restart...' : 'Restart'}
+                                                </button>
+                                            </div>
+                                        )}
+                                        {canShutdown && (
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Shutdown message</label>
+                                                <textarea
+                                                    value={shutdownReason}
+                                                    onChange={(event) => setShutdownReason(event.target.value)}
+                                                    rows={2}
+                                                    className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium resize-none"
+                                                />
+                                                <button
+                                                    onClick={() => sendCommand('SHUTDOWN', { reason: trimString(shutdownReason) }, `Shut down ${targetLabel}? Players in the targeted live servers will be disconnected.`, `Shutdown queued for ${targetLabel}.`)}
+                                                    disabled={actionLoading === 'SHUTDOWN' || normalizedServers.length === 0}
+                                                    className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
+                                                >
+                                                    {actionLoading === 'SHUTDOWN' ? 'Queueing shutdown...' : 'Shut down'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </section>
+                                )}
+                            </div>
                         </div>
-                    )}
-
-                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-                        {canBroadcast && (
-                            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5 space-y-4">
-                                <div>
-                                    <h2 className="text-sm font-bold text-white uppercase tracking-wider">Broadcast</h2>
-                                    <p className="text-[11px] text-slate-500 font-medium">Broadcasts are filtered by Roblox before they appear in-game.</p>
-                                </div>
-                                <textarea
-                                    value={broadcastMessage}
-                                    onChange={(event) => setBroadcastMessage(event.target.value)}
-                                    rows={5}
-                                    placeholder="Type the announcement to send..."
-                                    className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium resize-none"
-                                />
-                                <button
-                                    onClick={() => {
-                                        const message = trimString(broadcastMessage);
-                                        if (!message) {
-                                            setNotice({ type: 'error', text: 'Enter a message before broadcasting.' });
-                                            return;
-                                        }
-                                        sendCommand('BROADCAST', { message }, undefined, `Broadcast queued for ${targetLabel}.`);
-                                    }}
-                                    disabled={actionLoading === 'BROADCAST' || normalizedServers.length === 0}
-                                    className="w-full px-4 py-2.5 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
-                                >
-                                    {actionLoading === 'BROADCAST' ? 'Sending Broadcast...' : 'Send Broadcast'}
-                                </button>
-                            </div>
-                        )}
-
-                        {(canGravity || canBrightness) && (
-                            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5 space-y-4">
-                                <div>
-                                    <h2 className="text-sm font-bold text-white uppercase tracking-wider">World Controls</h2>
-                                    <p className="text-[11px] text-slate-500 font-medium">Adjust environment values on the targeted live servers.</p>
-                                </div>
-                                {canGravity && (
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Gravity</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={gravityValue}
-                                                onChange={(event) => setGravityValue(event.target.value)}
-                                                className="flex-1 bg-black/40 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
-                                            />
-                                            <button
-                                                onClick={() => sendCommand('GRAVITY', { amount: trimString(gravityValue) }, undefined, `Gravity queued for ${targetLabel}.`)}
-                                                disabled={actionLoading === 'GRAVITY' || normalizedServers.length === 0}
-                                                className="px-4 py-2.5 bg-slate-800 hover:bg-sky-600 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
-                                            >
-                                                {actionLoading === 'GRAVITY' ? '...' : 'Apply'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                                {canBrightness && (
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Brightness</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={brightnessValue}
-                                                onChange={(event) => setBrightnessValue(event.target.value)}
-                                                className="flex-1 bg-black/40 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
-                                            />
-                                            <button
-                                                onClick={() => sendCommand('BRIGHTNESS', { amount: trimString(brightnessValue) }, undefined, `Brightness queued for ${targetLabel}.`)}
-                                                disabled={actionLoading === 'BRIGHTNESS' || normalizedServers.length === 0}
-                                                className="px-4 py-2.5 bg-slate-800 hover:bg-sky-600 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
-                                            >
-                                                {actionLoading === 'BRIGHTNESS' ? '...' : 'Apply'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {(canRestart || canShutdown) && (
-                            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5 space-y-4">
-                                <div>
-                                    <h2 className="text-sm font-bold text-white uppercase tracking-wider">Server Lifecycle</h2>
-                                    <p className="text-[11px] text-slate-500 font-medium">Restart uses a reserved-server bounce before returning players to public servers.</p>
-                                </div>
-                                {canRestart && (
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Restart Reason</label>
-                                        <textarea
-                                            value={restartReason}
-                                            onChange={(event) => setRestartReason(event.target.value)}
-                                            rows={3}
-                                            className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium resize-none"
-                                        />
-                                        <button
-                                            onClick={() => sendCommand('UPDATE', { reason: trimString(restartReason) }, `Restart ${targetLabel}? Players will be moved through a reserved server and then back into public servers.`, `Restart queued for ${targetLabel}.`)}
-                                            disabled={actionLoading === 'UPDATE' || normalizedServers.length === 0}
-                                            className="w-full px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
-                                        >
-                                            {actionLoading === 'UPDATE' ? 'Queueing Restart...' : 'Restart Target'}
-                                        </button>
-                                    </div>
-                                )}
-                                {canShutdown && (
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Shutdown Reason</label>
-                                        <textarea
-                                            value={shutdownReason}
-                                            onChange={(event) => setShutdownReason(event.target.value)}
-                                            rows={3}
-                                            className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium resize-none"
-                                        />
-                                        <button
-                                            onClick={() => sendCommand('SHUTDOWN', { reason: trimString(shutdownReason) }, `Shut down ${targetLabel}? Players in the targeted live servers will be disconnected.`, `Shutdown queued for ${targetLabel}.`)}
-                                            disabled={actionLoading === 'SHUTDOWN' || normalizedServers.length === 0}
-                                            className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
-                                        >
-                                            {actionLoading === 'SHUTDOWN' ? 'Queueing Shutdown...' : 'Shutdown Target'}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
                     </div>
                 </div>
             )}
