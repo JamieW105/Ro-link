@@ -102,6 +102,7 @@ const commands = [
         options: [
             {
                 name: 'user',
+                description: 'The Discord user to refresh verification data for',
                 type: 6, // USER
                 required: false
             }
@@ -168,6 +169,10 @@ const commands = [
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+let metadataSyncEnabled = Boolean(
+    process.env.DISCORD_BEARER_TOKEN
+    && process.env.DISCORD_BEARER_TOKEN !== '0'
+);
 
 async function refreshCommands() {
     try {
@@ -221,35 +226,38 @@ async function updateStatus() {
         `CONNECTING ${serverCount} SERVERS TO ROBLOX. JOIN OUR SUPPORT SERVER: \`\`\` ${supportUrl} \`\`\``
     ];
 
-    if (!process.env.DISCORD_BEARER_TOKEN || process.env.DISCORD_BEARER_TOKEN === '0') {
-        // Skip metadata sync if no bearer token is provided
-        return;
-    }
+    if (metadataSyncEnabled) {
+        try {
+            // Using the raw Discord API with an Application Bearer Token
+            const response = await fetch(`https://discord.com/api/v10/applications/${process.env.DISCORD_CLIENT_ID}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${process.env.DISCORD_BEARER_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    description: statuses[statusIndex]
+                })
+            });
 
-    try {
-        // Using the raw Discord API with an Application Bearer Token
-        const response = await fetch(`https://discord.com/api/v10/applications/${process.env.DISCORD_CLIENT_ID}`, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `Bearer ${process.env.DISCORD_BEARER_TOKEN}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                description: statuses[statusIndex]
-            })
-        });
+            if (!response.ok) {
+                const err = await response.text();
 
-        if (!response.ok) {
-            const err = await response.text();
-            console.error(`[BOT] API Error: ${response.status} - ${err}`);
-        } else {
-            console.log(`[BOT] Description updated: Page ${statusIndex + 1}`);
+                if (response.status === 401 || response.status === 403) {
+                    metadataSyncEnabled = false;
+                    console.warn(`[BOT] Metadata sync disabled after Discord API ${response.status}. Check DISCORD_BEARER_TOKEN.`);
+                } else {
+                    console.error(`[BOT] API Error: ${response.status} - ${err}`);
+                }
+            } else {
+                console.log(`[BOT] Description updated: Page ${statusIndex + 1}`);
+                statusIndex = (statusIndex + 1) % statuses.length;
+            }
+        } catch (e) {
+            console.error('[BOT] Failed to patch application description:', e.message);
         }
-    } catch (e) {
-        console.error('[BOT] Failed to patch application description:', e.message);
     }
 
-    statusIndex = (statusIndex + 1) % statuses.length;
     syncStats();
 }
 
@@ -406,7 +414,7 @@ async function fetchRobloxLookup(username, serverId) {
     };
 }
 
-client.once('ready', () => {
+client.once('clientReady', () => {
     console.log(`✅ Logged in as ${client.user.tag}!`);
     let serverCount = client.guilds.cache.size;
     console.log(`The bot is in ${serverCount} servers.`);
@@ -1232,268 +1240,15 @@ function getSetupEmbeds(guildId, apiKey) {
     const embed1 = new EmbedBuilder()
         .setTitle('Studio Setup Instructions')
         .setColor('#0ea5e9')
-        .setURL(`\${baseUrl}/dashboard/\${guildId}`)
-        .setImage(`\${baseUrl}/Media/Ro-LinkIcon.png`)
+        .setURL(`${baseUrl}/dashboard/${guildId}`)
+        .setImage(`${baseUrl}/Media/Ro-LinkIcon.png`)
         .addFields(
             { name: '1. Installer Plugin', value: `[Install the RoLink installer plugin](${installerPluginUrl}) from the Roblox Creator Store.` },
             { name: '2. Open in Studio', value: "Open your experience in Roblox Studio, then launch **RoLink installer** from the **Plugins** tab." },
             { name: '3. Security Key', value: "Copy the Security Key from the next embed and paste it into the installer when prompted." },
             { name: '4. Publish', value: "Let the plugin place the Ro-Link bridge, then enable **HTTP Requests** and **API Services** if your experience requires them before publishing." },
-            { name: 'Dashboard', value: `\${baseUrl}/dashboard/\${guildId}` }
+            { name: 'Dashboard', value: `${baseUrl}/dashboard/${guildId}` }
         );
-
-    const luaCode = `-- RoLink Core Bridge
-local RoLink = {}
-local Http = game:GetService("HttpService")
-local Players = game:GetService("Players")
-local MS = game:GetService("MessagingService")
-
-local URL = "\${baseUrl}"
-local KEY = "\${apiKey}"
-local POLL_INTERVAL = 5
-
-function RoLink:Initialize()
-	task.spawn(function()
-		pcall(function()
-			MS:SubscribeAsync("AdminActions", function(msg)
-				local d = msg.Data
-				if typeof(d) == "string" then d = Http:JSONDecode(d) end
-				self:Execute(d)
-			end)
-		end)
-	end)
-	task.spawn(function()
-		while true do
-			local id = game.JobId ~= "" and game.JobId or "STUDIO"
-			local s, r = pcall(function()
-				return Http:RequestAsync({
-					Url = URL .. "/api/roblox/poll",
-					Method = "POST",
-					Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. KEY },
-					Body = Http:JSONEncode({ jobId = id, playerCount = #Players:GetPlayers(), players = (function() local l = {} for _, p in ipairs(Players:GetPlayers()) do table.insert(l, p.Name) end return l end)() })
-				})
-			end)
-			if s and r.StatusCode == 200 then
-				local d = Http:JSONDecode(r.Body)
-				for _, c in ipairs(d.commands or {}) do self:Execute(c) end
-			end
-			task.wait(POLL_INTERVAL)
-		end
-	end)
-end
-
-function RoLink:Execute(cmd)
-	local u, r = cmd.args.username, cmd.args.reason or "No reason"
-	local p = Players:FindFirstChild(u) 
-    
-    local commandsWithoutLiveTarget = {
-        UPDATE = true,
-        SHUTDOWN = true,
-        BAN = true,
-        UNBAN = true,
-        SOFTBAN = true,
-        BROADCAST = true,
-        GRAVITY = true,
-        BRIGHTNESS = true
-    }
-
-    if not p and not commandsWithoutLiveTarget[cmd.command] then return end
-
-	if cmd.command == "KICK" then
-		p:Kick(r)
-	elseif cmd.command == "BAN" then
-		task.spawn(function()
-			local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(u) end)
-			if s and uid then pcall(function() Players:BanAsync({UserIds={uid},Duration=-1,DisplayReason=r,PrivateReason="RoLink"}) end) end
-            if p then p:Kick("Banned: "..r) end
-		end)
-	elseif cmd.command == "UNBAN" then
-		task.spawn(function()
-			local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(u) end)
-			if s and uid then pcall(function() Players:UnbanAsync({UserIds={uid}}) end) end
-		end)
-    elseif cmd.command == "SOFTBAN" then
-        task.spawn(function()
-            local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(u) end)
-            local durationSeconds = tonumber(cmd.args.duration_seconds) or 3600
-            if s and uid then
-                pcall(function()
-                    Players:BanAsync({
-                        UserIds = {uid},
-                        Duration = durationSeconds,
-                        DisplayReason = r,
-                        PrivateReason = "RoLink Kernel (Temporary): " .. (cmd.args.moderator or "System")
-                    })
-                end)
-            end
-            if p then p:Kick("Temporarily banned: " .. r) end
-        end)
-    elseif cmd.command == "FLY" then
-        if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = p.Character.HumanoidRootPart
-            local bv = hrp:FindFirstChild("RoLinkFly")
-            if bv then 
-                bv:Destroy() 
-            else
-                bv = Instance.new("BodyVelocity", hrp)
-                bv.Name = "RoLinkFly"
-                bv.MaxForce = Vector3.new(1,1,1) * 1000000
-                bv.Velocity = Vector3.new(0,0,0)
-            end
-        end
-    elseif cmd.command == "NOCLIP" then
-         if p and p.Character then
-            local attr = "RoLink_Noclip"
-            local state = not p.Character:GetAttribute(attr)
-            p.Character:SetAttribute(attr, state)
-            for _, v in pairs(p.Character:GetDescendants()) do
-                if v:IsA("BasePart") then v.CanCollide = not state end
-            end
-         end
-    elseif cmd.command == "INVIS" then
-         if p and p.Character then
-            local attr = "RoLink_Invis"
-            local state = not p.Character:GetAttribute(attr)
-            p.Character:SetAttribute(attr, state)
-            for _, v in pairs(p.Character:GetDescendants()) do
-                if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = state and 1 or 0 end
-            end
-            if p.Character:FindFirstChild("Head") and p.Character.Head:FindFirstChild("face") then
-                p.Character.Head.face.Transparency = state and 1 or 0
-            end
-         end
-    elseif cmd.command == "GHOST" then
-        if p and p.Character then
-            local attr = "RoLink_Ghost"
-            local state = not p.Character:GetAttribute(attr)
-            p.Character:SetAttribute(attr, state)
-            for _, v in pairs(p.Character:GetDescendants()) do
-                 if v:IsA("BasePart") or v:IsA("MeshPart") then v.Material = state and Enum.Material.ForceField or Enum.Material.Plastic end
-            end
-        end
-    elseif cmd.command == "SET_CHAR" then
-        if p and cmd.args.char_user then
-            task.spawn(function()
-                 local s, uid = pcall(function() return Players:GetUserIdFromNameAsync(cmd.args.char_user) end)
-                 if s and uid then
-                     p:LoadCharacterWithHumanoidDescription(Players:GetHumanoidDescriptionFromUserId(uid))
-                 end
-            end)
-        end
-    elseif cmd.command == "HEAL" then
-        if p and p.Character and p.Character:FindFirstChild("Humanoid") then
-            p.Character.Humanoid.Health = p.Character.Humanoid.MaxHealth
-        end
-    elseif cmd.command == "DAMAGE" then
-        local amount = tonumber(cmd.args.amount)
-        local humanoid = p and p.Character and p.Character:FindFirstChild("Humanoid")
-        if humanoid and amount then
-            humanoid:TakeDamage(math.max(amount, 0))
-        end
-    elseif cmd.command == "MAX_HEALTH" then
-        local amount = tonumber(cmd.args.amount)
-        local humanoid = p and p.Character and p.Character:FindFirstChild("Humanoid")
-        if humanoid and amount then
-            humanoid.MaxHealth = math.max(amount, 1)
-            if humanoid.Health > humanoid.MaxHealth then
-                humanoid.Health = humanoid.MaxHealth
-            end
-        end
-    elseif cmd.command == "WALK_SPEED" then
-        local amount = tonumber(cmd.args.amount)
-        local humanoid = p and p.Character and p.Character:FindFirstChild("Humanoid")
-        if humanoid and amount then
-            humanoid.WalkSpeed = amount
-        end
-    elseif cmd.command == "JUMP_POWER" then
-        local amount = tonumber(cmd.args.amount)
-        local humanoid = p and p.Character and p.Character:FindFirstChild("Humanoid")
-        if humanoid and amount then
-            humanoid.UseJumpPower = true
-            humanoid.JumpPower = amount
-        end
-    elseif cmd.command == "KILL" then
-        if p and p.Character and p.Character:FindFirstChild("Humanoid") then
-            p.Character.Humanoid.Health = 0
-        end
-    elseif cmd.command == "RESET" then
-        if p then p:LoadCharacter() end
-    elseif cmd.command == "REFRESH" then
-        if p and p.Character then
-            local cf = p.Character:GetPrimaryPartCFrame()
-            p:LoadCharacter()
-            p.CharacterAdded:Wait()
-            p.Character:SetPrimaryPartCFrame(cf)
-        end
-    elseif cmd.command == "FREEZE" then
-        local hrp = p and p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.Anchored = true
-        end
-    elseif cmd.command == "UNFREEZE" then
-        local hrp = p and p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.Anchored = false
-        end
-    elseif cmd.command == "BRING_TO_SPAWN" then
-        local hrp = p and p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-        local spawnLocation = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
-        if hrp and spawnLocation then
-            hrp.CFrame = spawnLocation.CFrame + Vector3.new(0, 5, 0)
-        end
-    elseif cmd.command == "TELEPORT_TO_ME" then
-        local hrp = p and p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-        local moderatorPlayer = Players:FindFirstChild(cmd.args.moderator_roblox_username or "")
-        local moderatorRoot = moderatorPlayer and moderatorPlayer.Character and moderatorPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hrp and moderatorRoot then
-            hrp.CFrame = moderatorRoot.CFrame * CFrame.new(2, 0, 0)
-        end
-    elseif cmd.command == "FORCEFIELD_ADD" then
-        if p and p.Character and not p.Character:FindFirstChildOfClass("ForceField") then
-            local forceField = Instance.new("ForceField")
-            forceField.Parent = p.Character
-        end
-    elseif cmd.command == "FORCEFIELD_REMOVE" then
-        if p and p.Character then
-            for _, child in ipairs(p.Character:GetChildren()) do
-                if child:IsA("ForceField") then
-                    child:Destroy()
-                end
-            end
-        end
-    elseif cmd.command == "BROADCAST" then
-        local message = tostring(cmd.args.message or r)
-        if message ~= "" then
-            local hint = Instance.new("Hint")
-            hint.Name = "RoLinkBroadcast"
-            hint.Text = message
-            hint.Parent = workspace
-            task.delay(10, function()
-                if hint and hint.Parent then
-                    hint:Destroy()
-                end
-            end)
-        end
-    elseif cmd.command == "GRAVITY" then
-        local amount = tonumber(cmd.args.amount)
-        if amount then
-            workspace.Gravity = amount
-        end
-    elseif cmd.command == "BRIGHTNESS" then
-        local amount = tonumber(cmd.args.amount)
-        if amount then
-            game:GetService("Lighting").Brightness = amount
-        end
-	elseif cmd.command == "UPDATE" then
-        local updateMessage = r ~= "" and r or "Updating..."
-		for _, p in ipairs(Players:GetPlayers()) do p:Kick(updateMessage) end
-	elseif cmd.command == "SHUTDOWN" then
-		if not cmd.args.job_id or cmd.args.job_id == game.JobId then
-			for _, p in ipairs(Players:GetPlayers()) do p:Kick(r ~= "" and r or "Shutdown.") end
-		end
-	end
-end
-return RoLink`;
 
     const embed2 = new EmbedBuilder()
         .setTitle('Ro-Link Security Key')
