@@ -204,12 +204,12 @@ function Callout({
     const Icon = tones.icon;
 
     return (
-        <div className={cn('rounded-2xl border p-5', tones.border, tones.bg)}>
-            <div className="flex gap-3">
-                <div className={cn('mt-0.5 rounded-xl border p-2', tones.border, tones.bg)}>
+        <div className={cn('w-full rounded-2xl border p-5', tones.border, tones.bg)}>
+            <div className="flex items-start gap-3">
+                <div className={cn('mt-0.5 shrink-0 rounded-xl border p-2', tones.border, tones.bg)}>
                     <Icon className={cn('h-4 w-4', tones.title)} />
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                     <h3 className={cn('text-sm font-bold', tones.title)}>{title}</h3>
                     <div className={cn('mt-2 text-sm leading-7', tones.text)}>{children}</div>
                 </div>
@@ -1231,11 +1231,6 @@ export default function DocsClientPage() {
                         })}
                     </div>
 
-                    <div className="mt-auto pt-8">
-                        <div className="rounded-full border border-white/10 bg-white/[0.02] px-5 py-4 text-sm font-semibold text-slate-300">
-                            Powered by GitBook
-                        </div>
-                    </div>
                 </aside>
 
                 {mobileMenuOpen && <button type="button" aria-label="Close navigation" onClick={() => setMobileMenuOpen(false)} className="fixed inset-0 z-20 bg-black/50 lg:hidden" />}
