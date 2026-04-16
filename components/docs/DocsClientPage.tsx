@@ -96,6 +96,12 @@ const Icons = {
             <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
         </svg>
     ),
+    Search: (props: SVGProps<SVGSVGElement>) => (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+        </svg>
+    ),
     ChevronRight: (props: SVGProps<SVGSVGElement>) => (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
             <path d="m9 18 6-6-6-6" />
@@ -158,10 +164,6 @@ function ExternalAnchor({ href, children }: { href: string; children: ReactNode 
     );
 }
 
-function Surface({ children, className }: { children: ReactNode; className?: string }) {
-    return <div className={cn('rounded-[24px] border border-white/10 bg-white/[0.035] shadow-[0_24px_80px_rgba(2,6,23,0.35)] backdrop-blur-md', className)}>{children}</div>;
-}
-
 function SectionCard({
     id,
     eyebrow,
@@ -176,15 +178,11 @@ function SectionCard({
     children: ReactNode;
 }) {
     return (
-        <section id={id} className="scroll-mt-24">
-            <Surface className="overflow-hidden">
-                <div className="border-b border-white/8 bg-white/[0.02] px-6 py-5 sm:px-8">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-sky-300/85">{eyebrow}</p>
-                    <h2 className="mt-3 text-2xl font-bold tracking-tight text-white sm:text-[2rem]">{title}</h2>
-                    <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400 sm:text-[15px]">{description}</p>
-                </div>
-                <div className="px-6 py-6 sm:px-8 sm:py-8">{children}</div>
-            </Surface>
+        <section id={id} className="scroll-mt-24 border-t border-white/8 pt-10 first:border-t-0 first:pt-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-sky-400/90">{eyebrow}</p>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-[2.35rem]">{title}</h2>
+            <p className="mt-4 max-w-3xl text-base leading-8 text-slate-300">{description}</p>
+            <div className="mt-7 space-y-5">{children}</div>
         </section>
     );
 }
@@ -232,8 +230,8 @@ function CodeBlock({ children, label }: { children: ReactNode; label: string }) 
     }
 
     return (
-        <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#08101f]">
-            <div className="flex items-center justify-between border-b border-white/8 bg-white/[0.03] px-4 py-3">
+        <div className="overflow-hidden rounded-[18px] border border-white/10 bg-[#111827]">
+            <div className="flex items-center justify-between border-b border-white/8 bg-white/[0.02] px-4 py-3">
                 <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{label}</span>
                 <button
                     type="button"
@@ -256,7 +254,7 @@ function Checklist({ items }: { items: string[] }) {
         <ul className="grid gap-3 md:grid-cols-2">
             {items.map((item) => (
                 <li key={item} className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4 text-sm leading-7 text-slate-300">
-                    <span className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-emerald-500/25 bg-emerald-500/10 text-emerald-300">
+                    <span className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-sky-500/25 bg-sky-500/10 text-sky-300">
                         <Icons.Check className="h-3 w-3" />
                     </span>
                     <span>{item}</span>
@@ -268,7 +266,7 @@ function Checklist({ items }: { items: string[] }) {
 
 function DataTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
     return (
-        <div className="table-responsive overflow-hidden rounded-2xl border border-white/10">
+        <div className="table-responsive overflow-hidden rounded-[18px] border border-white/10">
             <table className="min-w-full border-collapse text-left text-sm">
                 <thead className="bg-white/[0.03]">
                     <tr>
@@ -279,7 +277,7 @@ function DataTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
                         ))}
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-white/8 bg-[#08101f]/60">
+                <tbody className="divide-y divide-white/8 bg-[#0f172a]/55">
                     {rows.map((row) => (
                         <tr key={row.join('-')}>
                             {row.map((cell, index) => (
@@ -309,13 +307,13 @@ function ResourceCard({
     external?: boolean;
 }) {
     const content = (
-        <div className="group flex h-full items-start gap-4 rounded-[22px] border border-white/10 bg-white/[0.025] p-5 transition-all duration-200 hover:border-sky-400/30 hover:bg-sky-500/[0.06]">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-sky-300">
+        <div className="group flex h-full items-center gap-4 rounded-[18px] border border-white/10 bg-white/[0.02] p-5 transition-all duration-200 hover:border-sky-400/30 hover:bg-white/[0.04]">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sky-300">
                 <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
                 <h3 className="text-base font-semibold text-white transition-colors group-hover:text-sky-200">{title}</h3>
-                <p className="mt-2 text-sm leading-7 text-slate-400">{description}</p>
+                <p className="mt-1.5 text-sm leading-7 text-slate-400">{description}</p>
             </div>
             <Icons.ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-sky-200" />
         </div>
@@ -334,9 +332,9 @@ function ResourceCard({
 
 function PageStat({ label, value }: StatItem) {
     return (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
-            <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-slate-500">{label}</p>
-            <p className="mt-2 text-lg font-semibold text-white">{value}</p>
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-3 py-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">{label}</span>
+            <span className="text-sm font-medium text-slate-200">{value}</span>
         </div>
     );
 }
@@ -357,13 +355,11 @@ function NavButton({
             type="button"
             onClick={onClick}
             className={cn(
-                'group flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium transition-all duration-200',
-                active ? 'bg-sky-500/10 text-sky-200 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.18)]' : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
+                'group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-200',
+                active ? 'bg-indigo-500/15 text-indigo-200 shadow-[inset_0_0_0_1px_rgba(129,140,248,0.18)]' : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
             )}
         >
-            <span className={cn('rounded-xl border p-2 transition-colors', active ? 'border-sky-500/20 bg-sky-500/10 text-sky-300' : 'border-white/8 bg-white/[0.03] text-slate-500 group-hover:text-sky-200')}>
-                <Icon className="h-4 w-4" />
-            </span>
+            <Icon className={cn('h-4 w-4 shrink-0 transition-colors', active ? 'text-indigo-300' : 'text-slate-500 group-hover:text-slate-300')} />
             <span className="truncate">{children}</span>
         </button>
     );
@@ -1110,8 +1106,14 @@ export default function DocsClientPage() {
     const [activeSectionId, setActiveSectionId] = useState<string | null>(docsPages[0].toc[0]?.id ?? null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [pendingSectionId, setPendingSectionId] = useState<string | null>(null);
+    const [copiedPageLink, setCopiedPageLink] = useState(false);
 
     const activePage = docsPages.find((page) => page.id === activePageId) || docsPages[0];
+    const ActivePageIcon = activePage.icon;
+    const activePageIndex = docsPages.findIndex((page) => page.id === activePage.id);
+    const previousPage = activePageIndex > 0 ? docsPages[activePageIndex - 1] : null;
+    const nextPage = activePageIndex >= 0 && activePageIndex < docsPages.length - 1 ? docsPages[activePageIndex + 1] : null;
+    const pagerPages = [previousPage, nextPage].filter((page): page is DocPage => Boolean(page));
 
     useEffect(() => {
         function syncFromHash() {
@@ -1161,143 +1163,162 @@ export default function DocsClientPage() {
         window.history.replaceState(null, '', `#${activePageId}/${sectionId}`);
     }
 
-    return (
-        <div className="relative min-h-screen overflow-hidden bg-[#050816] text-slate-100 selection:bg-sky-400/20">
-            <div className="pointer-events-none absolute inset-0">
-                <div className="absolute inset-x-0 top-0 h-[440px] bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_30%),radial-gradient(circle_at_top_right,rgba(99,102,241,0.1),transparent_28%),linear-gradient(to_bottom,rgba(8,15,30,0.9),rgba(5,8,22,0))]" />
-                <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.03)_1px,transparent_1px)] bg-[size:36px_36px] opacity-[0.12]" />
-            </div>
+    function copyCurrentPageLink() {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.hash = activeSectionId ? `${activePageId}/${activeSectionId}` : activePageId;
+        navigator.clipboard.writeText(currentUrl.toString());
+        setCopiedPageLink(true);
+        window.setTimeout(() => setCopiedPageLink(false), 1500);
+    }
 
-            <div className="relative flex min-h-screen w-full">
-                <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-white/8 bg-[#050816]/85 px-5 py-4 backdrop-blur-xl lg:hidden">
-                    <div className="flex items-center gap-3">
-                        <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-2 text-sky-300">
+    return (
+        <div className="min-h-screen bg-[#181818] text-slate-100 selection:bg-indigo-400/20">
+            <header className="fixed inset-x-0 top-0 z-40 border-b border-white/8 bg-[#181818]/92 backdrop-blur-xl">
+                <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+                    <Link href="/" className="flex items-center gap-3">
+                        <div className="rounded-xl border border-indigo-500/25 bg-indigo-500/10 p-2 text-indigo-300">
                             <Icons.Book className="h-4 w-4" />
                         </div>
-                        <div>
-                            <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-sky-300/80">Ro-Link Docs</p>
-                            <p className="text-sm font-semibold text-white">{activePage.title}</p>
-                        </div>
+                        <span className="text-lg font-semibold text-white">Ro-Link</span>
+                    </Link>
+
+                    <div className="hidden items-center gap-4 lg:flex">
+                        <button
+                            type="button"
+                            className="flex min-w-[230px] items-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-4 py-2 text-left text-sm text-slate-400"
+                        >
+                            <Icons.Search className="h-4 w-4" />
+                            <span className="flex-1">Search...</span>
+                            <span className="rounded-md border border-white/10 px-2 py-0.5 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-500">Ctrl K</span>
+                        </button>
                     </div>
-                    <button type="button" onClick={() => setMobileMenuOpen((current) => !current)} className="rounded-2xl border border-white/10 bg-white/[0.03] p-2 text-slate-300">
+
+                    <button
+                        type="button"
+                        onClick={() => setMobileMenuOpen((current) => !current)}
+                        className="rounded-xl border border-white/10 bg-white/[0.03] p-2 text-slate-300 lg:hidden"
+                    >
                         {mobileMenuOpen ? <Icons.X className="h-5 w-5" /> : <Icons.Menu className="h-5 w-5" />}
                     </button>
                 </div>
+            </header>
+
+            <div className="pt-16">
                 <aside
                     className={cn(
-                        'fixed inset-y-0 left-0 z-30 w-[310px] border-r border-white/8 bg-[#07101f]/95 px-4 pb-6 pt-24 backdrop-blur-xl transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:px-5 lg:pt-6',
+                        'custom-scrollbar fixed inset-y-16 left-0 z-30 flex w-[280px] flex-col overflow-y-auto border-r border-white/8 bg-[#181818]/98 px-5 py-8 backdrop-blur-xl transition-transform duration-300',
                         mobileMenuOpen ? 'translate-x-0' : '-translate-x-full',
+                        'lg:translate-x-0',
                     )}
                 >
-                    <div className="custom-scrollbar h-full overflow-y-auto pr-1">
-                        <div className="hidden items-center gap-3 lg:flex">
-                            <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-2.5 text-sky-300">
-                                <Icons.Book className="h-5 w-5" />
-                            </div>
-                            <div>
-                                <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-sky-300/80">Ro-Link Docs</p>
-                                <p className="text-lg font-semibold text-white">Documentation</p>
-                            </div>
-                        </div>
+                    <div className="space-y-8">
+                        {categoryOrder.map((category) => {
+                            const pages = docsPages.filter((page) => page.category === category);
+                            if (pages.length === 0) return null;
 
-                        <div className="mt-8 space-y-8">
-                            {categoryOrder.map((category) => {
-                                const pages = docsPages.filter((page) => page.category === category);
-                                if (pages.length === 0) return null;
-
-                                return (
-                                    <div key={category}>
-                                        <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.26em] text-slate-500">{category}</p>
-                                        <div className="space-y-1.5">
-                                            {pages.map((page) => (
-                                                <NavButton key={page.id} active={activePageId === page.id} icon={page.icon} onClick={() => openPage(page.id)}>
-                                                    {page.title}
-                                                </NavButton>
-                                            ))}
-                                        </div>
+                            return (
+                                <div key={category}>
+                                    <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">{category}</p>
+                                    <div className="space-y-1">
+                                        {pages.map((page) => (
+                                            <NavButton key={page.id} active={activePageId === page.id} icon={page.icon} onClick={() => openPage(page.id)}>
+                                                {page.title}
+                                            </NavButton>
+                                        ))}
                                     </div>
-                                );
-                            })}
-                        </div>
+                                </div>
+                            );
+                        })}
+                    </div>
 
-                        <div className="mt-10 border-t border-white/8 pt-6">
-                            <div className="space-y-3">
-                                <ResourceCard href="/dashboard" icon={Icons.Server} title="Open Dashboard" description="Manage servers, logs, posts, and live player actions." />
-                                <ResourceCard href="/posts" icon={Icons.Book} title="View Updates" description="Read published release notes and public changelog posts." />
-                            </div>
-
-                            <Link href="/" className="mt-5 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-slate-500 transition-colors hover:text-white">
-                                <Icons.ChevronRight className="h-3.5 w-3.5 rotate-180" />
-                                Back to Home
-                            </Link>
+                    <div className="mt-auto pt-8">
+                        <div className="rounded-full border border-white/10 bg-white/[0.02] px-5 py-4 text-sm font-semibold text-slate-300">
+                            Powered by GitBook
                         </div>
                     </div>
                 </aside>
 
-                {mobileMenuOpen && (
-                    <button type="button" aria-label="Close navigation" onClick={() => setMobileMenuOpen(false)} className="fixed inset-0 z-20 bg-black/50 lg:hidden" />
-                )}
+                {mobileMenuOpen && <button type="button" aria-label="Close navigation" onClick={() => setMobileMenuOpen(false)} className="fixed inset-0 z-20 bg-black/50 lg:hidden" />}
 
-                <main className="relative z-10 min-w-0 flex-1 px-4 pb-12 pt-24 sm:px-6 lg:px-8 lg:pt-8 xl:px-10 2xl:px-14">
-                    <div className="space-y-8">
-                        <Surface className="relative overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.14),transparent_22%),rgba(255,255,255,0.03)]">
-                            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.05),transparent_35%,transparent_70%,rgba(255,255,255,0.04))]" />
-                            <div className="relative px-6 py-8 sm:px-8 sm:py-10 xl:px-10">
-                                <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
-                                    <div className="max-w-4xl">
-                                        <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.26em] text-sky-300">
-                                            {activePage.eyebrow}
-                                        </div>
-                                        <h1 className="mt-5 text-4xl font-black tracking-tight text-white sm:text-5xl xl:text-6xl">{activePage.title}</h1>
-                                        <p className="mt-5 max-w-3xl text-base leading-8 text-slate-300 sm:text-lg">{activePage.summary}</p>
-                                    </div>
+                <aside className="custom-scrollbar fixed inset-y-16 right-0 hidden w-[270px] overflow-y-auto border-l border-white/8 bg-[#181818] px-7 py-10 xl:block">
+                    <nav className="space-y-1">
+                        {activePage.toc.map((item) => (
+                            <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => openSection(item.id)}
+                                className={cn(
+                                    'block w-full rounded-xl px-4 py-3 text-left text-sm leading-6 transition-colors',
+                                    activeSectionId === item.id ? 'bg-indigo-500/14 text-indigo-200' : 'text-sky-100/90 hover:text-white',
+                                )}
+                            >
+                                {item.title}
+                            </button>
+                        ))}
+                    </nav>
+                </aside>
 
-                                    <div className="flex flex-wrap gap-3">
-                                        <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-slate-950 transition-colors hover:bg-slate-100">
-                                            <Icons.Server className="h-4 w-4" />
-                                            Open Dashboard
-                                        </Link>
-                                        <Link href="/posts" className="inline-flex items-center gap-2 rounded-2xl border border-white/12 bg-white/[0.05] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-white/[0.08]">
-                                            <Icons.Book className="h-4 w-4" />
-                                            View Updates
-                                        </Link>
-                                    </div>
+                <main className="lg:pl-[280px] xl:pr-[270px]">
+                    <div className="mx-auto max-w-[880px] px-6 py-10 sm:px-10">
+                        <div className="flex flex-col gap-6 border-b border-white/8 pb-10 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="max-w-3xl">
+                                <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-indigo-400">{activePage.category}</p>
+                                <div className="mt-4 flex items-center gap-4">
+                                    <ActivePageIcon className="h-10 w-10 text-slate-500" />
+                                    <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl">{activePage.title}</h1>
                                 </div>
-
-                                <div className="mt-8 grid gap-4 xl:grid-cols-3">
+                                <p className="mt-6 text-lg leading-9 text-slate-200">{activePage.summary}</p>
+                                <div className="mt-6 flex flex-wrap gap-2">
                                     {activePage.stats.map((stat) => (
                                         <PageStat key={stat.label} {...stat} />
                                     ))}
                                 </div>
                             </div>
-                        </Surface>
 
-                        <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_280px]">
-                            <article className="min-w-0 space-y-6">{activePage.content}</article>
+                            <button
+                                type="button"
+                                onClick={copyCurrentPageLink}
+                                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:text-white"
+                            >
+                                {copiedPageLink ? <Icons.Check className="h-4 w-4 text-emerald-400" /> : <Icons.Copy className="h-4 w-4" />}
+                                {copiedPageLink ? 'Copied' : 'Copy'}
+                            </button>
+                        </div>
 
-                            <aside className="hidden xl:block">
-                                <div className="sticky top-8">
-                                    <Surface className="p-5">
-                                        <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">On this page</p>
-                                        <nav className="mt-4 space-y-1.5">
-                                            {activePage.toc.map((item) => (
-                                                <button
-                                                    key={item.id}
-                                                    type="button"
-                                                    onClick={() => openSection(item.id)}
-                                                    className={cn(
-                                                        'flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm transition-colors',
-                                                        activeSectionId === item.id ? 'bg-sky-500/10 text-sky-200' : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
-                                                    )}
-                                                >
-                                                    <span className={cn('h-2 w-2 rounded-full', activeSectionId === item.id ? 'bg-sky-300' : 'bg-slate-600')} />
-                                                    <span>{item.title}</span>
-                                                </button>
-                                            ))}
-                                        </nav>
-                                    </Surface>
-                                </div>
-                            </aside>
+                        <article className="space-y-12 pt-10">{activePage.content}</article>
+
+                        <div className="mt-14 border-t border-white/8 pt-10">
+                            <div className={cn('grid gap-4', pagerPages.length > 1 ? 'md:grid-cols-2' : 'md:grid-cols-1')}>
+                                {previousPage && (
+                                    <button
+                                        type="button"
+                                        onClick={() => openPage(previousPage.id)}
+                                        className="group flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.02] px-6 py-5 text-left transition-colors hover:bg-white/[0.04]"
+                                    >
+                                        <div>
+                                            <p className="text-sm text-slate-500">Previous</p>
+                                            <p className="mt-1 text-2xl font-semibold text-white">{previousPage.title}</p>
+                                        </div>
+                                        <Icons.ChevronRight className="h-5 w-5 rotate-180 text-slate-600 transition-transform group-hover:-translate-x-0.5 group-hover:text-white" />
+                                    </button>
+                                )}
+
+                                {nextPage && (
+                                    <button
+                                        type="button"
+                                        onClick={() => openPage(nextPage.id)}
+                                        className="group flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.02] px-6 py-5 text-left transition-colors hover:bg-white/[0.04]"
+                                    >
+                                        <div>
+                                            <p className="text-sm text-slate-500">Next</p>
+                                            <p className="mt-1 text-2xl font-semibold text-white">{nextPage.title}</p>
+                                        </div>
+                                        <Icons.ChevronRight className="h-5 w-5 text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
+                                    </button>
+                                )}
+                            </div>
+
+                            <p className="mt-8 text-sm text-slate-500">Last updated April 16, 2026</p>
                         </div>
                     </div>
                 </main>
