@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "concurrently \"next dev\" \"node scripts/bot.js\"",
     "build": "next build",
+    "typecheck": "tsc --noEmit",
     "start": "concurrently \"next start\" \"node scripts/bot.js\"",
     "lint": "eslint",
     "bot": "node scripts/bot.js"
