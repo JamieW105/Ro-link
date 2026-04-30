@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { hasPermission } from "@/lib/management";
 import { supabase } from "@/lib/supabase";
-import { normalizeUpdatePost, sanitizeUpdatePostInput } from "@/lib/updatePosts";
+import { normalizeUpdatePost, normalizeUpdatePostStatus, sanitizeUpdatePostInput } from "@/lib/updatePosts";
 
 export async function GET(
     req: NextRequest,
@@ -13,7 +13,7 @@ export async function GET(
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const userId = (session.user as any).id;
+    const userId = String((session.user as { id?: unknown }).id ?? '');
     if (!(await hasPermission(userId, 'POST_UPDATES'))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -43,14 +43,31 @@ export async function PATCH(
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const userId = (session.user as any).id;
+    const userId = String((session.user as { id?: unknown }).id ?? '');
     if (!(await hasPermission(userId, 'POST_UPDATES'))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
-    const sanitized = sanitizeUpdatePostInput(body);
+
+    const { data: existingPost, error: loadError } = await supabase
+        .from('update_posts')
+        .select('status, published_at')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (loadError) {
+        return NextResponse.json({ error: loadError.message }, { status: 500 });
+    }
+
+    if (!existingPost) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    const sanitized = sanitizeUpdatePostInput(body, {
+        requireUpdateSection: normalizeUpdatePostStatus(existingPost.status, existingPost.published_at) === 'PUBLISHED',
+    });
     if ('error' in sanitized) {
         return NextResponse.json({ error: sanitized.error }, { status: 400 });
     }
@@ -79,7 +96,7 @@ export async function DELETE(
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const userId = (session.user as any).id;
+    const userId = String((session.user as { id?: unknown }).id ?? '');
     if (!(await hasPermission(userId, 'POST_UPDATES'))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

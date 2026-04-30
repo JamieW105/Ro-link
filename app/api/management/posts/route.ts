@@ -35,7 +35,7 @@ export async function GET() {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const userId = (session.user as any).id;
+    const userId = String((session.user as { id?: unknown }).id ?? '');
     if (!(await hasPermission(userId, 'POST_UPDATES'))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -43,7 +43,8 @@ export async function GET() {
     const { data, error } = await supabase
         .from('update_posts')
         .select('*')
-        .order('published_at', { ascending: false });
+        .order('status', { ascending: true })
+        .order('updated_at', { ascending: false });
 
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const userId = (session.user as any).id;
+    const userId = String((session.user as { id?: unknown }).id ?? '');
     if (!(await hasPermission(userId, 'POST_UPDATES'))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -77,7 +78,8 @@ export async function POST(req: Request) {
                 ...sanitized,
                 slug,
                 author_discord_id: userId,
-                published_at: now,
+                status: 'DRAFT',
+                published_at: null,
                 updated_at: now,
             })
             .select('*')
