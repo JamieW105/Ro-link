@@ -111,9 +111,9 @@ export default function Home() {
             <a href="/docs" className="text-sm font-semibold text-slate-400 hover:text-white transition-colors">
               Documentation
             </a>
-            <a href="/careers" className="text-sm font-semibold text-slate-400 hover:text-white transition-colors">
+            <Link href="/careers" className="text-sm font-semibold text-slate-400 hover:text-white transition-colors">
               Careers
-            </a>
+            </Link>
             <button
               onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}
               className="px-5 py-2 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-lg transition-all shadow-md shadow-sky-900/20"
