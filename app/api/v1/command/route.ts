@@ -4,8 +4,8 @@ import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy, re
 import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { logAction } from '@/lib/logger';
-import { readServerApiKey } from '@/lib/serverApiKey';
-import { findServerByKey } from '@/lib/serverAuth';
+import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
+import { findServerByKeyWithDiagnostics } from '@/lib/serverAuth';
 
 type ApiCommandServerRecord = {
     id: string;
@@ -36,24 +36,45 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+    const body = await req.json().catch(() => ({}));
     // 1. Authenticate with API Key
-    const apiKey = readServerApiKey(req);
+    const auth = readServerApiKeyDetails(req, body.apiKey ?? body.key ?? body.serverKey ?? body.securityKey);
+    const authDebug = describeServerApiKeyDetails(auth);
 
-    if (!apiKey) {
-        return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
+    if (!auth.key) {
+        console.warn('[RoLinkAPI][Command] Missing API key', { auth: authDebug });
+        return NextResponse.json({
+            error: 'Missing API Key',
+            code: 'missing_api_key',
+            message: 'No server key was provided. Send x-api-key or Authorization: Bearer <key>.',
+            auth: authDebug,
+        }, { status: 401 });
     }
 
-    const server = await findServerByKey<ApiCommandServerRecord>(
+    const lookup = await findServerByKeyWithDiagnostics<ApiCommandServerRecord>(
         'id, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy',
-        apiKey,
+        auth.key,
     );
+    const server = lookup.server;
 
     if (!server) {
-        return NextResponse.json({ error: 'Invalid API Key' }, { status: 403 });
+        console.warn('[RoLinkAPI][Command] Invalid API key', {
+            auth: authDebug,
+            lookupError: lookup.error,
+        });
+        return NextResponse.json({
+            error: 'Invalid API Key',
+            code: 'invalid_api_key',
+            message: 'The provided server key did not match any server record.',
+            auth: authDebug,
+            lookup: {
+                matchedBy: lookup.matchedBy,
+                error: lookup.error,
+            },
+        }, { status: 403 });
     }
 
     // 2. Parse Body
-    const body = await req.json().catch(() => ({}));
     const { command, args, moderator, moderatorDiscordId, moderatorRobloxId } = body;
 
     if (!command) {

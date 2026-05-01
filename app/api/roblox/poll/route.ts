@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { findServerByKey } from '@/lib/serverAuth';
+import { findServerByKeyWithDiagnostics } from '@/lib/serverAuth';
 import { supabase } from '@/lib/supabase';
-import { readServerApiKey } from '@/lib/serverApiKey';
+import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 
 interface QueuedCommand {
     id: string;
@@ -27,23 +27,55 @@ export async function GET() {
 
 export async function POST(req: Request) {
     try {
-        const apiKey = readServerApiKey(req);
-        if (!apiKey) return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
-        const { jobId, playerCount, players, status } = await req.json().catch(() => ({}));
+        const body = await req.json().catch(() => ({}));
+        const { jobId, playerCount, players, status } = body;
+        const auth = readServerApiKeyDetails(req, body.apiKey ?? body.key ?? body.serverKey ?? body.securityKey);
+        const authDebug = describeServerApiKeyDetails(auth);
+        if (!auth.key) {
+            console.warn('[RoLinkAPI][Poll] Missing API key', { auth: authDebug });
+            return NextResponse.json({
+                error: 'Missing API Key',
+                code: 'missing_api_key',
+                message: 'No server key was provided. Send x-api-key or Authorization: Bearer <key>.',
+                auth: authDebug,
+            }, { status: 401 });
+        }
 
         // 1. Validate API Key and get Server ID
-        const server = await findServerByKey<{
+        const lookup = await findServerByKeyWithDiagnostics<{
             id: string;
             admin_cmds_enabled: boolean | null;
             misc_cmds_enabled: boolean | null;
             enforce_moderation_role_hierarchy: boolean | null;
         }>(
             'id, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy',
-            apiKey,
+            auth.key,
         );
 
+        const server = lookup.server;
         if (!server) {
-            return NextResponse.json({ error: 'Invalid API Key' }, { status: 401 });
+            console.warn('[RoLinkAPI][Poll] Invalid API key', {
+                auth: authDebug,
+                lookupError: lookup.error,
+            });
+            return NextResponse.json({
+                error: 'Invalid API Key',
+                code: 'invalid_api_key',
+                message: 'The provided server key did not match any server record.',
+                auth: authDebug,
+                lookup: {
+                    matchedBy: lookup.matchedBy,
+                    error: lookup.error,
+                },
+            }, { status: 401 });
+        }
+
+        if (lookup.matchedBy !== 'api_key') {
+            console.warn('[RoLinkAPI][Poll] Accepted fallback server key', {
+                auth: authDebug,
+                matchedBy: lookup.matchedBy,
+                serverId: server.id,
+            });
         }
 
         // 2. Handle Shutdown (Explicit via status or implicit via 0 players)

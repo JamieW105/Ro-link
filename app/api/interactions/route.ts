@@ -1945,8 +1945,9 @@ function RoLink:Initialize()
 				return Http:RequestAsync({
 					Url = URL .. "/api/roblox/poll",
 					Method = "POST",
-					Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. KEY },
+					Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. KEY, ["x-api-key"] = KEY },
 					Body = Http:JSONEncode({
+						apiKey = KEY,
 						jobId = id,
 						playerCount = #Players:GetPlayers(),
 						players = (function()

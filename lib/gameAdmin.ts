@@ -213,10 +213,17 @@ export async function resolveDashboardUserPermissions(serverId: string, discordU
 }
 
 export async function getServerByApiKey(apiKey: string) {
-    return findServerByKey<GameAdminServerRecord>(
+    const server = await findServerByKey<GameAdminServerRecord>(
         'id, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy, place_id, universe_id',
         apiKey,
     );
+    if (!server) {
+        console.warn('[RoLinkAPI][GameAdmin] Server key lookup returned no server', {
+            keyPrefix: String(apiKey || '').slice(0, 6),
+            keyLength: String(apiKey || '').length,
+        });
+    }
+    return server;
 }
 
 export async function resolveRoLinkAdminAccess(

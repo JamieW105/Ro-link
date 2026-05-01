@@ -1,15 +1,22 @@
 import { NextResponse } from 'next/server';
-import { readServerApiKey } from '@/lib/serverApiKey';
-import { findServerByKey } from '@/lib/serverAuth';
+import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
+import { findServerByKeyWithDiagnostics } from '@/lib/serverAuth';
 
 export async function GET(req: Request) {
-    const apiKey = readServerApiKey(req);
+    const auth = readServerApiKeyDetails(req);
+    const authDebug = describeServerApiKeyDetails(auth);
 
-    if (!apiKey) {
-        return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
+    if (!auth.key) {
+        console.warn('[RoLinkAPI][Settings] Missing API key', { auth: authDebug });
+        return NextResponse.json({
+            error: 'Missing API Key',
+            code: 'missing_api_key',
+            message: 'No server key was provided. Send x-api-key or Authorization: Bearer <key>.',
+            auth: authDebug,
+        }, { status: 401 });
     }
 
-    const server = await findServerByKey<{
+    const lookup = await findServerByKeyWithDiagnostics<{
         verification_enabled: boolean | null;
         block_unverified: boolean | null;
         admin_cmds_enabled: boolean | null;
@@ -17,11 +24,25 @@ export async function GET(req: Request) {
         enforce_moderation_role_hierarchy: boolean | null;
     }>(
         'verification_enabled, block_unverified, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy',
-        apiKey,
+        auth.key,
     );
+    const server = lookup.server;
 
     if (!server) {
-        return NextResponse.json({ error: 'Invalid API Key' }, { status: 403 });
+        console.warn('[RoLinkAPI][Settings] Invalid API key', {
+            auth: authDebug,
+            lookupError: lookup.error,
+        });
+        return NextResponse.json({
+            error: 'Invalid API Key',
+            code: 'invalid_api_key',
+            message: 'The provided server key did not match any server record.',
+            auth: authDebug,
+            lookup: {
+                matchedBy: lookup.matchedBy,
+                error: lookup.error,
+            },
+        }, { status: 403 });
     }
 
     return NextResponse.json({
