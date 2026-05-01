@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { logAction } from '@/lib/logger';
 import { findLivePlayer } from '@/lib/livePlayers';
+import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import discordCommands from '@/lib/discordCommands.json';
 
@@ -853,6 +854,29 @@ export async function POST(req: Request) {
             const jobId = String(getCommandOptionValue(options, 'job_id') ?? '').trim();
             const reason = String(getCommandOptionValue(options, 'reason') ?? 'No reason provided').trim() || 'No reason provided';
 
+            if (commandRequiresModerationHierarchy(String(name || ''))) {
+                try {
+                    const hierarchyCheck = await evaluateModerationRoleHierarchy({
+                        serverId: guild_id,
+                        moderatorDiscordId: userId,
+                        targetRobloxUsername: targetUser,
+                        enabled: server.enforce_moderation_role_hierarchy,
+                    });
+
+                    if (!hierarchyCheck.allowed) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `❌ ${hierarchyCheck.message}`, flags: 64 }
+                        });
+                    }
+                } catch (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ ${getErrorMessage(error, 'Failed to verify the role hierarchy for that moderation action.')}`, flags: 64 }
+                    });
+                }
+            }
+
             if (name === 'lookup') {
                 try {
                     const lookup = await fetchRobloxLookup(String(targetUser || ''), guild_id, server.open_cloud_key);
@@ -1323,6 +1347,26 @@ export async function POST(req: Request) {
                 }
 
                 const command = reportAction === 'roblox_ban' ? 'BAN' : 'KICK';
+                try {
+                    const hierarchyCheck = await evaluateModerationRoleHierarchy({
+                        serverId: currentGuildId,
+                        moderatorDiscordId: String(user?.id || ''),
+                        targetRobloxUsername: target,
+                    });
+
+                    if (!hierarchyCheck.allowed) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `❌ ${hierarchyCheck.message}`, flags: 64 }
+                        });
+                    }
+                } catch (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
+                    });
+                }
+
                 try {
                     await Promise.all([
                         supabase.from('command_queue').insert([{

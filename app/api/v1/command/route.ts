@@ -1,8 +1,20 @@
 
 import { NextResponse } from 'next/server';
+import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy, resolveDiscordIdFromRobloxId } from '@/lib/moderationRoleHierarchy';
 import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { logAction } from '@/lib/logger';
+
+type ApiCommandServerRecord = {
+    id: string;
+    admin_cmds_enabled?: boolean | null;
+    misc_cmds_enabled?: boolean | null;
+    enforce_moderation_role_hierarchy?: boolean | null;
+};
+
+function trimString(value: unknown) {
+    return String(value ?? '').trim();
+}
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
@@ -31,9 +43,9 @@ export async function POST(req: Request) {
 
     const { data: server, error: authError } = await supabase
         .from('servers')
-        .select('*')
+        .select('id, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy')
         .eq('api_key', apiKey)
-        .single();
+        .single<ApiCommandServerRecord>();
 
     if (authError || !server) {
         return NextResponse.json({ error: 'Invalid API Key' }, { status: 403 });
@@ -41,17 +53,48 @@ export async function POST(req: Request) {
 
     // 2. Parse Body
     const body = await req.json().catch(() => ({}));
-    const { command, args, moderator } = body;
+    const { command, args, moderator, moderatorDiscordId, moderatorRobloxId } = body;
 
     if (!command) {
         return NextResponse.json({ error: 'Command is required' }, { status: 400 });
     }
 
-    const commandName = command.toUpperCase();
+    const commandName = trimString(command).toUpperCase();
     const safeArgs = args || {};
-    const modName = moderator || 'API User';
+    const modName = trimString(moderator) || 'API User';
 
     try {
+        if (commandRequiresModerationHierarchy(commandName)) {
+            const targetUsername = trimString(safeArgs.username);
+            if (!targetUsername) {
+                return NextResponse.json({ error: 'username is required for moderation commands.' }, { status: 400 });
+            }
+
+            let actingModeratorDiscordId = trimString(moderatorDiscordId);
+            if (!actingModeratorDiscordId && trimString(moderatorRobloxId)) {
+                actingModeratorDiscordId = await resolveDiscordIdFromRobloxId(trimString(moderatorRobloxId));
+            }
+
+            if (server.enforce_moderation_role_hierarchy !== false && !actingModeratorDiscordId) {
+                return NextResponse.json({
+                    error: 'moderatorDiscordId or moderatorRobloxId is required for moderation commands while role hierarchy protection is enabled.',
+                }, { status: 400 });
+            }
+
+            if (actingModeratorDiscordId) {
+                const hierarchyCheck = await evaluateModerationRoleHierarchy({
+                    serverId: server.id,
+                    moderatorDiscordId: actingModeratorDiscordId,
+                    targetRobloxUsername: targetUsername,
+                    enabled: server.enforce_moderation_role_hierarchy,
+                });
+
+                if (!hierarchyCheck.allowed) {
+                    return NextResponse.json({ error: hierarchyCheck.message }, { status: 403 });
+                }
+            }
+        }
+
         // 3. Queue Command
         const { error: queueError } = await supabase.from('command_queue').insert([{
             server_id: server.id,
@@ -67,7 +110,7 @@ export async function POST(req: Request) {
         const msgResult = await sendRobloxMessage(server.id, commandName, { ...safeArgs, moderator: modName }, server);
 
         // 5. Log Action (via Unified Logger)
-        await logAction(server.id, commandName, safeArgs.username || 'N/A', modName);
+        await logAction(server.id, commandName, trimString(safeArgs.username) || 'N/A', modName);
 
         return NextResponse.json({
             success: true,
@@ -75,8 +118,11 @@ export async function POST(req: Request) {
             open_cloud_status: msgResult.success ? 'Sent' : 'Failed'
         });
 
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('API Error:', err);
-        return NextResponse.json({ error: 'Internal Server Error', details: err.message }, { status: 500 });
+        return NextResponse.json({
+            error: 'Internal Server Error',
+            details: err instanceof Error ? err.message : String(err),
+        }, { status: 500 });
     }
 }

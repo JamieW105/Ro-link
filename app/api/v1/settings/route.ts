@@ -10,7 +10,7 @@ export async function GET(req: Request) {
 
     const { data: server, error } = await supabase
         .from('servers')
-        .select('verification_enabled, block_unverified, admin_cmds_enabled, misc_cmds_enabled')
+        .select('verification_enabled, block_unverified, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy')
         .eq('api_key', apiKey)
         .single();
 
@@ -22,6 +22,7 @@ export async function GET(req: Request) {
         verificationEnabled: server.verification_enabled,
         blockUnverified: server.block_unverified,
         adminCmdsEnabled: server.admin_cmds_enabled !== false,
-        miscCmdsEnabled: server.misc_cmds_enabled !== false
+        miscCmdsEnabled: server.misc_cmds_enabled !== false,
+        enforceModerationRoleHierarchy: server.enforce_moderation_role_hierarchy !== false,
     });
 }

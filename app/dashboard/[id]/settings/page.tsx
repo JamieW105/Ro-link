@@ -107,6 +107,7 @@ export default function SettingsPage() {
     // General Settings
     const [adminCmds, setAdminCmds] = useState(true);
     const [miscCmds, setMiscCmds] = useState(true);
+    const [enforceModerationRoleHierarchy, setEnforceModerationRoleHierarchy] = useState(true);
     const [loggingChannelId, setLoggingChannelId] = useState("");
     const [reportsEnabled, setReportsEnabled] = useState(false);
     const [reportsChannelId, setReportsChannelId] = useState("");
@@ -204,13 +205,14 @@ export default function SettingsPage() {
             // 2. Fetch Server Settings
             const { data, error: dbError } = await supabase
                 .from('servers')
-                .select('admin_cmds_enabled, misc_cmds_enabled, logging_channel_id, reports_enabled, reports_channel_id')
+                .select('admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy, logging_channel_id, reports_enabled, reports_channel_id')
                 .eq('id', id)
                 .single();
 
             if (data && !dbError) {
                 setAdminCmds(data.admin_cmds_enabled !== false);
                 setMiscCmds(data.misc_cmds_enabled !== false);
+                setEnforceModerationRoleHierarchy(data.enforce_moderation_role_hierarchy !== false);
                 setLoggingChannelId(data.logging_channel_id || "");
                 setReportsEnabled(data.reports_enabled || false);
                 setReportsChannelId(data.reports_channel_id || "");
@@ -268,6 +270,7 @@ export default function SettingsPage() {
             .update({
                 admin_cmds_enabled: adminCmds,
                 misc_cmds_enabled: miscCmds,
+                enforce_moderation_role_hierarchy: enforceModerationRoleHierarchy,
                 logging_channel_id: loggingChannelId || null,
                 reports_enabled: reportsEnabled,
                 reports_channel_id: reportsChannelId || null
@@ -755,6 +758,19 @@ export default function SettingsPage() {
                                     <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${miscCmds ? 'left-8 bg-sky-500' : 'left-1.5 bg-slate-500'}`} />
                                 </button>
                             </div>
+
+                            <div className="flex items-center justify-between p-6 bg-slate-950/40 border border-slate-800 rounded-2xl">
+                                <div>
+                                    <h4 className="text-sm font-bold text-slate-200 uppercase tracking-tight">Enforce Role Hierarchy</h4>
+                                    <p className="text-[11px] text-slate-500 font-medium mt-1">Prevents kick, ban, and softban actions against linked users whose highest Discord role is above the moderator.</p>
+                                </div>
+                                <button
+                                    onClick={() => setEnforceModerationRoleHierarchy(!enforceModerationRoleHierarchy)}
+                                    className={`w-14 h-7 rounded-full transition-all duration-500 relative border-2 ${enforceModerationRoleHierarchy ? 'bg-sky-600/20 border-sky-500 shadow-[0_0_15px_rgba(2,132,199,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
+                                >
+                                    <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${enforceModerationRoleHierarchy ? 'left-8 bg-sky-500' : 'left-1.5 bg-slate-500'}`} />
+                                </button>
+                            </div>
                         </div>
 
                         <div className="mt-12 md:hidden">
@@ -915,6 +931,7 @@ export default function SettingsPage() {
                             {[
                                 { title: "Admin Commands", text: "Essential moderation tools. Disabling this prevents any kick/ban actions from Discord." },
                                 { title: "Misc Commands", text: "Fun and utility commands. Can be disabled if they interfere with gameplay." },
+                                { title: "Role Hierarchy", text: "Enabled by default. Linked users with higher Discord roles cannot be kicked, banned, or softbanned by lower-ranked moderators." },
                             ].map((item, i) => (
                                 <div key={i} className="group">
                                     <h5 className="text-xs font-bold text-sky-500 mb-1 group-hover:text-sky-400 transition-colors uppercase tracking-wide">
