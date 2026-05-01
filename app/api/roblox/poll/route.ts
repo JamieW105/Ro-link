@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { readServerApiKey } from '@/lib/serverApiKey';
 
 interface QueuedCommand {
     id: string;
@@ -25,10 +26,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
     try {
-        const authHeader = req.headers.get('Authorization');
-        if (!authHeader) return NextResponse.json({ error: 'No API Key' }, { status: 401 });
-
-        const apiKey = authHeader.replace('Bearer ', '');
+        const apiKey = readServerApiKey(req);
+        if (!apiKey) return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
         const { jobId, playerCount, players, status } = await req.json().catch(() => ({}));
 
         // 1. Validate API Key and get Server ID

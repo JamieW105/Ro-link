@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 
 import { getServerByApiKey } from '@/lib/gameAdmin';
 import { logAction } from '@/lib/logger';
+import { readServerApiKey } from '@/lib/serverApiKey';
 
 export async function POST(req: Request) {
-    const apiKey = req.headers.get('x-api-key');
+    const apiKey = readServerApiKey(req);
     if (!apiKey) {
         return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
     }

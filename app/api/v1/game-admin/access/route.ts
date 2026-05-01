@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 
 import { resolveRoLinkAdminAccess } from '@/lib/gameAdmin';
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
+import { readServerApiKey } from '@/lib/serverApiKey';
 
 export async function GET(req: Request) {
-    const apiKey = req.headers.get('x-api-key');
+    const apiKey = readServerApiKey(req);
     if (!apiKey) {
         return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
     }

@@ -4,6 +4,7 @@ import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy, re
 import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { logAction } from '@/lib/logger';
+import { readServerApiKey } from '@/lib/serverApiKey';
 
 type ApiCommandServerRecord = {
     id: string;
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     // 1. Authenticate with API Key
-    const apiKey = req.headers.get('x-api-key');
+    const apiKey = readServerApiKey(req);
 
     if (!apiKey) {
         return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
