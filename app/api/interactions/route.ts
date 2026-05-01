@@ -1803,7 +1803,12 @@ export async function POST(req: Request) {
                 const placeId = getModalField(modalComponents, 'place_id').trim();
                 const universeId = getModalField(modalComponents, 'universe_id').trim();
                 const openCloudKey = getModalField(modalComponents, 'api_key').trim();
-                const generatedKey = 'rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                const { data: existingServer } = await supabase
+                    .from('servers')
+                    .select('api_key')
+                    .eq('id', guild_id)
+                    .maybeSingle<{ api_key?: string | null }>();
+                const generatedKey = existingServer?.api_key?.trim() || ('rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
 
                 const { error: dbError } = await supabase
                     .from('servers')

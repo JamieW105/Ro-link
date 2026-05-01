@@ -2,6 +2,7 @@ import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
 import { normalizeAdminPanelCommandList } from './adminPanelCommands';
+import { findServerByKey } from './serverAuth';
 import { supabase } from './supabase';
 
 export interface DashboardPermissions {
@@ -212,17 +213,10 @@ export async function resolveDashboardUserPermissions(serverId: string, discordU
 }
 
 export async function getServerByApiKey(apiKey: string) {
-    const { data, error } = await supabase
-        .from('servers')
-        .select('id, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy, place_id, universe_id')
-        .eq('api_key', apiKey)
-        .single<GameAdminServerRecord>();
-
-    if (error || !data) {
-        return null;
-    }
-
-    return data;
+    return findServerByKey<GameAdminServerRecord>(
+        'id, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy, place_id, universe_id',
+        apiKey,
+    );
 }
 
 export async function resolveRoLinkAdminAccess(

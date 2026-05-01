@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { findServerByKey } from '@/lib/serverAuth';
 import { supabase } from '@/lib/supabase';
 import { readServerApiKey } from '@/lib/serverApiKey';
 
@@ -31,13 +32,17 @@ export async function POST(req: Request) {
         const { jobId, playerCount, players, status } = await req.json().catch(() => ({}));
 
         // 1. Validate API Key and get Server ID
-        const { data: server, error: serverError } = await supabase
-            .from('servers')
-            .select('id, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy')
-            .eq('api_key', apiKey)
-            .single();
+        const server = await findServerByKey<{
+            id: string;
+            admin_cmds_enabled: boolean | null;
+            misc_cmds_enabled: boolean | null;
+            enforce_moderation_role_hierarchy: boolean | null;
+        }>(
+            'id, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy',
+            apiKey,
+        );
 
-        if (serverError || !server) {
+        if (!server) {
             return NextResponse.json({ error: 'Invalid API Key' }, { status: 401 });
         }
 

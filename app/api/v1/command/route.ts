@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { logAction } from '@/lib/logger';
 import { readServerApiKey } from '@/lib/serverApiKey';
+import { findServerByKey } from '@/lib/serverAuth';
 
 type ApiCommandServerRecord = {
     id: string;
@@ -42,13 +43,12 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
     }
 
-    const { data: server, error: authError } = await supabase
-        .from('servers')
-        .select('id, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy')
-        .eq('api_key', apiKey)
-        .single<ApiCommandServerRecord>();
+    const server = await findServerByKey<ApiCommandServerRecord>(
+        'id, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy',
+        apiKey,
+    );
 
-    if (authError || !server) {
+    if (!server) {
         return NextResponse.json({ error: 'Invalid API Key' }, { status: 403 });
     }
 
