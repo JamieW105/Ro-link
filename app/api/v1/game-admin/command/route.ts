@@ -1,62 +1,35 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
 
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import {
-    ADMIN_PANEL_COMMAND_IDS,
-    canUseDashboardCommand,
-    normalizeAdminPanelCommand,
-} from '@/lib/adminPanelCommands';
+import { ADMIN_PANEL_COMMAND_IDS, normalizeAdminPanelCommand } from '@/lib/adminPanelCommands';
 import { buildDeliveryArgs, resolveDeliveryTargets, trimString, type CommandArgs } from '@/lib/commandDelivery';
-import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
+import { getServerByApiKey } from '@/lib/gameAdmin';
 import { logAction } from '@/lib/logger';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { supabase } from '@/lib/supabase';
 
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const apiKey = req.headers.get('x-api-key');
+    if (!apiKey) {
+        return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
+    }
+
+    const server = await getServerByApiKey(apiKey);
+    if (!server) {
+        return NextResponse.json({ error: 'Invalid API Key' }, { status: 403 });
     }
 
     try {
-        const body = await req.json();
-        const serverId = trimString(body?.serverId);
+        const body = await req.json().catch(() => ({}));
         const command = normalizeAdminPanelCommand(body?.command);
-        const rawArgs = typeof body?.args === 'object' && body?.args ? body.args : {};
+        const rawArgs = typeof body?.args === 'object' && body.args ? body.args : {};
         const args: CommandArgs = { ...rawArgs };
 
-        if (!serverId || !command) {
-            return NextResponse.json({ error: 'Missing serverId or command' }, { status: 400 });
-        }
-        if (!ADMIN_PANEL_COMMAND_IDS.includes(command)) {
+        if (!command || !ADMIN_PANEL_COMMAND_IDS.includes(command)) {
             return NextResponse.json({ error: 'Unknown command' }, { status: 400 });
         }
 
-        const discordUserId = trimString((session.user as { id?: string }).id);
-        const permissions = await resolveDashboardUserPermissions(serverId, discordUserId);
-        if (!permissions.is_admin && !permissions.can_access_dashboard) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-
-        if (!canUseDashboardCommand(permissions, command)) {
-            return NextResponse.json({ error: 'You do not have permission to use that Roblox admin command.' }, { status: 403 });
-        }
-
-        const { data: verifiedUser } = await supabase
-            .from('verified_users')
-            .select('roblox_username')
-            .eq('discord_id', discordUserId)
-            .maybeSingle<{ roblox_username?: string | null }>();
-
-        const moderatorRobloxUsername = trimString(verifiedUser?.roblox_username);
-        if (command === 'TELEPORT_TO_ME' && !moderatorRobloxUsername) {
-            return NextResponse.json({
-                error: 'Link your Discord account to Roblox before using Teleport To Me from the dashboard.',
-            }, { status: 400 });
-        }
-
-        const moderator = trimString(session.user?.name) || 'Web Admin';
+        const moderator = trimString(body?.moderator) || 'Ro-Link In-Game Panel';
+        const moderatorRobloxUsername = trimString(body?.moderatorRobloxUsername);
         const baseArgs: CommandArgs = {
             ...args,
             moderator,
@@ -66,13 +39,18 @@ export async function POST(req: Request) {
             baseArgs.moderator_roblox_username = moderatorRobloxUsername;
         }
 
-        const deliveryTargets = await resolveDeliveryTargets(serverId, command, baseArgs);
+        const deliveryTargets = await resolveDeliveryTargets(server.id, command, baseArgs, {
+            preferredJobId: trimString(body?.sourceJobId || args.source_job_id),
+        });
+
         if (deliveryTargets.length === 0) {
-            return NextResponse.json({ error: 'No live servers are available for that command target.' }, { status: 400 });
+            return NextResponse.json({
+                error: 'No live server currently has that target player.',
+            }, { status: 404 });
         }
 
         const queueRows = deliveryTargets.map((target) => ({
-            server_id: serverId,
+            server_id: server.id,
             command,
             args: buildDeliveryArgs(baseArgs, target),
             status: 'PENDING',
@@ -88,7 +66,7 @@ export async function POST(req: Request) {
 
         const realtimeResults = await Promise.all(
             deliveryTargets.map((target) => sendRobloxMessage(
-                serverId,
+                server.id,
                 command,
                 buildDeliveryArgs(baseArgs, target),
             )),
@@ -108,11 +86,11 @@ export async function POST(req: Request) {
         );
 
         await logAction(
-            serverId,
+            server.id,
             command,
             logTarget || 'server',
             moderator,
-            trimString(args.reason || args.message || 'Dashboard action'),
+            trimString(args.reason || args.message || 'In-game panel action'),
         );
 
         return NextResponse.json({
@@ -121,9 +99,10 @@ export async function POST(req: Request) {
             realtime: realtimeSuccess,
             warning: realtimeWarnings.length > 0 ? realtimeWarnings.join(' | ') : null,
             deliveredTargets: deliveryTargets.length,
+            targetJobId: deliveryTargets.length === 1 ? deliveryTargets[0].jobId : null,
         });
     } catch (error) {
-        console.error('[Dashboard Command API] Error:', error);
+        console.error('[Game Admin Command API] Error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
