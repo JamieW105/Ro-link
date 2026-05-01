@@ -6,7 +6,11 @@ import { use, useEffect, useState } from 'react';
 import AutoLinkText from '@/components/AutoLinkText';
 import type { UpdatePostRecord } from '@/lib/updatePosts';
 
-function formatPostDate(value: string) {
+function formatPostDate(value: string | null) {
+    if (!value) {
+        return 'Unpublished';
+    }
+
     return new Intl.DateTimeFormat('en-US', {
         month: 'long',
         day: 'numeric',

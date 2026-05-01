@@ -58,7 +58,7 @@ export default function EditPostPage({ params: paramsPromise }: { params: Promis
             submitUrl={`/api/management/posts/${post.id}`}
             submitMethod="PATCH"
             heading="Edit Update Post"
-            subheading="Adjust the release notes and section content before publishing changes live."
+            subheading="Adjust draft or published release notes and section content."
             submitLabel="Save Changes"
         />
     );

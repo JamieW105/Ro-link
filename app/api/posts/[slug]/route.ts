@@ -13,6 +13,8 @@ export async function GET(
         .from('update_posts')
         .select('*')
         .eq('slug', decodeURIComponent(slug))
+        .eq('status', 'PUBLISHED')
+        .not('published_at', 'is', null)
         .maybeSingle();
 
     if (error) {
