@@ -38,6 +38,42 @@ const emptyForm: ModuleForm = {
     sourceCode: '',
 };
 
+const developerApiExample = `return {
+    Init = function(context)
+        context.OnAdminPanelOpened(function(player)
+            context.Notify(player, "Admin panel opened", true)
+        end)
+
+        context.OnCommandBarOpened(function(player)
+            context.CreateUI(player, [[
+                return function(ui)
+                    local label = ui.Create("TextLabel", {
+                        Size = UDim2.new(0, 260, 0, 48),
+                        Text = "Module UI",
+                        BackgroundColor3 = Color3.fromRGB(15, 23, 42),
+                        TextColor3 = Color3.fromRGB(255, 255, 255)
+                    })
+                    return label
+                end
+            ]])
+        end)
+    end,
+
+    Commands = {
+        hello = function(command, context)
+            context.SendBotMessage("channel", nil, command.args.channelId, {
+                PlainText = "Hello from a Ro-Link module",
+                Embed = {
+                    Title = "Optional embed",
+                    Content = "Embed body",
+                    media = "https://example.com/image.png",
+                    Footer = "Ro-Link"
+                }
+            })
+        end
+    }
+}`;
+
 function formatDate(value: string | null) {
     if (!value) return 'Never';
     return new Date(value).toLocaleString();
@@ -379,6 +415,28 @@ export default function ManagementModulesPage() {
                             className="h-[360px] w-full resize-none rounded-xl border border-slate-800 bg-black/50 p-4 font-mono text-xs leading-relaxed text-slate-100 outline-none transition-colors focus:border-sky-500"
                             spellCheck={false}
                         />
+                    </div>
+
+                    <div className="space-y-3 border-t border-slate-800 pt-4">
+                        <div>
+                            <h3 className="text-sm font-bold text-white">Developer API</h3>
+                            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                                Modules receive a context object with helpers for Discord messages, lifecycle hooks, Roblox UI, command registration, player lookup, and admin feedback.
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[11px] font-medium text-slate-300">
+                            <span className="rounded-lg bg-slate-950/70 px-3 py-2">SendBotMessage</span>
+                            <span className="rounded-lg bg-slate-950/70 px-3 py-2">GetDiscordChannels</span>
+                            <span className="rounded-lg bg-slate-950/70 px-3 py-2">OnAdminPanelOpened</span>
+                            <span className="rounded-lg bg-slate-950/70 px-3 py-2">OnCommandBarOpened</span>
+                            <span className="rounded-lg bg-slate-950/70 px-3 py-2">CreateUI</span>
+                            <span className="rounded-lg bg-slate-950/70 px-3 py-2">RegisterCommand</span>
+                            <span className="rounded-lg bg-slate-950/70 px-3 py-2">FindPlayer</span>
+                            <span className="rounded-lg bg-slate-950/70 px-3 py-2">Notify</span>
+                        </div>
+                        <pre className="max-h-80 overflow-auto rounded-xl border border-slate-800 bg-black/50 p-4 text-[11px] leading-relaxed text-slate-200">
+                            {developerApiExample}
+                        </pre>
                     </div>
 
                     <button

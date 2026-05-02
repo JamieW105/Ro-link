@@ -1905,6 +1905,10 @@ function RoLink:Initialize()
 
 	self.loadedModules = self.loadedModules or {}
 	self.moduleCommands = self.moduleCommands or {}
+	self.moduleHooks = self.moduleHooks or {
+		AdminPanelOpened = {},
+		CommandBarOpened = {}
+	}
 
 	task.spawn(function()
 		self:LoadModules()
@@ -1989,6 +1993,228 @@ function RoLink:Initialize()
 	end)
 end
 
+local function moduleKeyOf(moduleInfo)
+	return tostring((moduleInfo and (moduleInfo.slug or moduleInfo.id)) or "unknown")
+end
+
+local function resolvePlayers(target, defaultAll)
+	if target == nil then
+		return defaultAll and Players:GetPlayers() or {}
+	end
+	if typeof(target) == "Instance" and target:IsA("Player") then
+		return { target }
+	end
+	if type(target) == "number" then
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player.UserId == target then
+				return { player }
+			end
+		end
+		return {}
+	end
+	if type(target) == "string" then
+		local value = string.gsub(string.gsub(target, "^%s+", ""), "%s+$", "")
+		local lowered = string.lower(value)
+		if lowered == "all" or lowered == "server" or lowered == "everyone" then
+			return Players:GetPlayers()
+		end
+		local exact = Players:FindFirstChild(value)
+		if exact then
+			return { exact }
+		end
+		local userId = tonumber(value)
+		if userId then
+			for _, player in ipairs(Players:GetPlayers()) do
+				if player.UserId == userId then
+					return { player }
+				end
+			end
+		end
+	end
+	return {}
+end
+
+local function attachUiResult(playerGui, moduleInfo, result)
+	if typeof(result) ~= "Instance" then
+		return result
+	end
+	if result.Parent then
+		return result
+	end
+	if result:IsA("ScreenGui") then
+		result.ResetOnSpawn = false
+		result.Parent = playerGui
+		return result
+	end
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "RoLinkModuleUI_" .. moduleKeyOf(moduleInfo)
+	screenGui.ResetOnSpawn = false
+	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	screenGui.Parent = playerGui
+	result.Parent = screenGui
+	return result
+end
+
+local function buildUiTree(spec, parent)
+	if type(spec) ~= "table" then
+		return nil
+	end
+	local className = tostring(spec.ClassName or spec.className or spec[1] or "")
+	if className == "" then
+		return nil
+	end
+	local ok, instance = pcall(function()
+		return Instance.new(className)
+	end)
+	if not ok or not instance then
+		return nil
+	end
+	local props = type(spec.Properties) == "table" and spec.Properties or spec.props
+	if type(props) == "table" then
+		for key, value in pairs(props) do
+			if key ~= "Parent" then
+				pcall(function()
+					instance[key] = value
+				end)
+			end
+		end
+	end
+	instance.Parent = parent
+	local children = type(spec.Children) == "table" and spec.Children or spec.children
+	if type(children) == "table" then
+		for _, childSpec in ipairs(children) do
+			buildUiTree(childSpec, instance)
+		end
+	end
+	return instance
+end
+
+function RoLink:RequestModuleJson(path, method, body)
+	local request = {
+		Url = URL .. path,
+		Method = method or "GET",
+		Headers = { ["Content-Type"] = "application/json", ["x-api-key"] = KEY }
+	}
+	if body ~= nil then
+		local encodeOk, encoded = pcall(function()
+			return Http:JSONEncode(body)
+		end)
+		if not encodeOk then
+			return false, "Failed to encode request body: " .. tostring(encoded)
+		end
+		request.Body = encoded
+	end
+	local ok, response = pcall(function()
+		return Http:RequestAsync(request)
+	end)
+	if not ok or not response then
+		return false, tostring(response)
+	end
+	if not response.Success and response.StatusCode ~= 200 then
+		local message = tostring(response.StatusCode)
+		local decodeOk, decoded = pcall(function()
+			return Http:JSONDecode(response.Body or "{}")
+		end)
+		if decodeOk and typeof(decoded) == "table" and decoded.error then
+			message = tostring(decoded.error)
+		end
+		return false, message
+	end
+	local bodyText = tostring(response.Body or "")
+	if bodyText == "" then
+		return true, nil
+	end
+	local decodeOk, payload = pcall(function()
+		return Http:JSONDecode(bodyText)
+	end)
+	if not decodeOk then
+		return false, "Invalid JSON response."
+	end
+	return true, payload
+end
+
+function RoLink:SendModuleBotMessage(moduleInfo, target, user, channelId, content)
+	local normalizedUser = user
+	if typeof(user) == "Instance" and user:IsA("Player") then
+		normalizedUser = {
+			robloxUserId = user.UserId,
+			username = user.Name,
+			displayName = user.DisplayName
+		}
+	end
+	return self:RequestModuleJson("/api/v1/game-admin/bot-message", "POST", {
+		target = tostring(target or "channel"),
+		user = normalizedUser,
+		channelId = channelId,
+		content = content,
+		moduleId = moduleInfo and moduleInfo.id or nil,
+		moduleSlug = moduleInfo and moduleInfo.slug or nil
+	})
+end
+
+function RoLink:GetModuleDiscordChannels()
+	local ok, payload = self:RequestModuleJson("/api/v1/game-admin/channels", "GET")
+	if not ok then
+		return false, payload
+	end
+	return true, payload and payload.channels or {}
+end
+
+function RoLink:CreateModuleUi(moduleInfo, target, sourceOrTree, props)
+	if sourceOrTree == nil then
+		sourceOrTree = target
+		target = "all"
+	end
+	local results = {}
+	for _, player in ipairs(resolvePlayers(target, true)) do
+		local playerGui = player:FindFirstChildOfClass("PlayerGui") or player:WaitForChild("PlayerGui", 5)
+		if playerGui then
+			if type(sourceOrTree) == "table" then
+				local result = buildUiTree(sourceOrTree, playerGui)
+				results[player.Name] = result ~= nil
+			elseif type(sourceOrTree) == "function" then
+				local ok, result = pcall(sourceOrTree, { Player = player, PlayerGui = playerGui, Module = moduleInfo, Settings = moduleInfo and moduleInfo.settings or {} }, player, props or {})
+				results[player.Name] = ok and attachUiResult(playerGui, moduleInfo, result) or tostring(result)
+			elseif type(sourceOrTree) == "string" and type(loadstring) == "function" then
+				local chunk, loadError = loadstring(sourceOrTree)
+				if chunk then
+					local ok, result = pcall(chunk, { Player = player, PlayerGui = playerGui, Module = moduleInfo, Settings = moduleInfo and moduleInfo.settings or {} }, player, props or {})
+					results[player.Name] = ok and attachUiResult(playerGui, moduleInfo, result) or tostring(result)
+				else
+					results[player.Name] = tostring(loadError)
+				end
+			else
+				results[player.Name] = "CreateUI expects source code, a function, or a UI tree table."
+			end
+		else
+			results[player.Name] = "PlayerGui is not available."
+		end
+	end
+	return results
+end
+
+function RoLink:RegisterModuleHook(hookName, moduleInfo, handler)
+	if type(handler) ~= "function" then return end
+	self.moduleHooks = self.moduleHooks or { AdminPanelOpened = {}, CommandBarOpened = {} }
+	self.moduleHooks[hookName] = self.moduleHooks[hookName] or {}
+	table.insert(self.moduleHooks[hookName], {
+		handler = handler,
+		moduleKey = moduleKeyOf(moduleInfo),
+		module = moduleInfo
+	})
+end
+
+function RoLink:FireModuleHook(hookName, player, payload)
+	local hooks = self.moduleHooks and self.moduleHooks[hookName]
+	if type(hooks) ~= "table" then return end
+	for _, binding in ipairs(hooks) do
+		local ok, hookError = pcall(binding.handler, player, payload or {}, self:BuildModuleContext(binding.module))
+		if not ok then
+			warn("[Ro-Link] Module hook failed: " .. tostring(hookError))
+		end
+	end
+end
+
 function RoLink:BuildModuleContext(moduleInfo)
 	return {
 		RoLink = self,
@@ -2007,6 +2233,34 @@ function RoLink:BuildModuleContext(moduleInfo)
 				moduleKey = tostring((moduleInfo and (moduleInfo.slug or moduleInfo.id)) or "unknown"),
 				module = moduleInfo
 			}
+		end,
+		OnAdminPanelOpened = function(handler)
+			self:RegisterModuleHook("AdminPanelOpened", moduleInfo, handler)
+		end,
+		OnCommandBarOpened = function(handler)
+			self:RegisterModuleHook("CommandBarOpened", moduleInfo, handler)
+		end,
+		SendBotMessage = function(target, user, channelId, content)
+			return self:SendModuleBotMessage(moduleInfo, target, user, channelId, content)
+		end,
+		sendbotmessage = function(target, user, channelId, content)
+			return self:SendModuleBotMessage(moduleInfo, target, user, channelId, content)
+		end,
+		GetDiscordChannels = function()
+			return self:GetModuleDiscordChannels()
+		end,
+		CreateUI = function(target, sourceOrTree, props)
+			return self:CreateModuleUi(moduleInfo, target, sourceOrTree, props)
+		end,
+		FindPlayer = function(target)
+			return resolvePlayers(target, false)[1]
+		end,
+		GetPlayers = function()
+			return Players:GetPlayers()
+		end,
+		Notify = function(target, message)
+			print("[Ro-Link Module Notify]", tostring(message or target or ""))
+			return true
 		end,
 		Log = function(...)
 			print("[Ro-Link Module]", ...)
@@ -2054,6 +2308,13 @@ function RoLink:LoadModules()
 						self.moduleCommands[commandName] = nil
 					end
 				end
+				for _, handlers in pairs(self.moduleHooks or {}) do
+					for index = #handlers, 1, -1 do
+						if handlers[index].moduleKey == moduleKey then
+							table.remove(handlers, index)
+						end
+					end
+				end
 
 				local chunk, loadError = loader(source)
 				if not chunk then
@@ -2064,6 +2325,7 @@ function RoLink:LoadModules()
 						warn("[Ro-Link] Module " .. moduleKey .. " failed during startup: " .. tostring(exported))
 					else
 						local context = self:BuildModuleContext(moduleInfo)
+						local initFailed = false
 						if type(exported) == "function" then
 							exported = { Init = exported }
 						end
@@ -2073,17 +2335,42 @@ function RoLink:LoadModules()
 									context.RegisterCommand(commandName, handler)
 								end
 							end
+							if type(exported.OnAdminPanelOpened) == "function" then
+								context.OnAdminPanelOpened(exported.OnAdminPanelOpened)
+							elseif type(exported.AdminPanelOpened) == "function" then
+								context.OnAdminPanelOpened(exported.AdminPanelOpened)
+							end
+							if type(exported.OnCommandBarOpened) == "function" then
+								context.OnCommandBarOpened(exported.OnCommandBarOpened)
+							elseif type(exported.CommandBarOpened) == "function" then
+								context.OnCommandBarOpened(exported.CommandBarOpened)
+							end
 							if type(exported.Init) == "function" then
 								local initOk, initError = pcall(exported.Init, context, moduleInfo.settings or {})
 								if not initOk then
 									warn("[Ro-Link] Module " .. moduleKey .. " init failed: " .. tostring(initError))
+									for commandName, binding in pairs(self.moduleCommands) do
+										if binding.moduleKey == moduleKey then
+											self.moduleCommands[commandName] = nil
+										end
+									end
+									for _, handlers in pairs(self.moduleHooks or {}) do
+										for index = #handlers, 1, -1 do
+											if handlers[index].moduleKey == moduleKey then
+												table.remove(handlers, index)
+											end
+										end
+									end
+									initFailed = true
 								end
 							end
 						end
-						self.loadedModules[moduleKey] = {
-							checksum = checksum,
-							module = moduleInfo
-						}
+						if not initFailed then
+							self.loadedModules[moduleKey] = {
+								checksum = checksum,
+								module = moduleInfo
+							}
+						end
 					end
 				end
 			end
