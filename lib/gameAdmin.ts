@@ -2,6 +2,7 @@ import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
 import { normalizeAdminPanelCommandList } from './adminPanelCommands';
+import { findServerByKey } from './serverAuth';
 import { supabase } from './supabase';
 
 export interface DashboardPermissions {
@@ -21,6 +22,7 @@ export interface GameAdminServerRecord {
     id: string;
     admin_cmds_enabled: boolean | null;
     misc_cmds_enabled: boolean | null;
+    enforce_moderation_role_hierarchy?: boolean | null;
     place_id?: string | null;
     universe_id?: string | null;
 }
@@ -66,6 +68,7 @@ export interface RoLinkAdminAccess {
     settings: {
         adminCmdsEnabled: boolean;
         miscCmdsEnabled: boolean;
+        enforceModerationRoleHierarchy: boolean;
     };
     permissions: DashboardPermissions;
     user?: {
@@ -210,17 +213,17 @@ export async function resolveDashboardUserPermissions(serverId: string, discordU
 }
 
 export async function getServerByApiKey(apiKey: string) {
-    const { data, error } = await supabase
-        .from('servers')
-        .select('id, admin_cmds_enabled, misc_cmds_enabled, place_id, universe_id')
-        .eq('api_key', apiKey)
-        .single<GameAdminServerRecord>();
-
-    if (error || !data) {
-        return null;
+    const server = await findServerByKey<GameAdminServerRecord>(
+        'id, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy, place_id, universe_id',
+        apiKey,
+    );
+    if (!server) {
+        console.warn('[RoLinkAPI][GameAdmin] Server key lookup returned no server', {
+            keyPrefix: String(apiKey || '').slice(0, 6),
+            keyLength: String(apiKey || '').length,
+        });
     }
-
-    return data;
+    return server;
 }
 
 export async function resolveRoLinkAdminAccess(
@@ -235,6 +238,7 @@ export async function resolveRoLinkAdminAccess(
     const settings = {
         adminCmdsEnabled: server.admin_cmds_enabled !== false,
         miscCmdsEnabled: server.misc_cmds_enabled !== false,
+        enforceModerationRoleHierarchy: server.enforce_moderation_role_hierarchy !== false,
     };
 
     const { data: verifiedUser } = await supabase

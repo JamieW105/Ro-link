@@ -10,8 +10,13 @@ import {
 import { buildDeliveryArgs, resolveDeliveryTargets, trimString, type CommandArgs } from '@/lib/commandDelivery';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
 import { logAction } from '@/lib/logger';
+import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { supabase } from '@/lib/supabase';
+
+type ServerModerationSettingsRecord = {
+    enforce_moderation_role_hierarchy?: boolean | null;
+};
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
@@ -43,11 +48,35 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'You do not have permission to use that Roblox admin command.' }, { status: 403 });
         }
 
-        const { data: verifiedUser } = await supabase
-            .from('verified_users')
-            .select('roblox_username')
-            .eq('discord_id', discordUserId)
-            .maybeSingle<{ roblox_username?: string | null }>();
+        const [{ data: serverSettings, error: serverSettingsError }, { data: verifiedUser }] = await Promise.all([
+            supabase
+                .from('servers')
+                .select('enforce_moderation_role_hierarchy')
+                .eq('id', serverId)
+                .maybeSingle<ServerModerationSettingsRecord>(),
+            supabase
+                .from('verified_users')
+                .select('roblox_username')
+                .eq('discord_id', discordUserId)
+                .maybeSingle<{ roblox_username?: string | null }>(),
+        ]);
+
+        if (serverSettingsError) {
+            return NextResponse.json({ error: serverSettingsError.message }, { status: 500 });
+        }
+
+        if (commandRequiresModerationHierarchy(command)) {
+            const hierarchyCheck = await evaluateModerationRoleHierarchy({
+                serverId,
+                moderatorDiscordId: discordUserId,
+                targetRobloxUsername: trimString(args.username),
+                enabled: serverSettings?.enforce_moderation_role_hierarchy,
+            });
+
+            if (!hierarchyCheck.allowed) {
+                return NextResponse.json({ error: hierarchyCheck.message }, { status: 403 });
+            }
+        }
 
         const moderatorRobloxUsername = trimString(verifiedUser?.roblox_username);
         if (command === 'TELEPORT_TO_ME' && !moderatorRobloxUsername) {

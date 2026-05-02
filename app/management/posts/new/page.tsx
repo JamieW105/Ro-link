@@ -5,9 +5,9 @@ export default function NewPostPage() {
         <PostEditor
             submitUrl="/api/management/posts"
             submitMethod="POST"
-            heading="Create Update Post"
-            subheading="Write a release note with structured feature sections and optional smaller follow-up notes."
-            submitLabel="Publish Post"
+            heading="Create Update Draft"
+            subheading="Write a release note draft with structured feature sections and optional smaller follow-up notes."
+            submitLabel="Save Draft"
         />
     );
 }

@@ -5,6 +5,7 @@ export interface UpdatePostMajorFeature {
 }
 
 export const DEFAULT_ROLINK_VERSION = 'V2.01.0';
+export type UpdatePostStatus = 'DRAFT' | 'PUBLISHED';
 
 export interface UpdatePostRecord {
     id: string;
@@ -17,7 +18,8 @@ export interface UpdatePostRecord {
     qol_updates: string[];
     bug_fixes: string[];
     author_discord_id: string | null;
-    published_at: string;
+    status: UpdatePostStatus;
+    published_at: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -30,6 +32,29 @@ export interface UpdatePostInput {
     minor_updates: string[];
     qol_updates: string[];
     bug_fixes: string[];
+}
+
+export function normalizeUpdatePostStatus(value: unknown, publishedAt?: unknown): UpdatePostStatus {
+    const status = trimString(value).toUpperCase();
+
+    if (status === 'PUBLISHED') {
+        return 'PUBLISHED';
+    }
+
+    if (!status && trimString(publishedAt)) {
+        return 'PUBLISHED';
+    }
+
+    return 'DRAFT';
+}
+
+export function hasUpdatePostSections(post: Pick<UpdatePostInput, 'major_features' | 'minor_updates' | 'qol_updates' | 'bug_fixes'>) {
+    return (
+        post.major_features.length > 0
+        || post.minor_updates.length > 0
+        || post.qol_updates.length > 0
+        || post.bug_fixes.length > 0
+    );
 }
 
 function trimString(value: unknown) {
@@ -75,7 +100,7 @@ export function normalizeMajorFeatures(rawFeatures: unknown): UpdatePostMajorFea
         .filter((feature): feature is UpdatePostMajorFeature => Boolean(feature));
 }
 
-export function sanitizeUpdatePostInput(rawBody: unknown) {
+export function sanitizeUpdatePostInput(rawBody: unknown, options: { requireUpdateSection?: boolean } = {}) {
     const body = rawBody && typeof rawBody === 'object'
         ? rawBody as Record<string, unknown>
         : {};
@@ -100,12 +125,7 @@ export function sanitizeUpdatePostInput(rawBody: unknown) {
         return { error: 'Description is required.' } as const;
     }
 
-    if (
-        major_features.length === 0
-        && minor_updates.length === 0
-        && qol_updates.length === 0
-        && bug_fixes.length === 0
-    ) {
+    if (options.requireUpdateSection && !hasUpdatePostSections({ major_features, minor_updates, qol_updates, bug_fixes })) {
         return { error: 'Add at least one update section before publishing.' } as const;
     }
 
@@ -131,11 +151,12 @@ export function normalizeUpdatePost(rawPost: unknown): UpdatePostRecord | null {
     const version = trimString(post.version) || null;
     const title = trimString(post.title);
     const description = trimString(post.description);
-    const published_at = trimString(post.published_at);
+    const published_at = trimString(post.published_at) || null;
+    const status = normalizeUpdatePostStatus(post.status, published_at);
     const created_at = trimString(post.created_at);
     const updated_at = trimString(post.updated_at);
 
-    if (!id || !slug || !title || !description || !published_at) {
+    if (!id || !slug || !title || !description) {
         return null;
     }
 
@@ -150,6 +171,7 @@ export function normalizeUpdatePost(rawPost: unknown): UpdatePostRecord | null {
         qol_updates: normalizeUpdateStringList(post.qol_updates),
         bug_fixes: normalizeUpdateStringList(post.bug_fixes),
         author_discord_id: trimString(post.author_discord_id) || null,
+        status,
         published_at,
         created_at,
         updated_at,

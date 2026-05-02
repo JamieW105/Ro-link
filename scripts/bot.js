@@ -1065,15 +1065,23 @@ client.on('interactionCreate', async interaction => {
         const placeId = interaction.fields.getTextInputValue('place_id');
         const universeId = interaction.fields.getTextInputValue('universe_id');
         const openCloudKey = interaction.fields.getTextInputValue('api_key');
-        const generatedKey = 'rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
         await interaction.deferReply({ ephemeral: true });
+
+        const { data: existingServer } = await supabase
+            .from('servers')
+            .select('api_key')
+            .eq('id', interaction.guildId)
+            .maybeSingle();
+
+        const generatedKey = existingServer?.api_key?.trim()
+            || ('rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
 
         const { error: dbError } = await supabase
             .from('servers')
             .upsert({
                 id: interaction.guildId,
-                linked_place_id: placeId,
+                place_id: placeId,
                 universe_id: universeId,
                 open_cloud_key: openCloudKey,
                 api_key: generatedKey

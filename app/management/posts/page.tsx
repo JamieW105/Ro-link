@@ -6,7 +6,11 @@ import { useEffect, useState } from 'react';
 import AutoLinkText from '@/components/AutoLinkText';
 import type { UpdatePostRecord } from '@/lib/updatePosts';
 
-function formatPostDate(value: string) {
+function formatPostDate(value: string | null) {
+    if (!value) {
+        return 'Not published';
+    }
+
     return new Intl.DateTimeFormat('en-US', {
         month: 'short',
         day: 'numeric',
@@ -17,6 +21,7 @@ function formatPostDate(value: string) {
 export default function ManagePostsPage() {
     const [posts, setPosts] = useState<UpdatePostRecord[]>([]);
     const [loading, setLoading] = useState(true);
+    const [publishingId, setPublishingId] = useState<string | null>(null);
 
     useEffect(() => {
         fetch('/api/management/posts')
@@ -52,12 +57,38 @@ export default function ManagePostsPage() {
         }
     }
 
+    async function publishPost(id: string) {
+        if (!confirm('Publish this update post? It will become visible on the public updates page.')) {
+            return;
+        }
+
+        setPublishingId(id);
+
+        try {
+            const response = await fetch(`/api/management/posts/${encodeURIComponent(id)}/publish`, {
+                method: 'PATCH',
+            });
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                alert(String(payload.error || 'Failed to publish update post.'));
+                return;
+            }
+
+            setPosts((current) => current.map((post) => post.id === id ? payload : post));
+        } catch {
+            alert('Failed to publish update post.');
+        } finally {
+            setPublishingId(null);
+        }
+    }
+
     return (
         <div className="space-y-8">
             <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <h1 className="text-3xl font-extrabold tracking-tight text-white">Update Posts</h1>
-                    <p className="mt-1 text-slate-400">Publish release notes, feature breakdowns, and smaller rollout changes.</p>
+                    <p className="mt-1 text-slate-400">Draft release notes, then publish them when they are ready to go live.</p>
                 </div>
 
                 <Link
@@ -77,14 +108,15 @@ export default function ManagePostsPage() {
                 </div>
             ) : posts.length === 0 ? (
                 <div className="flex min-h-72 flex-col items-center justify-center rounded-3xl border border-dashed border-slate-800 bg-slate-900/30 px-6 text-center text-slate-500">
-                    <p className="text-base font-medium text-slate-400">No update posts have been published yet.</p>
+                    <p className="text-base font-medium text-slate-400">No update posts have been created yet.</p>
                     <Link href="/management/posts/new" className="mt-3 text-sm font-bold text-sky-400 hover:text-sky-300">
-                        Publish the first update
+                        Create the first draft
                     </Link>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                     {posts.map((post) => {
+                        const isPublished = post.status === 'PUBLISHED';
                         const sectionCount = [
                             post.major_features.length > 0 ? 1 : 0,
                             post.minor_updates.length > 0 ? 1 : 0,
@@ -105,8 +137,8 @@ export default function ManagePostsPage() {
                                                     {post.version}
                                                 </span>
                                             )}
-                                            <span className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-300">
-                                                Published {formatPostDate(post.published_at)}
+                                            <span className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] ${isPublished ? 'border-slate-700 bg-slate-800/80 text-slate-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'}`}>
+                                                {isPublished && post.published_at ? `Published ${formatPostDate(post.published_at)}` : isPublished ? 'Published' : 'Draft'}
                                             </span>
                                             <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-sky-300">
                                                 {sectionCount} section{sectionCount === 1 ? '' : 's'}
@@ -116,12 +148,24 @@ export default function ManagePostsPage() {
                                     </div>
 
                                     <div className="flex items-center gap-2">
-                                        <Link
-                                            href={`/posts/${post.slug}`}
-                                            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-bold uppercase tracking-widest text-slate-300 transition-all hover:border-slate-600 hover:text-white"
-                                        >
-                                            View
-                                        </Link>
+                                        {isPublished && (
+                                            <Link
+                                                href={`/posts/${post.slug}`}
+                                                className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-bold uppercase tracking-widest text-slate-300 transition-all hover:border-slate-600 hover:text-white"
+                                            >
+                                                View
+                                            </Link>
+                                        )}
+                                        {!isPublished && (
+                                            <button
+                                                type="button"
+                                                onClick={() => publishPost(post.id)}
+                                                disabled={publishingId === post.id}
+                                                className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-emerald-300 transition-all hover:bg-emerald-500/20 disabled:opacity-50"
+                                            >
+                                                {publishingId === post.id ? 'Publishing...' : 'Publish'}
+                                            </button>
+                                        )}
                                         <Link
                                             href={`/management/posts/${post.id}/edit`}
                                             className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-sky-300 transition-all hover:bg-sky-500/20"

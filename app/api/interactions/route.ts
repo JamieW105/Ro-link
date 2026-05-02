@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { logAction } from '@/lib/logger';
 import { findLivePlayer } from '@/lib/livePlayers';
+import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import discordCommands from '@/lib/discordCommands.json';
 
@@ -93,6 +94,70 @@ type DiscordCommandDefinition = {
     options?: DiscordCommandOptionDefinition[];
 };
 
+type RobloxSearchCandidate = {
+    id?: number | string | null;
+    name?: string | null;
+    displayName?: string | null;
+};
+
+type LiveServerRow = {
+    id?: string | null;
+    players?: unknown;
+};
+
+type DashboardRoleRow = Record<string, boolean | number | string | null | undefined>;
+
+type CommandOptionValue = string | number | boolean;
+
+type CommandOption = {
+    name: string;
+    value?: CommandOptionValue;
+};
+
+type ModalFieldComponent = {
+    custom_id?: string;
+    value?: string;
+};
+
+type ModalComponentRow = {
+    components?: ModalFieldComponent[];
+};
+
+type InteractionData = {
+    name?: string;
+    options?: CommandOption[];
+    custom_id?: string;
+    components?: ModalComponentRow[];
+    values?: string[];
+};
+
+type DiscordUser = {
+    id: string;
+    username: string;
+    discriminator?: string | null;
+};
+
+type DiscordMember = {
+    user?: DiscordUser;
+    permissions?: string;
+    roles?: string[];
+};
+
+type DiscordInteractionPayload = {
+    id: string;
+    type: number;
+    guild_id?: string | null;
+    member?: DiscordMember | null;
+    user?: DiscordUser | null;
+    data?: InteractionData | null;
+};
+
+type MiscCommandArgs = {
+    username: string;
+    moderator: string;
+    char_user?: string;
+};
+
 const REPORT_CUSTOM_ID_PREFIX = 'report|';
 const commandDefinitions = discordCommands as DiscordCommandDefinition[];
 
@@ -103,6 +168,23 @@ function buildCommandSummary(commandNames: string[]) {
             return `\`/${commandName}\` - ${description}`;
         })
         .join('\n');
+}
+
+function getCommandOptionValue(options: CommandOption[] | undefined, name: string) {
+    return options?.find((option) => option.name === name)?.value;
+}
+
+function getModalField(components: ModalComponentRow[] | undefined, id: string) {
+    const row = components?.find((componentRow) =>
+        Array.isArray(componentRow.components)
+        && componentRow.components.some((component) => component.custom_id === id)
+    );
+    const field = row?.components?.find((component) => component.custom_id === id);
+    return typeof field?.value === 'string' ? field.value : '';
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+    return error instanceof Error && error.message ? error.message : fallback;
 }
 
 function truncateText(value: unknown, maxLength = 1024) {
@@ -160,8 +242,8 @@ async function fetchRobloxLookup(username: string, serverId: string, openCloudKe
     }
 
     const searchData = await searchRes.json();
-    const matches = Array.isArray(searchData?.data) ? searchData.data : [];
-    const exactMatch = matches.find((candidate: any) =>
+    const matches = (Array.isArray(searchData?.data) ? searchData.data : []) as RobloxSearchCandidate[];
+    const exactMatch = matches.find((candidate) =>
         String(candidate?.name || '').toLowerCase() === searchUsername.toLowerCase()
     );
     const matchedUser = exactMatch || matches[0];
@@ -216,9 +298,9 @@ async function fetchRobloxLookup(username: string, serverId: string, openCloudKe
         throw new Error('Failed to load moderation history.');
     }
 
-    const liveServers = Array.isArray(liveServersRes.data) ? liveServersRes.data : [];
+    const liveServers = (Array.isArray(liveServersRes.data) ? liveServersRes.data : []) as LiveServerRow[];
     const moderationHistory = Array.isArray(logsRes.data) ? logsRes.data : [];
-    const activeServer = liveServers.find((liveServer: any) => findLivePlayer(liveServer?.players, resolvedUsername));
+    const activeServer = liveServers.find((liveServer) => findLivePlayer(liveServer.players, resolvedUsername));
 
     return {
         id: matchedUser.id,
@@ -377,9 +459,14 @@ export async function POST(req: Request) {
             return new NextResponse('Invalid request signature', { status: 401 });
         }
 
-        const interaction = JSON.parse(body);
-        const { type, guild_id, member, user: interactionUser } = interaction;
+        const interaction = JSON.parse(body) as DiscordInteractionPayload;
+        const type = interaction.type;
+        const guild_id = String(interaction.guild_id ?? '');
+        const member = interaction.member ?? undefined;
+        const interactionUser = interaction.user ?? undefined;
+        const interactionData = interaction.data ?? undefined;
         const user = interactionUser || member?.user;
+        const userId = user?.id ?? '';
         const userTag = user ? `${user.username}${user.discriminator !== '0' ? '#' + user.discriminator : ''}` : 'Unknown';
 
         // Helper to check permissions against RBAC
@@ -401,11 +488,12 @@ export async function POST(req: Request) {
             if (!roles) return false;
 
             // Check if any of the user's roles have the required permission
-            return roles.some((role: any) => role[permissionKey] === true);
+            const roleRows = roles as DashboardRoleRow[];
+            return roleRows.some((role) => role[permissionKey] === true);
         }
 
         // Helper to trigger Messaging Service
-        const triggerMessaging = async (command: string, args: any, serverData: any = null) => {
+        const triggerMessaging = async (command: string, args: Record<string, unknown>, serverData: unknown = null) => {
             if (!guild_id) return;
             await sendRobloxMessage(guild_id, command, args, serverData);
         };
@@ -417,7 +505,7 @@ export async function POST(req: Request) {
 
         // 3. Handle Application Commands
         if (type === 2) {
-            const { name, options } = interaction.data;
+            const { name, options } = interactionData ?? {};
 
             // Handle Setup (Owner Only)
             if (name === 'setup') {
@@ -441,7 +529,7 @@ export async function POST(req: Request) {
                 }
 
                 const guildData = await guildRes.json();
-                if (user.id !== guildData.owner_id) {
+                if (userId !== guildData.owner_id) {
                     return NextResponse.json({
                         type: 4,
                         data: { content: `❌ This command can only be run by the server owner.`, flags: 64 }
@@ -592,7 +680,7 @@ export async function POST(req: Request) {
             }
 
             if (name === 'get-discord') {
-                const robloxUsername = options?.find((o: any) => o.name === 'roblox_username')?.value;
+                const robloxUsername = String(getCommandOptionValue(options, 'roblox_username') ?? '').trim();
                 const { data, error } = await supabase
                     .from('verified_users')
                     .select('*')
@@ -626,7 +714,7 @@ export async function POST(req: Request) {
             }
 
             if (name === 'get-roblox') {
-                const discordUserId = options?.find((o: any) => o.name === 'discord_user')?.value;
+                const discordUserId = String(getCommandOptionValue(options, 'discord_user') ?? '').trim();
                 const { data, error } = await supabase
                     .from('verified_users')
                     .select('*')
@@ -720,7 +808,7 @@ export async function POST(req: Request) {
             else if (isLookup) hasPerms = await checkPermission('can_lookup');
             else if (isUpdateServers || isShutdown) {
                 const permissions = BigInt(member?.permissions || '0');
-                hasPerms = (permissions & 0x8n) !== 0n || user.id === '953414442060746854';
+                hasPerms = (permissions & 0x8n) !== 0n || userId === '953414442060746854';
             }
             else if (isUpdate) {
                 hasPerms = true;
@@ -762,9 +850,32 @@ export async function POST(req: Request) {
                 });
             }
 
-            const targetUser = options?.find((o: any) => o.name === 'username')?.value;
-            const jobId = options?.find((o: any) => o.name === 'job_id')?.value;
-            const reason = options?.find((o: any) => o.name === 'reason')?.value || 'No reason provided';
+            const targetUser = String(getCommandOptionValue(options, 'username') ?? '').trim();
+            const jobId = String(getCommandOptionValue(options, 'job_id') ?? '').trim();
+            const reason = String(getCommandOptionValue(options, 'reason') ?? 'No reason provided').trim() || 'No reason provided';
+
+            if (commandRequiresModerationHierarchy(String(name || ''))) {
+                try {
+                    const hierarchyCheck = await evaluateModerationRoleHierarchy({
+                        serverId: guild_id,
+                        moderatorDiscordId: userId,
+                        targetRobloxUsername: targetUser,
+                        enabled: server.enforce_moderation_role_hierarchy,
+                    });
+
+                    if (!hierarchyCheck.allowed) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `❌ ${hierarchyCheck.message}`, flags: 64 }
+                        });
+                    }
+                } catch (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ ${getErrorMessage(error, 'Failed to verify the role hierarchy for that moderation action.')}`, flags: 64 }
+                    });
+                }
+            }
 
             if (name === 'lookup') {
                 try {
@@ -800,11 +911,11 @@ export async function POST(req: Request) {
                             }]
                         }
                     });
-                } catch (error: any) {
+                } catch (error: unknown) {
                     console.error('[LOOKUP] Error:', error);
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `❌ ${error?.message || 'Failed to lookup that Roblox user.'}`, flags: 64 }
+                        data: { content: `❌ ${getErrorMessage(error, 'Failed to lookup that Roblox user.')}`, flags: 64 }
                     });
                 }
             }
@@ -891,8 +1002,8 @@ export async function POST(req: Request) {
                 message = `🚀 **Update Signal Sent**! All game servers will restart shortly.`;
             }
             else if (name === 'update') {
-                const targetUserId = options?.find((o: any) => o.name === 'user')?.value || user.id;
-                const isSelf = targetUserId === user.id;
+                const targetUserId = String(getCommandOptionValue(options, 'user') ?? userId);
+                const isSelf = targetUserId === userId;
 
                 if (!isSelf) {
                     const canManageRoles = (BigInt(member?.permissions || "0") & 0x10000000n) === 0x10000000n; // Manage Roles
@@ -987,7 +1098,7 @@ export async function POST(req: Request) {
                             data: { content: `❌ Failed to fetch Roblox data. Please try again later.`, flags: 64 }
                         });
                     }
-                } catch (e) {
+                } catch {
                     return NextResponse.json({
                         type: 4,
                         data: { content: `❌ An error occurred while updating the profile.`, flags: 64 }
@@ -1066,8 +1177,13 @@ export async function POST(req: Request) {
 
         // Handle Button Clicks (Vercel)
         if (type === 3) {
+            const cid = interactionData?.custom_id ?? '';
+            if (!cid) {
+                return NextResponse.json({ error: 'Missing component custom_id' }, { status: 400 });
+            }
+
             // Public Button: Report Form
-            if (interaction.data.custom_id === 'report_open') {
+            if (cid === 'report_open') {
                 return NextResponse.json({
                     type: 9,
                     data: {
@@ -1104,7 +1220,6 @@ export async function POST(req: Request) {
 
             // Permission Check for buttons/components
             let requiredPerm = 'can_manage_reports'; // Default for most report/moderation buttons
-            const cid = interaction.data.custom_id;
 
             if (cid === 'misc_menu' || cid.startsWith('misc_modal_')) {
                 // Determine if it should be a misc action check, for now we allow if they have dashboard access
@@ -1233,6 +1348,26 @@ export async function POST(req: Request) {
 
                 const command = reportAction === 'roblox_ban' ? 'BAN' : 'KICK';
                 try {
+                    const hierarchyCheck = await evaluateModerationRoleHierarchy({
+                        serverId: currentGuildId,
+                        moderatorDiscordId: String(user?.id || ''),
+                        targetRobloxUsername: target,
+                    });
+
+                    if (!hierarchyCheck.allowed) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `❌ ${hierarchyCheck.message}`, flags: 64 }
+                        });
+                    }
+                } catch (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `❌ ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
+                    });
+                }
+
+                try {
                     await Promise.all([
                         supabase.from('command_queue').insert([{
                             server_id: currentGuildId,
@@ -1268,7 +1403,7 @@ export async function POST(req: Request) {
 
             if (cid.startsWith('switch_')) {
                 const currentGuildId = String(guild_id || '').trim();
-                const target = interaction.data.custom_id.split('_').pop() || '';
+                const target = cid.split('_').pop() || '';
                 const fallbackReportId = currentGuildId ? await findPendingReportIdByTarget(currentGuildId, target) : null;
 
                 if (fallbackReportId) {
@@ -1379,8 +1514,14 @@ export async function POST(req: Request) {
                 }
             }
 
-            if (interaction.data.custom_id === 'misc_menu') {
-                const action = interaction.data.values[0];
+            if (cid === 'misc_menu') {
+                const action = interactionData?.values?.[0] ?? '';
+                if (!action) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: '❌ Invalid misc action.', flags: 64 }
+                    });
+                }
 
                 const components = [{
                     type: 1,
@@ -1418,9 +1559,9 @@ export async function POST(req: Request) {
                 });
             }
 
-            if (interaction.data.custom_id.startsWith('switch_')) {
-                const isRoblox = interaction.data.custom_id.startsWith('switch_roblox');
-                const target = interaction.data.custom_id.split('_').pop();
+            if (cid.startsWith('switch_')) {
+                const isRoblox = cid.startsWith('switch_roblox');
+                const target = cid.split('_').pop();
 
                 const components = [{
                     type: 1,
@@ -1441,8 +1582,8 @@ export async function POST(req: Request) {
                 });
             }
 
-            if (interaction.data.custom_id.startsWith('discord_')) {
-                const parts = interaction.data.custom_id.split('_');
+            if (cid.startsWith('discord_')) {
+                const parts = cid.split('_');
                 const discAction = parts[1]; // kick or ban
                 const target = parts.slice(2).join('_');
 
@@ -1487,10 +1628,8 @@ export async function POST(req: Request) {
                 });
             }
 
-            const customId = interaction.data.custom_id;
-            const parts = customId.split('_');
+            const parts = cid.split('_');
             const action = parts[0];
-            const userId = parts[1];
             const username = parts.slice(2).join('_');
 
             // Parallelize Button Actions
@@ -1513,22 +1652,23 @@ export async function POST(req: Request) {
 
         // Handle Modal Submissions (Vercel)
         if (type === 5) {
-            const { custom_id, components: modalComponents } = interaction.data;
+            const custom_id = interactionData?.custom_id ?? '';
+            const modalComponents = interactionData?.components ?? [];
+
+            if (!custom_id) {
+                return NextResponse.json({ error: 'Missing modal custom_id' }, { status: 400 });
+            }
 
             if (custom_id.startsWith('misc_modal_')) {
                 const action = custom_id.replace('misc_modal_', '');
 
-                const getField = (id: string) => {
-                    const row = modalComponents.find((c: any) => c.components.some((ic: any) => ic.custom_id === id));
-                    return row ? row.components.find((ic: any) => ic.custom_id === id).value : '';
-                };
+                const targetUser = getModalField(modalComponents, 'target_user');
+                const args: MiscCommandArgs = { username: targetUser, moderator: userTag };
 
-                const targetUser = getField('target_user');
-                let args: any = { username: targetUser, moderator: userTag };
                 let msgContent = `✅ Queuing **${action}** for **${targetUser}**...`;
 
                 if (action === 'SET_CHAR') {
-                    const charUser = getField('char_user');
+                    const charUser = getModalField(modalComponents, 'char_user');
                     args.char_user = charUser;
                     msgContent = `✅ Queuing **Set Character** (to ${charUser}) for **${targetUser}**...`;
                 }
@@ -1551,13 +1691,8 @@ export async function POST(req: Request) {
             }
 
             if (custom_id === 'report_submit') {
-                const getField = (id: string) => {
-                    const row = modalComponents.find((c: any) => c.components.some((ic: any) => ic.custom_id === id));
-                    return row ? row.components.find((ic: any) => ic.custom_id === id).value : '';
-                };
-
-                const targetInput = getField('target_input');
-                const reason = getField('reason');
+                const targetInput = getModalField(modalComponents, 'target_input');
+                const reason = getModalField(modalComponents, 'reason');
 
                 // 1. Save to Database
                 const reportClient = getSupabaseAdmin();
@@ -1665,15 +1800,15 @@ export async function POST(req: Request) {
             }
 
             if (custom_id === 'setup_modal') {
-                const getField = (id: string) => {
-                    const row = modalComponents.find((c: any) => c.components.some((ic: any) => ic.custom_id === id));
-                    return row ? row.components.find((ic: any) => ic.custom_id === id).value : '';
-                };
-
-                const placeId = getField('place_id').trim();
-                const universeId = getField('universe_id').trim();
-                const openCloudKey = getField('api_key').trim();
-                const generatedKey = 'rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                const placeId = getModalField(modalComponents, 'place_id').trim();
+                const universeId = getModalField(modalComponents, 'universe_id').trim();
+                const openCloudKey = getModalField(modalComponents, 'api_key').trim();
+                const { data: existingServer } = await supabase
+                    .from('servers')
+                    .select('api_key')
+                    .eq('id', guild_id)
+                    .maybeSingle<{ api_key?: string | null }>();
+                const generatedKey = existingServer?.api_key?.trim() || ('rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
 
                 const { error: dbError } = await supabase
                     .from('servers')
@@ -1821,8 +1956,9 @@ function RoLink:Initialize()
 				return Http:RequestAsync({
 					Url = URL .. "/api/roblox/poll",
 					Method = "POST",
-					Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. KEY },
+					Headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. KEY, ["x-api-key"] = KEY },
 					Body = Http:JSONEncode({
+						apiKey = KEY,
 						jobId = id,
 						playerCount = #Players:GetPlayers(),
 						players = (function()

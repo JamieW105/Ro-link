@@ -7,6 +7,8 @@ export async function GET() {
     const { data, error } = await supabase
         .from('update_posts')
         .select('*')
+        .eq('status', 'PUBLISHED')
+        .not('published_at', 'is', null)
         .order('published_at', { ascending: false });
 
     if (error) {

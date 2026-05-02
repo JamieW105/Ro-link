@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
+import { findServerByKeyWithDiagnostics } from '@/lib/serverAuth';
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
@@ -15,19 +16,36 @@ export async function GET(req: Request) {
         }, { status: 200 });
     }
 
-    const apiKey = req.headers.get('x-api-key');
-    if (!apiKey) {
-        return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
+    const auth = readServerApiKeyDetails(req);
+    const authDebug = describeServerApiKeyDetails(auth);
+    if (!auth.key) {
+        console.warn('[RoLinkAPI][User] Missing API key', { auth: authDebug });
+        return NextResponse.json({
+            error: 'Missing API Key',
+            code: 'missing_api_key',
+            message: 'No server key was provided. Send x-api-key or Authorization: Bearer <key>.',
+            auth: authDebug,
+        }, { status: 401 });
     }
 
-    const { data: server, error: authError } = await supabase
-        .from('servers')
-        .select('id')
-        .eq('api_key', apiKey)
-        .single();
+    const lookup = await findServerByKeyWithDiagnostics<{ id: string }>('id', auth.key);
+    const server = lookup.server;
 
-    if (authError || !server) {
-        return NextResponse.json({ error: 'Invalid API Key' }, { status: 403 });
+    if (!server) {
+        console.warn('[RoLinkAPI][User] Invalid API key', {
+            auth: authDebug,
+            lookupError: lookup.error,
+        });
+        return NextResponse.json({
+            error: 'Invalid API Key',
+            code: 'invalid_api_key',
+            message: 'The provided server key did not match any server record.',
+            auth: authDebug,
+            lookup: {
+                matchedBy: lookup.matchedBy,
+                error: lookup.error,
+            },
+        }, { status: 403 });
     }
 
     try {
@@ -46,7 +64,7 @@ export async function GET(req: Request) {
 
         return NextResponse.json(user);
 
-    } catch (err: any) {
+    } catch {
         return NextResponse.json({ error: 'Failed' }, { status: 500 });
     }
 }
