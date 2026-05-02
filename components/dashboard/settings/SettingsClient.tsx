@@ -1,6 +1,124 @@
-import SettingsClient from "@/components/dashboard/settings/SettingsClient";
+'use client';
 
-export default function SettingsPage() {
+import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import {
+    ADMIN_PANEL_COMMAND_GROUPS,
+    ADMIN_PANEL_COMMAND_IDS,
+    hasAdminPanelCommandAccess,
+    normalizeAdminPanelCommandList,
+} from "@/lib/adminPanelCommands";
+import { supabase } from "@/lib/supabase";
+import { useSession } from "next-auth/react";
+
+// Icons
+const SettingsIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
+);
+
+const SaveIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>
+);
+
+const CommandIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9" /><path d="M4 4a16 16 0 0 1 16 16" /><circle cx="5" cy="19" r="1" /></svg>
+);
+
+const InfoIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+);
+
+const ShieldIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+);
+
+const TrashIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+);
+
+interface DiscordRole {
+    id: string;
+    name: string;
+    color: number;
+}
+
+interface GuildSummary {
+    id: string;
+    permissions: string;
+}
+
+interface DashboardRole {
+    id: string; // UUID
+    discord_role_id: string;
+    role_name: string;
+    can_access_dashboard: boolean;
+    can_kick: boolean;
+    can_ban: boolean;
+    can_timeout: boolean;
+    can_mute: boolean;
+    can_lookup: boolean;
+    can_manage_settings: boolean;
+    can_manage_reports: boolean;
+    allowed_misc_cmds: string[];
+}
+
+type DashboardRoleBooleanField =
+    | 'can_access_dashboard'
+    | 'can_manage_settings'
+    | 'can_manage_reports'
+    | 'can_lookup'
+    | 'can_kick'
+    | 'can_ban'
+    | 'can_timeout'
+    | 'can_mute';
+
+const ROLE_PERMISSION_OPTIONS: Array<{ key: DashboardRoleBooleanField; label: string }> = [
+    { key: 'can_access_dashboard', label: 'Dashboard Access' },
+    { key: 'can_manage_settings', label: 'Manage Settings' },
+    { key: 'can_manage_reports', label: 'Manage Reports' },
+    { key: 'can_lookup', label: 'Lookup Users' },
+    { key: 'can_kick', label: 'Kick Users' },
+    { key: 'can_ban', label: 'Ban Users' },
+    { key: 'can_timeout', label: 'Timeout/Softban' },
+    { key: 'can_mute', label: 'Server Mute' },
+];
+
+interface DiscordChannel {
+    id: string;
+    name: string;
+    type: number;
+}
+
+type SettingsView = 'overview' | 'roles' | 'commands' | 'logging' | 'reports';
+
+interface SettingsClientProps {
+    view?: SettingsView;
+}
+
+const PAGE_COPY: Record<SettingsView, { title: string; description: string }> = {
+    overview: {
+        title: 'Settings',
+        description: 'Choose a settings area to configure. Removal controls stay here for extra visibility.',
+    },
+    roles: {
+        title: 'Role Permissions',
+        description: 'Assign dashboard and in-game permissions to Discord roles.',
+    },
+    commands: {
+        title: 'Command Modules',
+        description: 'Enable or disable global command categories for this server.',
+    },
+    logging: {
+        title: 'Audit Logging',
+        description: 'Choose where moderation and administrative actions are logged.',
+    },
+    reports: {
+        title: 'Report System',
+        description: 'Configure player reports and where report notifications are delivered.',
+    },
+};
+
+export default function SettingsClient({ view = 'overview' }: SettingsClientProps) {
     const { id } = useParams();
     const { data: session } = useSession();
     const router = useRouter();
@@ -18,7 +136,6 @@ export default function SettingsPage() {
     // General Settings
     const [adminCmds, setAdminCmds] = useState(true);
     const [miscCmds, setMiscCmds] = useState(true);
-    const [enforceModerationRoleHierarchy, setEnforceModerationRoleHierarchy] = useState(true);
     const [loggingChannelId, setLoggingChannelId] = useState("");
     const [reportsEnabled, setReportsEnabled] = useState(false);
     const [reportsChannelId, setReportsChannelId] = useState("");
@@ -116,14 +233,13 @@ export default function SettingsPage() {
             // 2. Fetch Server Settings
             const { data, error: dbError } = await supabase
                 .from('servers')
-                .select('admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy, logging_channel_id, reports_enabled, reports_channel_id')
+                .select('admin_cmds_enabled, misc_cmds_enabled, logging_channel_id, reports_enabled, reports_channel_id')
                 .eq('id', id)
                 .single();
 
             if (data && !dbError) {
                 setAdminCmds(data.admin_cmds_enabled !== false);
                 setMiscCmds(data.misc_cmds_enabled !== false);
-                setEnforceModerationRoleHierarchy(data.enforce_moderation_role_hierarchy !== false);
                 setLoggingChannelId(data.logging_channel_id || "");
                 setReportsEnabled(data.reports_enabled || false);
                 setReportsChannelId(data.reports_channel_id || "");
@@ -163,13 +279,13 @@ export default function SettingsPage() {
         setError(null);
         setSuccess(false);
 
-        if (loggingChannelId && !channels.some((channel) => channel.id === loggingChannelId)) {
+        if (view === 'logging' && loggingChannelId && !channels.some((channel) => channel.id === loggingChannelId)) {
             setError('The selected logging channel is not accessible to the bot anymore. Choose another channel and save again.');
             setSaving(false);
             return;
         }
 
-        if (reportsChannelId && !channels.some((channel) => channel.id === reportsChannelId)) {
+        if (view === 'reports' && reportsChannelId && !channels.some((channel) => channel.id === reportsChannelId)) {
             setError('The selected reports channel is not accessible to the bot anymore. Choose another channel and save again.');
             setSaving(false);
             return;
@@ -181,7 +297,6 @@ export default function SettingsPage() {
             .update({
                 admin_cmds_enabled: adminCmds,
                 misc_cmds_enabled: miscCmds,
-                enforce_moderation_role_hierarchy: enforceModerationRoleHierarchy,
                 logging_channel_id: loggingChannelId || null,
                 reports_enabled: reportsEnabled,
                 reports_channel_id: reportsChannelId || null
@@ -355,6 +470,66 @@ export default function SettingsPage() {
         </div>
     );
 
+    const pageCopy = PAGE_COPY[view];
+    const showsSaveButton = view === 'commands' || view === 'logging' || view === 'reports';
+    const settingsTiles = [
+        {
+            title: 'Game Connection',
+            description: 'Configure Roblox place IDs, API keys, and install the game script.',
+            href: `/dashboard/${id}/settings/setup`,
+            tone: 'emerald',
+        },
+        {
+            title: 'Role Permissions',
+            description: 'Assign dashboard permissions and Roblox admin panel commands to Discord roles.',
+            href: `/dashboard/${id}/settings/roles`,
+            tone: 'purple',
+        },
+        {
+            title: 'Command Modules',
+            description: 'Enable or disable admin and misc command groups server-wide.',
+            href: `/dashboard/${id}/settings/commands`,
+            tone: 'sky',
+        },
+        {
+            title: 'Audit Logging',
+            description: 'Select the Discord channel for moderation and administrative action logs.',
+            href: `/dashboard/${id}/settings/logging`,
+            tone: 'indigo',
+        },
+        {
+            title: 'Report System',
+            description: 'Turn reports on or off and pick the Discord channel for report notifications.',
+            href: `/dashboard/${id}/settings/reports`,
+            tone: 'red',
+        },
+        {
+            title: 'Activity Logs',
+            description: 'Review recent dashboard and moderation activity for this server.',
+            href: `/dashboard/${id}/settings/logs`,
+            tone: 'slate',
+        },
+    ];
+    const infoItems = view === 'roles'
+        ? [
+            { title: "Dashboard Access", text: "A role must have dashboard access before its other dashboard permissions are useful." },
+            { title: "Panel Commands", text: "The Roblox admin panel uses the same command allowlist configured on each Discord role." },
+        ]
+        : view === 'logging'
+            ? [
+                { title: "Channel Access", text: "The bot needs permission to view and send messages in the selected logging channel." },
+                { title: "Audit Trail", text: "Moderation actions are kept in dashboard logs even when Discord channel logging is disabled." },
+            ]
+            : view === 'reports'
+                ? [
+                    { title: "Dashboard Reports", text: "Reports remain visible in the dashboard even when no Discord channel is selected." },
+                    { title: "Notifications", text: "Choose a reports channel when staff should receive new report notifications in Discord." },
+                ]
+                : [
+                    { title: "Admin Commands", text: "Essential moderation tools. Disabling this prevents any kick/ban actions from Discord." },
+                    { title: "Misc Commands", text: "Fun and utility commands. Can be disabled if they interfere with gameplay." },
+                ];
+
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full pb-20">
             {/* Page Header */}
@@ -365,55 +540,74 @@ export default function SettingsPage() {
                             <SettingsIcon />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">General Settings</h1>
-                            <p className="text-slate-500 text-sm font-medium mt-1">Configure global server behavior and command permissions.</p>
+                            <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">{pageCopy.title}</h1>
+                            <p className="text-slate-500 text-sm font-medium mt-1">{pageCopy.description}</p>
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="hidden md:flex bg-sky-600 hover:bg-sky-500 text-white font-bold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-sky-900/20 text-xs disabled:opacity-50 items-center justify-center gap-3 active:scale-95 border border-sky-400/20"
-                    >
-                        {saving ? (
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        ) : (
-                            <>
-                                <SaveIcon />
-                                SAVE CHANGES
-                            </>
-                        )}
-                    </button>
+                    {showsSaveButton && (
+                        <button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="hidden md:flex bg-sky-600 hover:bg-sky-500 text-white font-bold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-sky-900/20 text-xs disabled:opacity-50 items-center justify-center gap-3 active:scale-95 border border-sky-400/20"
+                        >
+                            {saving ? (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                <>
+                                    <SaveIcon />
+                                    SAVE CHANGES
+                                </>
+                            )}
+                        </button>
+                    )}
                 </div>
             </div>
 
             <div className="grid grid-cols-12 gap-8">
                 {/* Main Settings Column */}
-                <div className="col-span-12 lg:col-span-8 space-y-12">
+                <div className={`col-span-12 space-y-12 ${view === 'overview' ? '' : 'lg:col-span-8'}`}>
 
-                    {/* Game Connection Card (Setup Wizard Link) */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-8 flex flex-col sm:flex-row items-center justify-between gap-6 backdrop-blur-sm relative overflow-hidden group">
-                        <div className="flex items-center gap-6">
-                            <div className="p-4 bg-emerald-500/10 rounded-2xl text-emerald-500 border border-emerald-500/10 group-hover:bg-emerald-500/20 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-black text-white uppercase italic tracking-tight">Game Connection</h3>
-                                <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-sm mt-1">
-                                    Configure Roblox place IDs, API keys, and install the game script.
-                                </p>
-                            </div>
+                    {view === 'overview' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            {settingsTiles.map((tile) => {
+                                const toneClass = tile.tone === 'emerald'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 group-hover:border-emerald-500/40'
+                                    : tile.tone === 'purple'
+                                        ? 'bg-purple-500/10 text-purple-400 border-purple-500/20 group-hover:border-purple-500/40'
+                                        : tile.tone === 'indigo'
+                                            ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 group-hover:border-indigo-500/40'
+                                            : tile.tone === 'red'
+                                                ? 'bg-red-500/10 text-red-400 border-red-500/20 group-hover:border-red-500/40'
+                                                : tile.tone === 'sky'
+                                                    ? 'bg-sky-500/10 text-sky-400 border-sky-500/20 group-hover:border-sky-500/40'
+                                                    : 'bg-slate-500/10 text-slate-400 border-slate-500/20 group-hover:border-slate-500/40';
+
+                                return (
+                                    <button
+                                        key={tile.href}
+                                        type="button"
+                                        onClick={() => router.push(tile.href)}
+                                        className="group min-h-44 rounded-[2rem] border border-slate-800 bg-slate-900/40 p-7 text-left transition-all hover:bg-slate-900/70 hover:border-slate-700"
+                                    >
+                                        <div className={`mb-6 inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-colors ${toneClass}`}>
+                                            <SettingsIcon />
+                                        </div>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div>
+                                                <h3 className="text-sm font-black uppercase tracking-[0.16em] text-white">{tile.title}</h3>
+                                                <p className="mt-3 text-sm leading-relaxed text-slate-500">{tile.description}</p>
+                                            </div>
+                                            <svg className="mt-0.5 shrink-0 text-slate-600 transition-colors group-hover:text-white" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
-                        <button
-                            onClick={() => router.push(`/dashboard/${id}/settings/setup`)}
-                            className="w-full sm:w-auto px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all shadow-lg border border-slate-700 uppercase tracking-widest text-xs flex items-center justify-center gap-3 group-hover:border-emerald-500/50 group-hover:text-emerald-400"
-                        >
-                            Manage Connection
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                        </button>
-                    </div>
+                    )}
 
                     {/* --- ROLE PERMISSIONS SECTION (NEW) --- */}
+                    {view === 'roles' && (
                     <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden transition-all duration-300">
                         <div className="flex items-start justify-between mb-8 cursor-pointer" onClick={() => setIsRolesCollapsed(!isRolesCollapsed)}>
                             <div className="flex items-start gap-6">
@@ -627,9 +821,11 @@ export default function SettingsPage() {
                             </div>
                         )}
                     </div>
+                    )}
 
 
                     {/* Command Config Section */}
+                    {view === 'commands' && (
                     <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
                             <div className="p-3 bg-sky-500/10 rounded-xl text-sky-500 border border-sky-500/10">
@@ -669,33 +865,12 @@ export default function SettingsPage() {
                                     <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${miscCmds ? 'left-8 bg-sky-500' : 'left-1.5 bg-slate-500'}`} />
                                 </button>
                             </div>
-
-                            <div className="flex items-center justify-between p-6 bg-slate-950/40 border border-slate-800 rounded-2xl">
-                                <div>
-                                    <h4 className="text-sm font-bold text-slate-200 uppercase tracking-tight">Enforce Role Hierarchy</h4>
-                                    <p className="text-[11px] text-slate-500 font-medium mt-1">Prevents kick, ban, and softban actions against linked users whose highest Discord role is above the moderator.</p>
-                                </div>
-                                <button
-                                    onClick={() => setEnforceModerationRoleHierarchy(!enforceModerationRoleHierarchy)}
-                                    className={`w-14 h-7 rounded-full transition-all duration-500 relative border-2 ${enforceModerationRoleHierarchy ? 'bg-sky-600/20 border-sky-500 shadow-[0_0_15px_rgba(2,132,199,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
-                                >
-                                    <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${enforceModerationRoleHierarchy ? 'left-8 bg-sky-500' : 'left-1.5 bg-slate-500'}`} />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="mt-12 md:hidden">
-                            <button
-                                onClick={handleSave}
-                                disabled={saving}
-                                className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-sky-900/10 text-xs disabled:opacity-50 flex items-center justify-center gap-3 active:scale-95"
-                            >
-                                {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "SAVE SETTINGS"}
-                            </button>
                         </div>
                     </div>
+                    )}
 
                     {/* Logging Config Section */}
+                    {view === 'logging' && (
                     <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
                             <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-500 border border-indigo-500/10">
@@ -728,8 +903,10 @@ export default function SettingsPage() {
                             )}
                         </div>
                     </div>
+                    )}
 
                     {/* Report System Config */}
+                    {view === 'reports' && (
                     <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
                             <div className="p-3 bg-red-500/10 rounded-xl text-red-500 border border-red-500/10">
@@ -779,28 +956,43 @@ export default function SettingsPage() {
                             </div>
                         </div>
                     </div>
+                    )}
 
                     {/* Status Box */}
-                    <div className="p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
-                        <div className="flex items-center gap-5">
-                            <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/10">
-                                <InfoIcon />
+                    {showsSaveButton && (
+                    <>
+                        <div className="p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
+                            <div className="flex items-center gap-5">
+                                <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/10">
+                                    <InfoIcon />
+                                </div>
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-200 uppercase tracking-tight">System Status</h4>
+                                    <p className="text-[11px] text-slate-500 font-medium tracking-tight mt-0.5">Settings changes propagate to game servers within ~30 seconds.</p>
+                                </div>
                             </div>
-                            <div>
-                                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-tight">System Status</h4>
-                                <p className="text-[11px] text-slate-500 font-medium tracking-tight mt-0.5">Settings changes propagate to game servers within ~30 seconds.</p>
-                            </div>
+                            {success && (
+                                <div className="flex items-center gap-2 text-emerald-500 animate-in fade-in slide-in-from-right-2 duration-300">
+                                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                                    <span className="text-[10px] font-bold uppercase tracking-widest">Changes Saved</span>
+                                </div>
+                            )}
+                            {error && <span className="text-red-500 text-[10px] font-bold uppercase tracking-widest">{error}</span>}
                         </div>
-                        {success && (
-                            <div className="flex items-center gap-2 text-emerald-500 animate-in fade-in slide-in-from-right-2 duration-300">
-                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                                <span className="text-[10px] font-bold uppercase tracking-widest">Changes Saved</span>
-                            </div>
-                        )}
-                        {error && <span className="text-red-500 text-[10px] font-bold uppercase tracking-widest">{error}</span>}
-                    </div>
+                        <div className="md:hidden">
+                            <button
+                                onClick={handleSave}
+                                disabled={saving}
+                                className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-sky-900/10 text-xs disabled:opacity-50 flex items-center justify-center gap-3 active:scale-95"
+                            >
+                                {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "SAVE SETTINGS"}
+                            </button>
+                        </div>
+                    </>
+                    )}
 
                     {/* Remove Ro-Link */}
+                    {view === 'overview' && (
                     <div className="bg-red-950/20 border border-red-500/20 rounded-[2rem] p-10 backdrop-blur-sm">
                         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                             <div className="flex items-start gap-5">
@@ -829,9 +1021,11 @@ export default function SettingsPage() {
                             </button>
                         </div>
                     </div>
+                    )}
                 </div>
 
                 {/* Info Column */}
+                {view !== 'overview' && (
                 <div className="col-span-12 lg:col-span-4 space-y-8">
                     <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-8">
                         <h4 className="text-xs font-bold text-white uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
@@ -839,11 +1033,7 @@ export default function SettingsPage() {
                             Information
                         </h4>
                         <div className="space-y-6">
-                            {[
-                                { title: "Admin Commands", text: "Essential moderation tools. Disabling this prevents any kick/ban actions from Discord." },
-                                { title: "Misc Commands", text: "Fun and utility commands. Can be disabled if they interfere with gameplay." },
-                                { title: "Role Hierarchy", text: "Enabled by default. Linked users with higher Discord roles cannot be kicked, banned, or softbanned by lower-ranked moderators." },
-                            ].map((item, i) => (
+                            {infoItems.map((item, i) => (
                                 <div key={i} className="group">
                                     <h5 className="text-xs font-bold text-sky-500 mb-1 group-hover:text-sky-400 transition-colors uppercase tracking-wide">
                                         {item.title}
@@ -856,9 +1046,10 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 </div>
+                )}
             </div>
 
-            {isRemoveModalOpen && (
+            {view === 'overview' && isRemoveModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
                     <div className="w-full max-w-2xl rounded-[2rem] border border-red-500/20 bg-[#020617] shadow-2xl overflow-hidden">
                         <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-8 py-6">
@@ -955,5 +1146,4 @@ export default function SettingsPage() {
             )}
         </div>
     );
-    return <SettingsClient view="overview" />;
 }

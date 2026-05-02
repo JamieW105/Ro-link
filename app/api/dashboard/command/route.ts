@@ -4,10 +4,10 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import {
     ADMIN_PANEL_COMMAND_IDS,
-    GLOBAL_COMMAND_IDS,
     canUseDashboardCommand,
     normalizeAdminPanelCommand,
 } from '@/lib/adminPanelCommands';
+import { buildDeliveryArgs, resolveDeliveryTargets, trimString, type CommandArgs } from '@/lib/commandDelivery';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
 import { logAction } from '@/lib/logger';
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
