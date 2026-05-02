@@ -146,6 +146,98 @@ Once your web server is running and your Discord server is linked via `/setup`:
 
 ---
 
+## Module Developer API
+
+Marketplace modules are uploaded from the management portal, published by users with the required management permissions, enabled per Discord server from the dashboard, and loaded by the Roblox admin panel at runtime.
+
+Each uploaded Luau module should return a table:
+
+```lua
+return {
+    Init = function(context, settings)
+        context.Log("Module loaded", context.Module.name)
+    end,
+
+    Commands = {
+        hello = function(command, context, args)
+            context.Log("Hello command ran")
+        end
+    }
+}
+```
+
+### Context Fields and Helpers
+
+| API | Purpose |
+| --- | --- |
+| `context.Module` | Published module metadata for the running add-on. |
+| `context.Settings` | Per-server module settings from the dashboard. |
+| `context.Services` | Whitelisted Roblox services such as `Players`, `HttpService`, `ReplicatedStorage`, `RunService`, `Workspace`, `Lighting`, `MessagingService`, and `ServerScriptService`. |
+| `context.RegisterCommand(commandName, handler)` | Registers a module command. You can also return a `Commands` table. |
+| `context.OnAdminPanelOpened(handler)` | Runs when an authorized player opens the admin panel. |
+| `context.OnCommandBarOpened(handler)` | Runs when an authorized player opens the command bar. |
+| `context.SendBotMessage(target, user, channelId, content)` | Sends a Discord bot message through Ro-Link with server and channel validation. |
+| `context.GetDiscordChannels()` | Returns Discord channels the bot can send to for the current server. |
+| `context.CreateUI(target, sourceCodeOrTree, props)` | Creates Roblox UI for a player, all players, or a target list. Accepts source code, a function, or a UI tree table. |
+| `context.FindPlayer(target)` | Finds one live Roblox player by player instance, username, or UserId. |
+| `context.GetPlayers()` | Returns live Roblox players. |
+| `context.Notify(target, message, success)` | Shows admin feedback where the Studio package has the feedback remote available. |
+| `context.Log(...)` | Prints a namespaced module log line. |
+
+### SendBotMessage
+
+`SendBotMessage` accepts these target values:
+
+- `channel`: sends to `channelId`. The channel must belong to the current Discord server and be sendable by the bot.
+- `serverowner`: DMs the Discord server owner.
+- `user`, `dm`, or `member`: DMs the provided Discord user. The user must be a member of the current Discord server.
+
+```lua
+context.SendBotMessage("channel", nil, "123456789012345678", {
+    PlainText = "Plain text message",
+    Embed = {
+        Title = "Optional embed",
+        Content = "Embed body",
+        media = "https://example.com/image.png",
+        Footer = "Footer text",
+        icon = "https://example.com/icon.png",
+        Color = 0x38bdf8
+    }
+})
+```
+
+`Embed` is optional. `PlainText` is optional when an embed has content. `Footer` and `Footor` are both accepted for compatibility.
+
+### Lifecycle Hooks and UI
+
+```lua
+return {
+    Init = function(context)
+        context.OnAdminPanelOpened(function(player)
+            context.Notify(player, "Admin panel opened", true)
+        end)
+
+        context.OnCommandBarOpened(function(player)
+            context.CreateUI(player, [[
+                return function(ui)
+                    local label = ui.Create("TextLabel", {
+                        Size = UDim2.new(0, 260, 0, 48),
+                        Text = "Module UI",
+                        BackgroundColor3 = Color3.fromRGB(15, 23, 42),
+                        TextColor3 = Color3.fromRGB(255, 255, 255)
+                    })
+                    return label
+                end
+            ]])
+        end)
+    end
+}
+```
+
+Dynamic source-based modules and `CreateUI` source strings require `ServerScriptService.LoadStringEnabled`.
+
+---
+
 ## ⚠️ Troubleshooting
 
 -   **Bot Offline?**: The Vercel integration is serverless, so the bot won't show as "Online" unless you run `npm run bot` on a VPS or local machine. However, commands will still work perfectly via slash commands.

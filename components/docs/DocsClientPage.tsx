@@ -396,6 +396,22 @@ const commandGroups = [
     },
 ] as const;
 
+const moduleDeveloperFunctions = [
+    ['Module', 'table', 'Published marketplace module metadata for the currently running module.'],
+    ['Settings', 'table', 'Per-server settings configured from the dashboard module install page.'],
+    ['Services', 'table', 'Whitelisted Roblox services such as Players, HttpService, ReplicatedStorage, RunService, Workspace, Lighting, MessagingService, and ServerScriptService.'],
+    ['RegisterCommand(commandName, handler)', 'function', 'Adds a custom command handler. Handlers receive command payload, context, and args.'],
+    ['OnAdminPanelOpened(handler)', 'function', 'Runs when an authorized user opens the in-game admin panel. Handler receives player, payload, and context.'],
+    ['OnCommandBarOpened(handler)', 'function', 'Runs when an authorized user opens the in-game command bar. Handler receives player, payload, and context.'],
+    ['SendBotMessage(target, user, channelId, content)', 'function', 'Sends a Discord bot message through Ro-Link after validating the server, channel, or member target.'],
+    ['GetDiscordChannels()', 'function', 'Returns sendable Discord channels for the current server.'],
+    ['CreateUI(target, sourceCodeOrTree, props)', 'function', 'Creates Roblox UI for one player, all players, or a target list. Supports Luau source, a function, or a UI tree table.'],
+    ['FindPlayer(target)', 'function', 'Finds one live Roblox player by Player instance, username, or UserId.'],
+    ['GetPlayers()', 'function', 'Returns the current live Players list.'],
+    ['Notify(target, message, success)', 'function', 'Shows admin-panel feedback where the Studio package exposes the feedback remote.'],
+    ['Log(...)', 'function', 'Prints a namespaced marketplace module log line.'],
+] as const;
+
 const docsPages: DocPage[] = [
     {
         id: 'getting-started',
@@ -998,6 +1014,214 @@ const docsPages: DocPage[] = [
                             ]}
                         />
                     </div>
+                </SectionCard>
+            </div>
+        ),
+    },
+    {
+        id: 'module-developer-api',
+        category: 'Developer',
+        eyebrow: 'Module Runtime',
+        title: 'Module Developer API',
+        summary: 'Build marketplace add-ons that run inside the Roblox admin panel runtime, register commands, react to panel lifecycle events, send validated Discord bot messages, and create player UI.',
+        icon: Icons.Terminal,
+        stats: [
+            { label: 'Runtime object', value: 'context' },
+            { label: 'Upload surface', value: 'Management portal' },
+            { label: 'Loaded by', value: 'Roblox admin panel' },
+        ],
+        toc: [
+            { id: 'module-api-overview', title: 'Module shape' },
+            { id: 'module-api-functions', title: 'Context functions' },
+            { id: 'module-api-discord', title: 'Discord messages' },
+            { id: 'module-api-lifecycle', title: 'Lifecycle hooks' },
+            { id: 'module-api-ui', title: 'CreateUI' },
+            { id: 'module-api-example', title: 'Full example' },
+        ],
+        content: (
+            <div className="space-y-6">
+                <SectionCard
+                    id="module-api-overview"
+                    eyebrow="Structure"
+                    title="Return a module table from your uploaded Luau"
+                    description="Marketplace modules are uploaded in the management portal, published by staff with the required permissions, enabled per server from the dashboard, and loaded by the Roblox admin panel at runtime."
+                >
+                    <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+                        <CodeBlock label="Minimal module shape">
+                            {`return {
+    Init = function(context, settings)
+        context.Log("Loaded", context.Module.name)
+    end,
+
+    Commands = {
+        hello = function(command, context, args)
+            context.Log("Hello command ran", command, args)
+        end
+    }
+}`}
+                        </CodeBlock>
+                        <Callout title="Runtime requirements" tone="warn">
+                            Dynamic module source requires Roblox HTTP requests and loadstring support. Keep module source trusted, because marketplace code runs inside the server runtime for servers that enable it.
+                        </Callout>
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-functions"
+                    eyebrow="Reference"
+                    title="Context functions and fields"
+                    description="Every module receives a context table. Use these helpers instead of calling Ro-Link internals directly so modules keep working as the runtime evolves."
+                >
+                    <DataTable
+                        headers={['Name', 'Type', 'Description']}
+                        rows={moduleDeveloperFunctions.map((row) => [...row])}
+                    />
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-discord"
+                    eyebrow="Discord"
+                    title="Send validated bot messages"
+                    description="SendBotMessage routes through Ro-Link so the server API key is checked and channel IDs are validated against the Discord server attached to that Roblox server."
+                >
+                    <div className="grid gap-6 xl:grid-cols-2">
+                        <CodeBlock label="SendBotMessage signature">
+                            {`local ok, result = context.SendBotMessage(
+    "channel", -- "channel", "serverowner", "user", "dm", or "member"
+    nil,       -- Discord user ID or { discordId = "..." } for user/dm/member targets
+    "123456789012345678", -- channel ID for channel target
+    {
+        PlainText = "Plain text is optional when Embed exists",
+        Embed = {
+            Title = "Optional embed title",
+            Content = "Optional embed body",
+            media = "https://example.com/image.png",
+            Footer = "Footer text",
+            icon = "https://example.com/icon.png",
+            Color = 0x38bdf8
+        }
+    }
+)`}
+                        </CodeBlock>
+                        <div className="space-y-4">
+                            <DataTable
+                                headers={['Target', 'Behavior', 'Validation']}
+                                rows={[
+                                    ['channel', 'Sends to channelId.', 'Channel must belong to the current Discord server and be sendable by the bot.'],
+                                    ['serverowner', 'DMs the Discord server owner.', 'Owner is resolved from Discord for the current server.'],
+                                    ['user, dm, member', 'DMs the provided Discord user.', 'User must be a member of the current Discord server.'],
+                                ]}
+                            />
+                            <Callout title="Embed is optional" tone="info">
+                                Content can include <InlineCode>PlainText</InlineCode>, <InlineCode>Embed</InlineCode>, or both. The runtime also accepts <InlineCode>Footer</InlineCode> or the misspelled <InlineCode>Footor</InlineCode> for compatibility.
+                            </Callout>
+                        </div>
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-lifecycle"
+                    eyebrow="Hooks"
+                    title="React when admins open the panel or command bar"
+                    description="Lifecycle hooks let a module run code when the in-game UI is opened, which is useful for refreshing module state, showing contextual UI, or sending audit messages."
+                >
+                    <CodeBlock label="Lifecycle hooks">
+                        {`return {
+    Init = function(context)
+        context.OnAdminPanelOpened(function(player, payload, hookContext)
+            context.Log(player.Name .. " opened the admin panel")
+        end)
+
+        context.OnCommandBarOpened(function(player, payload, hookContext)
+            context.Notify(player, "Command bar opened", true)
+        end)
+    end
+}`}
+                    </CodeBlock>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-ui"
+                    eyebrow="UI"
+                    title="Create player UI from a module"
+                    description="CreateUI can target a Player instance, username, UserId, all/server/everyone, or a list of targets. It can run source code, call a function, or build a simple UI tree table."
+                >
+                    <div className="grid gap-6 xl:grid-cols-2">
+                        <CodeBlock label="CreateUI from source">
+                            {`context.CreateUI(player, [[
+    return function(ui)
+        local frame = ui.Create("Frame", {
+            Size = UDim2.new(0, 320, 0, 120),
+            BackgroundColor3 = Color3.fromRGB(15, 23, 42)
+        })
+
+        ui.Create("TextLabel", {
+            Size = UDim2.fromScale(1, 1),
+            BackgroundTransparency = 1,
+            Text = "Hello from a module",
+            TextColor3 = Color3.fromRGB(255, 255, 255)
+        }, frame)
+
+        return frame
+    end
+]])`}
+                        </CodeBlock>
+                        <CodeBlock label="CreateUI from tree">
+                            {`context.CreateUI("all", {
+    ClassName = "ScreenGui",
+    Properties = { Name = "ModuleNotice", ResetOnSpawn = false },
+    Children = {
+        {
+            ClassName = "TextLabel",
+            Properties = {
+                Size = UDim2.new(0, 260, 0, 48),
+                Text = "Server module loaded"
+            }
+        }
+    }
+})`}
+                        </CodeBlock>
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-example"
+                    eyebrow="Example"
+                    title="Complete module example"
+                    description="This example registers one command, announces lifecycle activity, reads server channels, and sends a Discord message only to channels that belong to the current server."
+                >
+                    <CodeBlock label="Marketplace module example">
+                        {`return {
+    Init = function(context, settings)
+        context.OnAdminPanelOpened(function(player)
+            context.Notify(player, "Marketplace module ready", true)
+        end)
+
+        context.OnCommandBarOpened(function(player)
+            context.Log("Command bar opened by", player.Name)
+        end)
+    end,
+
+    Commands = {
+        announce = function(command, context, args)
+            local ok, channels = context.GetDiscordChannels()
+            if not ok or #channels == 0 then
+                return false, "No sendable Discord channels are available."
+            end
+
+            local channelId = args.channelId or channels[1].id
+            return context.SendBotMessage("channel", nil, channelId, {
+                PlainText = args.message or "Announcement from Roblox",
+                Embed = {
+                    Title = "Ro-Link Module",
+                    Content = "This was sent by a marketplace add-on.",
+                    Footer = "Server validated"
+                }
+            })
+        end
+    }
+}`}
+                    </CodeBlock>
                 </SectionCard>
             </div>
         ),
