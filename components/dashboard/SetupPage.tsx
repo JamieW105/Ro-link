@@ -120,7 +120,7 @@ export default function DashboardSetupPage() {
         setLoading(true);
         setError(null);
 
-        const generatedKey = `rl_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+        const resolvedApiKey = apiKey.trim() || `rl_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
 
         const { error: dbError } = await supabase
             .from("servers")
@@ -129,7 +129,7 @@ export default function DashboardSetupPage() {
                 place_id: placeId,
                 universe_id: universeId,
                 open_cloud_key: openCloudKey,
-                api_key: generatedKey
+                api_key: resolvedApiKey
             });
 
         if (dbError) {
@@ -138,7 +138,7 @@ export default function DashboardSetupPage() {
             return;
         }
 
-        setApiKey(generatedKey);
+        setApiKey(resolvedApiKey);
         setStep(2);
         setLoading(false);
     }

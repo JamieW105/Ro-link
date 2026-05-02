@@ -1,0 +1,74 @@
+import { supabase } from './supabase';
+
+export type ServerKeyLookupResult<T> = {
+    server: T | null;
+    matchedBy: 'api_key' | 'open_cloud_key' | null;
+    error: string | null;
+};
+
+export async function findServerByKeyWithDiagnostics<T>(
+    selectClause: string,
+    rawKey: string,
+): Promise<ServerKeyLookupResult<T>> {
+    const apiKey = String(rawKey ?? '').trim();
+    if (!apiKey) {
+        return {
+            server: null,
+            matchedBy: null,
+            error: 'empty_key',
+        };
+    }
+
+    const primaryLookup = await supabase
+        .from('servers')
+        .select(selectClause)
+        .eq('api_key', apiKey)
+        .maybeSingle<T>();
+
+    if (primaryLookup.data) {
+        return {
+            server: primaryLookup.data,
+            matchedBy: 'api_key',
+            error: null,
+        };
+    }
+
+    if (primaryLookup.error) {
+        console.warn('[RoLinkAPI][Auth] api_key lookup failed', {
+            code: primaryLookup.error.code,
+            message: primaryLookup.error.message,
+        });
+    }
+
+    const fallbackLookup = await supabase
+        .from('servers')
+        .select(selectClause)
+        .eq('open_cloud_key', apiKey)
+        .maybeSingle<T>();
+
+    if (fallbackLookup.data) {
+        return {
+            server: fallbackLookup.data,
+            matchedBy: 'open_cloud_key',
+            error: null,
+        };
+    }
+
+    if (fallbackLookup.error) {
+        console.warn('[RoLinkAPI][Auth] open_cloud_key lookup failed', {
+            code: fallbackLookup.error.code,
+            message: fallbackLookup.error.message,
+        });
+    }
+
+    return {
+        server: null,
+        matchedBy: null,
+        error: primaryLookup.error?.message || fallbackLookup.error?.message || 'no_matching_server_key',
+    };
+}
+
+export async function findServerByKey<T>(selectClause: string, rawKey: string) {
+    const lookup = await findServerByKeyWithDiagnostics<T>(selectClause, rawKey);
+    return lookup.server;
+}

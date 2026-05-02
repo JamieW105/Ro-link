@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - Preview
     types:
       - opened
       - reopened
