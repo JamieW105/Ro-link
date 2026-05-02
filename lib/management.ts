@@ -6,6 +6,7 @@ export type ManagementPermission =
     | 'POST_JOB_APPLICATION'
     | 'POST_UPDATES'
     | 'BLOCK_SERVERS'
+    | 'MANAGE_MODULES'
     | 'MANAGE_RO_LINK';
 
 export async function getManagementUser(discordId: string) {
@@ -21,6 +22,7 @@ export async function getManagementUser(discordId: string) {
                     'POST_JOB_APPLICATION',
                     'POST_UPDATES',
                     'BLOCK_SERVERS',
+                    'MANAGE_MODULES',
                     'MANAGE_RO_LINK'
                 ] as ManagementPermission[]
             }

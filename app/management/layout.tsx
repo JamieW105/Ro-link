@@ -21,7 +21,7 @@ export default function ManagementLayout({
             const userId = (session.user as any).id;
             // Cherubdude check
             if (userId === '953414442060746854') {
-                setPerms(['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'POST_UPDATES', 'BLOCK_SERVERS', 'MANAGE_RO_LINK']);
+                setPerms(['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'POST_UPDATES', 'BLOCK_SERVERS', 'MANAGE_MODULES', 'MANAGE_RO_LINK']);
                 setLoading(false);
                 return;
             }
@@ -68,6 +68,7 @@ export default function ManagementLayout({
         { name: 'Servers', href: '/management/servers', icon: 'M5 12h14M12 5l7 7-7 7', perm: 'MANAGE_SERVERS' },
         { name: 'Job Apps', href: '/management/jobs', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', perm: 'POST_JOB_APPLICATION' },
         { name: 'Updates', href: '/management/posts', icon: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01', perm: 'POST_UPDATES' },
+        { name: 'Modules', href: '/management/modules', icon: 'M12 2l7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4zm-3 9h6m-6 4h4', perm: 'MANAGE_MODULES' },
         { name: 'Blocking', href: '/management/blocking', icon: 'M18.36 6.64a9 9 0 11-12.73 0M12 2v10', perm: 'BLOCK_SERVERS' },
         { name: 'People', href: '/management/people', icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m11-10a4 4 0 11-8 0 4 4 0 018 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zm-2 4v2', perm: 'MANAGE_RO_LINK' },
     ];

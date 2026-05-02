@@ -263,6 +263,16 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             hide: !userPermissions.can_manage_settings
         },
         {
+            label: "Modules",
+            icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m12 2 7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4Z" /><path d="M9 11h6" /><path d="M9 15h4" />
+                </svg>
+            ),
+            href: `/dashboard/${id}/modules`,
+            hide: !userPermissions.can_manage_settings
+        },
+        {
             label: "Logging",
             icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

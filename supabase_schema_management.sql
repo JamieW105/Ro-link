@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS public.management_roles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL UNIQUE,
-    permissions TEXT[] DEFAULT '{}', -- ['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'POST_UPDATES', 'BLOCK_SERVERS', 'MANAGE_RO_LINK']
+    permissions TEXT[] DEFAULT '{}', -- ['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'POST_UPDATES', 'BLOCK_SERVERS', 'MANAGE_MODULES', 'MANAGE_RO_LINK']
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -83,13 +83,13 @@ WHERE version IS NULL OR btrim(version) = '';
 
 -- Insert initial Admin role for cherubdude
 INSERT INTO public.management_roles (name, permissions)
-VALUES ('Super Admin', ARRAY['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'POST_UPDATES', 'BLOCK_SERVERS', 'MANAGE_RO_LINK'])
+VALUES ('Super Admin', ARRAY['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'POST_UPDATES', 'BLOCK_SERVERS', 'MANAGE_MODULES', 'MANAGE_RO_LINK'])
 ON CONFLICT (name) DO NOTHING;
 
 UPDATE public.management_roles
 SET permissions = ARRAY(
     SELECT DISTINCT permission
-    FROM unnest(COALESCE(permissions, ARRAY[]::TEXT[]) || ARRAY['POST_UPDATES']) AS permission
+    FROM unnest(COALESCE(permissions, ARRAY[]::TEXT[]) || ARRAY['POST_UPDATES', 'MANAGE_MODULES']) AS permission
 )
 WHERE name = 'Super Admin';
 

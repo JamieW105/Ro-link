@@ -1768,6 +1768,17 @@ function RoLink:Initialize()
 		end
 	end)
 
+	self.loadedModules = self.loadedModules or {}
+	self.moduleCommands = self.moduleCommands or {}
+
+	task.spawn(function()
+		self:LoadModules()
+		while true do
+			task.wait(60)
+			self:LoadModules()
+		end
+	end)
+
 	-- 2. Security Check (Block Unverified Joins)
 	Players.PlayerAdded:Connect(function(player)
 		-- Wait for settings to load if they haven't yet
@@ -1842,7 +1853,122 @@ function RoLink:Initialize()
 	end)
 end
 
+function RoLink:BuildModuleContext(moduleInfo)
+	return {
+		RoLink = self,
+		Module = moduleInfo,
+		Settings = moduleInfo and moduleInfo.settings or {},
+		Services = {
+			HttpService = Http,
+			Players = Players,
+			MessagingService = MS
+		},
+		RegisterCommand = function(commandName, handler)
+			if type(commandName) ~= "string" or type(handler) ~= "function" then return end
+			local key = string.upper(commandName)
+			self.moduleCommands[key] = {
+				handler = handler,
+				moduleKey = tostring((moduleInfo and (moduleInfo.slug or moduleInfo.id)) or "unknown"),
+				module = moduleInfo
+			}
+		end,
+		Log = function(...)
+			print("[Ro-Link Module]", ...)
+		end
+	}
+end
+
+function RoLink:LoadModules()
+	local loader = loadstring
+	if type(loader) ~= "function" then
+		warn("[Ro-Link] Add-on modules require ServerScriptService.LoadStringEnabled.")
+		return
+	end
+
+	local ok, response = pcall(function()
+		return Http:RequestAsync({
+			Url = URL .. "/api/v1/game-admin/modules",
+			Method = "GET",
+			Headers = { ["x-api-key"] = KEY }
+		})
+	end)
+
+	if not ok or not response or response.StatusCode ~= 200 then
+		return
+	end
+
+	local decodedOk, payload = pcall(function()
+		return Http:JSONDecode(response.Body)
+	end)
+
+	if not decodedOk or type(payload) ~= "table" or type(payload.modules) ~= "table" then
+		return
+	end
+
+	for _, moduleInfo in ipairs(payload.modules) do
+		local moduleKey = tostring(moduleInfo.slug or moduleInfo.id or "")
+		local source = tostring(moduleInfo.sourceCode or "")
+		local checksum = tostring(moduleInfo.sourceChecksum or moduleInfo.version or "")
+
+		if moduleKey ~= "" and source ~= "" then
+			local existing = self.loadedModules[moduleKey]
+			if not existing or existing.checksum ~= checksum then
+				for commandName, binding in pairs(self.moduleCommands) do
+					if binding.moduleKey == moduleKey then
+						self.moduleCommands[commandName] = nil
+					end
+				end
+
+				local chunk, loadError = loader(source)
+				if not chunk then
+					warn("[Ro-Link] Failed to load module " .. moduleKey .. ": " .. tostring(loadError))
+				else
+					local runOk, exported = pcall(chunk)
+					if not runOk then
+						warn("[Ro-Link] Module " .. moduleKey .. " failed during startup: " .. tostring(exported))
+					else
+						local context = self:BuildModuleContext(moduleInfo)
+						if type(exported) == "function" then
+							exported = { Init = exported }
+						end
+						if type(exported) == "table" then
+							if type(exported.Commands) == "table" then
+								for commandName, handler in pairs(exported.Commands) do
+									context.RegisterCommand(commandName, handler)
+								end
+							end
+							if type(exported.Init) == "function" then
+								local initOk, initError = pcall(exported.Init, context, moduleInfo.settings or {})
+								if not initOk then
+									warn("[Ro-Link] Module " .. moduleKey .. " init failed: " .. tostring(initError))
+								end
+							end
+						end
+						self.loadedModules[moduleKey] = {
+							checksum = checksum,
+							module = moduleInfo
+						}
+					end
+				end
+			end
+		end
+	end
+end
+
 function RoLink:Execute(cmd)
+	if not cmd or not cmd.command then return end
+	cmd.args = cmd.args or {}
+	cmd.command = string.upper(tostring(cmd.command))
+
+	if self.moduleCommands and self.moduleCommands[cmd.command] then
+		local binding = self.moduleCommands[cmd.command]
+		local ok, moduleError = pcall(binding.handler, cmd, self:BuildModuleContext(binding.module), cmd.args)
+		if not ok then
+			warn("[Ro-Link] Module command " .. tostring(cmd.command) .. " failed: " .. tostring(moduleError))
+		end
+		return
+	end
+
 	local u, r = cmd.args.username, cmd.args.reason or "No reason"
 	local p = Players:FindFirstChild(u) 
     

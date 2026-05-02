@@ -20,6 +20,7 @@ const ALL_PERMISSIONS = [
     { id: 'POST_JOB_APPLICATION', name: 'Post Job Application' },
     { id: 'POST_UPDATES', name: 'Post Updates' },
     { id: 'BLOCK_SERVERS', name: 'Block Servers' },
+    { id: 'MANAGE_MODULES', name: 'Manage Modules' },
     { id: 'MANAGE_RO_LINK', name: 'Manage Ro-Link (Full Admin)' },
 ];
 
