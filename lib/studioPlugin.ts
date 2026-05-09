@@ -77,6 +77,7 @@ export interface StudioPluginServerSummary {
     universeId: string;
     hasOpenCloudKey: boolean;
     hasApiKey: boolean;
+    apiKey: string | null;
     isConfigured: boolean;
     setupUrl: string;
 }
@@ -619,7 +620,8 @@ export async function getStudioPluginServers(req: Request, session: StudioPlugin
             const placeId = typeof setup?.place_id === 'string' ? setup.place_id : '';
             const universeId = typeof setup?.universe_id === 'string' ? setup.universe_id : '';
             const hasOpenCloudKey = Boolean(setup?.open_cloud_key?.trim());
-            const hasApiKey = Boolean(setup?.api_key?.trim());
+            const apiKey = setup?.api_key?.trim() || null;
+            const hasApiKey = Boolean(apiKey);
 
             return {
                 id: guild.id,
@@ -632,6 +634,7 @@ export async function getStudioPluginServers(req: Request, session: StudioPlugin
                 universeId,
                 hasOpenCloudKey,
                 hasApiKey,
+                apiKey,
                 isConfigured: Boolean(placeId && universeId && hasOpenCloudKey && hasApiKey),
                 setupUrl: `${baseUrl}/dashboard/${guild.id}/settings/setup`,
             } satisfies StudioPluginServerSummary;
