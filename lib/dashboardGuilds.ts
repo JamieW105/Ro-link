@@ -74,9 +74,58 @@ export function hasDiscordGuildManagePermission(permissionBits?: string | null, 
     }
 }
 
+async function listBotGuilds() {
+    const botGuilds: BotGuildRecord[] = [];
+    let botAfter = '0';
+    const discordRest = rest;
+
+    if (!discordRest) {
+        console.warn('[DASHBOARD][GUILDS] Missing DISCORD_TOKEN while loading bot guilds. Returning an empty bot guild list.');
+        return botGuilds;
+    }
+
+    try {
+        while (true) {
+            const data = await discordRest.get(Routes.userGuilds(), {
+                query: new URLSearchParams({ after: botAfter, limit: '100' }),
+            }) as BotGuildRecord[];
+
+            if (!Array.isArray(data) || data.length === 0) {
+                break;
+            }
+
+            botGuilds.push(...data);
+            botAfter = data[data.length - 1].id;
+
+            if (data.length < 100) {
+                break;
+            }
+        }
+    } catch (error) {
+        console.warn('[DASHBOARD][GUILDS] Failed to load bot guilds. Returning an empty bot guild list.', {
+            error: error instanceof Error ? error.message : error,
+        });
+    }
+
+    return botGuilds;
+}
+
 export async function listVisibleGuildsForDiscordSession(accessToken: string, discordUserId: string) {
     const userGuilds: DiscordGuildRecord[] = [];
     const isSuperUser = discordUserId === SUPER_USER_DISCORD_ID;
+
+    if (isSuperUser) {
+        const botGuilds = await listBotGuilds();
+        return botGuilds.map((guild) => ({
+            id: guild.id,
+            name: guild.name,
+            icon: guild.icon,
+            permissions: '0',
+            owner: true,
+            hasBot: true,
+        } satisfies VisibleDashboardGuild));
+    }
+
     let after = '0';
 
     while (true) {
@@ -119,37 +168,7 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
         }
     }
 
-    const botGuilds: BotGuildRecord[] = [];
-    let botAfter = '0';
-
-    const discordRest = rest;
-
-    if (!discordRest) {
-        console.warn('[DASHBOARD][GUILDS] Missing DISCORD_TOKEN while loading bot guilds. Returning user guilds without bot matches.');
-    } else {
-        try {
-            while (true) {
-                const data = await discordRest.get(Routes.userGuilds(), {
-                    query: new URLSearchParams({ after: botAfter, limit: '100' }),
-                }) as BotGuildRecord[];
-
-                if (!Array.isArray(data) || data.length === 0) {
-                    break;
-                }
-
-                botGuilds.push(...data);
-                botAfter = data[data.length - 1].id;
-
-                if (data.length < 100) {
-                    break;
-                }
-            }
-        } catch (error) {
-            console.warn('[DASHBOARD][GUILDS] Failed to load bot guilds. Returning user guilds without bot matches.', {
-                error: error instanceof Error ? error.message : error,
-            });
-        }
-    }
+    const botGuilds = await listBotGuilds();
 
     const botGuildIds = new Set(botGuilds.map((guild) => guild.id));
 
@@ -158,6 +177,7 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
     const potentialRoleAccessGuilds = userGuilds.filter((guild) => botGuildIds.has(guild.id) && !adminGuildIds.has(guild.id));
 
     let roleAccessGuilds: VisibleDashboardGuild[] = [];
+    const discordRest = rest;
 
     if (discordRest && potentialRoleAccessGuilds.length > 0) {
         const { data: accessRoles } = await supabase
