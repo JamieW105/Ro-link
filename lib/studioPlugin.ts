@@ -78,6 +78,7 @@ export interface StudioPluginServerSummary {
     hasOpenCloudKey: boolean;
     hasApiKey: boolean;
     apiKey: string | null;
+    apiBaseUrl: string;
     isConfigured: boolean;
     setupUrl: string;
 }
@@ -635,6 +636,7 @@ export async function getStudioPluginServers(req: Request, session: StudioPlugin
                 hasOpenCloudKey,
                 hasApiKey,
                 apiKey,
+                apiBaseUrl: baseUrl,
                 isConfigured: Boolean(placeId && universeId && hasOpenCloudKey && hasApiKey),
                 setupUrl: `${baseUrl}/dashboard/${guild.id}/settings/setup`,
             } satisfies StudioPluginServerSummary;
