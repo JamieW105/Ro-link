@@ -188,7 +188,17 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             ),
             href: `/dashboard/${id}/verification`
         },
-    ];
+        {
+            label: "Modules",
+            icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m12 2 7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4Z" /><path d="M9 11h6" /><path d="M9 15h4" />
+                </svg>
+            ),
+            href: `/dashboard/${id}/modules`,
+            hide: !userPermissions.can_manage_settings
+        },
+    ].filter(item => !item.hide);
 
     const moderationItems = [
         {
@@ -233,16 +243,6 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             hide: !userPermissions.can_manage_settings
         },
         {
-            label: "Connection",
-            icon: (
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M12 8v4" /><path d="M12 16h.01" />
-                </svg>
-            ),
-            href: `/dashboard/${id}/settings/setup`,
-            hide: !userPermissions.can_manage_settings
-        },
-        {
             label: "Roles",
             icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -260,26 +260,6 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 </svg>
             ),
             href: `/dashboard/${id}/settings/commands`,
-            hide: !userPermissions.can_manage_settings
-        },
-        {
-            label: "Modules",
-            icon: (
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m12 2 7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4Z" /><path d="M9 11h6" /><path d="M9 15h4" />
-                </svg>
-            ),
-            href: `/dashboard/${id}/modules`,
-            hide: !userPermissions.can_manage_settings
-        },
-        {
-            label: "Logging",
-            icon: (
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M16 13H8" /><path d="M16 17H8" />
-                </svg>
-            ),
-            href: `/dashboard/${id}/settings/logging`,
             hide: !userPermissions.can_manage_settings
         },
         {

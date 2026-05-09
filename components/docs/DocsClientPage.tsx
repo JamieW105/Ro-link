@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, type ReactNode, type SVGProps } from 'react';
+import { isValidElement, useEffect, useMemo, useRef, useState, type ReactNode, type SVGProps } from 'react';
 
 type IconComponent = (props: SVGProps<SVGSVGElement>) => ReactNode;
 type DocCategory = 'Platform' | 'Operations' | 'Configuration' | 'Developer';
@@ -26,6 +26,32 @@ type DocPage = {
     stats: StatItem[];
     toc: TocItem[];
     content: ReactNode;
+};
+
+type SearchableElementProps = {
+    children?: ReactNode;
+    title?: ReactNode;
+    description?: ReactNode;
+    eyebrow?: ReactNode;
+    label?: ReactNode;
+    value?: ReactNode;
+    items?: ReactNode[];
+    headers?: ReactNode[];
+    rows?: ReactNode[][];
+};
+
+type DocSearchEntry = {
+    key: string;
+    pageId: string;
+    sectionId: string | null;
+    title: string;
+    subtitle: string;
+    body: string;
+    tokens: string;
+};
+
+type DocSearchResult = DocSearchEntry & {
+    score: number;
 };
 
 const INSTALLER_PLUGIN_URL = 'https://create.roblox.com/store/asset/87859041511603/RoLink-installer';
@@ -365,6 +391,89 @@ function NavButton({
             <span className="truncate">{children}</span>
         </button>
     );
+}
+
+function normalizeSearchText(value: string) {
+    return value.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function collectSearchText(node: ReactNode): string {
+    if (node === null || node === undefined || typeof node === 'boolean') return '';
+    if (typeof node === 'string' || typeof node === 'number') return String(node);
+    if (Array.isArray(node)) return node.map(collectSearchText).filter(Boolean).join(' ');
+
+    if (isValidElement<SearchableElementProps>(node)) {
+        const props = node.props;
+        const values: ReactNode[] = [props.eyebrow, props.title, props.description, props.label, props.value, props.children];
+
+        if (Array.isArray(props.items)) values.push(...props.items);
+        if (Array.isArray(props.headers)) values.push(...props.headers);
+        if (Array.isArray(props.rows)) values.push(...props.rows.flat());
+
+        return values.map(collectSearchText).filter(Boolean).join(' ');
+    }
+
+    return '';
+}
+
+function buildSearchEntries(pages: DocPage[]): DocSearchEntry[] {
+    return pages.flatMap((page) => {
+        const pageBody = [
+            page.eyebrow,
+            page.summary,
+            page.category,
+            ...page.stats.flatMap((stat) => [stat.label, stat.value]),
+            ...page.toc.map((item) => item.title),
+            collectSearchText(page.content),
+        ].join(' ');
+
+        const pageEntry: DocSearchEntry = {
+            key: page.id,
+            pageId: page.id,
+            sectionId: null,
+            title: page.title,
+            subtitle: page.category,
+            body: pageBody,
+            tokens: normalizeSearchText(`${page.title} ${pageBody}`),
+        };
+
+        const sectionEntries = page.toc.map((section) => {
+            const body = `${page.title} ${page.summary} ${page.category} ${section.title} ${pageBody}`;
+
+            return {
+                key: `${page.id}/${section.id}`,
+                pageId: page.id,
+                sectionId: section.id,
+                title: section.title,
+                subtitle: page.title,
+                body,
+                tokens: normalizeSearchText(body),
+            };
+        });
+
+        return [pageEntry, ...sectionEntries];
+    });
+}
+
+function scoreSearchEntry(entry: DocSearchEntry, query: string, queryParts: string[]) {
+    const title = normalizeSearchText(entry.title);
+    const subtitle = normalizeSearchText(entry.subtitle);
+    let score = 0;
+
+    if (title === query) score += 120;
+    if (title.startsWith(query)) score += 80;
+    if (title.includes(query)) score += 50;
+    if (subtitle.includes(query)) score += 25;
+    if (entry.tokens.includes(query)) score += 15;
+
+    for (const part of queryParts) {
+        if (title.includes(part)) score += 16;
+        else if (subtitle.includes(part)) score += 8;
+        else if (entry.tokens.includes(part)) score += 4;
+    }
+
+    if (!entry.sectionId) score += 5;
+    return score;
 }
 
 const commandGroups = [
@@ -1351,6 +1460,9 @@ export default function DocsClientPage() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [pendingSectionId, setPendingSectionId] = useState<string | null>(null);
     const [copiedPageLink, setCopiedPageLink] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
     const activePage = docsPages.find((page) => page.id === activePageId) || docsPages[0];
     const ActivePageIcon = activePage.icon;
@@ -1358,6 +1470,18 @@ export default function DocsClientPage() {
     const previousPage = activePageIndex > 0 ? docsPages[activePageIndex - 1] : null;
     const nextPage = activePageIndex >= 0 && activePageIndex < docsPages.length - 1 ? docsPages[activePageIndex + 1] : null;
     const pagerPages = [previousPage, nextPage].filter((page): page is DocPage => Boolean(page));
+    const searchEntries = useMemo(() => buildSearchEntries(docsPages), []);
+    const searchResults = useMemo(() => {
+        const query = normalizeSearchText(searchQuery);
+        if (!query) return searchEntries.slice(0, 8).map((entry) => ({ ...entry, score: 0 }));
+
+        const queryParts = query.split(' ').filter(Boolean);
+        return searchEntries
+            .map((entry) => ({ ...entry, score: scoreSearchEntry(entry, query, queryParts) }))
+            .filter((entry) => entry.score > 0)
+            .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title))
+            .slice(0, 8);
+    }, [searchEntries, searchQuery]);
 
     useEffect(() => {
         function syncFromHash() {
@@ -1377,6 +1501,29 @@ export default function DocsClientPage() {
         window.addEventListener('hashchange', syncFromHash);
         return () => window.removeEventListener('hashchange', syncFromHash);
     }, []);
+
+    useEffect(() => {
+        function handleSearchShortcut(event: KeyboardEvent) {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+                event.preventDefault();
+                setSearchOpen(true);
+            }
+
+            if (event.key === 'Escape') {
+                setSearchOpen(false);
+            }
+        }
+
+        window.addEventListener('keydown', handleSearchShortcut);
+        return () => window.removeEventListener('keydown', handleSearchShortcut);
+    }, []);
+
+    useEffect(() => {
+        if (!searchOpen) return;
+
+        const timeout = window.setTimeout(() => searchInputRef.current?.focus(), 0);
+        return () => window.clearTimeout(timeout);
+    }, [searchOpen]);
 
     useEffect(() => {
         if (!pendingSectionId) return;
@@ -1407,6 +1554,28 @@ export default function DocsClientPage() {
         window.history.replaceState(null, '', `#${activePageId}/${sectionId}`);
     }
 
+    function openSearchResult(result: DocSearchResult) {
+        const targetPage = docsPages.find((page) => page.id === result.pageId);
+        if (!targetPage) return;
+
+        const targetSectionId = result.sectionId || targetPage.toc[0]?.id || null;
+
+        setActivePageId(targetPage.id);
+        setActiveSectionId(targetSectionId);
+        setMobileMenuOpen(false);
+        setSearchOpen(false);
+        setSearchQuery('');
+
+        if (result.sectionId) {
+            setPendingSectionId(result.sectionId);
+            window.history.replaceState(null, '', `#${targetPage.id}/${result.sectionId}`);
+        } else {
+            setPendingSectionId(null);
+            window.history.replaceState(null, '', `#${targetPage.id}`);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+
     function copyCurrentPageLink() {
         const currentUrl = new URL(window.location.href);
         currentUrl.hash = activeSectionId ? `${activePageId}/${activeSectionId}` : activePageId;
@@ -1429,6 +1598,7 @@ export default function DocsClientPage() {
                     <div className="hidden items-center gap-4 lg:flex">
                         <button
                             type="button"
+                            onClick={() => setSearchOpen(true)}
                             className="flex min-w-[230px] items-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-4 py-2 text-left text-sm text-slate-400"
                         >
                             <Icons.Search className="h-4 w-4" />
@@ -1446,6 +1616,70 @@ export default function DocsClientPage() {
                     </button>
                 </div>
             </header>
+
+            {searchOpen && (
+                <div className="fixed inset-0 z-50 bg-black/65 px-4 py-20 backdrop-blur-sm" onMouseDown={() => setSearchOpen(false)}>
+                    <div
+                        className="mx-auto w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-[#181818] shadow-2xl shadow-black/40"
+                        onMouseDown={(event) => event.stopPropagation()}
+                    >
+                        <div className="flex items-center gap-3 border-b border-white/8 px-4 py-3">
+                            <Icons.Search className="h-5 w-5 shrink-0 text-slate-500" />
+                            <input
+                                ref={searchInputRef}
+                                value={searchQuery}
+                                onChange={(event) => setSearchQuery(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter' && searchResults[0]) {
+                                        event.preventDefault();
+                                        openSearchResult(searchResults[0]);
+                                    }
+                                }}
+                                placeholder="Search docs..."
+                                className="h-11 min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-slate-500"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setSearchOpen(false)}
+                                className="rounded-lg border border-white/10 px-2 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-500 transition-colors hover:text-white"
+                            >
+                                Esc
+                            </button>
+                        </div>
+
+                        <div className="max-h-[min(520px,65vh)] overflow-y-auto p-2">
+                            {searchResults.length > 0 ? (
+                                <div className="space-y-1">
+                                    {searchResults.map((result) => (
+                                        <button
+                                            key={result.key}
+                                            type="button"
+                                            onClick={() => openSearchResult(result)}
+                                            className="group flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-white/[0.04]"
+                                        >
+                                            <div className="mt-0.5 rounded-lg border border-white/10 bg-white/[0.03] p-2 text-sky-300">
+                                                <Icons.Book className="h-4 w-4" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-semibold text-white group-hover:text-sky-200">{result.title}</p>
+                                                <p className="mt-1 truncate text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                                                    {result.sectionId ? `${result.subtitle} / Section` : result.subtitle}
+                                                </p>
+                                            </div>
+                                            <Icons.ChevronRight className="mt-2 h-4 w-4 text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-sky-200" />
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="px-4 py-10 text-center">
+                                    <p className="text-sm font-semibold text-white">No results found</p>
+                                    <p className="mt-2 text-sm text-slate-500">Try a page name, setup step, API route, or command.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="pt-16">
                 <aside
