@@ -148,12 +148,13 @@ Once your web server is running and your Discord server is linked via `/setup`:
 
 ## Module Developer API
 
-Marketplace modules are uploaded from the management portal, published by users with the required management permissions, enabled per Discord server from the dashboard, and loaded by the Roblox admin panel at runtime.
+Marketplace modules are uploaded from the management portal, published by users with the required management permissions, enabled per Discord server from the dashboard, installed by the Studio plugin into `ReplicatedStorage.ModularAdmin["Custom Modules"]`, and loaded by the Roblox admin panel at runtime.
 
-Each uploaded Luau module can declare a top-level `CONFIG` table before returning its module table. The dashboard reads that schema and saves per-server values.
+Each uploaded Luau module can declare a top-level `CONFIG` table before returning its module table. `CONFIG.Version` is used as the module's update version when the upload form does not provide one. The dashboard reads the rest of that schema and saves per-server values.
 
 ```lua
 CONFIG = {
+    Version = "1.0.0",
     Debug_UI = {
         Short_Description = "Show a debug panel for this module.",
         Type = "Bool",
@@ -206,7 +207,7 @@ return {
 | `context.OnCommandBarOpened(handler)` | Runs when an authorized player opens the command bar. |
 | `context.SendBotMessage(target, user, channelId, content)` | Sends a Discord bot message through Ro-Link with server and channel validation. |
 | `context.GetDiscordChannels()` | Returns Discord channels the bot can send to for the current server. |
-| `context.CreateUI(target, sourceCodeOrTree, props)` | Creates Roblox UI for a player, all players, or a target list. Accepts source code, a function, or a UI tree table. |
+| `context.CreateUI(target, functionOrTree, props)` | Creates Roblox UI for a player, all players, or a target list. Installed modules should pass a function or UI tree table. |
 | `context.FindPlayer(target)` | Finds one live Roblox player by player instance, username, or UserId. |
 | `context.GetPlayers()` | Returns live Roblox players. |
 | `context.Notify(target, message, success)` | Shows admin feedback where the Studio package has the feedback remote available. |
@@ -246,23 +247,21 @@ return {
         end)
 
         context.OnCommandBarOpened(function(player)
-            context.CreateUI(player, [[
-                return function(ui)
-                    local label = ui.Create("TextLabel", {
-                        Size = UDim2.new(0, 260, 0, 48),
-                        Text = "Module UI",
-                        BackgroundColor3 = Color3.fromRGB(15, 23, 42),
-                        TextColor3 = Color3.fromRGB(255, 255, 255)
-                    })
-                    return label
-                end
-            ]])
+            context.CreateUI(player, function(ui)
+                local label = ui.Create("TextLabel", {
+                    Size = UDim2.new(0, 260, 0, 48),
+                    Text = "Module UI",
+                    BackgroundColor3 = Color3.fromRGB(15, 23, 42),
+                    TextColor3 = Color3.fromRGB(255, 255, 255)
+                })
+                return label
+            end)
         end)
     end
 }
 ```
 
-Dynamic source-based modules and `CreateUI` source strings require `ServerScriptService.LoadStringEnabled`.
+Marketplace modules are installed by the Studio plugin as ModuleScripts, so `CreateUI` source strings are disabled in the runtime loader.
 
 ---
 

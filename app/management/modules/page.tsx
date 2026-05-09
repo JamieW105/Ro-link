@@ -40,6 +40,7 @@ const emptyForm: ModuleForm = {
 };
 
 const developerApiExample = `CONFIG = {
+    Version = "1.0.0",
     Debug_UI = {
         Short_Description = "Show a live test panel when the module loads.",
         Type = "Bool",
@@ -78,17 +79,15 @@ return {
         end)
 
         context.OnCommandBarOpened(function(player)
-            context.CreateUI(player, [[
-                return function(ui)
-                    local label = ui.Create("TextLabel", {
-                        Size = UDim2.new(0, 260, 0, 48),
-                        Text = "Module UI: " .. tostring(ui.Settings.Debug_UI),
-                        BackgroundColor3 = Color3.fromRGB(15, 23, 42),
-                        TextColor3 = Color3.fromRGB(255, 255, 255)
-                    })
-                    return label
-                end
-            ]])
+            context.CreateUI(player, function(ui)
+                local label = ui.Create("TextLabel", {
+                    Size = UDim2.new(0, 260, 0, 48),
+                    Text = "Module UI: " .. tostring(ui.Settings.Debug_UI),
+                    BackgroundColor3 = Color3.fromRGB(15, 23, 42),
+                    TextColor3 = Color3.fromRGB(255, 255, 255)
+                })
+                return label
+            end)
         end)
     end,
 

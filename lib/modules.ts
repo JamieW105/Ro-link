@@ -51,6 +51,82 @@ export function checksumModuleSource(sourceCode: string) {
     return createHash('sha256').update(sourceCode, 'utf8').digest('hex');
 }
 
+export function obfuscateModuleSourceForStudio(sourceCode: string) {
+    let output = '';
+    let quote: '"' | "'" | null = null;
+    let escaped = false;
+    let longStringDepth = 0;
+
+    for (let index = 0; index < sourceCode.length; index += 1) {
+        const char = sourceCode[index];
+        const next = sourceCode[index + 1];
+
+        if (longStringDepth > 0) {
+            output += char;
+            if (char === ']' && next === ']') {
+                output += next;
+                index += 1;
+                longStringDepth -= 1;
+            }
+            continue;
+        }
+
+        if (quote) {
+            output += char;
+            if (escaped) {
+                escaped = false;
+            } else if (char === '\\') {
+                escaped = true;
+            } else if (char === quote) {
+                quote = null;
+            }
+            continue;
+        }
+
+        if (char === '"' || char === "'") {
+            quote = char;
+            output += char;
+            continue;
+        }
+
+        if (char === '[' && next === '[') {
+            longStringDepth += 1;
+            output += char + next;
+            index += 1;
+            continue;
+        }
+
+        if (char === '-' && next === '-') {
+            const third = sourceCode[index + 2];
+            const fourth = sourceCode[index + 3];
+            if (third === '[' && fourth === '[') {
+                index += 4;
+                while (index < sourceCode.length && !(sourceCode[index] === ']' && sourceCode[index + 1] === ']')) {
+                    index += 1;
+                }
+                index += 1;
+                continue;
+            }
+
+            while (index < sourceCode.length && sourceCode[index] !== '\n') {
+                index += 1;
+            }
+            output += '\n';
+            continue;
+        }
+
+        output += char;
+    }
+
+    const compacted = output
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join('\n');
+
+    return `-- Ro-Link managed marketplace module. Source is compacted before Studio insertion.\n${compacted}\n`;
+}
+
 function splitTopLevelEntries(value: string) {
     const entries: string[] = [];
     let current = '';
@@ -272,6 +348,30 @@ export function parseModuleConfigSchema(sourceCode: string): ModuleConfigSchema 
     return schema;
 }
 
+export function parseModuleConfigVersion(sourceCode: string) {
+    const configMatch = /(?:^|\n)\s*(?:local\s+)?CONFIG\s*=\s*\{/m.exec(sourceCode);
+    if (!configMatch) return '';
+
+    const openBraceIndex = sourceCode.indexOf('{', configMatch.index);
+    if (openBraceIndex < 0) return '';
+
+    const closeBraceIndex = findMatchingBrace(sourceCode, openBraceIndex);
+    if (closeBraceIndex < 0) return '';
+
+    const inner = sourceCode.slice(openBraceIndex + 1, closeBraceIndex);
+    for (const entry of splitTopLevelEntries(inner)) {
+        const match = entry.match(/^\s*(?:\["([^"]+)"\]|\['([^']+)'\]|([A-Za-z_][A-Za-z0-9_]*))\s*=\s*([\s\S]*)$/);
+        if (!match) continue;
+
+        const key = trimModuleString(match[1] || match[2] || match[3], 80).toLowerCase();
+        if (key !== 'version') continue;
+
+        return trimModuleString(parseSimpleLuaValue(match[4]), 40);
+    }
+
+    return '';
+}
+
 export function parseModuleConfigSettings(value: unknown, schema: ModuleConfigSchema) {
     const rawSettings = parseModuleSettings(value);
     const settings: Record<string, unknown> = {};
@@ -353,6 +453,10 @@ export function sanitizeAddonModuleInput(body: Record<string, unknown>, partial 
         } else {
             input.sourceCode = sourceCode;
             input.configSchema = parseModuleConfigSchema(sourceCode);
+            const configVersion = parseModuleConfigVersion(sourceCode);
+            if (configVersion) {
+                input.version = configVersion;
+            }
         }
     }
 

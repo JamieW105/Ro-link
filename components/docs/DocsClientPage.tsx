@@ -515,7 +515,7 @@ const moduleDeveloperFunctions = [
     ['OnCommandBarOpened(handler)', 'function', 'Runs when an authorized user opens the in-game command bar. Handler receives player, payload, and context.'],
     ['SendBotMessage(target, user, channelId, content)', 'function', 'Sends a Discord bot message through Ro-Link after validating the server, channel, or member target.'],
     ['GetDiscordChannels()', 'function', 'Returns sendable Discord channels for the current server.'],
-    ['CreateUI(target, sourceCodeOrTree, props)', 'function', 'Creates Roblox UI for one player, all players, or a target list. Supports Luau source, a function, or a UI tree table.'],
+    ['CreateUI(target, functionOrTree, props)', 'function', 'Creates Roblox UI for one player, all players, or a target list. Installed modules should pass a function or UI tree table.'],
     ['FindPlayer(target)', 'function', 'Finds one live Roblox player by Player instance, username, or UserId.'],
     ['GetPlayers()', 'function', 'Returns the current live Players list.'],
     ['Notify(target, message, success)', 'function', 'Shows admin-panel feedback where the Studio package exposes the feedback remote.'],
@@ -1154,11 +1154,12 @@ const docsPages: DocPage[] = [
                     id="module-api-overview"
                     eyebrow="Structure"
                     title="Return a module table from your uploaded Luau"
-                    description="Marketplace modules are uploaded in the management portal, published by staff with the required permissions, enabled per server from the dashboard, and loaded by the Roblox admin panel at runtime."
+                    description="Marketplace modules are uploaded in the management portal, published by staff with the required permissions, enabled per server from the dashboard, installed into Custom Modules by the Studio plugin, and loaded by the Roblox admin panel at runtime."
                 >
                     <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
                         <CodeBlock label="Minimal module shape">
                             {`CONFIG = {
+    Version = "1.0.0",
     Debug_UI = {
         Short_Description = "Show extra module UI.",
         Type = "Bool",
@@ -1186,7 +1187,7 @@ return {
 }`}
                         </CodeBlock>
                         <Callout title="Runtime requirements" tone="warn">
-                            Dashboard config is declared with a top-level CONFIG table. Saved values are available to the module as context.Settings and the schema is available as context.Config.
+                            Dashboard config is declared with a top-level CONFIG table. CONFIG.Version can drive module updates, saved values are available as context.Settings, and the schema is available as context.Config.
                         </Callout>
                     </div>
                 </SectionCard>

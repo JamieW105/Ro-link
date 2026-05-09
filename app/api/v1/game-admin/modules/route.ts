@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getServerByApiKey } from '@/lib/gameAdmin';
-import { normalizeAddonModule, parseModuleConfigSettings, parseStoredModuleConfigSchema } from '@/lib/modules';
+import { normalizeAddonModule, obfuscateModuleSourceForStudio, parseModuleConfigSettings, parseStoredModuleConfigSchema } from '@/lib/modules';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -60,8 +60,14 @@ export async function GET(req: Request) {
             }
             const configSchema = parseStoredModuleConfigSchema(moduleRow.config_schema);
 
+            const normalized = normalizeAddonModule(moduleRow, true);
+            if (!normalized) {
+                return null;
+            }
+
             return {
-                ...normalizeAddonModule(moduleRow, true),
+                ...normalized,
+                sourceCode: obfuscateModuleSourceForStudio(String(normalized.sourceCode || '')),
                 settings: parseModuleConfigSettings(row.settings, configSchema),
             };
         })
