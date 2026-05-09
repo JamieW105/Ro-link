@@ -10,8 +10,19 @@ export class DiscordAccessTokenError extends Error {
     }
 }
 
+export class DiscordRateLimitError extends Error {
+    retryAfter: number | null;
+
+    constructor(message = 'Discord rate limited the guild list request.', retryAfter: number | null = null) {
+        super(message);
+        this.name = 'DiscordRateLimitError';
+        this.retryAfter = retryAfter;
+    }
+}
+
 const ADMINISTRATOR_PERMISSION = 0x8n;
 const MANAGE_GUILD_PERMISSION = 0x20n;
+const SUPER_USER_DISCORD_ID = '953414442060746854';
 
 const rest = process.env.DISCORD_TOKEN
     ? new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN)
@@ -65,6 +76,7 @@ export function hasDiscordGuildManagePermission(permissionBits?: string | null, 
 
 export async function listVisibleGuildsForDiscordSession(accessToken: string, discordUserId: string) {
     const userGuilds: DiscordGuildRecord[] = [];
+    const isSuperUser = discordUserId === SUPER_USER_DISCORD_ID;
     let after = '0';
 
     while (true) {
@@ -76,6 +88,17 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
         if (!res.ok) {
             if (res.status === 401) {
                 throw new DiscordAccessTokenError();
+            }
+            if (res.status === 429) {
+                const retryAfterHeader = res.headers.get('retry-after');
+                const retryAfter = retryAfterHeader ? Number(retryAfterHeader) : null;
+                if (isSuperUser && userGuilds.length === 0) {
+                    console.warn('[DASHBOARD][GUILDS] Discord rate limited superuser guild lookup. Falling back to bot guild visibility.', {
+                        retryAfter,
+                    });
+                    break;
+                }
+                throw new DiscordRateLimitError(`Failed to fetch user guilds (${res.status})`, Number.isFinite(retryAfter) ? retryAfter : null);
             }
             if (userGuilds.length === 0) {
                 throw new Error(`Failed to fetch user guilds (${res.status})`);
@@ -129,7 +152,6 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
     }
 
     const botGuildIds = new Set(botGuilds.map((guild) => guild.id));
-    const isSuperUser = discordUserId === '953414442060746854';
 
     const adminGuilds = userGuilds.filter((guild) => hasDiscordGuildManagePermission(guild.permissions, guild.owner));
     const adminGuildIds = new Set(adminGuilds.map((guild) => guild.id));

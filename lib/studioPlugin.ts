@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { resolveDashboardUserPermissions } from './gameAdmin';
 import {
     DiscordAccessTokenError,
+    DiscordRateLimitError,
     hasDiscordGuildManagePermission,
     listVisibleGuildsForDiscordSession,
     type VisibleDashboardGuild,
@@ -439,9 +440,23 @@ async function resolveManageableGuildsForSession(
     mode: 'prefer_snapshot' | 'refresh',
 ): Promise<VisibleDashboardGuild[]> {
     if (mode === 'refresh') {
-        const live = await getManageableGuildsForPlugin(session);
-        await persistGuildSnapshot(session.id, live);
-        return live;
+        try {
+            const live = await getManageableGuildsForPlugin(session);
+            await persistGuildSnapshot(session.id, live);
+            return live;
+        } catch (error) {
+            const fromSnapshot = parseGuildSnapshot(session.guild_snapshot);
+            if (fromSnapshot !== null && !(error instanceof DiscordAccessTokenError)) {
+                console.warn('[PLUGIN][SERVERS] Refresh failed; using cached guild snapshot.', {
+                    sessionId: session.id,
+                    discordUserId: session.discord_user_id || null,
+                    error: error instanceof Error ? error.message : error,
+                    retryAfter: error instanceof DiscordRateLimitError ? error.retryAfter : null,
+                });
+                return fromSnapshot;
+            }
+            throw error;
+        }
     }
 
     const fromSnapshot = parseGuildSnapshot(session.guild_snapshot);
