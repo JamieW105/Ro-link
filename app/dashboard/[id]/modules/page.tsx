@@ -2,6 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
+
+type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color';
+
+interface ModuleConfigField {
+    key: string;
+    label: string;
+    shortDescription: string;
+    type: ModuleConfigFieldType;
+    options: string[];
+    defaultValue: boolean | string | string[];
+}
 
 interface MarketplaceModule {
     id: string;
@@ -12,6 +24,7 @@ interface MarketplaceModule {
     category: string;
     status: string;
     sourceChecksum: string;
+    configSchema: Record<string, ModuleConfigField>;
     installed: boolean;
     enabled: boolean;
     settings: Record<string, unknown>;
@@ -181,6 +194,9 @@ export default function DashboardModulesPage() {
                                     <div className="shrink-0 text-left sm:text-right">
                                         <div className="font-mono text-xs text-slate-500">v{addon.version}</div>
                                         <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-600">{addon.slug}</div>
+                                        <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                            {Object.keys(addon.configSchema || {}).length} config fields
+                                        </div>
                                     </div>
                                 </div>
 
@@ -212,6 +228,12 @@ export default function DashboardModulesPage() {
                                             </button>
                                         ) : (
                                             <>
+                                                <Link
+                                                    href={`/dashboard/${serverId}/modules/${addon.id}`}
+                                                    className="rounded-xl border border-sky-500/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10"
+                                                >
+                                                    Configure
+                                                </Link>
                                                 <button
                                                     onClick={() => sendAction(addon.id, addon.enabled ? 'disable' : 'enable')}
                                                     disabled={busy}

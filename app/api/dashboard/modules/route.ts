@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
-import { normalizeAddonModule, parseModuleSettings, trimModuleString } from '@/lib/modules';
+import { normalizeAddonModule, parseModuleConfigSettings, parseStoredModuleConfigSchema, trimModuleString } from '@/lib/modules';
 import { supabase } from '@/lib/supabase';
 
 interface InstalledModuleRow {
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
     const [{ data: modules, error: modulesError }, { data: installedRows, error: installedError }] = await Promise.all([
         supabase
             .from('addon_modules')
-            .select('id, slug, name, description, version, category, status, source_checksum, author_discord_id, created_at, updated_at, published_at')
+            .select('id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, created_at, updated_at, published_at')
             .eq('status', 'PUBLISHED')
             .order('name', { ascending: true }),
         supabase
@@ -69,11 +69,12 @@ export async function GET(req: Request) {
     return NextResponse.json({
         modules: ((modules || []) as Record<string, unknown>[]).map((row) => {
             const installed = installedByModule.get(String(row.id));
+            const configSchema = parseStoredModuleConfigSchema(row.config_schema);
             return {
                 ...normalizeAddonModule(row, false),
                 installed: Boolean(installed),
                 enabled: installed ? installed.enabled !== false : false,
-                settings: parseModuleSettings(installed?.settings),
+                settings: parseModuleConfigSettings(installed?.settings, configSchema),
                 installedAt: installed?.installed_at || null,
                 serverModuleUpdatedAt: installed?.updated_at || null,
             };
@@ -96,9 +97,9 @@ export async function POST(req: Request) {
 
     const { data: moduleRow, error: moduleError } = await supabase
         .from('addon_modules')
-        .select('id, status')
+        .select('id, status, config_schema')
         .eq('id', moduleId)
-        .maybeSingle<{ id: string; status: string }>();
+        .maybeSingle<{ id: string; status: string; config_schema?: unknown }>();
 
     if (moduleError) {
         return NextResponse.json({ error: moduleError.message }, { status: 500 });
@@ -107,6 +108,8 @@ export async function POST(req: Request) {
     if (!moduleRow || moduleRow.status !== 'PUBLISHED') {
         return NextResponse.json({ error: 'Published module not found.' }, { status: 404 });
     }
+
+    const configSchema = parseStoredModuleConfigSchema(moduleRow.config_schema);
 
     if (action === 'remove') {
         const { error } = await supabase
@@ -129,7 +132,7 @@ export async function POST(req: Request) {
                 server_id: serverId,
                 module_id: moduleId,
                 enabled: true,
-                settings: parseModuleSettings(body.settings),
+                settings: parseModuleConfigSettings(body.settings, configSchema),
                 installed_by: auth.userId,
                 updated_at: new Date().toISOString(),
             }, { onConflict: 'server_id,module_id' });
@@ -148,7 +151,7 @@ export async function POST(req: Request) {
 
         if (action === 'enable') updates.enabled = true;
         if (action === 'disable') updates.enabled = false;
-        if (action === 'settings') updates.settings = parseModuleSettings(body.settings);
+        if (action === 'settings') updates.settings = parseModuleConfigSettings(body.settings, configSchema);
 
         const { error } = await supabase
             .from('server_addon_modules')

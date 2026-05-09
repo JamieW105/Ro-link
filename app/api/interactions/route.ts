@@ -2173,12 +2173,12 @@ function RoLink:CreateModuleUi(moduleInfo, target, sourceOrTree, props)
 				local result = buildUiTree(sourceOrTree, playerGui)
 				results[player.Name] = result ~= nil
 			elseif type(sourceOrTree) == "function" then
-				local ok, result = pcall(sourceOrTree, { Player = player, PlayerGui = playerGui, Module = moduleInfo, Settings = moduleInfo and moduleInfo.settings or {} }, player, props or {})
+				local ok, result = pcall(sourceOrTree, { Player = player, PlayerGui = playerGui, Module = moduleInfo, Config = moduleInfo and moduleInfo.configSchema or {}, Settings = moduleInfo and moduleInfo.settings or {} }, player, props or {})
 				results[player.Name] = ok and attachUiResult(playerGui, moduleInfo, result) or tostring(result)
 			elseif type(sourceOrTree) == "string" and type(loadstring) == "function" then
 				local chunk, loadError = loadstring(sourceOrTree)
 				if chunk then
-					local ok, result = pcall(chunk, { Player = player, PlayerGui = playerGui, Module = moduleInfo, Settings = moduleInfo and moduleInfo.settings or {} }, player, props or {})
+					local ok, result = pcall(chunk, { Player = player, PlayerGui = playerGui, Module = moduleInfo, Config = moduleInfo and moduleInfo.configSchema or {}, Settings = moduleInfo and moduleInfo.settings or {} }, player, props or {})
 					results[player.Name] = ok and attachUiResult(playerGui, moduleInfo, result) or tostring(result)
 				else
 					results[player.Name] = tostring(loadError)
@@ -2219,6 +2219,7 @@ function RoLink:BuildModuleContext(moduleInfo)
 	return {
 		RoLink = self,
 		Module = moduleInfo,
+		Config = moduleInfo and moduleInfo.configSchema or {},
 		Settings = moduleInfo and moduleInfo.settings or {},
 		Services = {
 			HttpService = Http,

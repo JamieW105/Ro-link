@@ -105,6 +105,7 @@ export async function PATCH(req: Request, context: RouteContext) {
     if (input.sourceCode !== undefined) {
         updates.source_code = input.sourceCode;
         updates.source_checksum = checksumModuleSource(input.sourceCode);
+        updates.config_schema = input.configSchema || {};
     }
     if (input.slug !== undefined || input.name !== undefined) {
         updates.slug = await buildUniqueSlug(input.slug || input.name || 'module', id);

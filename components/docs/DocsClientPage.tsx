@@ -398,6 +398,7 @@ const commandGroups = [
 
 const moduleDeveloperFunctions = [
     ['Module', 'table', 'Published marketplace module metadata for the currently running module.'],
+    ['Config', 'table', 'Parsed CONFIG schema declared at the top of the uploaded module source.'],
     ['Settings', 'table', 'Per-server settings configured from the dashboard module install page.'],
     ['Services', 'table', 'Whitelisted Roblox services such as Players, HttpService, ReplicatedStorage, RunService, Workspace, Lighting, MessagingService, and ServerScriptService.'],
     ['RegisterCommand(commandName, handler)', 'function', 'Adds a custom command handler. Handlers receive command payload, context, and args.'],
@@ -1048,9 +1049,24 @@ const docsPages: DocPage[] = [
                 >
                     <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
                         <CodeBlock label="Minimal module shape">
-                            {`return {
+                            {`CONFIG = {
+    Debug_UI = {
+        Short_Description = "Show extra module UI.",
+        Type = "Bool",
+        Default = true,
+        Options = {}
+    },
+    Theme = {
+        Short_Description = "Dashboard-selected module theme.",
+        Type = "Dropdown",
+        Default = "Sky",
+        Options = { "Sky", "Emerald", "Amber" }
+    }
+}
+
+return {
     Init = function(context, settings)
-        context.Log("Loaded", context.Module.name)
+        context.Log("Loaded", context.Module.name, context.Settings.Debug_UI)
     end,
 
     Commands = {
@@ -1061,7 +1077,7 @@ const docsPages: DocPage[] = [
 }`}
                         </CodeBlock>
                         <Callout title="Runtime requirements" tone="warn">
-                            Dynamic module source requires Roblox HTTP requests and loadstring support. Keep module source trusted, because marketplace code runs inside the server runtime for servers that enable it.
+                            Dashboard config is declared with a top-level CONFIG table. Saved values are available to the module as context.Settings and the schema is available as context.Config.
                         </Callout>
                     </div>
                 </SectionCard>

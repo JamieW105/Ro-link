@@ -150,12 +150,39 @@ Once your web server is running and your Discord server is linked via `/setup`:
 
 Marketplace modules are uploaded from the management portal, published by users with the required management permissions, enabled per Discord server from the dashboard, and loaded by the Roblox admin panel at runtime.
 
-Each uploaded Luau module should return a table:
+Each uploaded Luau module can declare a top-level `CONFIG` table before returning its module table. The dashboard reads that schema and saves per-server values.
 
 ```lua
+CONFIG = {
+    Debug_UI = {
+        Short_Description = "Show a debug panel for this module.",
+        Type = "Bool",
+        Default = true,
+        Options = {}
+    },
+    Theme = {
+        Short_Description = "Theme used by this module.",
+        Type = "Dropdown",
+        Default = "Sky",
+        Options = { "Sky", "Emerald", "Amber" }
+    },
+    Enabled_Checks = {
+        Short_Description = "Checks the module should run.",
+        Type = "CheckBoxes",
+        Default = { "ui", "hooks" },
+        Options = { "ui", "hooks", "messages" }
+    },
+    Accent_Color = {
+        Short_Description = "Accent color as a hex value.",
+        Type = "Color Wheel",
+        Default = "#38bdf8",
+        Options = {}
+    }
+}
+
 return {
     Init = function(context, settings)
-        context.Log("Module loaded", context.Module.name)
+        context.Log("Module loaded", context.Module.name, context.Settings.Debug_UI)
     end,
 
     Commands = {
@@ -171,6 +198,7 @@ return {
 | API | Purpose |
 | --- | --- |
 | `context.Module` | Published module metadata for the running add-on. |
+| `context.Config` | Parsed module `CONFIG` schema from the uploaded source. |
 | `context.Settings` | Per-server module settings from the dashboard. |
 | `context.Services` | Whitelisted Roblox services such as `Players`, `HttpService`, `ReplicatedStorage`, `RunService`, `Workspace`, `Lighting`, `MessagingService`, and `ServerScriptService`. |
 | `context.RegisterCommand(commandName, handler)` | Registers a module command. You can also return a `Commands` table. |

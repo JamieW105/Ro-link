@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getServerByApiKey } from '@/lib/gameAdmin';
-import { normalizeAddonModule, parseModuleSettings } from '@/lib/modules';
+import { normalizeAddonModule, parseModuleConfigSettings, parseStoredModuleConfigSchema } from '@/lib/modules';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -38,6 +38,7 @@ export async function GET(req: Request) {
                 status,
                 source_code,
                 source_checksum,
+                config_schema,
                 author_discord_id,
                 created_at,
                 updated_at,
@@ -57,10 +58,11 @@ export async function GET(req: Request) {
             if (!moduleRow || moduleRow.status !== 'PUBLISHED') {
                 return null;
             }
+            const configSchema = parseStoredModuleConfigSchema(moduleRow.config_schema);
 
             return {
                 ...normalizeAddonModule(moduleRow, true),
-                settings: parseModuleSettings(row.settings),
+                settings: parseModuleConfigSettings(row.settings, configSchema),
             };
         })
         .filter(Boolean);

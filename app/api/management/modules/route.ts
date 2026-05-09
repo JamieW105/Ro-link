@@ -91,6 +91,7 @@ export async function POST(req: Request) {
             status: input.status || 'DRAFT',
             source_code: input.sourceCode,
             source_checksum: checksumModuleSource(input.sourceCode || ''),
+            config_schema: input.configSchema || {},
             author_discord_id: auth.userId,
             published_at: input.status === 'PUBLISHED' ? now : null,
             updated_at: now,

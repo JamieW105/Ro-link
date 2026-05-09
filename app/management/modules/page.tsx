@@ -14,6 +14,7 @@ interface AddonModule {
     status: ModuleStatus;
     sourceCode: string;
     sourceChecksum: string;
+    configSchema?: Record<string, unknown>;
     updatedAt: string | null;
     publishedAt: string | null;
 }
@@ -38,10 +39,42 @@ const emptyForm: ModuleForm = {
     sourceCode: '',
 };
 
-const developerApiExample = `return {
+const developerApiExample = `CONFIG = {
+    Debug_UI = {
+        Short_Description = "Show a live test panel when the module loads.",
+        Type = "Bool",
+        Default = true,
+        Options = {}
+    },
+    Message_Target = {
+        Short_Description = "Where the test notification should be sent.",
+        Type = "Dropdown",
+        Default = "serverowner",
+        Options = { "serverowner", "channel" }
+    },
+    Enabled_Checks = {
+        Short_Description = "Pick which checks the module should mark in its test UI.",
+        Type = "CheckBoxes",
+        Default = { "ui", "hooks", "messages" },
+        Options = { "ui", "hooks", "messages" }
+    },
+    Accent_Color = {
+        Short_Description = "Accent color used by the module UI.",
+        Type = "Color Wheel",
+        Default = "#38bdf8",
+        Options = {}
+    }
+}
+
+return {
     Init = function(context)
+        local settings = context.Settings or {}
+        context.Log("Config Debug_UI =", settings.Debug_UI)
+
         context.OnAdminPanelOpened(function(player)
-            context.Notify(player, "Admin panel opened", true)
+            if settings.Debug_UI ~= false then
+                context.Notify(player, "Admin panel opened with configured module settings.", true)
+            end
         end)
 
         context.OnCommandBarOpened(function(player)
@@ -49,7 +82,7 @@ const developerApiExample = `return {
                 return function(ui)
                     local label = ui.Create("TextLabel", {
                         Size = UDim2.new(0, 260, 0, 48),
-                        Text = "Module UI",
+                        Text = "Module UI: " .. tostring(ui.Settings.Debug_UI),
                         BackgroundColor3 = Color3.fromRGB(15, 23, 42),
                         TextColor3 = Color3.fromRGB(255, 255, 255)
                     })
@@ -62,10 +95,10 @@ const developerApiExample = `return {
     Commands = {
         hello = function(command, context)
             context.SendBotMessage("channel", nil, command.args.channelId, {
-                PlainText = "Hello from a Ro-Link module",
+                PlainText = "Hello from a Ro-Link module. Accent color: " .. tostring(context.Settings.Accent_Color),
                 Embed = {
                     Title = "Optional embed",
-                    Content = "Embed body",
+                    Content = "Configured target: " .. tostring(context.Settings.Message_Target),
                     media = "https://example.com/image.png",
                     Footer = "Ro-Link"
                 }
@@ -276,6 +309,7 @@ export default function ManagementModulesPage() {
                                                 <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                                     <span>{addon.slug}</span>
                                                     <span>{addon.category}</span>
+                                                    <span>{Object.keys(addon.configSchema || {}).length} config fields</span>
                                                     <span>{addon.sourceChecksum.slice(0, 12)}</span>
                                                 </div>
                                             </td>
