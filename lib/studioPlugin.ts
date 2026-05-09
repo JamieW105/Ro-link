@@ -519,15 +519,17 @@ export async function authorizeStudioPluginSession(sessionId: string, code: stri
         authorized_at: new Date().toISOString(),
     };
 
-    try {
-        const guilds = await getManageableGuildsForPlugin(authorizedSession);
-        await persistGuildSnapshot(existing.id, guilds);
-    } catch (snapshotError) {
-        console.warn('[PLUGIN][AUTHORIZE] Guild snapshot failed; /servers will compute live', {
-            sessionId: existing.id,
-            error: snapshotError instanceof Error ? snapshotError.message : snapshotError,
-        });
-    }
+    void (async () => {
+        try {
+            const guilds = await getManageableGuildsForPlugin(authorizedSession);
+            await persistGuildSnapshot(existing.id, guilds);
+        } catch (snapshotError) {
+            console.warn('[PLUGIN][AUTHORIZE] Guild snapshot failed; /servers will compute live', {
+                sessionId: existing.id,
+                error: snapshotError instanceof Error ? snapshotError.message : snapshotError,
+            });
+        }
+    })();
 
     return {
         pluginToken,

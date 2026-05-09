@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
+import { useEffect, useState } from 'react';
 
 import type { StudioPluginConnectOutcome } from '@/lib/studioPluginBrowserAuth';
 
@@ -26,19 +27,101 @@ type Props = {
 
 export function ConnectClient({ sessionId, code, outcome, signedInName }: Props) {
     const { data: session, status } = useSession();
+    const [clientOutcome, setClientOutcome] = useState(outcome);
+    const [clientAuthorizeStarted, setClientAuthorizeStarted] = useState(false);
     const callbackUrl = buildCallbackUrl(sessionId, code);
     const missingSessionParams = !sessionId || !code;
 
     const needsDiscordReauth =
-        outcome.kind === 'need_discord'
+        clientOutcome.kind === 'need_discord'
         && status === 'authenticated'
         && (!session?.accessToken || Boolean(session.error));
 
     const serverNeedsDiscordButClientLooksReady =
-        outcome.kind === 'need_discord'
+        clientOutcome.kind === 'need_discord'
         && status === 'authenticated'
         && Boolean(session?.accessToken)
         && !session?.error;
+
+    useEffect(() => {
+        setClientOutcome(outcome);
+        setClientAuthorizeStarted(false);
+    }, [sessionId, code, outcome]);
+
+    useEffect(() => {
+        if (
+            missingSessionParams
+            || clientAuthorizeStarted
+            || clientOutcome.kind !== 'need_discord'
+            || status !== 'authenticated'
+            || !session?.accessToken
+            || session.error
+        ) {
+            return;
+        }
+
+        let cancelled = false;
+        setClientAuthorizeStarted(true);
+
+        async function authorizeFromHydratedSession() {
+            try {
+                const response = await fetch('/api/plugin/session/authorize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ sessionId, code }),
+                });
+                const payload = await response.json().catch(() => ({}));
+
+                if (cancelled) {
+                    return;
+                }
+
+                if (response.ok && payload?.pluginToken && payload?.tokenExpiresAt) {
+                    setClientOutcome({
+                        kind: 'success',
+                        pluginToken: String(payload.pluginToken),
+                        tokenExpiresAt: String(payload.tokenExpiresAt),
+                    });
+                    return;
+                }
+
+                setClientOutcome({
+                    kind: 'error',
+                    message: typeof payload?.error === 'string'
+                        ? payload.error
+                        : `Studio authorization failed (${response.status}).`,
+                    status: response.status,
+                });
+            } catch (error) {
+                if (cancelled) {
+                    return;
+                }
+
+                setClientOutcome({
+                    kind: 'error',
+                    message: error instanceof Error ? error.message : 'Studio authorization failed.',
+                    status: 500,
+                });
+            }
+        }
+
+        authorizeFromHydratedSession();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        clientAuthorizeStarted,
+        clientOutcome.kind,
+        code,
+        missingSessionParams,
+        session?.accessToken,
+        session?.error,
+        sessionId,
+        status,
+    ]);
 
     return (
         <main className="min-h-screen bg-[#07111f] text-white flex items-center justify-center px-6 py-12">
@@ -59,7 +142,7 @@ export function ConnectClient({ sessionId, code, outcome, signedInName }: Props)
                     </div>
                 ) : null}
 
-                {outcome.kind === 'success' ? (
+                {clientOutcome.kind === 'success' ? (
                     <div className="space-y-5">
                         {signedInName ? (
                             <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-5 py-4">
@@ -76,7 +159,7 @@ export function ConnectClient({ sessionId, code, outcome, signedInName }: Props)
                     </div>
                 ) : null}
 
-                {outcome.kind === 'error' ? (
+                {clientOutcome.kind === 'error' ? (
                     <div className="space-y-5">
                         {signedInName ? (
                             <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-5 py-4">
@@ -85,7 +168,7 @@ export function ConnectClient({ sessionId, code, outcome, signedInName }: Props)
                             </div>
                         ) : null}
                         <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-5 py-4 text-sm leading-7 text-rose-100">
-                            {outcome.message}
+                            {clientOutcome.message}
                         </div>
                         <p className="text-xs text-slate-400">
                             Refresh this page after fixing the issue, or start a new connection from the Studio plugin.
@@ -96,13 +179,13 @@ export function ConnectClient({ sessionId, code, outcome, signedInName }: Props)
                     </div>
                 ) : null}
 
-                {!missingSessionParams && outcome.kind === 'need_discord' && status === 'loading' ? (
+                {!missingSessionParams && clientOutcome.kind === 'need_discord' && status === 'loading' ? (
                     <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-5 py-4 text-sm text-slate-300">
                         Checking your Ro-Link session...
                     </div>
                 ) : null}
 
-                {!missingSessionParams && outcome.kind === 'need_discord' && status === 'unauthenticated' ? (
+                {!missingSessionParams && clientOutcome.kind === 'need_discord' && status === 'unauthenticated' ? (
                     <div className="space-y-5">
                         <p className="text-sm leading-7 text-slate-300">
                             Sign in with Discord so Ro-Link can link this Studio session to your account.
@@ -117,7 +200,7 @@ export function ConnectClient({ sessionId, code, outcome, signedInName }: Props)
                     </div>
                 ) : null}
 
-                {!missingSessionParams && outcome.kind === 'need_discord' && needsDiscordReauth ? (
+                {!missingSessionParams && clientOutcome.kind === 'need_discord' && needsDiscordReauth ? (
                     <div className="space-y-5">
                         <p className="text-sm leading-7 text-slate-300">
                             Your Discord session is missing a fresh token. Sign in again to finish connecting Studio.
@@ -134,7 +217,7 @@ export function ConnectClient({ sessionId, code, outcome, signedInName }: Props)
 
                 {!missingSessionParams && serverNeedsDiscordButClientLooksReady ? (
                     <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-5 py-4 text-sm text-slate-100">
-                        Your browser session looks signed in, but the server did not receive a complete Discord token. Refresh this page or sign out and sign in again.
+                        Finishing Studio authorization with your Discord session...
                     </div>
                 ) : null}
             </section>

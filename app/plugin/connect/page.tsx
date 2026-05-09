@@ -8,6 +8,8 @@ import { authorizeStudioPluginFromBrowserSession } from '@/lib/studioPluginBrows
 
 import { ConnectClient } from './ConnectClient';
 
+export const dynamic = 'force-dynamic';
+
 type SessionWithDiscord = Session & {
     accessToken?: string;
     error?: string;
