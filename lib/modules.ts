@@ -517,7 +517,13 @@ function obfuscateIdentifierToken(tokens: LuaToken[], index: number, renameMap: 
     }
 
     const prevIndex = previousSignificantTokenIndex(tokens, index - 1);
-    if (prevIndex >= 0 && (tokens[prevIndex].value === '.' || tokens[prevIndex].value === ':')) {
+    if (prevIndex >= 0 && tokens[prevIndex].value === '.') {
+        const prevPrevIndex = previousSignificantTokenIndex(tokens, prevIndex - 1);
+        if (prevPrevIndex < 0 || tokens[prevPrevIndex].value !== '.') {
+            return token.value;
+        }
+    }
+    if (prevIndex >= 0 && tokens[prevIndex].value === ':') {
         return token.value;
     }
     if (isTableFieldKey(tokens, index, braceDepth)) {
@@ -568,9 +574,6 @@ function needsSpaceBetween(prev: string, next: string) {
         return true;
     }
     if (prev.endsWith('-') && next.startsWith('-')) {
-        return true;
-    }
-    if (prev.endsWith('.') && next.startsWith('.')) {
         return true;
     }
 
