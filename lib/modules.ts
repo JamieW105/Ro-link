@@ -51,80 +51,596 @@ export function checksumModuleSource(sourceCode: string) {
     return createHash('sha256').update(sourceCode, 'utf8').digest('hex');
 }
 
-export function obfuscateModuleSourceForStudio(sourceCode: string) {
-    let output = '';
-    let quote: '"' | "'" | null = null;
-    let escaped = false;
-    let longStringDepth = 0;
+type LuaTokenType = 'identifier' | 'keyword' | 'number' | 'punctuation' | 'string' | 'whitespace';
 
-    for (let index = 0; index < sourceCode.length; index += 1) {
+interface LuaToken {
+    type: LuaTokenType;
+    value: string;
+    decoded?: string;
+}
+
+const LUA_KEYWORDS = new Set([
+    'and',
+    'break',
+    'continue',
+    'do',
+    'else',
+    'elseif',
+    'end',
+    'export',
+    'false',
+    'for',
+    'function',
+    'if',
+    'in',
+    'local',
+    'nil',
+    'not',
+    'or',
+    'repeat',
+    'return',
+    'then',
+    'true',
+    'type',
+    'typeof',
+    'until',
+    'while',
+]);
+
+const LUA_GLOBALS_AND_COMMON_FIELDS = new Set([
+    '_G',
+    'assert',
+    'bit32',
+    'BrickColor',
+    'CFrame',
+    'Color3',
+    'ColorSequence',
+    'coroutine',
+    'debug',
+    'Enum',
+    'error',
+    'game',
+    'getmetatable',
+    'Instance',
+    'ipairs',
+    'math',
+    'next',
+    'NumberRange',
+    'NumberSequence',
+    'os',
+    'pairs',
+    'pcall',
+    'plugin',
+    'print',
+    'Random',
+    'rawget',
+    'rawlen',
+    'rawset',
+    'require',
+    'script',
+    'select',
+    'self',
+    'setmetatable',
+    'shared',
+    'string',
+    'table',
+    'task',
+    'tonumber',
+    'tostring',
+    'TweenInfo',
+    'type',
+    'typeof',
+    'UDim',
+    'UDim2',
+    'unpack',
+    'utf8',
+    'Vector2',
+    'Vector3',
+    'warn',
+    'workspace',
+    'xpcall',
+]);
+
+function isIdentifierStart(char: string) {
+    return /[A-Za-z_]/.test(char);
+}
+
+function isIdentifierPart(char: string) {
+    return /[A-Za-z0-9_]/.test(char);
+}
+
+function isWhitespace(char: string) {
+    return /\s/.test(char);
+}
+
+function findLongBracketClose(sourceCode: string, startIndex: number) {
+    if (sourceCode[startIndex] !== '[') {
+        return null;
+    }
+
+    let index = startIndex + 1;
+    while (sourceCode[index] === '=') {
+        index += 1;
+    }
+
+    if (sourceCode[index] !== '[') {
+        return null;
+    }
+
+    const equals = sourceCode.slice(startIndex + 1, index);
+    const openEnd = index + 1;
+    const closeMarker = `]${equals}]`;
+    const closeIndex = sourceCode.indexOf(closeMarker, openEnd);
+
+    return {
+        openEnd,
+        closeIndex,
+        closeMarkerLength: closeMarker.length,
+    };
+}
+
+function normalizeLuaLongStringContent(content: string) {
+    if (content.startsWith('\r\n')) {
+        return content.slice(2);
+    }
+    if (content.startsWith('\n')) {
+        return content.slice(1);
+    }
+    return content;
+}
+
+function decodeLuaQuotedString(rawValue: string) {
+    let output = '';
+    for (let index = 1; index < rawValue.length - 1; index += 1) {
+        const char = rawValue[index];
+        if (char !== '\\') {
+            output += char;
+            continue;
+        }
+
+        index += 1;
+        const escaped = rawValue[index];
+        if (escaped === undefined) {
+            break;
+        }
+
+        if (escaped === '\r' && rawValue[index + 1] === '\n') {
+            index += 1;
+            continue;
+        }
+        if (escaped === '\n' || escaped === '\r') {
+            continue;
+        }
+        if (escaped === 'a') output += '\x07';
+        else if (escaped === 'b') output += '\b';
+        else if (escaped === 'f') output += '\f';
+        else if (escaped === 'n') output += '\n';
+        else if (escaped === 'r') output += '\r';
+        else if (escaped === 't') output += '\t';
+        else if (escaped === 'v') output += '\v';
+        else if (escaped === 'z') {
+            while (index + 1 < rawValue.length - 1 && isWhitespace(rawValue[index + 1])) {
+                index += 1;
+            }
+        } else if (escaped === 'x') {
+            const hex = rawValue.slice(index + 1, index + 3);
+            if (/^[0-9a-fA-F]{2}$/.test(hex)) {
+                output += String.fromCharCode(parseInt(hex, 16));
+                index += 2;
+            } else {
+                output += escaped;
+            }
+        } else if (escaped === 'u' && rawValue[index + 1] === '{') {
+            const closeIndex = rawValue.indexOf('}', index + 2);
+            const codePoint = closeIndex > index + 2 ? parseInt(rawValue.slice(index + 2, closeIndex), 16) : NaN;
+            if (Number.isFinite(codePoint)) {
+                output += String.fromCodePoint(codePoint);
+                index = closeIndex;
+            } else {
+                output += escaped;
+            }
+        } else if (/[0-9]/.test(escaped)) {
+            let digits = escaped;
+            while (digits.length < 3 && /[0-9]/.test(rawValue[index + 1] || '')) {
+                digits += rawValue[index + 1];
+                index += 1;
+            }
+            output += String.fromCharCode(Number(digits) % 256);
+        } else {
+            output += escaped;
+        }
+    }
+
+    return output;
+}
+
+function tokenizeLua(sourceCode: string): LuaToken[] {
+    const tokens: LuaToken[] = [];
+    let index = 0;
+
+    while (index < sourceCode.length) {
         const char = sourceCode[index];
         const next = sourceCode[index + 1];
 
-        if (longStringDepth > 0) {
-            output += char;
-            if (char === ']' && next === ']') {
-                output += next;
-                index += 1;
-                longStringDepth -= 1;
+        if (isWhitespace(char)) {
+            let end = index + 1;
+            while (end < sourceCode.length && isWhitespace(sourceCode[end])) {
+                end += 1;
             }
-            continue;
-        }
-
-        if (quote) {
-            output += char;
-            if (escaped) {
-                escaped = false;
-            } else if (char === '\\') {
-                escaped = true;
-            } else if (char === quote) {
-                quote = null;
-            }
-            continue;
-        }
-
-        if (char === '"' || char === "'") {
-            quote = char;
-            output += char;
-            continue;
-        }
-
-        if (char === '[' && next === '[') {
-            longStringDepth += 1;
-            output += char + next;
-            index += 1;
+            tokens.push({ type: 'whitespace', value: sourceCode.slice(index, end) });
+            index = end;
             continue;
         }
 
         if (char === '-' && next === '-') {
-            const third = sourceCode[index + 2];
-            const fourth = sourceCode[index + 3];
-            if (third === '[' && fourth === '[') {
-                index += 4;
-                while (index < sourceCode.length && !(sourceCode[index] === ']' && sourceCode[index + 1] === ']')) {
+            const longComment = findLongBracketClose(sourceCode, index + 2);
+            if (longComment) {
+                index = longComment.closeIndex >= 0
+                    ? longComment.closeIndex + longComment.closeMarkerLength
+                    : sourceCode.length;
+            } else {
+                while (index < sourceCode.length && sourceCode[index] !== '\n') {
                     index += 1;
                 }
-                index += 1;
-                continue;
             }
-
-            while (index < sourceCode.length && sourceCode[index] !== '\n') {
-                index += 1;
-            }
-            output += '\n';
+            tokens.push({ type: 'whitespace', value: '\n' });
             continue;
         }
 
-        output += char;
+        if (char === '"' || char === "'") {
+            const quote = char;
+            let end = index + 1;
+            let escaped = false;
+            while (end < sourceCode.length) {
+                const current = sourceCode[end];
+                if (escaped) {
+                    escaped = false;
+                } else if (current === '\\') {
+                    escaped = true;
+                } else if (current === quote) {
+                    end += 1;
+                    break;
+                }
+                end += 1;
+            }
+            const value = sourceCode.slice(index, end);
+            tokens.push({ type: 'string', value, decoded: decodeLuaQuotedString(value) });
+            index = end;
+            continue;
+        }
+
+        if (char === '[') {
+            const longString = findLongBracketClose(sourceCode, index);
+            if (longString) {
+                const closeIndex = longString.closeIndex >= 0 ? longString.closeIndex : sourceCode.length;
+                const value = sourceCode.slice(index, closeIndex + (longString.closeIndex >= 0 ? longString.closeMarkerLength : 0));
+                const content = sourceCode.slice(longString.openEnd, closeIndex);
+                tokens.push({ type: 'string', value, decoded: normalizeLuaLongStringContent(content) });
+                index = closeIndex + (longString.closeIndex >= 0 ? longString.closeMarkerLength : 0);
+                continue;
+            }
+        }
+
+        if (/[0-9]/.test(char) || (char === '.' && /[0-9]/.test(next || ''))) {
+            let end = index + 1;
+            while (end < sourceCode.length && /[A-Za-z0-9_.]/.test(sourceCode[end])) {
+                end += 1;
+            }
+            tokens.push({ type: 'number', value: sourceCode.slice(index, end) });
+            index = end;
+            continue;
+        }
+
+        if (isIdentifierStart(char)) {
+            let end = index + 1;
+            while (end < sourceCode.length && isIdentifierPart(sourceCode[end])) {
+                end += 1;
+            }
+            const value = sourceCode.slice(index, end);
+            tokens.push({
+                type: LUA_KEYWORDS.has(value) ? 'keyword' : 'identifier',
+                value,
+            });
+            index = end;
+            continue;
+        }
+
+        tokens.push({ type: 'punctuation', value: char });
+        index += 1;
     }
 
-    const compacted = output
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .join('\n');
+    return tokens;
+}
 
-    return `-- Ro-Link managed marketplace module. Source is compacted before Studio insertion.\n${compacted}\n`;
+function nextSignificantTokenIndex(tokens: LuaToken[], startIndex: number) {
+    for (let index = startIndex; index < tokens.length; index += 1) {
+        if (tokens[index].type !== 'whitespace') {
+            return index;
+        }
+    }
+    return -1;
+}
+
+function previousSignificantTokenIndex(tokens: LuaToken[], startIndex: number) {
+    for (let index = startIndex; index >= 0; index -= 1) {
+        if (tokens[index].type !== 'whitespace') {
+            return index;
+        }
+    }
+    return -1;
+}
+
+function shouldRenameIdentifier(name: string) {
+    return !LUA_KEYWORDS.has(name)
+        && !LUA_GLOBALS_AND_COMMON_FIELDS.has(name)
+        && name !== 'CONFIG'
+        && !/^__rolink_/.test(name);
+}
+
+function collectLocalRenameCandidates(tokens: LuaToken[]) {
+    const candidates = new Set<string>();
+
+    for (let index = 0; index < tokens.length; index += 1) {
+        const token = tokens[index];
+        if (token.type === 'keyword' && token.value === 'local') {
+            const nextIndex = nextSignificantTokenIndex(tokens, index + 1);
+            if (nextIndex >= 0 && tokens[nextIndex].type === 'keyword' && tokens[nextIndex].value === 'function') {
+                const nameIndex = nextSignificantTokenIndex(tokens, nextIndex + 1);
+                if (nameIndex >= 0 && tokens[nameIndex].type === 'identifier' && shouldRenameIdentifier(tokens[nameIndex].value)) {
+                    candidates.add(tokens[nameIndex].value);
+                }
+                continue;
+            }
+
+            let inTypeAnnotation = false;
+            for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
+                const current = tokens[cursor];
+                if (current.type === 'whitespace' && current.value.includes('\n')) {
+                    break;
+                }
+                if (current.value === '=') {
+                    break;
+                }
+                if (current.value === ',') {
+                    inTypeAnnotation = false;
+                    continue;
+                }
+                if (current.value === ':') {
+                    inTypeAnnotation = true;
+                    continue;
+                }
+                if (!inTypeAnnotation && current.type === 'identifier' && shouldRenameIdentifier(current.value)) {
+                    candidates.add(current.value);
+                }
+            }
+        }
+
+        if (token.type === 'keyword' && token.value === 'function') {
+            const openIndex = (() => {
+                let cursor = index + 1;
+                while (cursor < tokens.length) {
+                    if (tokens[cursor].value === '(') return cursor;
+                    if (tokens[cursor].type === 'whitespace' || tokens[cursor].type === 'identifier' || tokens[cursor].value === '.' || tokens[cursor].value === ':') {
+                        cursor += 1;
+                        continue;
+                    }
+                    return -1;
+                }
+                return -1;
+            })();
+
+            if (openIndex >= 0) {
+                let depth = 1;
+                let inTypeAnnotation = false;
+                for (let cursor = openIndex + 1; cursor < tokens.length; cursor += 1) {
+                    const current = tokens[cursor];
+                    if (current.value === '(') depth += 1;
+                    if (current.value === ')') {
+                        depth -= 1;
+                        if (depth === 0) break;
+                    }
+                    if (depth !== 1) continue;
+                    if (current.value === ',') {
+                        inTypeAnnotation = false;
+                        continue;
+                    }
+                    if (current.value === ':') {
+                        inTypeAnnotation = true;
+                        continue;
+                    }
+                    if (!inTypeAnnotation && current.type === 'identifier' && shouldRenameIdentifier(current.value)) {
+                        candidates.add(current.value);
+                    }
+                }
+            }
+        }
+
+        if (token.type === 'keyword' && token.value === 'for') {
+            let inTypeAnnotation = false;
+            for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
+                const current = tokens[cursor];
+                if (current.value === '=' || (current.type === 'keyword' && current.value === 'in')) {
+                    break;
+                }
+                if (current.value === ',') {
+                    inTypeAnnotation = false;
+                    continue;
+                }
+                if (current.value === ':') {
+                    inTypeAnnotation = true;
+                    continue;
+                }
+                if (!inTypeAnnotation && current.type === 'identifier' && shouldRenameIdentifier(current.value)) {
+                    candidates.add(current.value);
+                }
+            }
+        }
+    }
+
+    return candidates;
+}
+
+function buildRenameMap(tokens: LuaToken[], sourceCode: string) {
+    const candidates = Array.from(collectLocalRenameCandidates(tokens)).sort();
+    const hash = checksumModuleSource(sourceCode).slice(0, 10);
+    const renameMap = new Map<string, string>();
+
+    candidates.forEach((candidate, index) => {
+        renameMap.set(candidate, `__rolink_${hash}_${index.toString(36)}`);
+    });
+
+    return renameMap;
+}
+
+function isTableFieldKey(tokens: LuaToken[], index: number, braceDepth: number) {
+    if (braceDepth <= 0) {
+        return false;
+    }
+    const nextIndex = nextSignificantTokenIndex(tokens, index + 1);
+    const prevIndex = previousSignificantTokenIndex(tokens, index - 1);
+    const afterNextIndex = nextIndex >= 0 ? nextSignificantTokenIndex(tokens, nextIndex + 1) : -1;
+    return nextIndex >= 0
+        && tokens[nextIndex].value === '='
+        && (afterNextIndex < 0 || tokens[afterNextIndex].value !== '=')
+        && (prevIndex < 0 || tokens[prevIndex].value !== '.');
+}
+
+function obfuscateIdentifierToken(tokens: LuaToken[], index: number, renameMap: Map<string, string>, braceDepth: number) {
+    const token = tokens[index];
+    if (token.type !== 'identifier') {
+        return token.value;
+    }
+
+    const renamed = renameMap.get(token.value);
+    if (!renamed) {
+        return token.value;
+    }
+
+    const prevIndex = previousSignificantTokenIndex(tokens, index - 1);
+    if (prevIndex >= 0 && (tokens[prevIndex].value === '.' || tokens[prevIndex].value === ':')) {
+        return token.value;
+    }
+    if (isTableFieldKey(tokens, index, braceDepth)) {
+        return token.value;
+    }
+
+    return renamed;
+}
+
+function encodeLuaString(decoded: string, decodeFunctionName: string, seed: number) {
+    const bytes = Buffer.from(decoded, 'utf8');
+    const key = (seed % 173) + 53;
+    const encoded = Array.from(bytes, (byte, index) => (byte + key + (((index + 1) * 17) % 251)) % 256);
+    return `${decodeFunctionName}({${encoded.join(',')}},${key})`;
+}
+
+function encodeIntegerConstant(rawValue: string, seed: number) {
+    if (!/^\d+$/.test(rawValue)) {
+        return rawValue;
+    }
+
+    const value = Number(rawValue);
+    if (!Number.isSafeInteger(value)) {
+        return rawValue;
+    }
+
+    const mask = ((seed % 997) + 31) * 3;
+    return `(${value + mask}-${mask})`;
+}
+
+function tokenStartsLikeWord(value: string) {
+    return /^[A-Za-z0-9_]/.test(value);
+}
+
+function tokenEndsLikeWord(value: string) {
+    return /[A-Za-z0-9_]$/.test(value);
+}
+
+function needsSpaceBetween(prev: string, next: string) {
+    if (!prev || !next) {
+        return false;
+    }
+
+    if (tokenEndsLikeWord(prev) && tokenStartsLikeWord(next)) {
+        return true;
+    }
+    if (/[\])}]$/.test(prev) && tokenStartsLikeWord(next)) {
+        return true;
+    }
+    if (prev.endsWith('-') && next.startsWith('-')) {
+        return true;
+    }
+    if (prev.endsWith('.') && next.startsWith('.')) {
+        return true;
+    }
+
+    return false;
+}
+
+function buildObfuscatedPrelude(decodeFunctionName: string, hash: string) {
+    const charName = `__rolink_char_${hash}`;
+    const concatName = `__rolink_concat_${hash}`;
+    const outputName = `__rolink_out_${hash}`;
+    const indexName = `__rolink_i_${hash}`;
+    const noiseName = `__rolink_noise_${hash}`;
+
+    return [
+        `local ${charName}=string.char`,
+        `local ${concatName}=table.concat`,
+        `local function ${decodeFunctionName}(__rolink_data_${hash},__rolink_key_${hash})`,
+        `local ${outputName}={}`,
+        `for ${indexName}=1,#__rolink_data_${hash} do`,
+        `${outputName}[${indexName}]=${charName}((__rolink_data_${hash}[${indexName}]-__rolink_key_${hash}-(${indexName}*17%251))%256)`,
+        'end',
+        `return ${concatName}(${outputName})`,
+        'end',
+        `local ${noiseName}=0`,
+        `if ${noiseName}==${Number.parseInt(hash.slice(0, 5), 36)} then ${noiseName}=${noiseName}+1 end`,
+    ].join('\n');
+}
+
+export function obfuscateModuleSourceForStudio(sourceCode: string) {
+    const tokens = tokenizeLua(sourceCode);
+    const renameMap = buildRenameMap(tokens, sourceCode);
+    const hash = checksumModuleSource(sourceCode).slice(0, 8);
+    const decodeFunctionName = `__rolink_decode_${hash}`;
+    const fragments: string[] = [];
+    let previous = '';
+    let braceDepth = 0;
+
+    tokens.forEach((token, index) => {
+        if (token.type === 'whitespace') {
+            return;
+        }
+
+        let value = token.value;
+        if (token.type === 'identifier') {
+            value = obfuscateIdentifierToken(tokens, index, renameMap, braceDepth);
+        } else if (token.type === 'string') {
+            value = encodeLuaString(token.decoded ?? '', decodeFunctionName, index + sourceCode.length);
+        } else if (token.type === 'number') {
+            value = encodeIntegerConstant(token.value, index + sourceCode.length);
+        }
+
+        if (needsSpaceBetween(previous, value)) {
+            fragments.push(' ');
+        }
+        fragments.push(value);
+        previous = value;
+
+        if (token.value === '{') {
+            braceDepth += 1;
+        } else if (token.value === '}') {
+            braceDepth = Math.max(0, braceDepth - 1);
+        }
+    });
+
+    return [
+        '-- Ro-Link managed marketplace module. Source is statically obfuscated before Studio insertion.',
+        buildObfuscatedPrelude(decodeFunctionName, hash),
+        fragments.join(''),
+        '',
+    ].join('\n');
 }
 
 function splitTopLevelEntries(value: string) {
