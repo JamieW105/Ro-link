@@ -3,7 +3,6 @@
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 // SVGs
 const LogOutIcon = () => (
@@ -28,10 +27,32 @@ interface Guild {
     isRoleAccess?: boolean;
 }
 
+type SessionUserWithId = {
+    id?: string;
+};
+
+const ADMINISTRATOR_PERMISSION = 0x8n;
+const MANAGE_GUILD_PERMISSION = 0x20n;
+
+function canOpenMarketplaceFromServerList(guild: Guild) {
+    if (guild.owner) {
+        return true;
+    }
+
+    try {
+        const permissions = BigInt(guild.permissions || 0);
+        return (permissions & ADMINISTRATOR_PERMISSION) === ADMINISTRATOR_PERMISSION
+            || (permissions & MANAGE_GUILD_PERMISSION) === MANAGE_GUILD_PERMISSION;
+    } catch {
+        return false;
+    }
+}
+
 export default function Dashboard() {
     const { data: session, status } = useSession();
     const [guilds, setGuilds] = useState<Guild[]>([]);
     const [loading, setLoading] = useState(false);
+    const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
 
     // Admin Actions State
     const [removeModal, setRemoveModal] = useState<{ id: string, name: string } | null>(null);
@@ -136,7 +157,7 @@ export default function Dashboard() {
                     </Link>
 
                     <div className="ml-auto flex items-center gap-2 border-l border-slate-800 pl-3 sm:gap-4 md:pl-4">
-                        {((session?.user as any)?.id === '953414442060746854') && (
+                        {(sessionUserId === '953414442060746854') && (
                             <Link
                                 href="/management"
                                 className="hidden md:flex items-center gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-sky-900/20"
@@ -208,7 +229,7 @@ export default function Dashboard() {
                                 <div className="mt-auto">
                                     {guild.hasBot ? (
                                         (() => {
-                                            const userId = (session?.user as any)?.id;
+                                            const userId = sessionUserId;
                                             const isSuperUser = userId === '953414442060746854';
                                             // isReadOnly is ONLY for the superuser to manage bot state in servers they don't own perms in.
                                             // Everyone else (Admins or RoleAccess users) should see the Console.
@@ -239,13 +260,23 @@ export default function Dashboard() {
                                             }
 
                                             return (
-                                                <Link
-                                                    href={`/dashboard/${guild.id}`}
-                                                    className="w-full py-2.5 bg-slate-800 hover:bg-sky-600 text-white border border-slate-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 group/btn shadow-sm"
-                                                >
-                                                    <SettingsIcon />
-                                                    Open Console
-                                                </Link>
+                                                <div className="flex flex-col gap-2">
+                                                    <Link
+                                                        href={`/dashboard/${guild.id}`}
+                                                        className="w-full py-2.5 bg-slate-800 hover:bg-sky-600 text-white border border-slate-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 group/btn shadow-sm"
+                                                    >
+                                                        <SettingsIcon />
+                                                        Open Console
+                                                    </Link>
+                                                    {canOpenMarketplaceFromServerList(guild) && (
+                                                        <Link
+                                                            href={`/dashboard/${guild.id}/modules`}
+                                                            className="w-full py-2.5 bg-sky-600/10 hover:bg-sky-600/20 text-sky-200 border border-sky-500/30 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
+                                                        >
+                                                            Open Marketplace
+                                                        </Link>
+                                                    )}
+                                                </div>
                                             );
                                         })()
                                     ) : (

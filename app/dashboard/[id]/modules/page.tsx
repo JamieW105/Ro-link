@@ -44,9 +44,14 @@ export default function DashboardModulesPage() {
     const [loading, setLoading] = useState(true);
     const [savingId, setSavingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
 
     const installedCount = useMemo(() => modules.filter((addon) => addon.installed).length, [modules]);
     const enabledCount = useMemo(() => modules.filter((addon) => addon.installed && addon.enabled).length, [modules]);
+    const selectedModule = useMemo(
+        () => modules.find((addon) => addon.id === selectedModuleId) || null,
+        [modules, selectedModuleId],
+    );
 
     const loadModules = useCallback(async () => {
         if (!serverId) return;
@@ -218,6 +223,13 @@ export default function DashboardModulesPage() {
                                     </div>
 
                                     <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedModuleId(addon.id)}
+                                            className="rounded-xl border border-sky-500/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10"
+                                        >
+                                            Open
+                                        </button>
                                         {!addon.installed ? (
                                             <button
                                                 onClick={() => sendAction(addon.id, 'install', true)}
@@ -230,7 +242,7 @@ export default function DashboardModulesPage() {
                                             <>
                                                 <Link
                                                     href={`/dashboard/${serverId}/modules/${addon.id}`}
-                                                    className="rounded-xl border border-sky-500/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10"
+                                                    className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
                                                 >
                                                     Configure
                                                 </Link>
@@ -267,6 +279,136 @@ export default function DashboardModulesPage() {
                             </article>
                         );
                     })}
+                </div>
+            )}
+
+            {selectedModule && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+                    <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-700 bg-[#020617] shadow-2xl">
+                        <div className="flex flex-col gap-4 border-b border-slate-800 bg-slate-950/80 px-5 py-5 md:flex-row md:items-start md:justify-between md:px-7">
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">
+                                        {selectedModule.category}
+                                    </span>
+                                    <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${selectedModule.enabled ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : selectedModule.installed ? 'border-amber-400/20 bg-amber-400/10 text-amber-300' : 'border-slate-700 bg-slate-950 text-slate-500'}`}>
+                                        {selectedModule.installed ? (selectedModule.enabled ? 'Enabled' : 'Paused') : 'Available'}
+                                    </span>
+                                    <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                        v{selectedModule.version}
+                                    </span>
+                                </div>
+                                <h2 className="mt-4 text-2xl font-black tracking-tight text-white md:text-4xl">{selectedModule.name}</h2>
+                                <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
+                                    {selectedModule.description || 'No description provided.'}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedModuleId(null)}
+                                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
+                                aria-label="Close module preview"
+                            >
+                                x
+                            </button>
+                        </div>
+
+                        <div className="custom-scrollbar max-h-[calc(90vh-180px)] overflow-y-auto px-5 py-6 md:px-7">
+                            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+                                <section className="space-y-5">
+                                    <div>
+                                        <h3 className="text-sm font-bold uppercase tracking-widest text-white">Configuration Fields</h3>
+                                        {Object.values(selectedModule.configSchema || {}).length === 0 ? (
+                                            <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-5 text-sm text-slate-500">
+                                                This module does not expose configurable fields.
+                                            </div>
+                                        ) : (
+                                            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                                {Object.values(selectedModule.configSchema || {}).map((field) => (
+                                                    <div key={field.key} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <p className="text-sm font-bold text-white">{field.label}</p>
+                                                                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                                                                    {field.shortDescription || 'No field description provided.'}
+                                                                </p>
+                                                            </div>
+                                                            <span className="rounded-md border border-slate-700 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                                {field.type}
+                                                            </span>
+                                                        </div>
+                                                        {field.options.length > 0 && (
+                                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                                {field.options.slice(0, 6).map((option) => (
+                                                                    <span key={option} className="rounded-md border border-slate-800 bg-black/30 px-2 py-1 text-[10px] font-semibold text-slate-400">
+                                                                        {option}
+                                                                    </span>
+                                                                ))}
+                                                                {field.options.length > 6 && (
+                                                                    <span className="rounded-md border border-slate-800 bg-black/30 px-2 py-1 text-[10px] font-semibold text-slate-500">
+                                                                        +{field.options.length - 6} more
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <h3 className="text-sm font-bold uppercase tracking-widest text-white">Settings Preview</h3>
+                                        <pre className="mt-4 max-h-64 overflow-auto rounded-xl border border-slate-800 bg-black/40 p-4 text-xs text-slate-300 custom-scrollbar">
+                                            {settingsDrafts[selectedModule.id] || '{}'}
+                                        </pre>
+                                    </div>
+                                </section>
+
+                                <aside className="space-y-4">
+                                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Slug</p>
+                                        <p className="mt-2 break-all font-mono text-sm text-slate-300">{selectedModule.slug}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Checksum</p>
+                                        <p className="mt-2 break-all font-mono text-xs text-slate-300">{selectedModule.sourceChecksum || 'Unavailable'}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Install Status</p>
+                                        <p className="mt-2 text-sm font-semibold text-slate-300">{selectedModule.installed ? `Installed ${formatDate(selectedModule.installedAt)}` : 'Not installed on this server'}</p>
+                                    </div>
+                                    <div className="flex flex-col gap-3">
+                                        <Link
+                                            href={`/dashboard/${serverId}/modules/${selectedModule.id}`}
+                                            className="inline-flex items-center justify-center rounded-xl border border-sky-500/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10"
+                                        >
+                                            {selectedModule.installed ? 'Open Config' : 'Open Setup'}
+                                        </Link>
+                                        {!selectedModule.installed ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => sendAction(selectedModule.id, 'install', true)}
+                                                disabled={savingId === selectedModule.id}
+                                                className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
+                                            >
+                                                {savingId === selectedModule.id ? 'Installing' : 'Install Module'}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => sendAction(selectedModule.id, selectedModule.enabled ? 'disable' : 'enable')}
+                                                disabled={savingId === selectedModule.id}
+                                                className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
+                                            >
+                                                {selectedModule.enabled ? 'Disable Module' : 'Enable Module'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </aside>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

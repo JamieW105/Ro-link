@@ -162,8 +162,20 @@ export default function ServersPage() {
     return (
         <div className="space-y-8 max-w-7xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="flex flex-col gap-2">
-                <h1 className="text-2xl font-bold text-white tracking-tight">Live Servers</h1>
-                <p className="text-slate-500 text-sm font-medium">Monitor live jobs, expand each server roster, and drill into any active Roblox player.</p>
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-white tracking-tight">Live Servers</h1>
+                        <p className="mt-2 text-slate-500 text-sm font-medium">Monitor live jobs, expand each server roster, and drill into any active Roblox player.</p>
+                    </div>
+                    {perms.can_manage_settings && (
+                        <Link
+                            href={`/dashboard/${id}/modules`}
+                            className="inline-flex items-center justify-center rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:border-sky-400/60 hover:bg-sky-500/20"
+                        >
+                            Open Marketplace
+                        </Link>
+                    )}
+                </div>
             </div>
 
             {hasGlobalControls && (
