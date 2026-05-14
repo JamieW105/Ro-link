@@ -1,6 +1,5 @@
 'use client';
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -27,10 +26,6 @@ const ActivityIcon = () => (
 
 const GlobeIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
-);
-
-const ModuleIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 2 7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4Z" /><path d="M9 11h6" /><path d="M9 15h4" /></svg>
 );
 
 interface VisibleGuild {
@@ -127,30 +122,6 @@ export default function ServerDashboard() {
                     </p>
                 </div>
             </div>
-
-            {perms.can_manage_settings && (
-                <div className="rounded-xl border border-sky-500/20 bg-sky-500/10 p-5">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                        <div className="flex items-start gap-4">
-                            <div className="rounded-lg border border-sky-500/20 bg-sky-500/10 p-3 text-sky-300">
-                                <ModuleIcon />
-                            </div>
-                            <div>
-                                <h2 className="text-sm font-bold uppercase tracking-wider text-white">Module Marketplace</h2>
-                                <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-400">
-                                    Browse published modules, open a full preview, and install add-ons for this server.
-                                </p>
-                            </div>
-                        </div>
-                        <Link
-                            href={`/dashboard/${id}/modules`}
-                            className="inline-flex items-center justify-center rounded-lg bg-sky-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500"
-                        >
-                            Open Marketplace
-                        </Link>
-                    </div>
-                </div>
-            )}
 
             {/* Metric Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
