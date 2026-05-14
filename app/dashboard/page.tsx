@@ -17,6 +17,10 @@ const SettingsIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
 );
 
+const MarketplaceIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="m12 2 7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4Z" /><path d="M9 11h6" /><path d="M9 15h4" /></svg>
+);
+
 interface Guild {
     id: string;
     name: string;
@@ -188,9 +192,18 @@ export default function Dashboard() {
             </nav>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 md:py-12">
-                <header className="mb-6 md:mb-12">
-                    <h1 className="text-xl md:text-4xl font-extrabold text-white tracking-tight mb-1">Select a Server</h1>
-                    <p className="text-slate-500 text-xs md:text-base font-medium">Choose a community to manage and monitor.</p>
+                <header className="mb-6 flex flex-col gap-4 md:mb-12 md:flex-row md:items-end md:justify-between">
+                    <div>
+                        <h1 className="text-xl md:text-4xl font-extrabold text-white tracking-tight mb-1">Select a Server</h1>
+                        <p className="text-slate-500 text-xs md:text-base font-medium">Choose a community to manage and monitor.</p>
+                    </div>
+                    <Link
+                        href="/dashboard/marketplace"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:border-sky-400/60 hover:bg-sky-500/20"
+                    >
+                        <MarketplaceIcon />
+                        Open Marketplace
+                    </Link>
                 </header>
 
                 {loading ? (
@@ -270,7 +283,7 @@ export default function Dashboard() {
                                                     </Link>
                                                     {canOpenMarketplaceFromServerList(guild) && (
                                                         <Link
-                                                            href={`/dashboard/${guild.id}/modules`}
+                                                            href="/dashboard/marketplace"
                                                             className="w-full py-2.5 bg-sky-600/10 hover:bg-sky-600/20 text-sky-200 border border-sky-500/30 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
                                                         >
                                                             Open Marketplace
