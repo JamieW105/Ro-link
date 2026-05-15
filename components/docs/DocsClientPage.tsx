@@ -897,17 +897,6 @@ const docsPages: DocPage[] = [
                         ]}
                     />
                     <div className="mt-6">
-                        <h3 className="text-sm font-semibold text-white">How to get the Ro-Link config</h3>
-                        <Checklist
-                            items={[
-                                'From Discord, have the server owner run /setup, enter the Place ID, Universe ID, and Open Cloud API key, then copy the Security Key from the Ro-Link reply.',
-                                'From the dashboard, sign in to Ro-Link, open Dashboard, choose the Discord server, go to Settings > Setup, complete the setup form if needed, then copy the Security Key.',
-                                'Paste that Ro-Link Security Key into the Studio installer plugin when it asks for the config or key.',
-                                'Keep the Roblox Open Cloud key in Ro-Link server configuration. It is not the plugin config value.',
-                            ]}
-                        />
-                    </div>
-                    <div className="mt-6">
                         <Callout title="Keep credentials separated" tone="warn">
                             The Open Cloud credential and the dashboard security key serve different jobs. Mixing them is a common setup mistake and can expose a more sensitive credential in the wrong place.
                         </Callout>
@@ -1153,6 +1142,7 @@ const docsPages: DocPage[] = [
         ],
         toc: [
             { id: 'module-api-overview', title: 'Module shape' },
+            { id: 'module-api-config', title: 'Module config' },
             { id: 'module-api-functions', title: 'Context functions' },
             { id: 'module-api-discord', title: 'Discord messages' },
             { id: 'module-api-lifecycle', title: 'Lifecycle hooks' },
@@ -1165,7 +1155,7 @@ const docsPages: DocPage[] = [
                     id="module-api-overview"
                     eyebrow="Structure"
                     title="Return a module table from your uploaded Luau"
-                    description="Marketplace modules are uploaded in the management portal, published by staff with the required permissions, enabled per server from the dashboard, installed into Custom Modules by the Studio plugin, and loaded by the Roblox admin panel at runtime."
+                    description="Marketplace modules are uploaded in the management portal, published by staff with the required permissions, enabled per server from the dashboard, obfuscated before being inserted into a person's game, installed into Custom Modules by the Studio plugin, and loaded by the Roblox admin panel at runtime."
                 >
                     <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
                         <CodeBlock label="Minimal module shape">
@@ -1200,6 +1190,47 @@ return {
                         <Callout title="Runtime requirements" tone="warn">
                             Dashboard config is declared with a top-level CONFIG table. CONFIG.Version can drive module updates, saved values are available as context.Settings, and the schema is available as context.Config.
                         </Callout>
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-config"
+                    eyebrow="Configuration"
+                    title="Get module config from Ro-Link"
+                    description="A module declares its configurable fields with CONFIG. Ro-Link turns that schema into a per-server dashboard form, saves the selected values, then passes those values back into the Roblox runtime."
+                >
+                    <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+                        <div className="space-y-5">
+                            <Checklist
+                                items={[
+                                    'Declare a top-level CONFIG table in the uploaded module source.',
+                                    'Server managers open Dashboard > Modules, choose the module, select Configure, then save the module config for that Discord server.',
+                                    'Read saved values in Roblox from context.Settings or from the second settings argument passed to Init.',
+                                    'Use context.Config only for schema metadata such as field type, default value, options, and description.',
+                                ]}
+                            />
+                            <Callout title="Settings are per server" tone="info">
+                                The same published module can have different saved config values on different Discord servers. Always read the values from the runtime context instead of hard-coding dashboard choices in the module source.
+                            </Callout>
+                        </div>
+                        <CodeBlock label="Read saved module config">
+                            {`return {
+    Init = function(context, settings)
+        local debugEnabled = settings.Debug_UI
+        local theme = context.Settings.Theme
+
+        if debugEnabled then
+            context.Log("Debug UI enabled with theme", theme)
+        end
+    end,
+
+    Commands = {
+        theme = function(command, context)
+            return context.Notify(command.Player, "Theme: " .. tostring(context.Settings.Theme), true)
+        end
+    }
+}`}
+                        </CodeBlock>
                     </div>
                 </SectionCard>
 
