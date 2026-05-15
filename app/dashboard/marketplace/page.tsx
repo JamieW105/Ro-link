@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color';
+type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer';
 
 interface ModuleConfigField {
     key: string;
@@ -12,7 +12,7 @@ interface ModuleConfigField {
     shortDescription: string;
     type: ModuleConfigFieldType;
     options: string[];
-    defaultValue: boolean | string | string[];
+    defaultValue: boolean | string | string[] | number;
 }
 
 interface MarketplaceModule {

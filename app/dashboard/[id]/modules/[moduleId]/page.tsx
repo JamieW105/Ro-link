@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color';
+type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer';
 
 interface ModuleConfigField {
     key: string;
@@ -12,7 +12,7 @@ interface ModuleConfigField {
     shortDescription: string;
     type: ModuleConfigFieldType;
     options: string[];
-    defaultValue: boolean | string | string[];
+    defaultValue: boolean | string | string[] | number;
 }
 
 interface MarketplaceModule {
@@ -45,6 +45,7 @@ function fieldDescription(field: ModuleConfigField) {
     if (field.type === 'bool') return 'Toggle this module setting on or off.';
     if (field.type === 'dropdown') return 'Choose one option for this module setting.';
     if (field.type === 'checkboxes') return 'Choose any options that should be active.';
+    if (field.type === 'integer') return 'Enter a whole-number value for this module setting.';
     return 'Pick a hex color used by this module.';
 }
 
@@ -283,6 +284,16 @@ export default function DashboardModuleConfigPage() {
                                                 className="w-32 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 font-mono text-sm text-white outline-none transition-colors focus:border-sky-500"
                                             />
                                         </div>
+                                    )}
+
+                                    {field.type === 'integer' && (
+                                        <input
+                                            type="number"
+                                            step="1"
+                                            value={Number(settings[field.key] ?? field.defaultValue ?? 0)}
+                                            onChange={(event) => updateSetting(field.key, Math.trunc(Number(event.target.value || 0)))}
+                                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 font-mono text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                        />
                                     )}
                                 </div>
                             </div>

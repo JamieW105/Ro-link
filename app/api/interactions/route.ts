@@ -1905,6 +1905,7 @@ function RoLink:Initialize()
 
 	self.loadedModules = self.loadedModules or {}
 	self.moduleCommands = self.moduleCommands or {}
+	self.moduleCommandDefinitions = self.moduleCommandDefinitions or {}
 	self.moduleHooks = self.moduleHooks or {
 		AdminPanelOpened = {},
 		CommandBarOpened = {}
@@ -2160,6 +2161,54 @@ function RoLink:GetModuleDiscordChannels()
 	return true, payload and payload.channels or {}
 end
 
+function RoLink:GetModuleReports(options)
+	local query = ""
+	if type(options) == "table" then
+		local params = {}
+		for key, value in pairs(options) do
+			if value ~= nil and value ~= "" then
+				table.insert(params, Http:UrlEncode(tostring(key)) .. "=" .. Http:UrlEncode(tostring(value)))
+			end
+		end
+		if #params > 0 then
+			query = "?" .. table.concat(params, "&")
+		end
+	end
+	local ok, payload = self:RequestModuleJson("/api/v1/game-admin/reports" .. query, "GET")
+	if not ok then
+		return false, payload
+	end
+	return true, payload and payload.reports or {}
+end
+
+function RoLink:GetModuleReport(reportId)
+	local id = tostring(reportId or "")
+	if id == "" then
+		return false, "Report ID is required."
+	end
+	local ok, payload = self:RequestModuleJson("/api/v1/game-admin/reports/" .. Http:UrlEncode(id), "GET")
+	if not ok then
+		return false, payload
+	end
+	return true, payload and payload.report or nil
+end
+
+function RoLink:CreateModuleReport(body)
+	return self:RequestModuleJson("/api/v1/game-admin/reports", "POST", body or {})
+end
+
+function RoLink:UpdateModuleReport(reportId, updates)
+	local id = tostring(reportId or "")
+	if id == "" then
+		return false, "Report ID is required."
+	end
+	local ok, payload = self:RequestModuleJson("/api/v1/game-admin/reports/" .. Http:UrlEncode(id), "PATCH", updates or {})
+	if not ok then
+		return false, payload
+	end
+	return true, payload and payload.report or nil
+end
+
 function RoLink:CreateModuleUi(moduleInfo, target, sourceOrTree, props)
 	if sourceOrTree == nil then
 		sourceOrTree = target
@@ -2234,6 +2283,26 @@ function RoLink:BuildModuleContext(moduleInfo)
 				moduleKey = tostring((moduleInfo and (moduleInfo.slug or moduleInfo.id)) or "unknown"),
 				module = moduleInfo
 			}
+			self.moduleCommandDefinitions[key] = self.moduleCommandDefinitions[key] or {
+				Name = commandName,
+				Title = commandName,
+				Description = "Registered by " .. tostring((moduleInfo and (moduleInfo.name or moduleInfo.slug)) or "marketplace module"),
+				Category = "Marketplace",
+				TargetRequired = false,
+				Fields = {}
+			}
+		end,
+		RegisterPanelCommand = function(definition, handler)
+			if type(definition) ~= "table" or type(handler) ~= "function" then return end
+			local commandName = tostring(definition.Name or definition.name or definition.Command or definition.command or definition.Id or definition.id or "")
+			if commandName == "" then return end
+			local key = string.upper(commandName)
+			self.moduleCommands[key] = {
+				handler = handler,
+				moduleKey = tostring((moduleInfo and (moduleInfo.slug or moduleInfo.id)) or "unknown"),
+				module = moduleInfo
+			}
+			self.moduleCommandDefinitions[key] = definition
 		end,
 		OnAdminPanelOpened = function(handler)
 			self:RegisterModuleHook("AdminPanelOpened", moduleInfo, handler)
@@ -2249,6 +2318,18 @@ function RoLink:BuildModuleContext(moduleInfo)
 		end,
 		GetDiscordChannels = function()
 			return self:GetModuleDiscordChannels()
+		end,
+		GetReports = function(options)
+			return self:GetModuleReports(options)
+		end,
+		GetReport = function(reportId)
+			return self:GetModuleReport(reportId)
+		end,
+		CreateReport = function(body)
+			return self:CreateModuleReport(body)
+		end,
+		UpdateReport = function(reportId, updates)
+			return self:UpdateModuleReport(reportId, updates)
 		end,
 		CreateUI = function(target, sourceOrTree, props)
 			return self:CreateModuleUi(moduleInfo, target, sourceOrTree, props)
@@ -2307,6 +2388,9 @@ function RoLink:LoadModules()
 				for commandName, binding in pairs(self.moduleCommands) do
 					if binding.moduleKey == moduleKey then
 						self.moduleCommands[commandName] = nil
+						if self.moduleCommandDefinitions then
+							self.moduleCommandDefinitions[commandName] = nil
+						end
 					end
 				end
 				for _, handlers in pairs(self.moduleHooks or {}) do
@@ -2353,6 +2437,9 @@ function RoLink:LoadModules()
 									for commandName, binding in pairs(self.moduleCommands) do
 										if binding.moduleKey == moduleKey then
 											self.moduleCommands[commandName] = nil
+											if self.moduleCommandDefinitions then
+												self.moduleCommandDefinitions[commandName] = nil
+											end
 										end
 									end
 									for _, handlers in pairs(self.moduleHooks or {}) do

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 
-type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color';
+type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer';
 
 interface ModuleConfigField {
     key: string;
@@ -12,7 +12,7 @@ interface ModuleConfigField {
     shortDescription: string;
     type: ModuleConfigFieldType;
     options: string[];
-    defaultValue: boolean | string | string[];
+    defaultValue: boolean | string | string[] | number;
 }
 
 interface MarketplaceModule {

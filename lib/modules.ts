@@ -13,7 +13,7 @@ export interface SanitizedAddonModuleInput {
     configSchema?: ModuleConfigSchema;
 }
 
-export type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color';
+export type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer';
 
 export interface ModuleConfigField {
     key: string;
@@ -21,7 +21,7 @@ export interface ModuleConfigField {
     shortDescription: string;
     type: ModuleConfigFieldType;
     options: string[];
-    defaultValue: boolean | string | string[];
+    defaultValue: boolean | string | string[] | number;
 }
 
 export type ModuleConfigSchema = Record<string, ModuleConfigField>;
@@ -31,7 +31,7 @@ export type SanitizedAddonModuleResult =
     | { errors: string[] };
 
 const VALID_MODULE_STATUSES = new Set<AddonModuleStatus>(['DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'ARCHIVED']);
-const VALID_CONFIG_TYPES = new Set<ModuleConfigFieldType>(['bool', 'dropdown', 'checkboxes', 'color']);
+const VALID_CONFIG_TYPES = new Set<ModuleConfigFieldType>(['bool', 'dropdown', 'checkboxes', 'color', 'integer']);
 
 export function trimModuleString(value: unknown, maxLength = 5000) {
     return String(value ?? '').trim().slice(0, maxLength);
@@ -787,6 +787,9 @@ function normalizeConfigType(value: unknown): ModuleConfigFieldType | null {
     if (normalized === 'colorwheel' || normalized === 'color' || normalized === 'hexcolor') {
         return 'color';
     }
+    if (normalized === 'integer' || normalized === 'int' || normalized === 'wholenumber') {
+        return 'integer';
+    }
 
     return null;
 }
@@ -812,6 +815,10 @@ function defaultConfigValue(type: ModuleConfigFieldType, options: string[], rawD
             const color = String(rawDefault).trim();
             return /^#[0-9a-f]{6}$/i.test(color) ? color : '#38bdf8';
         }
+        if (type === 'integer') {
+            const integer = Number(rawDefault);
+            return Number.isFinite(integer) ? Math.trunc(integer) : 0;
+        }
         const selected = String(rawDefault);
         return options.includes(selected) ? selected : (options[0] || '');
     }
@@ -819,6 +826,7 @@ function defaultConfigValue(type: ModuleConfigFieldType, options: string[], rawD
     if (type === 'bool') return false;
     if (type === 'checkboxes') return [];
     if (type === 'color') return '#38bdf8';
+    if (type === 'integer') return 0;
     return options[0] || '';
 }
 
@@ -912,6 +920,12 @@ export function parseModuleConfigSettings(value: unknown, schema: ModuleConfigSc
         if (field.type === 'color') {
             const color = String(rawValue || field.defaultValue || '').trim();
             settings[key] = /^#[0-9a-f]{6}$/i.test(color) ? color : field.defaultValue;
+            continue;
+        }
+
+        if (field.type === 'integer') {
+            const integer = Number(rawValue ?? field.defaultValue);
+            settings[key] = Number.isFinite(integer) ? Math.trunc(integer) : field.defaultValue;
             continue;
         }
 

@@ -5,6 +5,16 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type ModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
+type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer';
+
+interface ModuleConfigField {
+    key: string;
+    label: string;
+    shortDescription: string;
+    type: ModuleConfigFieldType;
+    options: string[];
+    defaultValue: boolean | string | string[] | number;
+}
 
 interface AddonModule {
     id: string;
@@ -17,7 +27,7 @@ interface AddonModule {
     isOfficial: boolean;
     sourceCode?: string;
     sourceChecksum: string;
-    configSchema?: Record<string, unknown>;
+    configSchema?: Record<string, ModuleConfigField>;
     authorDiscordId: string | null;
     submittedAt: string | null;
     reviewedAt: string | null;
@@ -46,6 +56,31 @@ function statusClassName(status: ModuleStatus) {
     return 'border-slate-700 bg-slate-950 text-slate-500';
 }
 
+function formatDefaultValue(value: ModuleConfigField['defaultValue']) {
+    if (Array.isArray(value)) {
+        return value.length > 0 ? value.join(', ') : 'None';
+    }
+
+    if (typeof value === 'boolean') {
+        return value ? 'Enabled' : 'Disabled';
+    }
+
+    if (typeof value === 'number') {
+        return String(value);
+    }
+
+    return value || 'None';
+}
+
+function fieldDescription(field: ModuleConfigField) {
+    if (field.shortDescription) return field.shortDescription;
+    if (field.type === 'bool') return 'Toggle this module setting on or off.';
+    if (field.type === 'dropdown') return 'Choose one available option.';
+    if (field.type === 'checkboxes') return 'Choose any available options.';
+    if (field.type === 'integer') return 'Whole-number value saved for this module.';
+    return 'Pick a hex color value.';
+}
+
 export default function ManagementModuleReviewPage() {
     const params = useParams();
     const router = useRouter();
@@ -58,7 +93,7 @@ export default function ManagementModuleReviewPage() {
     const [success, setSuccess] = useState<string | null>(null);
 
     const history = useMemo(() => module?.creatorHistory || [], [module]);
-    const configFields = useMemo(() => Object.entries(module?.configSchema || {}), [module]);
+    const configFields = useMemo(() => Object.values(module?.configSchema || {}), [module]);
     const creatorBlocked = useMemo(() => {
         if (!module?.authorDiscordId) return false;
         return creatorBlocks.some((block) => block.active && block.discord_id === module.authorDiscordId);
@@ -95,6 +130,22 @@ export default function ManagementModuleReviewPage() {
         loadModule();
     }, [loadModule]);
 
+    async function getNextPendingModuleId(currentModuleId: string) {
+        const response = await fetch('/api/management/modules', { cache: 'no-store' });
+        const payload = await response.json().catch(() => ([]));
+        if (!response.ok || !Array.isArray(payload)) {
+            return null;
+        }
+
+        const pendingModules = (payload as AddonModule[]).filter((addon) => addon.status === 'PENDING_REVIEW');
+        const currentIndex = pendingModules.findIndex((addon) => addon.id === currentModuleId);
+        if (currentIndex >= 0) {
+            return pendingModules[currentIndex + 1]?.id || null;
+        }
+
+        return pendingModules.find((addon) => addon.id !== currentModuleId)?.id || null;
+    }
+
     async function copySource() {
         if (!module) return;
         await navigator.clipboard.writeText(module.sourceCode || '');
@@ -112,6 +163,7 @@ export default function ManagementModuleReviewPage() {
         setSuccess(null);
 
         try {
+            const nextPendingModuleId = await getNextPendingModuleId(module.id).catch(() => null);
             const response = await fetch(`/api/management/modules/${module.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -122,7 +174,14 @@ export default function ManagementModuleReviewPage() {
                 throw new Error(String(payload.error || 'Failed to review module.'));
             }
 
-            setSuccess(status === 'PUBLISHED' ? 'Module accepted and published.' : 'Module denied.');
+            if (nextPendingModuleId) {
+                router.replace(`/management/modules/${nextPendingModuleId}`);
+                return;
+            }
+
+            setSuccess(status === 'PUBLISHED'
+                ? 'Module accepted and published. No more modules are awaiting moderation.'
+                : 'Module denied. No more modules are awaiting moderation.');
             await loadModule();
         } catch (reviewError) {
             setError(reviewError instanceof Error ? reviewError.message : 'Failed to review module.');
@@ -293,20 +352,51 @@ export default function ManagementModuleReviewPage() {
                     </div>
 
                     <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-                        <h2 className="text-sm font-bold uppercase tracking-widest text-white">Config Schema</h2>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <h2 className="text-sm font-bold uppercase tracking-widest text-white">Available Configs</h2>
+                                <p className="mt-1 text-xs text-slate-500">Parsed from this submission&apos;s top-level CONFIG block.</p>
+                            </div>
+                            <div className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                                {configFields.length} {configFields.length === 1 ? 'field' : 'fields'}
+                            </div>
+                        </div>
                         {configFields.length > 0 ? (
                             <div className="mt-4 grid gap-3 md:grid-cols-2">
-                                {configFields.map(([key, field]) => {
-                                    const record = field && typeof field === 'object' ? field as Record<string, unknown> : {};
-                                    return (
-                                        <div key={key} className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-                                            <div className="font-semibold text-white">{String(record.label || key)}</div>
-                                            <div className="mt-1 font-mono text-xs text-slate-500">{key}</div>
-                                            <p className="mt-2 text-xs leading-relaxed text-slate-400">{String(record.shortDescription || 'No description provided.')}</p>
-                                            <div className="mt-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">{String(record.type || 'unknown')}</div>
+                                {configFields.map((field) => (
+                                    <div key={field.key} className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="font-semibold text-white">{field.label}</div>
+                                                <div className="mt-1 break-all font-mono text-xs text-slate-500">{field.key}</div>
+                                            </div>
+                                            <span className="shrink-0 rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                {field.type}
+                                            </span>
                                         </div>
-                                    );
-                                })}
+                                        <p className="mt-3 text-xs leading-relaxed text-slate-400">{fieldDescription(field)}</p>
+                                        <div className="mt-4 rounded-md border border-slate-800 bg-black/20 px-3 py-2">
+                                            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Default</div>
+                                            <div className="mt-1 break-words text-xs font-semibold text-slate-300">{formatDefaultValue(field.defaultValue)}</div>
+                                        </div>
+                                        {field.options.length > 0 ? (
+                                            <div className="mt-4">
+                                                <div className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Available Options</div>
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {field.options.map((option) => (
+                                                        <span key={option} className="rounded-md border border-slate-800 bg-black/30 px-2 py-1 text-[10px] font-semibold text-slate-400">
+                                                            {option}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-4 text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                                No fixed options
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         ) : (
                             <p className="mt-3 text-sm text-slate-500">This module does not declare configurable fields.</p>

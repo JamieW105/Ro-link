@@ -511,10 +511,15 @@ const moduleDeveloperFunctions = [
     ['Settings', 'table', 'Per-server settings configured from the dashboard module install page.'],
     ['Services', 'table', 'Whitelisted Roblox services such as Players, HttpService, ReplicatedStorage, RunService, Workspace, Lighting, MessagingService, and ServerScriptService.'],
     ['RegisterCommand(commandName, handler)', 'function', 'Adds a custom command handler. Handlers receive command payload, context, and args.'],
+    ['RegisterPanelCommand(definition, handler)', 'function', 'Registers a module command and exposes it in the in-game Cmds panel with title, description, target, and field metadata.'],
     ['OnAdminPanelOpened(handler)', 'function', 'Runs when an authorized user opens the in-game admin panel. Handler receives player, payload, and context.'],
     ['OnCommandBarOpened(handler)', 'function', 'Runs when an authorized user opens the in-game command bar. Handler receives player, payload, and context.'],
     ['SendBotMessage(target, user, channelId, content)', 'function', 'Sends a Discord bot message through Ro-Link after validating the server, channel, or member target.'],
     ['GetDiscordChannels()', 'function', 'Returns sendable Discord channels for the current server.'],
+    ['GetReports(options)', 'function', 'Reads reports for the current server. options can include status, limit, target, or reporter.'],
+    ['GetReport(reportId)', 'function', 'Reads one report from the current server.'],
+    ['CreateReport(body)', 'function', 'Creates a pending report for the current server.'],
+    ['UpdateReport(reportId, updates)', 'function', 'Edits report status, notes, target, reason, or moderator fields for the current server.'],
     ['CreateUI(target, functionOrTree, props)', 'function', 'Creates Roblox UI for one player, all players, or a target list. Installed modules should pass a function or UI tree table.'],
     ['FindPlayer(target)', 'function', 'Finds one live Roblox player by Player instance, username, or UserId.'],
     ['GetPlayers()', 'function', 'Returns the current live Players list.'],
@@ -1144,6 +1149,8 @@ const docsPages: DocPage[] = [
             { id: 'module-api-overview', title: 'Module shape' },
             { id: 'module-api-config', title: 'Module config' },
             { id: 'module-api-functions', title: 'Context functions' },
+            { id: 'module-api-command-panel', title: 'Cmds panel commands' },
+            { id: 'module-api-reports', title: 'Reports data' },
             { id: 'module-api-discord', title: 'Discord messages' },
             { id: 'module-api-lifecycle', title: 'Lifecycle hooks' },
             { id: 'module-api-ui', title: 'CreateUI' },
@@ -1172,6 +1179,12 @@ const docsPages: DocPage[] = [
         Type = "Dropdown",
         Default = "Sky",
         Options = { "Sky", "Emerald", "Amber" }
+    },
+    Max_Open_Reports = {
+        Short_Description = "Maximum open reports to show in module UI.",
+        Type = "Integer",
+        Default = 10,
+        Options = {}
     }
 }
 
@@ -1204,6 +1217,7 @@ return {
                             <Checklist
                                 items={[
                                     'Declare a top-level CONFIG table in the uploaded module source.',
+                                    'Use Bool, Dropdown, CheckBoxes, Color Wheel, or Integer field types.',
                                     'Server managers open Dashboard > Modules, choose the module, select Configure, then save the module config for that Discord server.',
                                     'Read saved values in Roblox from context.Settings or from the second settings argument passed to Init.',
                                     'Use context.Config only for schema metadata such as field type, default value, options, and description.',
@@ -1244,6 +1258,69 @@ return {
                         headers={['Name', 'Type', 'Description']}
                         rows={moduleDeveloperFunctions.map((row) => [...row])}
                     />
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-command-panel"
+                    eyebrow="Commands"
+                    title="Register commands in the in-game Cmds panel"
+                    description="Use RegisterPanelCommand when a marketplace module command should be discoverable from the admin command bar. RegisterCommand still works for direct command handling; RegisterPanelCommand adds the UI metadata the command bar needs."
+                >
+                    <CodeBlock label="RegisterPanelCommand">
+                        {`return {
+    Init = function(context)
+        context.RegisterPanelCommand({
+            Name = "flag_report",
+            Title = "Flag Report",
+            Description = "Add a moderator note to a report.",
+            Category = "Reports",
+            TargetRequired = false,
+            Fields = {
+                { id = "reportId", label = "Report ID", required = true },
+                { id = "note", label = "Note", required = true, multiline = true }
+            }
+        }, function(command, commandContext, args)
+            return commandContext.UpdateReport(args.reportId, {
+                moderatorNote = args.note
+            })
+        end)
+    end
+}`}
+                    </CodeBlock>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-reports"
+                    eyebrow="Reports"
+                    title="Read and edit reports for the current server"
+                    description="Report helpers call the Ro-Link game-admin API with the configured server key, so modules can only access reports that belong to the Discord server attached to the running Roblox server."
+                >
+                    <div className="grid gap-6 xl:grid-cols-2">
+                        <CodeBlock label="Read reports">
+                            {`local ok, reports = context.GetReports({
+    status = "PENDING",
+    limit = 25,
+    target = "PlayerName"
+})
+
+if ok then
+    for _, report in ipairs(reports) do
+        context.Log(report.id, report.reported_roblox_username, report.reason)
+    end
+end`}
+                        </CodeBlock>
+                        <CodeBlock label="Update a report">
+                            {`local ok, report = context.UpdateReport(reportId, {
+    status = "RESOLVED",
+    moderatorId = tostring(player.UserId),
+    moderatorNote = "Resolved by module command."
+})
+
+if ok then
+    context.Log("Updated report", report.id)
+end`}
+                        </CodeBlock>
+                    </div>
                 </SectionCard>
 
                 <SectionCard

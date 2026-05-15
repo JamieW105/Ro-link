@@ -178,6 +178,12 @@ CONFIG = {
         Type = "Color Wheel",
         Default = "#38bdf8",
         Options = {}
+    },
+    Max_Open_Reports = {
+        Short_Description = "Maximum open reports to show in module UI.",
+        Type = "Integer",
+        Default = 10,
+        Options = {}
     }
 }
 
@@ -231,10 +237,15 @@ return {
 | `context.Settings` | Per-server module settings from the dashboard. |
 | `context.Services` | Whitelisted Roblox services such as `Players`, `HttpService`, `ReplicatedStorage`, `RunService`, `Workspace`, `Lighting`, `MessagingService`, and `ServerScriptService`. |
 | `context.RegisterCommand(commandName, handler)` | Registers a module command. You can also return a `Commands` table. |
+| `context.RegisterPanelCommand(definition, handler)` | Registers a module command and exposes it in the in-game Cmds panel with title, description, target, and field metadata. |
 | `context.OnAdminPanelOpened(handler)` | Runs when an authorized player opens the admin panel. |
 | `context.OnCommandBarOpened(handler)` | Runs when an authorized player opens the command bar. |
 | `context.SendBotMessage(target, user, channelId, content)` | Sends a Discord bot message through Ro-Link with server and channel validation. |
 | `context.GetDiscordChannels()` | Returns Discord channels the bot can send to for the current server. |
+| `context.GetReports(options)` | Reads reports for the current server. Options can include `status`, `limit`, `target`, and `reporter`. |
+| `context.GetReport(reportId)` | Reads one report for the current server. |
+| `context.CreateReport(body)` | Creates a pending report for the current server. |
+| `context.UpdateReport(reportId, updates)` | Edits report status, note, target, reason, or moderator fields for the current server. |
 | `context.CreateUI(target, functionOrTree, props)` | Creates Roblox UI for a player, all players, or a target list. Installed modules should pass a function or UI tree table. |
 | `context.FindPlayer(target)` | Finds one live Roblox player by player instance, username, or UserId. |
 | `context.GetPlayers()` | Returns live Roblox players. |
@@ -264,6 +275,48 @@ context.SendBotMessage("channel", nil, "123456789012345678", {
 ```
 
 `Embed` is optional. `PlainText` is optional when an embed has content. `Footer` and `Footor` are both accepted for compatibility.
+
+### Cmds Panel Commands and Reports
+
+Use `RegisterPanelCommand` when your module command should show in the in-game Cmds panel. `RegisterCommand` still registers a runtime command handler, but `RegisterPanelCommand` also supplies the metadata the command bar needs.
+
+```lua
+return {
+    Init = function(context)
+        context.RegisterPanelCommand({
+            Name = "flag_report",
+            Title = "Flag Report",
+            Description = "Add a moderator note to a report.",
+            Category = "Reports",
+            TargetRequired = false,
+            Fields = {
+                { id = "reportId", label = "Report ID", required = true },
+                { id = "note", label = "Note", required = true, multiline = true }
+            }
+        }, function(command, commandContext, args)
+            return commandContext.UpdateReport(args.reportId, {
+                moderatorNote = args.note
+            })
+        end)
+    end
+}
+```
+
+Report helpers use the running server's Ro-Link API key, so a module can only read or edit reports for the Discord server attached to that Roblox server.
+
+```lua
+local ok, reports = context.GetReports({ status = "PENDING", limit = 25 })
+if ok then
+    for _, report in ipairs(reports) do
+        context.Log(report.id, report.reported_roblox_username, report.reason)
+    end
+end
+
+context.UpdateReport(reportId, {
+    status = "RESOLVED",
+    moderatorNote = "Resolved from an in-game module command."
+})
+```
 
 ### Lifecycle Hooks and UI
 

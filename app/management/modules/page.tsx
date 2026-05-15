@@ -4,6 +4,16 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 type ModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
+type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer';
+
+interface ModuleConfigField {
+    key: string;
+    label: string;
+    shortDescription: string;
+    type: ModuleConfigFieldType;
+    options: string[];
+    defaultValue: boolean | string | string[] | number;
+}
 
 interface AddonModule {
     id: string;
@@ -16,7 +26,7 @@ interface AddonModule {
     isOfficial: boolean;
     sourceCode: string;
     sourceChecksum: string;
-    configSchema?: Record<string, unknown>;
+    configSchema?: Record<string, ModuleConfigField>;
     authorDiscordId: string | null;
     submittedAt: string | null;
     reviewedAt: string | null;
@@ -31,9 +41,92 @@ interface CreatorBlock {
     active: boolean;
 }
 
+interface PendingModuleCardProps {
+    addon: AddonModule;
+    saving: boolean;
+    activeBlockIds: Set<string>;
+    onBlockCreator: (addon: AddonModule) => void;
+}
+
 function formatDate(value: string | null) {
     if (!value) return 'Never';
     return new Date(value).toLocaleString();
+}
+
+function configSummary(addon: AddonModule) {
+    return Object.values(addon.configSchema || {});
+}
+
+function PendingModuleCard({ addon, saving, activeBlockIds, onBlockCreator }: PendingModuleCardProps) {
+    const configs = configSummary(addon);
+
+    return (
+        <article className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-md border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-300">
+                            Awaiting moderation
+                        </span>
+                        {addon.authorDiscordId && (
+                            <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${activeBlockIds.has(addon.authorDiscordId) ? 'border-red-400/20 bg-red-400/10 text-red-300' : 'border-slate-700 bg-slate-900 text-slate-400'}`}>
+                                Creator {addon.authorDiscordId}
+                            </span>
+                        )}
+                        {addon.isOfficial && (
+                            <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+                                Offical
+                            </span>
+                        )}
+                    </div>
+                    <h3 className="mt-3 text-base font-bold text-white">{addon.name}</h3>
+                    <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-400">{addon.description || 'No description provided.'}</p>
+                    <div className="mt-3 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                        <span>{addon.slug}</span>
+                        <span>{addon.category}</span>
+                        <span>Submitted {formatDate(addon.submittedAt)}</span>
+                        <span>{addon.sourceChecksum.slice(0, 12)}</span>
+                    </div>
+                    <div className="mt-4 rounded-lg border border-slate-800 bg-black/20 p-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                Available configs
+                            </span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                {configs.length} {configs.length === 1 ? 'field' : 'fields'}
+                            </span>
+                        </div>
+                        {configs.length > 0 ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                {configs.map((field) => (
+                                    <span key={field.key} className="rounded-md border border-slate-800 bg-slate-950 px-2 py-1 text-[10px] font-semibold text-slate-400">
+                                        {field.label} <span className="text-slate-600">({field.type})</span>
+                                    </span>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="mt-2 text-xs text-slate-600">This submission does not declare configurable fields.</p>
+                        )}
+                    </div>
+                </div>
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                    <Link
+                        href={`/management/modules/${addon.id}`}
+                        className="rounded-lg border border-sky-500/30 px-3 py-2 text-xs font-bold text-sky-300 transition-colors hover:bg-sky-500/10"
+                    >
+                        Review Module
+                    </Link>
+                    <button
+                        onClick={() => onBlockCreator(addon)}
+                        disabled={saving || !addon.authorDiscordId || activeBlockIds.has(addon.authorDiscordId)}
+                        className="rounded-lg border border-red-500/30 px-3 py-2 text-xs font-bold text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+                    >
+                        {addon.authorDiscordId && activeBlockIds.has(addon.authorDiscordId) ? 'Blocked' : 'Block Creator'}
+                    </button>
+                </div>
+            </div>
+        </article>
+    );
 }
 
 export default function ManagementModulesPage() {
@@ -205,50 +298,13 @@ export default function ManagementModulesPage() {
                         </div>
                         <div className="grid grid-cols-1 gap-3">
                             {pendingModules.map((addon) => (
-                                <article key={addon.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                        <div className="min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <span className="rounded-md border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-300">
-                                                    Awaiting moderation
-                                                </span>
-                                                {addon.authorDiscordId && (
-                                                    <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${activeBlockIds.has(addon.authorDiscordId) ? 'border-red-400/20 bg-red-400/10 text-red-300' : 'border-slate-700 bg-slate-900 text-slate-400'}`}>
-                                                        Creator {addon.authorDiscordId}
-                                                    </span>
-                                                )}
-                                                {addon.isOfficial && (
-                                                    <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
-                                                        Offical
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <h3 className="mt-3 text-base font-bold text-white">{addon.name}</h3>
-                                            <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-400">{addon.description || 'No description provided.'}</p>
-                                            <div className="mt-3 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">
-                                                <span>{addon.slug}</span>
-                                                <span>{addon.category}</span>
-                                                <span>Submitted {formatDate(addon.submittedAt)}</span>
-                                                <span>{addon.sourceChecksum.slice(0, 12)}</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2 lg:justify-end">
-                                            <Link
-                                                href={`/management/modules/${addon.id}`}
-                                                className="rounded-lg border border-sky-500/30 px-3 py-2 text-xs font-bold text-sky-300 transition-colors hover:bg-sky-500/10"
-                                            >
-                                                Review Module
-                                            </Link>
-                                            <button
-                                                onClick={() => blockCreator(addon)}
-                                                disabled={saving || !addon.authorDiscordId || activeBlockIds.has(addon.authorDiscordId)}
-                                                className="rounded-lg border border-red-500/30 px-3 py-2 text-xs font-bold text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
-                                            >
-                                                {addon.authorDiscordId && activeBlockIds.has(addon.authorDiscordId) ? 'Blocked' : 'Block Creator'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </article>
+                                <PendingModuleCard
+                                    key={addon.id}
+                                    addon={addon}
+                                    saving={saving}
+                                    activeBlockIds={activeBlockIds}
+                                    onBlockCreator={blockCreator}
+                                />
                             ))}
                         </div>
                     </div>
