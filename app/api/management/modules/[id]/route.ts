@@ -78,6 +78,8 @@ async function notifyModuleCreator(
     status: 'PUBLISHED' | 'REJECTED',
     moduleName: string,
     moduleSlug: string,
+    moduleTag: string,
+    moduleDescription: string,
     moderationNote: string,
 ) {
     if (!discordId) return;
@@ -87,10 +89,12 @@ async function notifyModuleCreator(
         const accepted = status === 'PUBLISHED';
         const marketplaceUrl = buildMarketplaceModuleUrl(moduleSlug);
         const termsUrl = buildModuleCreatorTermsUrl();
+        const safeModuleTag = trimModuleString(moduleTag, 256) || 'General';
+        const safeModuleDescription = trimModuleString(moduleDescription, 1024) || 'No description provided.';
         await sendDiscordMessage(channelId, {
             embeds: [
                 {
-                    title: accepted ? 'Module Accepted' : 'Module Denied',
+                    title: accepted ? `${moduleName} | Ro-Link Dashboard Modules` : 'Module Denied',
                     url: accepted ? marketplaceUrl : termsUrl,
                     description: accepted
                         ? `Your Ro-Link module "${moduleName}" has been accepted and published. It is now available in the marketplace.`
@@ -98,6 +102,8 @@ async function notifyModuleCreator(
                     color: accepted ? 0x10b981 : 0xef4444,
                     fields: accepted
                         ? [
+                            { name: 'Tag', value: safeModuleTag, inline: true },
+                            { name: 'Description', value: safeModuleDescription },
                             { name: 'Marketplace URL', value: marketplaceUrl },
                             { name: 'Module Creator Terms', value: termsUrl },
                         ]
@@ -270,6 +276,8 @@ export async function PATCH(req: Request, context: RouteContext) {
             input.status,
             String(data.name || existingModule.name || 'Untitled Module'),
             String(data.slug || ''),
+            String(data.category || ''),
+            String(data.description || ''),
             String(data.moderation_note || moderationNote || ''),
         );
     }
