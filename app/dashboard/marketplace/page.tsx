@@ -34,6 +34,12 @@ interface MarketplaceModule {
     updatedAt: string | null;
 }
 
+interface InstallTarget {
+    id: string;
+    name: string;
+    icon: string | null;
+}
+
 type SessionUserWithId = {
     id?: string;
 };
@@ -65,11 +71,22 @@ export default function DashboardMarketplacePage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+    const [installTargets, setInstallTargets] = useState<InstallTarget[]>([]);
+    const [installPickerModuleId, setInstallPickerModuleId] = useState<string | null>(null);
+    const [selectedServerIds, setSelectedServerIds] = useState<string[]>([]);
+    const [multiSelectInstall, setMultiSelectInstall] = useState(false);
+    const [installing, setInstalling] = useState(false);
+    const [installMessage, setInstallMessage] = useState<string | null>(null);
+    const [installError, setInstallError] = useState<string | null>(null);
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
 
     const selectedModule = useMemo(
         () => modules.find((addon) => addon.id === selectedModuleId) || null,
         [modules, selectedModuleId],
+    );
+    const installPickerModule = useMemo(
+        () => modules.find((addon) => addon.id === installPickerModuleId) || null,
+        [modules, installPickerModuleId],
     );
 
     useEffect(() => {
@@ -84,12 +101,76 @@ export default function DashboardMarketplacePage() {
                     throw new Error(String(payload.error || 'Failed to load marketplace.'));
                 }
                 setModules(Array.isArray(payload.modules) ? payload.modules : []);
+                setInstallTargets(Array.isArray(payload.installTargets) ? payload.installTargets : []);
             })
             .catch((loadError) => {
                 setError(loadError instanceof Error ? loadError.message : 'Failed to load marketplace.');
             })
             .finally(() => setLoading(false));
     }, [status]);
+
+    function openInstallPicker(moduleId: string) {
+        setInstallPickerModuleId(moduleId);
+        setSelectedServerIds([]);
+        setMultiSelectInstall(false);
+        setInstallMessage(null);
+        setInstallError(null);
+    }
+
+    function closeInstallPicker() {
+        if (installing) return;
+        setInstallPickerModuleId(null);
+        setSelectedServerIds([]);
+        setMultiSelectInstall(false);
+        setInstallMessage(null);
+        setInstallError(null);
+    }
+
+    function toggleServerSelection(serverId: string) {
+        setSelectedServerIds((current) => (
+            current.includes(serverId)
+                ? current.filter((id) => id !== serverId)
+                : [...current, serverId]
+        ));
+    }
+
+    async function installModuleToServers(moduleId: string, serverIds: string[]) {
+        if (serverIds.length === 0) return;
+
+        setInstalling(true);
+        setInstallError(null);
+        setInstallMessage(null);
+
+        try {
+            const results = await Promise.all(serverIds.map(async (serverId) => {
+                const response = await fetch('/api/dashboard/modules', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        serverId,
+                        moduleId,
+                        action: 'install',
+                    }),
+                });
+                const payload = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    const target = installTargets.find((server) => server.id === serverId);
+                    throw new Error(`${target?.name || serverId}: ${String(payload.error || 'Install failed.')}`);
+                }
+
+                return serverId;
+            }));
+
+            setInstallMessage(`Installed to ${results.length} server${results.length === 1 ? '' : 's'}.`);
+            setSelectedServerIds([]);
+            setMultiSelectInstall(false);
+        } catch (installFailure) {
+            setInstallError(installFailure instanceof Error ? installFailure.message : 'Install failed.');
+        } finally {
+            setInstalling(false);
+        }
+    }
 
     if (status === 'loading') {
         return (
@@ -332,15 +413,135 @@ export default function DashboardMarketplacePage() {
                                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Checksum</p>
                                             <p className="mt-2 break-all font-mono text-xs text-slate-300">{selectedModule.sourceChecksum || 'Unavailable'}</p>
                                         </div>
-                                        <Link
-                                            href="/dashboard"
+                                        <button
+                                            type="button"
+                                            onClick={() => openInstallPicker(selectedModule.id)}
                                             className="inline-flex w-full items-center justify-center rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500"
                                         >
                                             Select Server To Install
-                                        </Link>
+                                        </button>
                                     </aside>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {installPickerModule && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+                        <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-700 bg-[#020617] shadow-2xl">
+                            <div className="flex items-start justify-between gap-4 border-b border-slate-800 bg-slate-950/80 px-5 py-5">
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-sky-400">Install Module</p>
+                                    <h3 className="mt-2 text-2xl font-black tracking-tight text-white">{installPickerModule.name}</h3>
+                                    <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                                        Click a server to install. Right-click a server to start multi-select.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={closeInstallPicker}
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition-colors hover:border-slate-500 hover:text-white disabled:opacity-50"
+                                    aria-label="Close install picker"
+                                    disabled={installing}
+                                >
+                                    x
+                                </button>
+                            </div>
+
+                            <div className="custom-scrollbar max-h-[calc(90vh-170px)] overflow-y-auto px-5 py-5">
+                                {installError && (
+                                    <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300">
+                                        {installError}
+                                    </div>
+                                )}
+                                {installMessage && (
+                                    <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-300">
+                                        {installMessage}
+                                    </div>
+                                )}
+
+                                {installTargets.length === 0 ? (
+                                    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-8 text-center text-sm text-slate-500">
+                                        No servers are available for module installs.
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        {installTargets.map((server) => {
+                                            const selected = selectedServerIds.includes(server.id);
+
+                                            return (
+                                                <button
+                                                    key={server.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (multiSelectInstall) {
+                                                            toggleServerSelection(server.id);
+                                                            return;
+                                                        }
+
+                                                        installModuleToServers(installPickerModule.id, [server.id]);
+                                                    }}
+                                                    onContextMenu={(event) => {
+                                                        event.preventDefault();
+                                                        setMultiSelectInstall(true);
+                                                        toggleServerSelection(server.id);
+                                                    }}
+                                                    disabled={installing}
+                                                    className={`flex min-h-20 items-center gap-3 rounded-xl border p-4 text-left transition-colors disabled:opacity-50 ${selected ? 'border-sky-400 bg-sky-500/15' : 'border-slate-800 bg-slate-900/40 hover:border-sky-500/40'}`}
+                                                >
+                                                    {server.icon ? (
+                                                        <img
+                                                            src={`https://cdn.discordapp.com/icons/${server.id}/${server.icon}.png`}
+                                                            alt=""
+                                                            className="h-11 w-11 shrink-0 rounded-lg border border-white/5 object-cover"
+                                                        />
+                                                    ) : (
+                                                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-sm font-bold text-sky-300">
+                                                            {server.name.substring(0, 1)}
+                                                        </span>
+                                                    )}
+                                                    <span className="min-w-0">
+                                                        <span className="block break-words text-sm font-bold text-white">{server.name}</span>
+                                                        <span className="mt-1 block font-mono text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                                            {selected ? 'Selected' : 'Ready'}
+                                                        </span>
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {multiSelectInstall && installTargets.length > 0 && (
+                                <div className="flex flex-col gap-3 border-t border-slate-800 bg-slate-950/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <p className="text-xs font-semibold text-slate-400">
+                                        {selectedServerIds.length} server{selectedServerIds.length === 1 ? '' : 's'} selected
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setMultiSelectInstall(false);
+                                                setSelectedServerIds([]);
+                                            }}
+                                            disabled={installing}
+                                            className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-slate-500 disabled:opacity-50"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => installModuleToServers(installPickerModule.id, selectedServerIds)}
+                                            disabled={installing || selectedServerIds.length === 0}
+                                            className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
+                                        >
+                                            {installing ? 'Installing' : 'Install Selected'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

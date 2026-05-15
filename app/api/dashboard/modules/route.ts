@@ -86,7 +86,7 @@ export async function GET(req: Request) {
                 installedAt: installed?.installed_at || null,
                 serverModuleUpdatedAt: installed?.updated_at || null,
             };
-        }).filter(Boolean),
+        }).filter((module) => module && module.installed),
     });
 }
 

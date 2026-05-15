@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { listVisibleGuildsForDiscordSession } from '@/lib/dashboardGuilds';
+import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
 import {
     checksumModuleSource,
     normalizeAddonModule,
@@ -13,6 +15,13 @@ import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/modul
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
+
+type SessionWithDiscord = Awaited<ReturnType<typeof getServerSession>> & {
+    accessToken?: string;
+    user?: {
+        id?: string;
+    };
+};
 
 async function buildUniqueSlug(seed: string) {
     const baseSlug = slugifyModuleName(seed);
@@ -55,7 +64,7 @@ async function getActiveCreatorBlock(discordId: string) {
 }
 
 export async function GET() {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions) as SessionWithDiscord | null;
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -75,11 +84,44 @@ export async function GET() {
     }
 
     const staffDiscordIds = await getRoLinkStaffDiscordIds();
+    let installTargets: Array<{ id: string; name: string; icon: string | null }> = [];
+
+    if (session.accessToken && userId) {
+        try {
+            const visibleGuilds = await listVisibleGuildsForDiscordSession(session.accessToken, userId);
+            const guildChecks = visibleGuilds
+                .filter((guild) => guild.hasBot)
+                .map(async (guild) => {
+                    try {
+                        const permissions = await resolveDashboardUserPermissions(guild.id, userId);
+                        if (!permissions.is_admin && !permissions.can_manage_settings) {
+                            return null;
+                        }
+
+                        return {
+                            id: guild.id,
+                            name: guild.name,
+                            icon: guild.icon || null,
+                        };
+                    } catch {
+                        return null;
+                    }
+                });
+
+            const checkedGuilds = await Promise.all(guildChecks);
+            installTargets = checkedGuilds
+                .filter((guild): guild is { id: string; name: string; icon: string | null } => Boolean(guild))
+                .sort((first, second) => first.name.localeCompare(second.name));
+        } catch (error) {
+            console.warn('[Marketplace] Failed to load module install targets.', error);
+        }
+    }
 
     return NextResponse.json({
         modules: applyOfficialModuleLabels((data || []) as Record<string, unknown>[], staffDiscordIds)
             .map((row) => normalizeAddonModule(row, false))
             .filter(Boolean),
+        installTargets,
     });
 }
 

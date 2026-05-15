@@ -164,7 +164,7 @@ export default function DashboardModulesPage() {
 
             {modules.length === 0 ? (
                 <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-10 text-center text-slate-500">
-                    No marketplace modules are available.
+                    No modules are installed on this server.
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">

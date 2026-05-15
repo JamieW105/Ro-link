@@ -121,35 +121,6 @@ export default function ManagementModulesPage() {
         setSuccess(`Copied ${addon.name} source code.`);
     }
 
-    async function reviewModule(addon: AddonModule, status: 'PUBLISHED' | 'REJECTED') {
-        const moderationNote = status === 'REJECTED'
-            ? prompt('Reason for denying this module?') || 'Denied by moderation.'
-            : '';
-
-        setSaving(true);
-        setError(null);
-        setSuccess(null);
-
-        try {
-            const response = await fetch(`/api/management/modules/${addon.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status, moderationNote }),
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(String(payload.error || 'Failed to review module.'));
-            }
-
-            setSuccess(status === 'PUBLISHED' ? 'Module accepted and published.' : 'Module denied.');
-            await loadModules();
-        } catch (reviewError) {
-            setError(reviewError instanceof Error ? reviewError.message : 'Failed to review module.');
-        } finally {
-            setSaving(false);
-        }
-    }
-
     async function blockCreator(addon: AddonModule) {
         if (!addon.authorDiscordId) {
             setError('This module does not have a creator Discord ID.');
@@ -228,7 +199,7 @@ export default function ManagementModulesPage() {
                         <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                             <div>
                                 <h2 className="text-lg font-bold text-white">Awaiting Moderation</h2>
-                                <p className="mt-1 text-xs text-slate-400">Review submitted source, copy code for inspection, then accept or deny the module.</p>
+                                <p className="mt-1 text-xs text-slate-400">Open a submitted module to inspect source, review creator history, then accept or deny it.</p>
                             </div>
                             <div className="text-2xl font-black text-amber-300">{pendingModules.length}</div>
                         </div>
@@ -262,26 +233,12 @@ export default function ManagementModulesPage() {
                                             </div>
                                         </div>
                                         <div className="flex flex-wrap gap-2 lg:justify-end">
-                                            <button
-                                                onClick={() => copySource(addon)}
-                                                className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-bold text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
+                                            <Link
+                                                href={`/management/modules/${addon.id}`}
+                                                className="rounded-lg border border-sky-500/30 px-3 py-2 text-xs font-bold text-sky-300 transition-colors hover:bg-sky-500/10"
                                             >
-                                                Copy Code
-                                            </button>
-                                            <button
-                                                onClick={() => reviewModule(addon, 'PUBLISHED')}
-                                                disabled={saving}
-                                                className="rounded-lg border border-emerald-500/30 px-3 py-2 text-xs font-bold text-emerald-300 transition-colors hover:bg-emerald-500/10 disabled:opacity-50"
-                                            >
-                                                Accept
-                                            </button>
-                                            <button
-                                                onClick={() => reviewModule(addon, 'REJECTED')}
-                                                disabled={saving}
-                                                className="rounded-lg border border-red-500/30 px-3 py-2 text-xs font-bold text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
-                                            >
-                                                Deny
-                                            </button>
+                                                Review Module
+                                            </Link>
                                             <button
                                                 onClick={() => blockCreator(addon)}
                                                 disabled={saving || !addon.authorDiscordId || activeBlockIds.has(addon.authorDiscordId)}
@@ -342,6 +299,12 @@ export default function ManagementModulesPage() {
                                                     >
                                                         Copy
                                                     </button>
+                                                    <Link
+                                                        href={`/management/modules/${addon.id}`}
+                                                        className="rounded-lg border border-sky-500/30 px-3 py-2 text-xs font-bold text-sky-300 transition-colors hover:bg-sky-500/10"
+                                                    >
+                                                        Open
+                                                    </Link>
                                                     <button
                                                         onClick={() => deleteModule(addon)}
                                                         disabled={saving}

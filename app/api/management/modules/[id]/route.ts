@@ -114,8 +114,34 @@ export async function GET(_req: Request, context: RouteContext) {
 
     const staffDiscordIds = await getRoLinkStaffDiscordIds();
     const [labeledModule] = applyOfficialModuleLabels([data as Record<string, unknown>], staffDiscordIds);
+    const addonModule = normalizeAddonModule(labeledModule, true);
+    let creatorHistory: ReturnType<typeof normalizeAddonModule>[] = [];
 
-    return NextResponse.json(normalizeAddonModule(labeledModule, true));
+    const authorDiscordId = addonModule?.authorDiscordId;
+    if (authorDiscordId) {
+        const { data: historyRows, error: historyError } = await supabase
+            .from('addon_modules')
+            .select('*')
+            .eq('author_discord_id', authorDiscordId)
+            .neq('id', id)
+            .in('status', ['PUBLISHED', 'REJECTED', 'ARCHIVED'])
+            .order('reviewed_at', { ascending: false })
+            .order('updated_at', { ascending: false })
+            .limit(25);
+
+        if (historyError) {
+            return NextResponse.json({ error: historyError.message }, { status: 500 });
+        }
+
+        creatorHistory = applyOfficialModuleLabels((historyRows || []) as Record<string, unknown>[], staffDiscordIds)
+            .map((row) => normalizeAddonModule(row, false))
+            .filter(Boolean);
+    }
+
+    return NextResponse.json({
+        ...addonModule,
+        creatorHistory,
+    });
 }
 
 export async function PATCH(req: Request, context: RouteContext) {
