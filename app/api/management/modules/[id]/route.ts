@@ -118,6 +118,41 @@ async function notifyModuleCreator(
     }
 }
 
+async function notifyModuleCreatorCodeEdited(
+    discordId: string | null | undefined,
+    moduleName: string,
+    moduleSlug: string,
+    moderatorDiscordId: string,
+    editReason: string,
+) {
+    if (!discordId) return;
+
+    try {
+        const channelId = await createDiscordDmChannel(discordId);
+        const marketplaceUrl = buildMarketplaceModuleUrl(moduleSlug);
+        await sendDiscordMessage(channelId, {
+            embeds: [
+                {
+                    title: 'Module Code Edited By Moderation',
+                    url: marketplaceUrl,
+                    description: `A Ro-Link moderator edited the source code for your module "${moduleName}".`,
+                    color: 0x38bdf8,
+                    fields: [
+                        { name: 'Moderator', value: moderatorDiscordId },
+                        { name: 'Reason', value: editReason },
+                        { name: 'Module', value: marketplaceUrl },
+                    ],
+                },
+            ],
+        });
+    } catch (error) {
+        console.error('[MODULES] Failed to DM module creator about code edit', {
+            discordId,
+            error: error instanceof Error ? error.message : error,
+        });
+    }
+}
+
 export async function GET(_req: Request, context: RouteContext) {
     const auth = await requireModuleManager();
     if ('error' in auth) return auth.error;
@@ -183,9 +218,9 @@ export async function PATCH(req: Request, context: RouteContext) {
     const input = sanitized.input;
     const { data: existingModule, error: existingModuleError } = await supabase
         .from('addon_modules')
-        .select('id, name, status, author_discord_id')
+        .select('id, name, slug, status, author_discord_id, source_code')
         .eq('id', id)
-        .maybeSingle<{ id: string; name?: string | null; status?: string | null; author_discord_id?: string | null }>();
+        .maybeSingle<{ id: string; name?: string | null; slug?: string | null; status?: string | null; author_discord_id?: string | null; source_code?: string | null }>();
 
     if (existingModuleError) {
         return NextResponse.json({ error: existingModuleError.message }, { status: 500 });
@@ -201,6 +236,14 @@ export async function PATCH(req: Request, context: RouteContext) {
     const moderationNote = 'moderationNote' in body || 'moderation_note' in body
         ? trimModuleString(body.moderationNote ?? body.moderation_note, 2000)
         : undefined;
+    const codeEditReason = 'codeEditReason' in body || 'code_edit_reason' in body
+        ? trimModuleString(body.codeEditReason ?? body.code_edit_reason, 1000)
+        : '';
+    const sourceCodeChanged = input.sourceCode !== undefined && input.sourceCode !== String(existingModule.source_code || '');
+
+    if (sourceCodeChanged && !codeEditReason) {
+        return NextResponse.json({ error: 'A code edit reason is required.' }, { status: 400 });
+    }
 
     if (input.name !== undefined) updates.name = input.name;
     if (input.description !== undefined) updates.description = input.description;
@@ -272,6 +315,16 @@ export async function PATCH(req: Request, context: RouteContext) {
             String(data.name || existingModule.name || 'Untitled Module'),
             String(data.slug || ''),
             String(data.moderation_note || moderationNote || ''),
+        );
+    }
+
+    if (sourceCodeChanged) {
+        await notifyModuleCreatorCodeEdited(
+            existingModule.author_discord_id,
+            String(data.name || existingModule.name || 'Untitled Module'),
+            String(data.slug || existingModule.slug || ''),
+            auth.userId,
+            codeEditReason,
         );
     }
 

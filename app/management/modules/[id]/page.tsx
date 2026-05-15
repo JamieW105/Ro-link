@@ -91,6 +91,9 @@ export default function ManagementModuleReviewPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+    const [editingSource, setEditingSource] = useState(false);
+    const [editedSourceCode, setEditedSourceCode] = useState('');
+    const [codeEditReason, setCodeEditReason] = useState('');
 
     const history = useMemo(() => module?.creatorHistory || [], [module]);
     const configFields = useMemo(() => Object.values(module?.configSchema || {}), [module]);
@@ -114,6 +117,9 @@ export default function ManagementModuleReviewPage() {
                 throw new Error(String(modulePayload.error || 'Failed to load module.'));
             }
             setModule(modulePayload as AddonModule);
+            setEditedSourceCode(String((modulePayload as AddonModule).sourceCode || ''));
+            setCodeEditReason('');
+            setEditingSource(false);
 
             const blocksPayload = await blocksResponse.json().catch(() => ([]));
             if (blocksResponse.ok) {
@@ -150,6 +156,70 @@ export default function ManagementModuleReviewPage() {
         if (!module) return;
         await navigator.clipboard.writeText(module.sourceCode || '');
         setSuccess(`Copied ${module.name} source code.`);
+    }
+
+    function startSourceEdit() {
+        if (!module) return;
+        setEditedSourceCode(module.sourceCode || '');
+        setCodeEditReason('');
+        setEditingSource(true);
+        setError(null);
+        setSuccess(null);
+    }
+
+    function cancelSourceEdit() {
+        setEditedSourceCode(module?.sourceCode || '');
+        setCodeEditReason('');
+        setEditingSource(false);
+        setError(null);
+    }
+
+    async function saveSourceEdit() {
+        if (!module) return;
+
+        const nextSourceCode = editedSourceCode.trim();
+        const reason = codeEditReason.trim();
+
+        if (!nextSourceCode) {
+            setError('Module source code is required.');
+            return;
+        }
+
+        if (nextSourceCode === (module.sourceCode || '').trim()) {
+            setError('Change the source code before saving an edit.');
+            return;
+        }
+
+        if (!reason) {
+            setError('A code edit reason is required.');
+            return;
+        }
+
+        setSaving(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const response = await fetch(`/api/management/modules/${module.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sourceCode: nextSourceCode,
+                    codeEditReason: reason,
+                }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(String(payload.error || 'Failed to save source edit.'));
+            }
+
+            setSuccess('Module source updated. The creator was notified.');
+            await loadModule();
+        } catch (saveError) {
+            setError(saveError instanceof Error ? saveError.message : 'Failed to save source edit.');
+        } finally {
+            setSaving(false);
+        }
     }
 
     async function reviewModule(status: 'PUBLISHED' | 'REJECTED') {
@@ -342,13 +412,64 @@ export default function ManagementModuleReviewPage() {
             <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <div className="min-w-0 space-y-6">
                     <div className="rounded-xl border border-slate-800 bg-slate-900/40">
-                        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+                        <div className="flex flex-col gap-3 border-b border-slate-800 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                             <h2 className="text-sm font-bold uppercase tracking-widest text-white">Submitted Source</h2>
-                            <span className="font-mono text-xs text-slate-500">{(module.sourceCode || '').length.toLocaleString()} chars</span>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono text-xs text-slate-500">{(editingSource ? editedSourceCode : module.sourceCode || '').length.toLocaleString()} chars</span>
+                                {editingSource ? (
+                                    <>
+                                        <button
+                                            onClick={cancelSourceEdit}
+                                            disabled={saving}
+                                            className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-bold text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveSourceEdit}
+                                            disabled={saving || !editedSourceCode.trim() || !codeEditReason.trim() || editedSourceCode.trim() === (module.sourceCode || '').trim()}
+                                            className="rounded-lg border border-emerald-500/30 px-3 py-2 text-xs font-bold text-emerald-300 transition-colors hover:bg-emerald-500/10 disabled:opacity-50"
+                                        >
+                                            {saving ? 'Saving' : 'Save Code'}
+                                        </button>
+                                    </>
+                                ) : (
+                                    <button
+                                        onClick={startSourceEdit}
+                                        disabled={saving}
+                                        className="rounded-lg border border-sky-500/30 px-3 py-2 text-xs font-bold text-sky-300 transition-colors hover:bg-sky-500/10 disabled:opacity-50"
+                                    >
+                                        Edit Code
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                        <pre className="max-h-[70vh] overflow-auto p-5 text-xs leading-relaxed text-slate-300">
-                            <code>{module.sourceCode || 'Source was cleared or is unavailable.'}</code>
-                        </pre>
+                        {editingSource ? (
+                            <div className="space-y-4 p-5">
+                                <textarea
+                                    value={editedSourceCode}
+                                    onChange={(event) => setEditedSourceCode(event.target.value)}
+                                    className="min-h-[60vh] w-full resize-y rounded-lg border border-slate-800 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-200 outline-none transition-colors focus:border-sky-500"
+                                    spellCheck={false}
+                                />
+                                <div>
+                                    <label className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                                        Edit Justification
+                                    </label>
+                                    <textarea
+                                        value={codeEditReason}
+                                        onChange={(event) => setCodeEditReason(event.target.value)}
+                                        maxLength={1000}
+                                        placeholder="Explain why moderation changed this code."
+                                        className="mt-2 min-h-24 w-full resize-y rounded-lg border border-slate-800 bg-slate-950 p-3 text-sm leading-relaxed text-slate-200 outline-none transition-colors focus:border-sky-500"
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <pre className="max-h-[70vh] overflow-auto p-5 text-xs leading-relaxed text-slate-300">
+                                <code>{module.sourceCode || 'Source was cleared or is unavailable.'}</code>
+                            </pre>
+                        )}
                     </div>
 
                     <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">

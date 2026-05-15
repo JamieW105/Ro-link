@@ -258,19 +258,19 @@ function CodeBlock({ children, label }: { children: ReactNode; label: string }) 
     }
 
     return (
-        <div className="overflow-hidden rounded-[18px] border border-white/10 bg-[#111827]">
+        <div className="min-w-0 overflow-hidden rounded-[18px] border border-white/10 bg-[#111827]">
             <div className="flex items-center justify-between border-b border-white/8 bg-white/[0.02] px-4 py-3">
-                <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{label}</span>
+                <span className="min-w-0 truncate pr-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{label}</span>
                 <button
                     type="button"
                     onClick={copyToClipboard}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-slate-400 transition-colors hover:text-white"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-slate-400 transition-colors hover:text-white"
                 >
                     {copied ? <Icons.Check className="h-3.5 w-3.5 text-emerald-400" /> : <Icons.Copy className="h-3.5 w-3.5" />}
                     {copied ? 'Copied' : 'Copy'}
                 </button>
             </div>
-            <pre id={codeId} className="overflow-x-auto p-4 text-sm leading-7 text-slate-300">
+            <pre id={codeId} className="custom-scrollbar w-full max-w-full overflow-x-auto p-4 text-sm leading-7 text-slate-300">
                 <code>{children}</code>
             </pre>
         </div>
