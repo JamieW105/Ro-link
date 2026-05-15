@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color';
 
@@ -65,6 +65,11 @@ function statusLabel(status: string) {
     return status.replace(/_/g, ' ');
 }
 
+function getModuleParam() {
+    if (typeof window === 'undefined') return '';
+    return new URLSearchParams(window.location.search).get('module') || '';
+}
+
 export default function DashboardMarketplacePage() {
     const { data: session, status } = useSession();
     const [modules, setModules] = useState<MarketplaceModule[]>([]);
@@ -89,6 +94,43 @@ export default function DashboardMarketplacePage() {
         [modules, installPickerModuleId],
     );
 
+    const syncSelectedModuleFromUrl = useCallback((nextModules: MarketplaceModule[]) => {
+        const moduleParam = getModuleParam();
+        if (!moduleParam) {
+            setSelectedModuleId(null);
+            return;
+        }
+
+        const decodedModuleParam = moduleParam.toLowerCase();
+        const matchedModule = nextModules.find((addon) => (
+            addon.slug.toLowerCase() === decodedModuleParam
+            || addon.id.toLowerCase() === decodedModuleParam
+        ));
+
+        setSelectedModuleId(matchedModule?.id || null);
+    }, []);
+
+    function setMarketplaceModuleUrl(moduleSlug: string | null) {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        if (moduleSlug) {
+            url.searchParams.set('module', moduleSlug);
+        } else {
+            url.searchParams.delete('module');
+        }
+        window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+
+    function openModulePreview(addon: MarketplaceModule) {
+        setSelectedModuleId(addon.id);
+        setMarketplaceModuleUrl(addon.slug);
+    }
+
+    function closeModulePreview() {
+        setSelectedModuleId(null);
+        setMarketplaceModuleUrl(null);
+    }
+
     useEffect(() => {
         if (status !== 'authenticated') {
             return;
@@ -100,14 +142,25 @@ export default function DashboardMarketplacePage() {
                 if (!response.ok) {
                     throw new Error(String(payload.error || 'Failed to load marketplace.'));
                 }
-                setModules(Array.isArray(payload.modules) ? payload.modules : []);
+                const nextModules = Array.isArray(payload.modules) ? payload.modules : [];
+                setModules(nextModules);
                 setInstallTargets(Array.isArray(payload.installTargets) ? payload.installTargets : []);
+                syncSelectedModuleFromUrl(nextModules);
             })
             .catch((loadError) => {
                 setError(loadError instanceof Error ? loadError.message : 'Failed to load marketplace.');
             })
             .finally(() => setLoading(false));
-    }, [status]);
+    }, [status, syncSelectedModuleFromUrl]);
+
+    useEffect(() => {
+        function handlePopState() {
+            syncSelectedModuleFromUrl(modules);
+        }
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [modules, syncSelectedModuleFromUrl]);
 
     function openInstallPicker(moduleId: string) {
         setInstallPickerModuleId(moduleId);
@@ -303,7 +356,7 @@ export default function DashboardMarketplacePage() {
                                     </div>
                                     <button
                                         type="button"
-                                        onClick={() => setSelectedModuleId(addon.id)}
+                                        onClick={() => openModulePreview(addon)}
                                         className="w-full rounded-xl border border-sky-500/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10"
                                     >
                                         Open Module
@@ -342,7 +395,7 @@ export default function DashboardMarketplacePage() {
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => setSelectedModuleId(null)}
+                                    onClick={closeModulePreview}
                                     className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
                                     aria-label="Close module preview"
                                 >

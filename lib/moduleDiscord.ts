@@ -40,7 +40,9 @@ type DiscordChannelRecord = {
 type DiscordEmbedPayload = {
     title?: string;
     description?: string;
+    url?: string;
     color?: number;
+    fields?: Array<{ name: string; value: string; inline?: boolean }>;
     image?: { url: string };
     footer?: { text: string; icon_url?: string };
 };
@@ -364,4 +366,3 @@ export async function sendDiscordMessage(channelId: string, payload: ModuleDisco
         },
     );
 }
-

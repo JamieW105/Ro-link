@@ -21,16 +21,33 @@ async function requireModuleManager() {
     return { userId };
 }
 
+function getBaseUrl() {
+    return (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
+}
+
+function buildModuleCreatorTermsUrl() {
+    return `${getBaseUrl()}/terms/modules/create`;
+}
+
+function buildMarketplaceUrl() {
+    return `${getBaseUrl()}/dashboard/marketplace`;
+}
+
 async function notifyCreatorUploadBlocked(discordId: string, reason: string) {
     try {
         const channelId = await createDiscordDmChannel(discordId);
+        const termsUrl = buildModuleCreatorTermsUrl();
         await sendDiscordMessage(channelId, {
-            content: 'You have been blocked from uploading Ro-Link marketplace modules.',
             embeds: [
                 {
                     title: 'Module Uploads Blocked',
-                    description: reason || 'The moderation team blocked your account from uploading marketplace modules.',
+                    url: termsUrl,
+                    description: `You have been blocked from uploading Ro-Link marketplace modules.${reason ? `\n\n**Reason:** ${reason}` : ''}`,
                     color: 0xef4444,
+                    fields: [
+                        { name: 'Module Creator Terms', value: termsUrl },
+                        { name: 'Marketplace', value: buildMarketplaceUrl() },
+                    ],
                 },
             ],
         });

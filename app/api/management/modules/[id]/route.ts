@@ -59,10 +59,25 @@ type RouteContext = {
     }>;
 };
 
+function getBaseUrl() {
+    return (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
+}
+
+function buildMarketplaceModuleUrl(slug: string) {
+    const normalizedSlug = trimModuleString(slug, 80);
+    const query = normalizedSlug ? `?module=${encodeURIComponent(normalizedSlug)}` : '';
+    return `${getBaseUrl()}/dashboard/marketplace${query}`;
+}
+
+function buildModuleCreatorTermsUrl() {
+    return `${getBaseUrl()}/terms/modules/create`;
+}
+
 async function notifyModuleCreator(
     discordId: string | null | undefined,
     status: 'PUBLISHED' | 'REJECTED',
     moduleName: string,
+    moduleSlug: string,
     moderationNote: string,
 ) {
     if (!discordId) return;
@@ -70,17 +85,26 @@ async function notifyModuleCreator(
     try {
         const channelId = await createDiscordDmChannel(discordId);
         const accepted = status === 'PUBLISHED';
+        const marketplaceUrl = buildMarketplaceModuleUrl(moduleSlug);
+        const termsUrl = buildModuleCreatorTermsUrl();
         await sendDiscordMessage(channelId, {
-            content: accepted
-                ? `Your Ro-Link module "${moduleName}" has been accepted and published.`
-                : `Your Ro-Link module "${moduleName}" has been denied.`,
             embeds: [
                 {
                     title: accepted ? 'Module Accepted' : 'Module Denied',
+                    url: accepted ? marketplaceUrl : termsUrl,
                     description: accepted
-                        ? 'Your module is now available in the marketplace.'
-                        : moderationNote || 'The moderation team denied this module submission.',
+                        ? `Your Ro-Link module "${moduleName}" has been accepted and published. It is now available in the marketplace.`
+                        : `Your Ro-Link module "${moduleName}" has been denied.${moderationNote ? `\n\n**Moderation note:** ${moderationNote}` : ''}`,
                     color: accepted ? 0x10b981 : 0xef4444,
+                    fields: accepted
+                        ? [
+                            { name: 'Marketplace URL', value: marketplaceUrl },
+                            { name: 'Module Creator Terms', value: termsUrl },
+                        ]
+                        : [
+                            { name: 'Module Creator Terms', value: termsUrl },
+                            { name: 'Next Step', value: 'Review the terms before submitting another module.' },
+                        ],
                 },
             ],
         });
@@ -245,6 +269,7 @@ export async function PATCH(req: Request, context: RouteContext) {
             existingModule.author_discord_id,
             input.status,
             String(data.name || existingModule.name || 'Untitled Module'),
+            String(data.slug || ''),
             String(data.moderation_note || moderationNote || ''),
         );
     }
