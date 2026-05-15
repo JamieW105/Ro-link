@@ -10,6 +10,7 @@ import {
     slugifyModuleName,
     trimModuleString,
 } from '@/lib/modules';
+import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
 
 async function requireModuleManager() {
@@ -76,7 +77,10 @@ export async function GET(_req: Request, context: RouteContext) {
         return NextResponse.json({ error: 'Module not found' }, { status: 404 });
     }
 
-    return NextResponse.json(normalizeAddonModule(data, true));
+    const staffDiscordIds = await getRoLinkStaffDiscordIds();
+    const [labeledModule] = applyOfficialModuleLabels([data as Record<string, unknown>], staffDiscordIds);
+
+    return NextResponse.json(normalizeAddonModule(labeledModule, true));
 }
 
 export async function PATCH(req: Request, context: RouteContext) {
@@ -139,7 +143,10 @@ export async function PATCH(req: Request, context: RouteContext) {
         return NextResponse.json({ error: 'Module not found' }, { status: 404 });
     }
 
-    return NextResponse.json(normalizeAddonModule(data, true));
+    const staffDiscordIds = await getRoLinkStaffDiscordIds();
+    const [labeledModule] = applyOfficialModuleLabels([data as Record<string, unknown>], staffDiscordIds);
+
+    return NextResponse.json(normalizeAddonModule(labeledModule, true));
 }
 
 export async function DELETE(_req: Request, context: RouteContext) {

@@ -13,7 +13,6 @@ import {
 } from "@/lib/adminPanelCommands";
 import { findLivePlayer } from "@/lib/livePlayers";
 import { normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
-import { supabase } from "@/lib/supabase";
 
 interface RobloxPlayerProfile {
     id: number;
@@ -28,6 +27,10 @@ interface RobloxPlayerProfile {
 interface LiveServerRecord {
     id: string;
     players?: unknown;
+}
+
+interface ServerPlaceConfig {
+    place_id?: string | null;
 }
 
 type PresenceState = {
@@ -104,31 +107,20 @@ export default function DashboardPlayerPage() {
             setPlayer(resolvedProfile);
 
             const [serverConfigRes, liveServersRes, logsRes] = await Promise.all([
-                supabase
-                    .from('servers')
-                    .select('place_id')
-                    .eq('id', guildId)
-                    .single(),
-                supabase
-                    .from('live_servers')
-                    .select('id, players')
-                    .eq('server_id', guildId),
-                supabase
-                    .from('logs')
-                    .select('id, action, moderator, timestamp')
-                    .eq('server_id', guildId)
-                    .ilike('target', resolvedProfile.username)
-                    .order('timestamp', { ascending: false })
-                    .limit(20),
+                fetch(`/api/dashboard/server-config?serverId=${encodeURIComponent(guildId)}`, { cache: 'no-store' }),
+                fetch(`/api/dashboard/live-servers?serverId=${encodeURIComponent(guildId)}`, { cache: 'no-store' }),
+                fetch(`/api/dashboard/logs?serverId=${encodeURIComponent(guildId)}&target=${encodeURIComponent(resolvedProfile.username)}&limit=20`, { cache: 'no-store' }),
             ]);
 
-            if (serverConfigRes.data?.place_id) {
-                setLinkedPlaceId(serverConfigRes.data.place_id);
+            const serverConfig = serverConfigRes.ok ? await serverConfigRes.json() as ServerPlaceConfig | null : null;
+            if (serverConfig?.place_id) {
+                setLinkedPlaceId(serverConfig.place_id);
             } else {
                 setLinkedPlaceId(null);
             }
 
-            const liveServers = Array.isArray(liveServersRes.data) ? liveServersRes.data as LiveServerRecord[] : [];
+            const liveServersData = liveServersRes.ok ? await liveServersRes.json() : [];
+            const liveServers = Array.isArray(liveServersData) ? liveServersData as LiveServerRecord[] : [];
             const matchingServer = liveServers.find((server) =>
                 findLivePlayer(server.players, resolvedProfile.username)
                 || findLivePlayer(server.players, String(resolvedProfile.id)),
@@ -139,7 +131,7 @@ export default function DashboardPlayerPage() {
                 jobId: matchingServer?.id || null,
             });
 
-            setLogs(normalizeDashboardLogs(logsRes.data));
+            setLogs(normalizeDashboardLogs(logsRes.ok ? await logsRes.json() : []));
         } catch (loadError) {
             setError(String(loadError instanceof Error ? loadError.message : loadError));
         } finally {

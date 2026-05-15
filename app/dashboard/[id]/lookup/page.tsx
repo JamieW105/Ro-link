@@ -5,7 +5,6 @@ import { Suspense, useState, useEffect, useCallback } from "react";
 import { canUseDashboardCommand, getAdminPanelCommandDefinition, MODERATION_COMMAND_IDS } from "@/lib/adminPanelCommands";
 import { findLivePlayer } from "@/lib/livePlayers";
 import { normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
-import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@/context/PermissionsContext";
 
@@ -17,6 +16,10 @@ interface RobloxPlayer {
     created: string;
     avatarUrl: string;
     isBanned?: boolean;
+}
+
+interface ServerPlaceConfig {
+    place_id?: string | null;
 }
 
 // SVGs
@@ -76,8 +79,11 @@ function PlayerLookupContent() {
     useEffect(() => {
         async function fetchConfig() {
             if (!id) return;
-            const { data } = await supabase.from('servers').select('place_id').eq('id', id).single();
-            if (data) setLinkedPlaceId(data.place_id);
+            const response = await fetch(`/api/dashboard/server-config?serverId=${encodeURIComponent(String(id))}`, {
+                cache: 'no-store',
+            });
+            const data = response.ok ? await response.json() as ServerPlaceConfig | null : null;
+            if (data) setLinkedPlaceId(data.place_id || null);
         }
         fetchConfig();
     }, [id]);
@@ -99,12 +105,13 @@ function PlayerLookupContent() {
 
             // Fetch Presence and Logs in Parallel
             const [serversRes, logsRes] = await Promise.all([
-                supabase.from('live_servers').select('id, players').eq('server_id', id),
-                supabase.from('logs').select('*').eq('server_id', id).eq('target', data.username).order('timestamp', { ascending: false })
+                fetch(`/api/dashboard/live-servers?serverId=${encodeURIComponent(String(id))}`, { cache: 'no-store' }),
+                fetch(`/api/dashboard/logs?serverId=${encodeURIComponent(String(id))}&target=${encodeURIComponent(data.username)}`, { cache: 'no-store' })
             ]);
 
-            if (serversRes.data) {
-                const activeServer = serversRes.data.find((s: any) => findLivePlayer(s.players, data.username) || findLivePlayer(s.players, String(data.id)));
+            if (serversRes.ok) {
+                const serversData = await serversRes.json();
+                const activeServer = serversData.find((s: any) => findLivePlayer(s.players, data.username) || findLivePlayer(s.players, String(data.id)));
                 if (activeServer) {
                     setPresence({ inGame: true, jobId: activeServer.id });
                 } else {
@@ -112,8 +119,8 @@ function PlayerLookupContent() {
                 }
             }
 
-            if (logsRes.data) {
-                setLogs(normalizeDashboardLogs(logsRes.data));
+            if (logsRes.ok) {
+                setLogs(normalizeDashboardLogs(await logsRes.json()));
             }
             if (data.username) {
                 await fetch('/api/logs', {
@@ -202,8 +209,10 @@ function PlayerLookupContent() {
             alert(`${getAdminPanelCommandDefinition(action)?.label || action} signal sent to Roblox.`);
 
             // Re-fetch logs
-            const { data } = await supabase.from('logs').select('*').eq('server_id', id).eq('target', player.username).order('timestamp', { ascending: false });
-            if (data) setLogs(normalizeDashboardLogs(data));
+            const logsResponse = await fetch(`/api/dashboard/logs?serverId=${encodeURIComponent(String(id))}&target=${encodeURIComponent(player.username)}`, {
+                cache: 'no-store',
+            });
+            if (logsResponse.ok) setLogs(normalizeDashboardLogs(await logsResponse.json()));
         }
         setActionLoading(false);
     }

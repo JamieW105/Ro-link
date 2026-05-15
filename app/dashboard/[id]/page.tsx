@@ -2,10 +2,9 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@/context/PermissionsContext";
-import { normalizeDashboardLog, normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
+import { normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
 
 // SVGs
 const ScrollIcon = () => (
@@ -33,6 +32,10 @@ interface VisibleGuild {
     name: string;
 }
 
+interface ServerOverviewConfig {
+    api_key?: string | null;
+}
+
 export default function ServerDashboard() {
     const { id } = useParams();
     const { data: session } = useSession();
@@ -53,51 +56,25 @@ export default function ServerDashboard() {
                     if (g) setServerName(g.name);
                 });
 
-            const { data: server } = await supabase
-                .from('servers')
-                .select('*')
-                .eq('id', id)
-                .single();
+            const [configRes, logsRes] = await Promise.all([
+                fetch(`/api/dashboard/server-config?serverId=${encodeURIComponent(String(id))}`, { cache: 'no-store' }),
+                fetch(`/api/dashboard/logs?serverId=${encodeURIComponent(String(id))}&limit=10`, { cache: 'no-store' }),
+            ]);
 
-            if (server) setApiKey(server.api_key);
+            if (configRes.ok) {
+                const server = await configRes.json() as ServerOverviewConfig | null;
+                if (server?.api_key) setApiKey(server.api_key);
+            }
 
-            const { data: logData } = await supabase
-                .from('logs')
-                .select('*')
-                .eq('server_id', id)
-                .order('timestamp', { ascending: false })
-                .limit(10);
-
-            if (logData) setLogs(normalizeDashboardLogs(logData));
+            if (logsRes.ok) {
+                const logData = await logsRes.json();
+                setLogs(normalizeDashboardLogs(logData));
+            }
             setLoading(false);
         }
         fetchData();
-
-        // Subscribe to real-time log updates
-        const channel = supabase
-            .channel(`dashboard_logs_${id}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'logs',
-                    filter: `server_id=eq.${id}`
-                },
-                (payload) => {
-                    const nextLog = normalizeDashboardLog(payload.new);
-                    if (!nextLog) {
-                        return;
-                    }
-
-                    setLogs((prev) => [nextLog, ...prev].slice(0, 10));
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        }
+        const interval = setInterval(fetchData, 5000);
+        return () => clearInterval(interval);
     }, [id]);
 
     const perms = usePermissions();

@@ -999,6 +999,7 @@ export function normalizeAddonModule(row: Record<string, unknown> | null | undef
         version: String(row.version || '1.0.0'),
         category: String(row.category || 'General'),
         status: String(row.status || 'DRAFT') as AddonModuleStatus,
+        isOfficial: row.is_official_module === true,
         sourceChecksum: String(row.source_checksum || ''),
         configSchema: parseStoredModuleConfigSchema(row.config_schema),
         authorDiscordId: row.author_discord_id ? String(row.author_discord_id) : null,

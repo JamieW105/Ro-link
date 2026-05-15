@@ -23,6 +23,7 @@ interface MarketplaceModule {
     version: string;
     category: string;
     status: string;
+    isOfficial: boolean;
     authorDiscordId: string | null;
     sourceChecksum: string;
     configSchema: Record<string, ModuleConfigField>;
@@ -186,6 +187,11 @@ export default function DashboardModulesPage() {
                                                     {reviewLabel(addon.status)}
                                                 </span>
                                             )}
+                                            {addon.isOfficial && (
+                                                <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+                                                    Offical
+                                                </span>
+                                            )}
                                         </div>
                                         <h2 className="mt-4 text-xl font-bold text-white">{addon.name}</h2>
                                         <p className="mt-2 text-sm leading-relaxed text-slate-400">{addon.description || 'No description provided.'}</p>
@@ -267,6 +273,11 @@ export default function DashboardModulesPage() {
                                     {selectedModule.status !== 'PUBLISHED' && (
                                         <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${reviewBadgeClassName(selectedModule.status)}`}>
                                             {reviewLabel(selectedModule.status)}
+                                        </span>
+                                    )}
+                                    {selectedModule.isOfficial && (
+                                        <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+                                            Offical
                                         </span>
                                     )}
                                     <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">

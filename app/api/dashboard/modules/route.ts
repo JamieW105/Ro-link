@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
 import { normalizeAddonModule, parseModuleConfigSettings, parseStoredModuleConfigSchema, trimModuleString } from '@/lib/modules';
+import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
 
 interface InstalledModuleRow {
@@ -66,9 +67,10 @@ export async function GET(req: Request) {
     }
 
     const installedByModule = new Map(((installedRows || []) as InstalledModuleRow[]).map((row) => [String(row.module_id), row]));
+    const staffDiscordIds = await getRoLinkStaffDiscordIds();
 
     return NextResponse.json({
-        modules: ((modules || []) as Record<string, unknown>[])
+        modules: applyOfficialModuleLabels((modules || []) as Record<string, unknown>[], staffDiscordIds)
             .filter((row) => (
                 row.status === 'PUBLISHED'
                 || (row.author_discord_id === auth.userId && (row.status === 'DRAFT' || row.status === 'PENDING_REVIEW'))

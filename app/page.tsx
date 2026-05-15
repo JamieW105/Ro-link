@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { DEFAULT_ROLINK_VERSION } from "@/lib/updatePosts";
 
 // SVGs
@@ -53,6 +52,7 @@ export default function Home() {
         const res = await fetch('/api/stats');
         const data = await res.json();
         if (data.guild_count !== undefined) setServerCount(data.guild_count);
+        if (data.command_count !== undefined) setCommandCount(data.command_count);
       } catch (err) {
         console.error("Failed to fetch server count", err);
       }
@@ -69,12 +69,6 @@ export default function Home() {
       } catch (err) {
         console.error("Failed to fetch latest version", err);
       }
-
-      // Commands (From DB still OK as per request context?)
-      const { count: cCount } = await supabase
-        .from('logs')
-        .select('*', { count: 'exact', head: true });
-      if (cCount !== null) setCommandCount(cCount);
     }
 
     fetchStats();

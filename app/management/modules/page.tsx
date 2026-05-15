@@ -12,6 +12,7 @@ interface AddonModule {
     version: string;
     category: string;
     status: ModuleStatus;
+    isOfficial: boolean;
     sourceCode: string;
     sourceChecksum: string;
     configSchema?: Record<string, unknown>;
@@ -404,6 +405,11 @@ export default function ManagementModulesPage() {
                                                         Creator {addon.authorDiscordId}
                                                     </span>
                                                 )}
+                                                {addon.isOfficial && (
+                                                    <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+                                                        Offical
+                                                    </span>
+                                                )}
                                             </div>
                                             <h3 className="mt-3 text-base font-bold text-white">{addon.name}</h3>
                                             <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-400">{addon.description || 'No description provided.'}</p>
@@ -475,6 +481,7 @@ export default function ManagementModulesPage() {
                                                 <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                                     <span>{addon.slug}</span>
                                                     <span>{addon.category}</span>
+                                                    {addon.isOfficial && <span>Offical</span>}
                                                     <span>{Object.keys(addon.configSchema || {}).length} config fields</span>
                                                     <span>{addon.sourceChecksum.slice(0, 12)}</span>
                                                 </div>

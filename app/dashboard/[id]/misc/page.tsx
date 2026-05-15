@@ -11,7 +11,6 @@ import {
     VALUE_INPUT_COMMAND_IDS,
 } from "@/lib/adminPanelCommands";
 import { normalizeLivePlayerList } from "@/lib/livePlayers";
-import { supabase } from "@/lib/supabase";
 import { usePermissions } from "@/context/PermissionsContext";
 
 interface LiveServer {
@@ -107,12 +106,12 @@ export default function MiscPage() {
         async function fetchPlayers() {
             if (!guildId) return;
 
-            const { data, error } = await supabase
-                .from('live_servers')
-                .select('id, players')
-                .eq('server_id', guildId);
+            const response = await fetch(`/api/dashboard/live-servers?serverId=${encodeURIComponent(String(guildId))}`, {
+                cache: 'no-store',
+            });
 
-            if (!error && data) {
+            if (response.ok) {
+                const data = await response.json();
                 const allPlayers: PlayerSummary[] = [];
                 data.forEach((server: LiveServer) => {
                     normalizeLivePlayerList(server.players).forEach((player) => {

@@ -1,6 +1,5 @@
 'use client';
 
-import { supabase } from "@/lib/supabase";
 import { hasAdminPanelCommandAccess } from "@/lib/adminPanelCommands";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -60,8 +59,8 @@ export default function ReportDetailsPage() {
                 console.error("Failed to fetch guild names:", error);
             }
 
-            // 1. Fetch Report Details
-            const reportResponse = await fetch(`/api/reports/${encodeURIComponent(String(reportId))}?serverId=${encodeURIComponent(String(id))}`, {
+            // 1. Fetch report details, linked profile, and moderation history.
+            const reportResponse = await fetch(`/api/reports/${encodeURIComponent(String(reportId))}/context?serverId=${encodeURIComponent(String(id))}`, {
                 cache: 'no-store',
             });
 
@@ -71,39 +70,12 @@ export default function ReportDetailsPage() {
                 return;
             }
 
-            const reportData = await reportResponse.json();
+            const contextData = await reportResponse.json();
+            const reportData = contextData.report;
             setReport(reportData);
             setReason(`Re: Report #${reportData.id.slice(0, 8)} - ${reportData.reason}`);
-
-            // 2. Fetch Linked Profiles (Verified Users)
-            // Try to find by Roblox Username OR Discord ID
-            const isDiscordId = /^\d{17,20}$/.test(reportData.reported_roblox_username);
-
-            let profileQuery = supabase.from('verified_users').select('*');
-            if (isDiscordId) {
-                profileQuery = profileQuery.eq('discord_id', reportData.reported_roblox_username);
-            } else {
-                profileQuery = profileQuery.ilike('roblox_username', reportData.reported_roblox_username);
-            }
-
-            const { data: profileData } = await profileQuery.maybeSingle();
-            setProfiles(profileData);
-
-            // 3. Fetch Global Moderation Logs
-            // Search logs for the reported target OR the linked Roblox username if found.
-            // Do not join against servers here; some deployments do not expose a usable logs->servers relationship.
-            const searchTargets = [reportData.reported_roblox_username];
-            if (profileData?.roblox_username) searchTargets.push(profileData.roblox_username);
-
-            const { data: logsData } = await supabase
-                .from('logs')
-                .select('*')
-                .in('target', searchTargets)
-                .order('timestamp', { ascending: false });
-
-            if (logsData) {
-                setLogs(normalizeDashboardLogs(logsData));
-            }
+            setProfiles(contextData.profile || null);
+            setLogs(normalizeDashboardLogs(contextData.logs));
 
             setLoading(false);
         }

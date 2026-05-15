@@ -897,6 +897,17 @@ const docsPages: DocPage[] = [
                         ]}
                     />
                     <div className="mt-6">
+                        <h3 className="text-sm font-semibold text-white">How to get the Ro-Link config</h3>
+                        <Checklist
+                            items={[
+                                'From Discord, have the server owner run /setup, enter the Place ID, Universe ID, and Open Cloud API key, then copy the Security Key from the Ro-Link reply.',
+                                'From the dashboard, sign in to Ro-Link, open Dashboard, choose the Discord server, go to Settings > Setup, complete the setup form if needed, then copy the Security Key.',
+                                'Paste that Ro-Link Security Key into the Studio installer plugin when it asks for the config or key.',
+                                'Keep the Roblox Open Cloud key in Ro-Link server configuration. It is not the plugin config value.',
+                            ]}
+                        />
+                    </div>
+                    <div className="mt-6">
                         <Callout title="Keep credentials separated" tone="warn">
                             The Open Cloud credential and the dashboard security key serve different jobs. Mixing them is a common setup mistake and can expose a more sensitive credential in the wrong place.
                         </Callout>

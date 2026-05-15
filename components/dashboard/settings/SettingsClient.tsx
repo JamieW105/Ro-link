@@ -8,7 +8,6 @@ import {
     hasAdminPanelCommandAccess,
     normalizeAdminPanelCommandList,
 } from "@/lib/adminPanelCommands";
-import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 
 // Icons
@@ -87,6 +86,14 @@ interface DiscordChannel {
     id: string;
     name: string;
     type: number;
+}
+
+interface ServerSettingsConfig {
+    admin_cmds_enabled?: boolean | null;
+    misc_cmds_enabled?: boolean | null;
+    logging_channel_id?: string | null;
+    reports_enabled?: boolean | null;
+    reports_channel_id?: string | null;
 }
 
 type SettingsView = 'overview' | 'roles' | 'commands' | 'logging' | 'reports';
@@ -231,13 +238,12 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
             }
 
             // 2. Fetch Server Settings
-            const { data, error: dbError } = await supabase
-                .from('servers')
-                .select('admin_cmds_enabled, misc_cmds_enabled, logging_channel_id, reports_enabled, reports_channel_id')
-                .eq('id', id)
-                .single();
+            const settingsRes = await fetch(`/api/dashboard/server-config?serverId=${encodeURIComponent(String(id))}`, {
+                cache: 'no-store',
+            });
+            const data = settingsRes.ok ? await settingsRes.json() as ServerSettingsConfig | null : null;
 
-            if (data && !dbError) {
+            if (data) {
                 setAdminCmds(data.admin_cmds_enabled !== false);
                 setMiscCmds(data.misc_cmds_enabled !== false);
                 setLoggingChannelId(data.logging_channel_id || "");
@@ -291,25 +297,29 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
             return;
         }
 
-        // Save General Settings
-        const { error: dbError } = await supabase
-            .from('servers')
-            .update({
+        const response = await fetch('/api/dashboard/server-config', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                serverId: id,
+                updates: {
                 admin_cmds_enabled: adminCmds,
                 misc_cmds_enabled: miscCmds,
                 logging_channel_id: loggingChannelId || null,
                 reports_enabled: reportsEnabled,
                 reports_channel_id: reportsChannelId || null
-            })
-            .eq('id', id);
+                },
+            }),
+        });
+        const payload = await response.json().catch(() => ({}));
 
         // Save Roles Logic (In this simplified view, we save roles as they are modified, but general settings on Save)
         // Actually, let's keep role editing separate to avoid complex state management
         // Roles are saved immediately when modified in the UI below, or we could batch them.
         // For simplicity, let's just save general settings here.
 
-        if (dbError) {
-            setError(dbError.message);
+        if (!response.ok) {
+            setError(String(payload.error || 'Failed to save settings.'));
         } else {
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
-import { supabase } from "@/lib/supabase";
 
 const RobloxIcon = () => (
     <img src="/Media/Roblox.png" alt="Roblox" className="w-6 h-6 object-contain" />
@@ -29,17 +28,12 @@ export default function VerifyPage() {
     }, [session, status]);
 
     async function checkLinkedAccount() {
-        const userId = (session?.user as any)?.id;
-        if (!userId) return;
-
-        const { data, error } = await supabase
-            .from('verified_users')
-            .select('*')
-            .eq('discord_id', userId)
-            .maybeSingle();
-
-        if (data) {
-            setLinkedAccount(data);
+        const response = await fetch('/api/verify/linked-account', { cache: 'no-store' });
+        if (response.ok) {
+            const data = await response.json();
+            if (data) {
+                setLinkedAccount(data);
+            }
         }
         setFetchingLinked(false);
     }

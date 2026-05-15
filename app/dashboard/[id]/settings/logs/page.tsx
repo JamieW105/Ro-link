@@ -2,8 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { normalizeDashboardLog, normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
-import { supabase } from "@/lib/supabase";
+import { normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
 
 const ScrollIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 21h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z" /><path d="M12 11V7" /><path d="M12 17v-2" /><path d="M8 7h8" /><path d="M8 11h8" /><path d="M8 15h8" /></svg>
@@ -28,42 +27,16 @@ export default function LogsPage() {
         async function fetchLogs() {
             if (!id) return;
 
-            const { data } = await supabase
-                .from('logs')
-                .select('*')
-                .eq('server_id', id)
-                .order('timestamp', { ascending: false })
-                .limit(200);
-
-            if (data) setLogs(normalizeDashboardLogs(data));
+            const response = await fetch(`/api/dashboard/logs?serverId=${encodeURIComponent(String(id))}&limit=200`, {
+                cache: 'no-store',
+            });
+            const data = response.ok ? await response.json() : [];
+            setLogs(normalizeDashboardLogs(data));
             setLoading(false);
         }
         fetchLogs();
-
-        const channel = supabase
-            .channel(`logs_page_${id}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'logs',
-                    filter: `server_id=eq.${id}`
-                },
-                (payload) => {
-                    const nextLog = normalizeDashboardLog(payload.new);
-                    if (!nextLog) {
-                        return;
-                    }
-
-                    setLogs((prev) => [nextLog, ...prev].slice(0, 200));
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        }
+        const interval = setInterval(fetchLogs, 5000);
+        return () => clearInterval(interval);
     }, [id]);
 
     const filteredLogs = logs

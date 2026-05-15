@@ -2,7 +2,6 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 
 const ShieldIcon = () => (
@@ -20,6 +19,13 @@ const RoleIcon = () => (
 const InfoIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
 );
+
+interface VerificationConfig {
+    verification_enabled?: boolean | null;
+    on_join_role?: string | null;
+    verified_role?: string | null;
+    block_unverified?: boolean | null;
+}
 
 export default function VerificationPage() {
     const { id } = useParams();
@@ -52,13 +58,12 @@ export default function VerificationPage() {
             }
 
             // 2. Fetch Server Settings
-            const { data, error: dbError } = await supabase
-                .from('servers')
-                .select('verification_enabled, on_join_role, verified_role, block_unverified')
-                .eq('id', id)
-                .single();
+            const configRes = await fetch(`/api/dashboard/server-config?serverId=${encodeURIComponent(String(id))}`, {
+                cache: 'no-store',
+            });
+            const data = configRes.ok ? await configRes.json() as VerificationConfig | null : null;
 
-            if (data && !dbError) {
+            if (data) {
                 setEnabled(data.verification_enabled || false);
                 setOnJoinRole(data.on_join_role || "");
                 setVerifiedRole(data.verified_role || "");
@@ -86,18 +91,23 @@ export default function VerificationPage() {
         setError(null);
         setSuccess(false);
 
-        const { error: dbError } = await supabase
-            .from('servers')
-            .update({
+        const response = await fetch('/api/dashboard/server-config', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                serverId: id,
+                updates: {
                 verification_enabled: enabled,
                 on_join_role: onJoinRole,
                 verified_role: verifiedRole,
                 block_unverified: blockUnverified
-            })
-            .eq('id', id);
+                },
+            }),
+        });
+        const payload = await response.json().catch(() => ({}));
 
-        if (dbError) {
-            setError(dbError.message);
+        if (!response.ok) {
+            setError(String(payload.error || 'Failed to save verification settings.'));
         } else {
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);

@@ -9,6 +9,7 @@ import {
     slugifyModuleName,
     trimModuleString,
 } from '@/lib/modules';
+import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -73,8 +74,10 @@ export async function GET() {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    const staffDiscordIds = await getRoLinkStaffDiscordIds();
+
     return NextResponse.json({
-        modules: ((data || []) as Record<string, unknown>[])
+        modules: applyOfficialModuleLabels((data || []) as Record<string, unknown>[], staffDiscordIds)
             .map((row) => normalizeAddonModule(row, false))
             .filter(Boolean),
     });
@@ -141,5 +144,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ module: normalizeAddonModule(data, false) }, { status: 201 });
+    const staffDiscordIds = await getRoLinkStaffDiscordIds();
+    const [labeledModule] = applyOfficialModuleLabels([data as Record<string, unknown>], staffDiscordIds);
+
+    return NextResponse.json({ module: normalizeAddonModule(labeledModule, false) }, { status: 201 });
 }

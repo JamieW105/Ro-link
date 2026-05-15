@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { getServerByApiKey } from '@/lib/gameAdmin';
 import { normalizeAddonModule, obfuscateModuleSourceForStudio, parseModuleConfigSettings, parseStoredModuleConfigSchema } from '@/lib/modules';
+import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -54,6 +55,8 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    const staffDiscordIds = await getRoLinkStaffDiscordIds();
+
     const modules = (data || [])
         .map((row: ServerAddonModuleRow) => {
             const moduleRow = Array.isArray(row.module) ? row.module[0] : row.module;
@@ -65,7 +68,8 @@ export async function GET(req: Request) {
             }
             const configSchema = parseStoredModuleConfigSchema(moduleRow.config_schema);
 
-            const normalized = normalizeAddonModule(moduleRow, true);
+            const [labeledModule] = applyOfficialModuleLabels([moduleRow], staffDiscordIds);
+            const normalized = normalizeAddonModule(labeledModule, true);
             if (!normalized) {
                 return null;
             }

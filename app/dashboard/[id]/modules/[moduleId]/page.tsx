@@ -22,6 +22,7 @@ interface MarketplaceModule {
     description: string;
     version: string;
     category: string;
+    isOfficial: boolean;
     sourceChecksum: string;
     installed: boolean;
     enabled: boolean;
@@ -157,6 +158,11 @@ export default function DashboardModuleConfigPage() {
                         Back to modules
                     </Link>
                     <h1 className="mt-3 text-3xl font-black tracking-tight text-white">{module.name}</h1>
+                    {module.isOfficial && (
+                        <div className="mt-3 inline-flex rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+                            Offical
+                        </div>
+                    )}
                     <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">{module.description || 'No description provided.'}</p>
                 </div>
 

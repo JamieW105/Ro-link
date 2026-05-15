@@ -23,6 +23,7 @@ interface MarketplaceModule {
     version: string;
     category: string;
     status: string;
+    isOfficial: boolean;
     sourceChecksum: string;
     configSchema: Record<string, ModuleConfigField>;
     authorDiscordId: string | null;
@@ -205,6 +206,11 @@ export default function DashboardMarketplacePage() {
                                             Yours
                                         </span>
                                     )}
+                                    {addon.isOfficial && (
+                                        <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+                                            Offical
+                                        </span>
+                                    )}
                                 </div>
                                 <h2 className="mt-4 text-xl font-bold text-white">{addon.name}</h2>
                                 <p className="mt-2 line-clamp-4 text-sm leading-relaxed text-slate-400">{addon.description || 'No description provided.'}</p>
@@ -242,6 +248,11 @@ export default function DashboardMarketplacePage() {
                                         <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(selectedModule.status)}`}>
                                             {statusLabel(selectedModule.status)}
                                         </span>
+                                        {selectedModule.isOfficial && (
+                                            <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+                                                Offical
+                                            </span>
+                                        )}
                                     </div>
                                     <h2 className="mt-4 text-2xl font-black tracking-tight text-white md:text-4xl">{selectedModule.name}</h2>
                                     <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
