@@ -23,6 +23,7 @@ interface MarketplaceModule {
     version: string;
     category: string;
     status: string;
+    authorDiscordId: string | null;
     sourceChecksum: string;
     configSchema: Record<string, ModuleConfigField>;
     installed: boolean;
@@ -36,11 +37,23 @@ function formatDate(value: string | null) {
     return new Date(value).toLocaleDateString();
 }
 
+function reviewBadgeClassName(status: string) {
+    if (status === 'PUBLISHED') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
+    if (status === 'PENDING_REVIEW') return 'border-amber-400/20 bg-amber-400/10 text-amber-300';
+    if (status === 'REJECTED') return 'border-red-400/20 bg-red-400/10 text-red-300';
+    return 'border-slate-700 bg-slate-950 text-slate-500';
+}
+
+function reviewLabel(status: string) {
+    if (status === 'PENDING_REVIEW') return 'Creator Preview';
+    if (status === 'REJECTED') return 'Rejected';
+    return status.replace(/_/g, ' ');
+}
+
 export default function DashboardModulesPage() {
     const { id } = useParams();
     const serverId = Array.isArray(id) ? id[0] : String(id || '');
     const [modules, setModules] = useState<MarketplaceModule[]>([]);
-    const [settingsDrafts, setSettingsDrafts] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
     const [savingId, setSavingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -70,12 +83,6 @@ export default function DashboardModulesPage() {
 
             const nextModules = Array.isArray(payload.modules) ? payload.modules : [];
             setModules(nextModules);
-            setSettingsDrafts(Object.fromEntries(
-                nextModules.map((addon: MarketplaceModule) => [
-                    addon.id,
-                    JSON.stringify(addon.settings || {}, null, 2),
-                ]),
-            ));
         } catch (loadError) {
             setError(loadError instanceof Error ? loadError.message : 'Failed to load modules.');
         } finally {
@@ -87,20 +94,7 @@ export default function DashboardModulesPage() {
         loadModules();
     }, [loadModules]);
 
-    function parseSettings(moduleId: string) {
-        const draft = settingsDrafts[moduleId]?.trim() || '{}';
-        try {
-            const parsed = JSON.parse(draft);
-            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-                throw new Error('Settings must be a JSON object.');
-            }
-            return parsed as Record<string, unknown>;
-        } catch (settingsError) {
-            throw new Error(settingsError instanceof Error ? settingsError.message : 'Invalid JSON settings.');
-        }
-    }
-
-    async function sendAction(moduleId: string, action: string, includeSettings = false) {
+    async function sendAction(moduleId: string, action: string) {
         setSavingId(moduleId);
         setError(null);
 
@@ -110,10 +104,6 @@ export default function DashboardModulesPage() {
                 moduleId,
                 action,
             };
-
-            if (includeSettings) {
-                body.settings = parseSettings(moduleId);
-            }
 
             const response = await fetch('/api/dashboard/modules', {
                 method: 'POST',
@@ -173,7 +163,7 @@ export default function DashboardModulesPage() {
 
             {modules.length === 0 ? (
                 <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-10 text-center text-slate-500">
-                    No published modules are available.
+                    No marketplace modules are available.
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
@@ -191,6 +181,11 @@ export default function DashboardModulesPage() {
                                             <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${addon.enabled ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : addon.installed ? 'border-amber-400/20 bg-amber-400/10 text-amber-300' : 'border-slate-700 bg-slate-950 text-slate-500'}`}>
                                                 {addon.installed ? (addon.enabled ? 'Enabled' : 'Paused') : 'Available'}
                                             </span>
+                                            {addon.status !== 'PUBLISHED' && (
+                                                <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${reviewBadgeClassName(addon.status)}`}>
+                                                    {reviewLabel(addon.status)}
+                                                </span>
+                                            )}
                                         </div>
                                         <h2 className="mt-4 text-xl font-bold text-white">{addon.name}</h2>
                                         <p className="mt-2 text-sm leading-relaxed text-slate-400">{addon.description || 'No description provided.'}</p>
@@ -205,71 +200,46 @@ export default function DashboardModulesPage() {
                                     </div>
                                 </div>
 
-                                <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto] md:items-end">
-                                    <div>
-                                        <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                            Settings JSON
-                                        </label>
-                                        <textarea
-                                            value={settingsDrafts[addon.id] || '{}'}
-                                            onChange={(event) => setSettingsDrafts((current) => ({
-                                                ...current,
-                                                [addon.id]: event.target.value,
-                                            }))}
-                                            disabled={!addon.installed || busy}
-                                            className="h-28 w-full resize-none rounded-xl border border-slate-800 bg-slate-950/60 p-3 font-mono text-xs text-slate-200 outline-none transition-colors focus:border-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                            spellCheck={false}
-                                        />
-                                    </div>
-
-                                    <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                                <div className="mt-5 flex flex-wrap items-center gap-2 md:justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedModuleId(addon.id)}
+                                        className="rounded-xl border border-sky-500/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10"
+                                    >
+                                        Open
+                                    </button>
+                                    {!addon.installed ? (
                                         <button
-                                            type="button"
-                                            onClick={() => setSelectedModuleId(addon.id)}
-                                            className="rounded-xl border border-sky-500/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10"
+                                            onClick={() => sendAction(addon.id, 'install')}
+                                            disabled={busy}
+                                            className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
                                         >
-                                            Open
+                                            {busy ? 'Saving' : 'Install'}
                                         </button>
-                                        {!addon.installed ? (
-                                            <button
-                                                onClick={() => sendAction(addon.id, 'install', true)}
-                                                disabled={busy}
-                                                className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
+                                    ) : (
+                                        <>
+                                            <Link
+                                                href={`/dashboard/${serverId}/modules/${addon.id}`}
+                                                className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
                                             >
-                                                {busy ? 'Saving' : 'Install'}
+                                                Configure
+                                            </Link>
+                                            <button
+                                                onClick={() => sendAction(addon.id, addon.enabled ? 'disable' : 'enable')}
+                                                disabled={busy}
+                                                className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
+                                            >
+                                                {addon.enabled ? 'Disable' : 'Enable'}
                                             </button>
-                                        ) : (
-                                            <>
-                                                <Link
-                                                    href={`/dashboard/${serverId}/modules/${addon.id}`}
-                                                    className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
-                                                >
-                                                    Configure
-                                                </Link>
-                                                <button
-                                                    onClick={() => sendAction(addon.id, addon.enabled ? 'disable' : 'enable')}
-                                                    disabled={busy}
-                                                    className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
-                                                >
-                                                    {addon.enabled ? 'Disable' : 'Enable'}
-                                                </button>
-                                                <button
-                                                    onClick={() => sendAction(addon.id, 'settings', true)}
-                                                    disabled={busy}
-                                                    className="rounded-xl bg-slate-800 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-slate-700 disabled:opacity-50"
-                                                >
-                                                    Save
-                                                </button>
-                                                <button
-                                                    onClick={() => sendAction(addon.id, 'remove')}
-                                                    disabled={busy}
-                                                    className="rounded-xl border border-red-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
-                                                >
-                                                    Remove
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
+                                            <button
+                                                onClick={() => sendAction(addon.id, 'remove')}
+                                                disabled={busy}
+                                                className="rounded-xl border border-red-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+                                            >
+                                                Remove
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
 
                                 <div className="mt-4 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">
@@ -294,6 +264,11 @@ export default function DashboardModulesPage() {
                                     <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${selectedModule.enabled ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : selectedModule.installed ? 'border-amber-400/20 bg-amber-400/10 text-amber-300' : 'border-slate-700 bg-slate-950 text-slate-500'}`}>
                                         {selectedModule.installed ? (selectedModule.enabled ? 'Enabled' : 'Paused') : 'Available'}
                                     </span>
+                                    {selectedModule.status !== 'PUBLISHED' && (
+                                        <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${reviewBadgeClassName(selectedModule.status)}`}>
+                                            {reviewLabel(selectedModule.status)}
+                                        </span>
+                                    )}
                                     <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
                                         v{selectedModule.version}
                                     </span>
@@ -357,12 +332,6 @@ export default function DashboardModulesPage() {
                                         )}
                                     </div>
 
-                                    <div>
-                                        <h3 className="text-sm font-bold uppercase tracking-widest text-white">Settings Preview</h3>
-                                        <pre className="mt-4 max-h-64 overflow-auto rounded-xl border border-slate-800 bg-black/40 p-4 text-xs text-slate-300 custom-scrollbar">
-                                            {settingsDrafts[selectedModule.id] || '{}'}
-                                        </pre>
-                                    </div>
                                 </section>
 
                                 <aside className="space-y-4">
@@ -388,7 +357,7 @@ export default function DashboardModulesPage() {
                                         {!selectedModule.installed ? (
                                             <button
                                                 type="button"
-                                                onClick={() => sendAction(selectedModule.id, 'install', true)}
+                                                onClick={() => sendAction(selectedModule.id, 'install')}
                                                 disabled={savingId === selectedModule.id}
                                                 className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
                                             >

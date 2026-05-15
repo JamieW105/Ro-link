@@ -44,12 +44,13 @@ export async function GET(req: Request) {
     const auth = await requireServerModuleAccess(serverId);
     if ('error' in auth) return auth.error;
 
+    const moduleQuery = supabase
+        .from('addon_modules')
+        .select('id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
+        .order('name', { ascending: true });
+
     const [{ data: modules, error: modulesError }, { data: installedRows, error: installedError }] = await Promise.all([
-        supabase
-            .from('addon_modules')
-            .select('id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, created_at, updated_at, published_at')
-            .eq('status', 'PUBLISHED')
-            .order('name', { ascending: true }),
+        moduleQuery.or(`status.eq.PUBLISHED,author_discord_id.eq.${auth.userId}`),
         supabase
             .from('server_addon_modules')
             .select('module_id, enabled, settings, installed_by, installed_at, updated_at')
@@ -67,7 +68,12 @@ export async function GET(req: Request) {
     const installedByModule = new Map(((installedRows || []) as InstalledModuleRow[]).map((row) => [String(row.module_id), row]));
 
     return NextResponse.json({
-        modules: ((modules || []) as Record<string, unknown>[]).map((row) => {
+        modules: ((modules || []) as Record<string, unknown>[])
+            .filter((row) => (
+                row.status === 'PUBLISHED'
+                || (row.author_discord_id === auth.userId && (row.status === 'DRAFT' || row.status === 'PENDING_REVIEW'))
+            ))
+            .map((row) => {
             const installed = installedByModule.get(String(row.id));
             const configSchema = parseStoredModuleConfigSchema(row.config_schema);
             return {
@@ -97,15 +103,18 @@ export async function POST(req: Request) {
 
     const { data: moduleRow, error: moduleError } = await supabase
         .from('addon_modules')
-        .select('id, status, config_schema')
+        .select('id, status, config_schema, author_discord_id')
         .eq('id', moduleId)
-        .maybeSingle<{ id: string; status: string; config_schema?: unknown }>();
+        .maybeSingle<{ id: string; status: string; config_schema?: unknown; author_discord_id?: string | null }>();
 
     if (moduleError) {
         return NextResponse.json({ error: moduleError.message }, { status: 500 });
     }
 
-    if (!moduleRow || moduleRow.status !== 'PUBLISHED') {
+    const canUseOwnUnpublished = moduleRow?.author_discord_id === auth.userId
+        && (moduleRow.status === 'DRAFT' || moduleRow.status === 'PENDING_REVIEW');
+
+    if (!moduleRow || (moduleRow.status !== 'PUBLISHED' && !canUseOwnUnpublished)) {
         return NextResponse.json({ error: 'Published module not found.' }, { status: 404 });
     }
 

@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 
-export type AddonModuleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+export type AddonModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
 
 export interface SanitizedAddonModuleInput {
     name?: string;
@@ -30,7 +30,7 @@ export type SanitizedAddonModuleResult =
     | { input: SanitizedAddonModuleInput }
     | { errors: string[] };
 
-const VALID_MODULE_STATUSES = new Set<AddonModuleStatus>(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
+const VALID_MODULE_STATUSES = new Set<AddonModuleStatus>(['DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'ARCHIVED']);
 const VALID_CONFIG_TYPES = new Set<ModuleConfigFieldType>(['bool', 'dropdown', 'checkboxes', 'color']);
 
 export function trimModuleString(value: unknown, maxLength = 5000) {
@@ -1002,6 +1002,10 @@ export function normalizeAddonModule(row: Record<string, unknown> | null | undef
         sourceChecksum: String(row.source_checksum || ''),
         configSchema: parseStoredModuleConfigSchema(row.config_schema),
         authorDiscordId: row.author_discord_id ? String(row.author_discord_id) : null,
+        submittedAt: row.submitted_at || null,
+        reviewedAt: row.reviewed_at || null,
+        reviewedByDiscordId: row.reviewed_by_discord_id ? String(row.reviewed_by_discord_id) : null,
+        moderationNote: String(row.moderation_note || ''),
         createdAt: row.created_at || null,
         updatedAt: row.updated_at || null,
         publishedAt: row.published_at || null,

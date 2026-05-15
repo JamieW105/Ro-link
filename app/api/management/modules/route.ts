@@ -93,6 +93,10 @@ export async function POST(req: Request) {
             source_checksum: checksumModuleSource(input.sourceCode || ''),
             config_schema: input.configSchema || {},
             author_discord_id: auth.userId,
+            submitted_at: input.status === 'PENDING_REVIEW' ? now : null,
+            reviewed_at: input.status === 'PUBLISHED' || input.status === 'REJECTED' ? now : null,
+            reviewed_by_discord_id: input.status === 'PUBLISHED' || input.status === 'REJECTED' ? auth.userId : null,
+            moderation_note: '',
             published_at: input.status === 'PUBLISHED' ? now : null,
             updated_at: now,
         })

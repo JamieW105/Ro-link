@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 interface ServerAddonModuleRow {
     enabled?: boolean | null;
     settings?: unknown;
+    installed_by?: string | null;
     module?: Record<string, unknown> | Record<string, unknown>[] | null;
 }
 
@@ -28,6 +29,7 @@ export async function GET(req: Request) {
         .select(`
             enabled,
             settings,
+            installed_by,
             module:addon_modules (
                 id,
                 slug,
@@ -55,7 +57,10 @@ export async function GET(req: Request) {
     const modules = (data || [])
         .map((row: ServerAddonModuleRow) => {
             const moduleRow = Array.isArray(row.module) ? row.module[0] : row.module;
-            if (!moduleRow || moduleRow.status !== 'PUBLISHED') {
+            const canRunCreatorPreview = moduleRow
+                && row.installed_by === moduleRow.author_discord_id
+                && (moduleRow.status === 'DRAFT' || moduleRow.status === 'PENDING_REVIEW');
+            if (!moduleRow || (moduleRow.status !== 'PUBLISHED' && !canRunCreatorPreview)) {
                 return null;
             }
             const configSchema = parseStoredModuleConfigSchema(moduleRow.config_schema);

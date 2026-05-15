@@ -25,6 +25,10 @@ interface MarketplaceModule {
     status: string;
     sourceChecksum: string;
     configSchema: Record<string, ModuleConfigField>;
+    authorDiscordId: string | null;
+    submittedAt: string | null;
+    reviewedAt: string | null;
+    moderationNote: string;
     publishedAt: string | null;
     updatedAt: string | null;
 }
@@ -40,6 +44,18 @@ const LogOutIcon = () => (
 function formatDate(value: string | null) {
     if (!value) return 'Unpublished';
     return new Date(value).toLocaleDateString();
+}
+
+function statusClassName(status: string) {
+    if (status === 'PUBLISHED') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
+    if (status === 'PENDING_REVIEW') return 'border-amber-400/20 bg-amber-400/10 text-amber-300';
+    if (status === 'REJECTED') return 'border-red-400/20 bg-red-400/10 text-red-300';
+    return 'border-slate-700 bg-slate-950 text-slate-500';
+}
+
+function statusLabel(status: string) {
+    if (status === 'PENDING_REVIEW') return 'Awaiting Moderation';
+    return status.replace(/_/g, ' ');
 }
 
 export default function DashboardMarketplacePage() {
@@ -138,12 +154,26 @@ export default function DashboardMarketplacePage() {
                         </Link>
                         <h1 className="mt-3 text-3xl font-black tracking-tight text-white md:text-4xl">Marketplace</h1>
                         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
-                            Browse every published Ro-Link module and open a larger view for details before installing it from a server console.
+                            Browse published modules, submit your own, and track your submissions while moderation reviews them.
                         </p>
                     </div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4 text-right">
-                        <div className="text-2xl font-black text-white">{modules.length}</div>
-                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Published Modules</div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <Link
+                            href="/terms/modules/use"
+                            className="inline-flex items-center justify-center rounded-xl border border-slate-700 px-5 py-4 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
+                        >
+                            Module Terms
+                        </Link>
+                        <Link
+                            href="/dashboard/marketplace/create"
+                            className="inline-flex items-center justify-center rounded-xl bg-sky-600 px-5 py-4 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500"
+                        >
+                            Create Module
+                        </Link>
+                        <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4 text-right">
+                            <div className="text-2xl font-black text-white">{modules.length}</div>
+                            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Visible Modules</div>
+                        </div>
                     </div>
                 </header>
 
@@ -157,7 +187,7 @@ export default function DashboardMarketplacePage() {
                     </div>
                 ) : modules.length === 0 ? (
                     <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-10 text-center text-slate-500">
-                        No published modules are available.
+                        No modules are available.
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -167,9 +197,14 @@ export default function DashboardMarketplacePage() {
                                     <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">
                                         {addon.category}
                                     </span>
-                                    <span className="rounded-md border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-300">
-                                        Published
+                                    <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(addon.status)}`}>
+                                        {statusLabel(addon.status)}
                                     </span>
+                                    {addon.authorDiscordId === sessionUserId && addon.status !== 'PUBLISHED' && (
+                                        <span className="rounded-md border border-indigo-400/20 bg-indigo-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-300">
+                                            Yours
+                                        </span>
+                                    )}
                                 </div>
                                 <h2 className="mt-4 text-xl font-bold text-white">{addon.name}</h2>
                                 <p className="mt-2 line-clamp-4 text-sm leading-relaxed text-slate-400">{addon.description || 'No description provided.'}</p>
@@ -177,6 +212,7 @@ export default function DashboardMarketplacePage() {
                                     <div className="mb-4 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">
                                         <span>v{addon.version}</span>
                                         <span>{Object.keys(addon.configSchema || {}).length} config fields</span>
+                                        {addon.status === 'PENDING_REVIEW' && <span>Submitted {formatDate(addon.submittedAt)}</span>}
                                     </div>
                                     <button
                                         type="button"
@@ -202,6 +238,9 @@ export default function DashboardMarketplacePage() {
                                         </span>
                                         <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
                                             v{selectedModule.version}
+                                        </span>
+                                        <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(selectedModule.status)}`}>
+                                            {statusLabel(selectedModule.status)}
                                         </span>
                                     </div>
                                     <h2 className="mt-4 text-2xl font-black tracking-tight text-white md:text-4xl">{selectedModule.name}</h2>
@@ -266,6 +305,13 @@ export default function DashboardMarketplacePage() {
                                         <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
                                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Slug</p>
                                             <p className="mt-2 break-all font-mono text-sm text-slate-300">{selectedModule.slug}</p>
+                                        </div>
+                                        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Review Status</p>
+                                            <p className="mt-2 text-sm font-semibold text-slate-300">{statusLabel(selectedModule.status)}</p>
+                                            {selectedModule.status === 'REJECTED' && selectedModule.moderationNote && (
+                                                <p className="mt-2 text-xs leading-relaxed text-red-300">{selectedModule.moderationNote}</p>
+                                            )}
                                         </div>
                                         <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
                                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Published</p>

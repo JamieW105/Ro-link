@@ -148,7 +148,7 @@ Once your web server is running and your Discord server is linked via `/setup`:
 
 ## Module Developer API
 
-Marketplace modules are uploaded from the management portal, published by users with the required management permissions, enabled per Discord server from the dashboard, installed by the Studio plugin into `ReplicatedStorage.ModularAdmin["Custom Modules"]`, and loaded by the Roblox admin panel at runtime.
+Marketplace modules are uploaded from the management portal, published by users with the required management permissions, enabled per Discord server from the dashboard, installed by the Studio plugin into `ReplicatedStorage.ModularAdmin["Custom Modules"]`, and loaded by the Roblox admin panel at runtime. All modules are obfuscated before they are inserted into a person's game.
 
 Each uploaded Luau module can declare a top-level `CONFIG` table before returning its module table. `CONFIG.Version` is used as the module's update version when the upload form does not provide one. The dashboard reads the rest of that schema and saves per-server values.
 

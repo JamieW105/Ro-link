@@ -8,6 +8,7 @@ import {
     normalizeAddonModule,
     sanitizeAddonModuleInput,
     slugifyModuleName,
+    trimModuleString,
 } from '@/lib/modules';
 import { supabase } from '@/lib/supabase';
 
@@ -100,7 +101,19 @@ export async function PATCH(req: Request, context: RouteContext) {
     if (input.category !== undefined) updates.category = input.category;
     if (input.status !== undefined) {
         updates.status = input.status;
+        updates.reviewed_at = input.status === 'PUBLISHED' || input.status === 'REJECTED'
+            ? new Date().toISOString()
+            : null;
+        updates.reviewed_by_discord_id = input.status === 'PUBLISHED' || input.status === 'REJECTED'
+            ? auth.userId
+            : null;
         updates.published_at = input.status === 'PUBLISHED' ? new Date().toISOString() : null;
+        if (input.status === 'PENDING_REVIEW') {
+            updates.submitted_at = new Date().toISOString();
+        }
+    }
+    if ('moderationNote' in body || 'moderation_note' in body) {
+        updates.moderation_note = trimModuleString(body.moderationNote ?? body.moderation_note, 2000);
     }
     if (input.sourceCode !== undefined) {
         updates.source_code = input.sourceCode;

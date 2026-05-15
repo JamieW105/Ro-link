@@ -6,11 +6,15 @@ CREATE TABLE IF NOT EXISTS public.addon_modules (
     description TEXT NOT NULL DEFAULT '',
     version TEXT NOT NULL DEFAULT '1.0.0',
     category TEXT NOT NULL DEFAULT 'General',
-    status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'PUBLISHED', 'ARCHIVED')),
+    status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'ARCHIVED')),
     source_code TEXT NOT NULL,
     source_checksum TEXT NOT NULL,
     config_schema JSONB NOT NULL DEFAULT '{}',
     author_discord_id TEXT,
+    submitted_at TIMESTAMPTZ,
+    reviewed_at TIMESTAMPTZ,
+    reviewed_by_discord_id TEXT,
+    moderation_note TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     published_at TIMESTAMPTZ
@@ -24,6 +28,39 @@ CREATE INDEX IF NOT EXISTS idx_addon_modules_category
 
 ALTER TABLE public.addon_modules
     ADD COLUMN IF NOT EXISTS config_schema JSONB NOT NULL DEFAULT '{}';
+
+ALTER TABLE public.addon_modules
+    ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS reviewed_by_discord_id TEXT,
+    ADD COLUMN IF NOT EXISTS moderation_note TEXT NOT NULL DEFAULT '';
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'addon_modules_status_check'
+    ) THEN
+        ALTER TABLE public.addon_modules DROP CONSTRAINT addon_modules_status_check;
+    END IF;
+END $$;
+
+ALTER TABLE public.addon_modules
+    ADD CONSTRAINT addon_modules_status_check
+    CHECK (status IN ('DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'ARCHIVED'));
+
+CREATE TABLE IF NOT EXISTS public.addon_module_creator_blocks (
+    discord_id TEXT PRIMARY KEY,
+    reason TEXT NOT NULL DEFAULT '',
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    blocked_by_discord_id TEXT,
+    blocked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_addon_module_creator_blocks_active
+    ON public.addon_module_creator_blocks(active);
 
 CREATE TABLE IF NOT EXISTS public.server_addon_modules (
     server_id TEXT NOT NULL REFERENCES public.servers(id) ON DELETE CASCADE,

@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 
-type ModuleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+type ModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
 
 interface AddonModule {
     id: string;
@@ -15,8 +15,18 @@ interface AddonModule {
     sourceCode: string;
     sourceChecksum: string;
     configSchema?: Record<string, unknown>;
+    authorDiscordId: string | null;
+    submittedAt: string | null;
+    reviewedAt: string | null;
+    moderationNote: string;
     updatedAt: string | null;
     publishedAt: string | null;
+}
+
+interface CreatorBlock {
+    discord_id: string;
+    reason: string;
+    active: boolean;
 }
 
 interface ModuleForm {
@@ -113,6 +123,7 @@ function formatDate(value: string | null) {
 
 export default function ManagementModulesPage() {
     const [modules, setModules] = useState<AddonModule[]>([]);
+    const [creatorBlocks, setCreatorBlocks] = useState<CreatorBlock[]>([]);
     const [form, setForm] = useState<ModuleForm>(emptyForm);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -132,6 +143,16 @@ export default function ManagementModulesPage() {
         ));
     }, [modules, search]);
 
+    const pendingModules = useMemo(
+        () => modules.filter((addon) => addon.status === 'PENDING_REVIEW'),
+        [modules],
+    );
+
+    const activeBlockIds = useMemo(
+        () => new Set(creatorBlocks.filter((block) => block.active).map((block) => block.discord_id)),
+        [creatorBlocks],
+    );
+
     async function loadModules() {
         setLoading(true);
         setError(null);
@@ -143,6 +164,11 @@ export default function ManagementModulesPage() {
                 throw new Error(String(payload.error || 'Failed to load modules.'));
             }
             setModules(Array.isArray(payload) ? payload : []);
+            const blocksResponse = await fetch('/api/management/module-creator-blocks', { cache: 'no-store' });
+            const blocksPayload = await blocksResponse.json().catch(() => ([]));
+            if (blocksResponse.ok) {
+                setCreatorBlocks(Array.isArray(blocksPayload) ? blocksPayload : []);
+            }
         } catch (loadError) {
             setError(loadError instanceof Error ? loadError.message : 'Failed to load modules.');
         } finally {
@@ -256,6 +282,78 @@ export default function ManagementModulesPage() {
         }
     }
 
+    async function copySource(addon: AddonModule) {
+        await navigator.clipboard.writeText(addon.sourceCode || '');
+        setSuccess(`Copied ${addon.name} source code.`);
+    }
+
+    async function reviewModule(addon: AddonModule, status: 'PUBLISHED' | 'REJECTED') {
+        const moderationNote = status === 'REJECTED'
+            ? prompt('Reason for denying this module?') || 'Denied by moderation.'
+            : '';
+
+        setSaving(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const response = await fetch(`/api/management/modules/${addon.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status, moderationNote }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(String(payload.error || 'Failed to review module.'));
+            }
+
+            setSuccess(status === 'PUBLISHED' ? 'Module accepted and published.' : 'Module denied.');
+            await loadModules();
+        } catch (reviewError) {
+            setError(reviewError instanceof Error ? reviewError.message : 'Failed to review module.');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function blockCreator(addon: AddonModule) {
+        if (!addon.authorDiscordId) {
+            setError('This module does not have a creator Discord ID.');
+            return;
+        }
+
+        const reason = prompt('Reason for blocking this creator from submitting modules?') || 'Repeated module terms violations.';
+        setSaving(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const response = await fetch('/api/management/module-creator-blocks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ discordId: addon.authorDiscordId, reason, active: true }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(String(payload.error || 'Failed to block creator.'));
+            }
+
+            setSuccess('Creator blocked from future module submissions.');
+            await loadModules();
+        } catch (blockError) {
+            setError(blockError instanceof Error ? blockError.message : 'Failed to block creator.');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    function statusClassName(status: ModuleStatus) {
+        if (status === 'PUBLISHED') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
+        if (status === 'PENDING_REVIEW') return 'border-amber-400/20 bg-amber-400/10 text-amber-300';
+        if (status === 'REJECTED') return 'border-red-400/20 bg-red-400/10 text-red-300';
+        return 'border-slate-700 bg-slate-950 text-slate-500';
+    }
+
     return (
         <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_440px]">
             <section className="space-y-6">
@@ -280,6 +378,75 @@ export default function ManagementModulesPage() {
                 {success && (
                     <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-5 py-4 text-sm font-medium text-emerald-300">
                         {success}
+                    </div>
+                )}
+
+                {pendingModules.length > 0 && (
+                    <div className="rounded-2xl border border-amber-400/20 bg-amber-400/5 p-5">
+                        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                            <div>
+                                <h2 className="text-lg font-bold text-white">Awaiting Moderation</h2>
+                                <p className="mt-1 text-xs text-slate-400">Review submitted source, copy code for inspection, then accept or deny the module.</p>
+                            </div>
+                            <div className="text-2xl font-black text-amber-300">{pendingModules.length}</div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3">
+                            {pendingModules.map((addon) => (
+                                <article key={addon.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="rounded-md border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-300">
+                                                    Awaiting moderation
+                                                </span>
+                                                {addon.authorDiscordId && (
+                                                    <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${activeBlockIds.has(addon.authorDiscordId) ? 'border-red-400/20 bg-red-400/10 text-red-300' : 'border-slate-700 bg-slate-900 text-slate-400'}`}>
+                                                        Creator {addon.authorDiscordId}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <h3 className="mt-3 text-base font-bold text-white">{addon.name}</h3>
+                                            <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-400">{addon.description || 'No description provided.'}</p>
+                                            <div className="mt-3 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                                <span>{addon.slug}</span>
+                                                <span>{addon.category}</span>
+                                                <span>Submitted {formatDate(addon.submittedAt)}</span>
+                                                <span>{addon.sourceChecksum.slice(0, 12)}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 lg:justify-end">
+                                            <button
+                                                onClick={() => copySource(addon)}
+                                                className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-bold text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
+                                            >
+                                                Copy Code
+                                            </button>
+                                            <button
+                                                onClick={() => reviewModule(addon, 'PUBLISHED')}
+                                                disabled={saving}
+                                                className="rounded-lg border border-emerald-500/30 px-3 py-2 text-xs font-bold text-emerald-300 transition-colors hover:bg-emerald-500/10 disabled:opacity-50"
+                                            >
+                                                Accept
+                                            </button>
+                                            <button
+                                                onClick={() => reviewModule(addon, 'REJECTED')}
+                                                disabled={saving}
+                                                className="rounded-lg border border-red-500/30 px-3 py-2 text-xs font-bold text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+                                            >
+                                                Deny
+                                            </button>
+                                            <button
+                                                onClick={() => blockCreator(addon)}
+                                                disabled={saving || !addon.authorDiscordId || activeBlockIds.has(addon.authorDiscordId)}
+                                                className="rounded-lg border border-red-500/30 px-3 py-2 text-xs font-bold text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+                                            >
+                                                {addon.authorDiscordId && activeBlockIds.has(addon.authorDiscordId) ? 'Blocked' : 'Block Creator'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </article>
+                            ))}
+                        </div>
                     </div>
                 )}
 
@@ -313,7 +480,7 @@ export default function ManagementModulesPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${addon.status === 'PUBLISHED' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : addon.status === 'ARCHIVED' ? 'border-slate-700 bg-slate-950 text-slate-500' : 'border-amber-400/20 bg-amber-400/10 text-amber-300'}`}>
+                                                <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(addon.status)}`}>
                                                     {addon.status}
                                                 </span>
                                             </td>
@@ -326,6 +493,12 @@ export default function ManagementModulesPage() {
                                                         className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-bold text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
                                                     >
                                                         Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => copySource(addon)}
+                                                        className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-bold text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
+                                                    >
+                                                        Copy
                                                     </button>
                                                     <button
                                                         onClick={() => deleteModule(addon)}
@@ -415,7 +588,9 @@ export default function ManagementModulesPage() {
                                 className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
                             >
                                 <option value="DRAFT">Draft</option>
+                                <option value="PENDING_REVIEW">Pending Review</option>
                                 <option value="PUBLISHED">Published</option>
+                                <option value="REJECTED">Rejected</option>
                                 <option value="ARCHIVED">Archived</option>
                             </select>
                         </div>
