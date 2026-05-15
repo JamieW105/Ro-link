@@ -79,6 +79,20 @@ CREATE INDEX IF NOT EXISTS idx_server_addon_modules_server
 CREATE INDEX IF NOT EXISTS idx_server_addon_modules_module
     ON public.server_addon_modules(module_id);
 
+UPDATE public.addon_modules
+SET
+    source_code = '',
+    source_checksum = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    config_schema = '{}'::jsonb,
+    updated_at = NOW()
+WHERE status = 'REJECTED'
+  AND (source_code <> '' OR config_schema <> '{}'::jsonb);
+
+DELETE FROM public.server_addon_modules sam
+USING public.addon_modules module
+WHERE sam.module_id = module.id
+  AND module.status = 'REJECTED';
+
 UPDATE public.management_roles
 SET permissions = ARRAY(
     SELECT DISTINCT permission

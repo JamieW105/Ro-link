@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { hasPermission } from '@/lib/management';
+import { createDiscordDmChannel, sendDiscordMessage } from '@/lib/moduleDiscord';
 import { trimModuleString } from '@/lib/modules';
 import { supabase } from '@/lib/supabase';
 
@@ -18,6 +19,27 @@ async function requireModuleManager() {
     }
 
     return { userId };
+}
+
+async function notifyCreatorUploadBlocked(discordId: string, reason: string) {
+    try {
+        const channelId = await createDiscordDmChannel(discordId);
+        await sendDiscordMessage(channelId, {
+            content: 'You have been blocked from uploading Ro-Link marketplace modules.',
+            embeds: [
+                {
+                    title: 'Module Uploads Blocked',
+                    description: reason || 'The moderation team blocked your account from uploading marketplace modules.',
+                    color: 0xef4444,
+                },
+            ],
+        });
+    } catch (error) {
+        console.error('[MODULES] Failed to DM blocked module creator', {
+            discordId,
+            error: error instanceof Error ? error.message : error,
+        });
+    }
 }
 
 export async function GET() {
@@ -64,6 +86,10 @@ export async function POST(req: Request) {
 
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (active) {
+        await notifyCreatorUploadBlocked(discordId, reason);
     }
 
     return NextResponse.json(data);
