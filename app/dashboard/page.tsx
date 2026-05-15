@@ -58,54 +58,6 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(false);
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
 
-    // Admin Actions State
-    const [removeModal, setRemoveModal] = useState<{ id: string, name: string } | null>(null);
-    const [removeReason, setRemoveReason] = useState("");
-    const [processing, setProcessing] = useState(false);
-
-    const handleJoinServer = async (guildId: string) => {
-        try {
-            const response = await fetch(`/api/guilds/${guildId}/invite`, { method: 'POST' });
-            const data = await response.json();
-            if (data.url) {
-                window.open(data.url, '_blank');
-            } else {
-                alert('Failed to get invite: ' + (data.error || 'Unknown error'));
-            }
-        } catch (err) {
-            console.error(err);
-            alert('Error joining server');
-        }
-    };
-
-    const handleRemoveBot = async () => {
-        if (!removeModal) return;
-        if (!removeReason.trim()) return alert("Reason required");
-
-        setProcessing(true);
-        try {
-            const response = await fetch(`/api/guilds/${removeModal.id}/leave`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason: removeReason })
-            });
-
-            if (response.ok) {
-                setGuilds(prev => prev.filter(g => g.id !== removeModal.id));
-                setRemoveModal(null);
-                setRemoveReason("");
-            } else {
-                const data = await response.json();
-                alert('Failed to remove bot: ' + (data.error || 'Unknown error'));
-            }
-        } catch (err) {
-            console.error(err);
-            alert('Error removing bot');
-        } finally {
-            setProcessing(false);
-        }
-    };
-
     useEffect(() => {
         if (session?.accessToken) {
             setLoading(true);
@@ -241,57 +193,23 @@ export default function Dashboard() {
 
                                 <div className="mt-auto">
                                     {guild.hasBot ? (
-                                        (() => {
-                                            const userId = sessionUserId;
-                                            const isSuperUser = userId === '953414442060746854';
-                                            // isReadOnly is ONLY for the superuser to manage bot state in servers they don't own perms in.
-                                            // Everyone else (Admins or RoleAccess users) should see the Console.
-                                            const isReadOnly = isSuperUser && (guild.permissions == 0 || guild.permissions === "0") && !guild.isRoleAccess;
-
-                                            // Debug log
-                                            if (userId === '953414442060746854') {
-                                                console.log(`Guild: ${guild.name} (${guild.id}), ReadOnly: ${isReadOnly}`);
-                                            }
-
-                                            if (isReadOnly) {
-                                                return (
-                                                    <div className="flex flex-col gap-2 w-full">
-                                                        <button
-                                                            onClick={() => handleJoinServer(guild.id)}
-                                                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2"
-                                                        >
-                                                            Join Server
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setRemoveModal({ id: guild.id, name: guild.name })}
-                                                            className="w-full py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2"
-                                                        >
-                                                            Remove Bot
-                                                        </button>
-                                                    </div>
-                                                );
-                                            }
-
-                                            return (
-                                                <div className="flex flex-col gap-2">
-                                                    <Link
-                                                        href={`/dashboard/${guild.id}`}
-                                                        className="w-full py-2.5 bg-slate-800 hover:bg-sky-600 text-white border border-slate-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 group/btn shadow-sm"
-                                                    >
-                                                        <SettingsIcon />
-                                                        Open Console
-                                                    </Link>
-                                                    {canOpenMarketplaceFromServerList(guild) && (
-                                                        <Link
-                                                            href="/dashboard/marketplace"
-                                                            className="w-full py-2.5 bg-sky-600/10 hover:bg-sky-600/20 text-sky-200 border border-sky-500/30 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
-                                                        >
-                                                            Open Marketplace
-                                                        </Link>
-                                                    )}
-                                                </div>
-                                            );
-                                        })()
+                                        <div className="flex flex-col gap-2">
+                                            <Link
+                                                href={`/dashboard/${guild.id}`}
+                                                className="w-full py-2.5 bg-slate-800 hover:bg-sky-600 text-white border border-slate-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 group/btn shadow-sm"
+                                            >
+                                                <SettingsIcon />
+                                                Open Console
+                                            </Link>
+                                            {canOpenMarketplaceFromServerList(guild) && (
+                                                <Link
+                                                    href="/dashboard/marketplace"
+                                                    className="w-full py-2.5 bg-sky-600/10 hover:bg-sky-600/20 text-sky-200 border border-sky-500/30 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
+                                                >
+                                                    Open Marketplace
+                                                </Link>
+                                            )}
+                                        </div>
                                     ) : (
                                         <a
                                             href={`https://discord.com/api/oauth2/authorize?client_id=1466340007940722750&permissions=268536470&scope=bot%20applications.commands&guild_id=${guild.id}&disable_guild_select=true`}
@@ -306,46 +224,6 @@ export default function Dashboard() {
                                 </div>
                             </div>
                         ))}
-                    </div>
-                )}
-                {/* Remove Bot Modal */}
-                {removeModal && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                        <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl relative">
-                            <h3 className="text-xl font-bold text-white mb-2">Remove Bot</h3>
-                            <p className="text-slate-400 text-sm mb-4">
-                                Remove bot from <span className="text-white font-semibold">{removeModal.name}</span>?
-                                <br />
-                                The owner will be notified with the reason below.
-                            </p>
-
-                            <textarea
-                                value={removeReason}
-                                onChange={(e) => setRemoveReason(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-red-500 mb-4 h-24 resize-none"
-                                placeholder="Reason for removal (required)..."
-                            />
-
-                            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
-                                <button
-                                    onClick={() => {
-                                        setRemoveModal(null);
-                                        setRemoveReason("");
-                                    }}
-                                    className="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition-colors"
-                                    disabled={processing}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleRemoveBot}
-                                    disabled={processing || !removeReason.trim()}
-                                    className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition-all shadow-lg shadow-red-900/20"
-                                >
-                                    {processing ? 'Removing...' : 'Confirm Remove'}
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 )}
             </div>
