@@ -32,6 +32,30 @@ let metadataSyncEnabled = Boolean(
     process.env.DISCORD_BEARER_TOKEN
     && process.env.DISCORD_BEARER_TOKEN !== '0'
 );
+const DISCORD_EPOCH = 1420070400000n;
+const MISC_SUBCOMMAND_TO_COMMAND = {
+    fly: 'FLY',
+    noclip: 'NOCLIP',
+    invis: 'INVIS',
+    ghost: 'GHOST',
+    'set-char': 'SET_CHAR',
+    heal: 'HEAL',
+    damage: 'DAMAGE',
+    'max-health': 'MAX_HEALTH',
+    'walk-speed': 'WALK_SPEED',
+    'jump-power': 'JUMP_POWER',
+    kill: 'KILL',
+    reset: 'RESET',
+    refresh: 'REFRESH',
+    freeze: 'FREEZE',
+    unfreeze: 'UNFREEZE',
+    'bring-to-spawn': 'BRING_TO_SPAWN',
+    'teleport-to-me': 'TELEPORT_TO_ME',
+    'forcefield-add': 'FORCEFIELD_ADD',
+    'forcefield-remove': 'FORCEFIELD_REMOVE',
+};
+const VALUE_INPUT_MISC_COMMANDS = new Set(['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED', 'JUMP_POWER']);
+const MODERATION_LOG_ACTIONS = new Set(['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'DISCORD_BAN', 'DISCORD_KICK', 'TIMEOUT', 'MUTE']);
 
 async function refreshCommands() {
     try {
@@ -150,8 +174,84 @@ function formatModerationHistory(entries) {
     return entries.slice(0, 5).map((entry) => {
         const action = truncateText(entry?.action || 'UNKNOWN', 24);
         const moderator = truncateText(entry?.moderator || 'Unknown Moderator', 48);
-        return `• \`${action}\` by **${moderator}** ${formatDiscordTimestamp(entry?.timestamp, 'R')}`;
+        return `- \`${action}\` by **${moderator}** ${formatDiscordTimestamp(entry?.timestamp, 'R')}`;
     }).join('\n');
+}
+
+function getDiscordCreatedAt(discordId) {
+    try {
+        const timestamp = Number((BigInt(discordId) >> 22n) + DISCORD_EPOCH);
+        return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : '';
+    } catch {
+        return '';
+    }
+}
+
+function formatDiscordUserTag(discordUser) {
+    if (!discordUser?.username) {
+        return 'Unknown User';
+    }
+
+    return discordUser.discriminator && discordUser.discriminator !== '0'
+        ? `${discordUser.username}#${discordUser.discriminator}`
+        : `@${discordUser.username}`;
+}
+
+async function fetchDiscordLookup(discordUser, guild, serverId) {
+    const userId = String(discordUser?.id || '').trim();
+    if (!userId) {
+        throw new Error('Please choose a Discord user to lookup.');
+    }
+
+    const [member, verifiedUserRes, logsRes] = await Promise.all([
+        guild?.members?.fetch(userId).catch(() => null),
+        supabase
+            .from('verified_users')
+            .select('*')
+            .eq('discord_id', userId)
+            .maybeSingle(),
+        supabase
+            .from('logs')
+            .select('id, action, moderator, timestamp, target')
+            .eq('server_id', serverId)
+            .order('timestamp', { ascending: false })
+            .limit(100),
+    ]);
+
+    const resolvedUser = member?.user || discordUser;
+    const matchValues = new Set(
+        [
+            userId,
+            `<@${userId}>`,
+            `<@!${userId}>`,
+            verifiedUserRes.data?.roblox_username,
+            resolvedUser?.username,
+            formatDiscordUserTag(resolvedUser),
+        ]
+            .filter(Boolean)
+            .map((value) => String(value).toLowerCase())
+    );
+
+    const moderationHistory = (Array.isArray(logsRes.data) ? logsRes.data : [])
+        .filter((entry) => {
+            const action = String(entry?.action || '').toUpperCase();
+            const target = String(entry?.target || '').toLowerCase();
+            return matchValues.has(target) && (
+                MODERATION_LOG_ACTIONS.has(action)
+                || action.includes('BAN')
+                || action.includes('KICK')
+                || action.includes('MUTE')
+                || action.includes('TIMEOUT')
+            );
+        })
+        .slice(0, 5);
+
+    return {
+        user: resolvedUser,
+        member,
+        verifiedUser: verifiedUserRes.data,
+        moderationHistory,
+    };
 }
 
 async function fetchRobloxLookup(username, serverId) {
@@ -348,7 +448,15 @@ client.on('interactionCreate', async interaction => {
 
     if (!interaction.isChatInputCommand()) return;
 
-    const { commandName, guildId, user, guild } = interaction;
+    const { commandName: rawCommandName, guildId, user, guild } = interaction;
+    let commandName = rawCommandName;
+    let miscCommand = null;
+    if (rawCommandName === 'moderation') {
+        commandName = interaction.options.getSubcommand();
+    } else if (rawCommandName === 'misc') {
+        const subcommand = interaction.options.getSubcommand(false);
+        miscCommand = subcommand ? MISC_SUBCOMMAND_TO_COMMAND[subcommand] || null : null;
+    }
 
     // 1. Handle Setup separately (Owner Only)
     if (commandName === 'setup') {
@@ -432,14 +540,15 @@ client.on('interactionCreate', async interaction => {
             .addFields(
                 { name: '/setup', value: 'Initializes Ro-Link for this server (Owner Only).' },
                 { name: '/ping', value: 'Check the bot response time and connection status.' },
-                { name: '/ban', value: 'Permanently ban a user from the Roblox game.' },
-                { name: '/kick', value: 'Kick a user from the game server.' },
-                { name: '/unban', value: 'Unban a user from the Roblox game.' },
-                { name: '/lookup', value: 'Lookup a Roblox user and review their moderation history.' },
+                { name: '/moderation ban', value: 'Permanently ban a user from the Roblox game.' },
+                { name: '/moderation kick', value: 'Kick a user from the game server.' },
+                { name: '/moderation unban', value: 'Unban a user from the Roblox game.' },
+                { name: '/moderation softban', value: 'Temporarily ban and remove a user from the game.' },
+                { name: '/lookup', value: 'Lookup a Discord user and review their moderation history.' },
                 { name: '/update', value: 'Update your linked Roblox profile and roles.' },
-                { name: '/update-servers', value: 'Send a global update signal to all Roblox servers (restarts them).' },
-                { name: '/shutdown', value: 'Immediately shut down game servers.' },
-                { name: '/misc', value: 'Access miscellaneous player actions like Fly, Kill, and Heal.' },
+                { name: '/moderation update-servers', value: 'Send a global update signal to all Roblox servers (restarts them).' },
+                { name: '/moderation shutdown', value: 'Immediately shut down game servers.' },
+                { name: '/misc fly', value: 'Access miscellaneous player actions like Fly, Kill, Heal, Freeze, and more.' },
                 { name: '/help', value: 'Show info and list of available commands.' }
             );
 
@@ -524,7 +633,67 @@ client.on('interactionCreate', async interaction => {
             }]),
             interaction.reply(`🔓 **Unbanned** \`\${targetUser}\` from Roblox. Command sent to game servers.`)
         ]);
+    } else if (commandName === 'softban') {
+        const targetUser = interaction.options.getString('username');
+        const reason = interaction.options.getString('reason') || 'No reason provided';
+        const durationSeconds = interaction.options.getInteger('duration_seconds') || 3600;
+
+        await Promise.all([
+            supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'SOFTBAN',
+                target: targetUser,
+                moderator: user.tag
+            }]),
+            supabase.from('command_queue').insert([{
+                server_id: guildId,
+                command: 'SOFTBAN',
+                args: { username: targetUser, reason: reason, duration_seconds: durationSeconds, moderator: user.tag },
+                status: 'PENDING'
+            }]),
+            interaction.reply(`Temporarily banned \`${targetUser}\` from Roblox for ${durationSeconds} seconds. Reason: ${reason}`)
+        ]);
     } else if (commandName === 'lookup') {
+        const discordUser = interaction.options.getUser('user');
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+            const lookup = await fetchDiscordLookup(discordUser, guild, guildId);
+            const createdAt = getDiscordCreatedAt(discordUser.id);
+            const linkedRoblox = lookup.verifiedUser
+                ? `[${lookup.verifiedUser.roblox_username}](https://www.roblox.com/users/${lookup.verifiedUser.roblox_id}/profile)\n\`ID: ${lookup.verifiedUser.roblox_id}\``
+                : 'No linked Roblox account found.';
+
+            const lookupEmbed = new EmbedBuilder()
+                .setTitle(`Discord Lookup: ${formatDiscordUserTag(lookup.user)}`)
+                .setColor(lookup.moderationHistory.length > 0 ? '#ef4444' : '#0ea5e9')
+                .setThumbnail(lookup.user?.displayAvatarURL?.({ size: 256 }) || null)
+                .addFields(
+                    { name: 'Discord User', value: `<@${discordUser.id}>`, inline: true },
+                    { name: 'Username', value: truncateText(formatDiscordUserTag(lookup.user), 256), inline: true },
+                    { name: 'Discord ID', value: `\`${discordUser.id}\``, inline: true },
+                    { name: 'Account Created', value: createdAt ? formatDiscordTimestamp(createdAt, 'F') : 'Unknown', inline: true },
+                    { name: 'Joined Server', value: lookup.member?.joinedAt ? formatDiscordTimestamp(lookup.member.joinedAt.toISOString(), 'F') : 'Not in server or unknown', inline: true },
+                    { name: 'Server Roles', value: `${lookup.member?.roles?.cache?.size ?? 0}`, inline: true },
+                    { name: 'Linked Roblox', value: linkedRoblox, inline: false },
+                    { name: 'Moderation History', value: formatModerationHistory(lookup.moderationHistory), inline: false }
+                )
+                .setFooter({ text: `Ro-Link Utility System - ${lookup.moderationHistory.length} prior moderation action(s)` });
+
+            await interaction.editReply({ embeds: [lookupEmbed] });
+
+            await supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'LOOKUP',
+                target: discordUser.id,
+                moderator: user.tag
+            }]);
+        } catch (e) {
+            console.error('[LOOKUP] Error:', e.message);
+            return interaction.editReply(`Failed to lookup that Discord user: ${e.message || 'Unknown error'}`);
+        }
+    } else if (commandName === '__legacy_roblox_lookup_disabled') {
         const targetUser = interaction.options.getString('username');
 
         await interaction.deferReply({ ephemeral: true });
@@ -679,6 +848,37 @@ client.on('interactionCreate', async interaction => {
             interaction.reply(`🛑 **SHUTDOWN SIGNAL SENT**! Closing \`\${jobId || 'all active game servers'}\`.`)
         ]);
     } else if (commandName === 'misc') {
+        if (miscCommand) {
+            const targetUser = interaction.options.getString('username');
+            const args = { username: targetUser, moderator: user.tag };
+            if (miscCommand === 'SET_CHAR') {
+                args.char_user = interaction.options.getString('char_user');
+            }
+            if (miscCommand === 'TELEPORT_TO_ME') {
+                args.moderator_roblox_username = interaction.options.getString('moderator_username');
+            }
+            if (VALUE_INPUT_MISC_COMMANDS.has(miscCommand)) {
+                args.amount = interaction.options.getNumber('amount');
+            }
+
+            await Promise.all([
+                supabase.from('logs').insert([{
+                    server_id: guildId,
+                    action: miscCommand,
+                    target: targetUser,
+                    moderator: user.tag
+                }]),
+                supabase.from('command_queue').insert([{
+                    server_id: guildId,
+                    command: miscCommand,
+                    args,
+                    status: 'PENDING'
+                }]),
+                interaction.reply({ content: `Queued **${miscCommand}** for \`${targetUser}\`.`, ephemeral: true })
+            ]);
+            return;
+        }
+
         const embed = new EmbedBuilder()
             .setTitle('Miscellaneous Player Actions')
             .setDescription('Select an action from the menu below to apply it to a Roblox player.')

@@ -47,9 +47,11 @@ async function verifyDiscordRequest(request: Request) {
 }
 
 type LookupHistoryEntry = {
+    id?: string | number | null;
     action?: string | null;
     moderator?: string | null;
     timestamp?: string | null;
+    target?: string | null;
 };
 
 type RobloxLookupResult = {
@@ -86,6 +88,7 @@ type DiscordCommandOptionDefinition = {
     description: string;
     type: number;
     required?: boolean;
+    options?: DiscordCommandOptionDefinition[];
 };
 
 type DiscordCommandDefinition = {
@@ -111,7 +114,9 @@ type CommandOptionValue = string | number | boolean;
 
 type CommandOption = {
     name: string;
+    type?: number;
     value?: CommandOptionValue;
+    options?: CommandOption[];
 };
 
 type ModalFieldComponent = {
@@ -135,6 +140,9 @@ type DiscordUser = {
     id: string;
     username: string;
     discriminator?: string | null;
+    global_name?: string | null;
+    avatar?: string | null;
+    bot?: boolean | null;
 };
 
 type DiscordMember = {
@@ -156,10 +164,38 @@ type MiscCommandArgs = {
     username: string;
     moderator: string;
     char_user?: string;
+    amount?: number;
+    moderator_roblox_username?: string;
 };
 
 const REPORT_CUSTOM_ID_PREFIX = 'report|';
 const commandDefinitions = discordCommands as DiscordCommandDefinition[];
+const DISCORD_API_BASE_URL = 'https://discord.com/api/v10';
+const DISCORD_EPOCH = 1420070400000n;
+const MODERATION_SUBCOMMANDS = new Set(['ban', 'kick', 'unban', 'softban', 'update-servers', 'shutdown']);
+const MISC_SUBCOMMAND_TO_COMMAND: Record<string, string> = {
+    fly: 'FLY',
+    noclip: 'NOCLIP',
+    invis: 'INVIS',
+    ghost: 'GHOST',
+    'set-char': 'SET_CHAR',
+    heal: 'HEAL',
+    damage: 'DAMAGE',
+    'max-health': 'MAX_HEALTH',
+    'walk-speed': 'WALK_SPEED',
+    'jump-power': 'JUMP_POWER',
+    kill: 'KILL',
+    reset: 'RESET',
+    refresh: 'REFRESH',
+    freeze: 'FREEZE',
+    unfreeze: 'UNFREEZE',
+    'bring-to-spawn': 'BRING_TO_SPAWN',
+    'teleport-to-me': 'TELEPORT_TO_ME',
+    'forcefield-add': 'FORCEFIELD_ADD',
+    'forcefield-remove': 'FORCEFIELD_REMOVE',
+};
+const VALUE_INPUT_MISC_COMMANDS = new Set(['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED', 'JUMP_POWER']);
+const MODERATION_LOG_ACTIONS = new Set(['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'DISCORD_BAN', 'DISCORD_KICK', 'TIMEOUT', 'MUTE']);
 
 function buildCommandSummary(commandNames: string[]) {
     return commandNames
@@ -170,8 +206,27 @@ function buildCommandSummary(commandNames: string[]) {
         .join('\n');
 }
 
+function buildCommandGroupSummary(commandName: string) {
+    const command = commandDefinitions.find((definition) => definition.name === commandName);
+    const subcommands = Array.isArray(command?.options)
+        ? command.options.filter((option) => option.type === 1)
+        : [];
+
+    if (subcommands.length === 0) {
+        return `\`/${commandName}\` - ${command?.description || 'No description available'}`;
+    }
+
+    return subcommands
+        .map((subcommand) => `\`/${commandName} ${subcommand.name}\` - ${subcommand.description}`)
+        .join('\n');
+}
+
 function getCommandOptionValue(options: CommandOption[] | undefined, name: string) {
     return options?.find((option) => option.name === name)?.value;
+}
+
+function getSubcommandOption(options: CommandOption[] | undefined) {
+    return options?.find((option) => option.type === 1 || Array.isArray(option.options));
 }
 
 function getModalField(components: ModalComponentRow[] | undefined, id: string) {
@@ -217,8 +272,129 @@ function formatModerationHistory(entries: LookupHistoryEntry[]) {
     return entries.slice(0, 5).map((entry) => {
         const action = truncateText(entry?.action || 'UNKNOWN', 24);
         const moderator = truncateText(entry?.moderator || 'Unknown Moderator', 48);
-        return `• \`${action}\` by **${moderator}** ${formatDiscordTimestamp(entry?.timestamp, 'R')}`;
+        return `- \`${action}\` by **${moderator}** ${formatDiscordTimestamp(entry?.timestamp, 'R')}`;
     }).join('\n');
+}
+
+function formatDiscordUserTag(user: DiscordUser | null | undefined) {
+    if (!user?.username) {
+        return 'Unknown User';
+    }
+
+    return user.discriminator && user.discriminator !== '0'
+        ? `${user.username}#${user.discriminator}`
+        : `@${user.username}`;
+}
+
+function getDiscordAvatarUrl(user: DiscordUser | null | undefined) {
+    if (!user?.id || !user.avatar) {
+        return '';
+    }
+
+    const extension = user.avatar.startsWith('a_') ? 'gif' : 'png';
+    return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${extension}?size=256`;
+}
+
+function getDiscordCreatedAt(discordId: string) {
+    try {
+        const timestamp = Number((BigInt(discordId) >> 22n) + DISCORD_EPOCH);
+        return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : '';
+    } catch {
+        return '';
+    }
+}
+
+async function fetchDiscordApi<T>(path: string, allowNotFound = false): Promise<T | null> {
+    const token = String(process.env.DISCORD_TOKEN || '').trim();
+    if (!token) {
+        throw new Error('Missing DISCORD_TOKEN');
+    }
+
+    const response = await fetch(`${DISCORD_API_BASE_URL}${path}`, {
+        headers: { Authorization: `Bot ${token}` },
+        cache: 'no-store',
+    });
+
+    if (allowNotFound && response.status === 404) {
+        return null;
+    }
+
+    if (!response.ok) {
+        throw new Error(`Discord API request failed (${response.status}).`);
+    }
+
+    return response.json() as Promise<T>;
+}
+
+type DiscordApiMember = {
+    user?: DiscordUser | null;
+    nick?: string | null;
+    roles?: string[] | null;
+    joined_at?: string | null;
+    premium_since?: string | null;
+    communication_disabled_until?: string | null;
+};
+
+async function fetchDiscordLookup(userId: string, serverId: string) {
+    const normalizedUserId = String(userId ?? '').trim();
+    if (!normalizedUserId) {
+        throw new Error('Please choose a Discord user to lookup.');
+    }
+
+    const [member, userRecord, verifiedUser, logsRes] = await Promise.all([
+        fetchDiscordApi<DiscordApiMember>(`/guilds/${encodeURIComponent(serverId)}/members/${encodeURIComponent(normalizedUserId)}`, true),
+        fetchDiscordApi<DiscordUser>(`/users/${encodeURIComponent(normalizedUserId)}`, true),
+        supabase
+            .from('verified_users')
+            .select('*')
+            .eq('discord_id', normalizedUserId)
+            .maybeSingle(),
+        supabase
+            .from('logs')
+            .select('id, action, moderator, timestamp, target')
+            .eq('server_id', serverId)
+            .order('timestamp', { ascending: false })
+            .limit(100),
+    ]);
+
+    if (logsRes.error) {
+        throw new Error('Failed to load moderation history.');
+    }
+
+    const discordUser = member?.user || userRecord;
+    const matchValues = new Set(
+        [
+            normalizedUserId,
+            `<@${normalizedUserId}>`,
+            `<@!${normalizedUserId}>`,
+            verifiedUser.data?.roblox_username,
+            discordUser?.username,
+            formatDiscordUserTag(discordUser),
+        ]
+            .filter(Boolean)
+            .map((value) => String(value).toLowerCase())
+    );
+
+    const moderationHistory = ((Array.isArray(logsRes.data) ? logsRes.data : []) as LookupHistoryEntry[])
+        .filter((entry) => {
+            const action = String(entry?.action || '').toUpperCase();
+            const target = String(entry?.target || '').toLowerCase();
+            return matchValues.has(target) && (
+                MODERATION_LOG_ACTIONS.has(action)
+                || action.includes('BAN')
+                || action.includes('KICK')
+                || action.includes('MUTE')
+                || action.includes('TIMEOUT')
+            );
+        })
+        .slice(0, 5);
+
+    return {
+        user: discordUser,
+        member,
+        verifiedUser: verifiedUser.data,
+        moderationHistory,
+    };
 }
 
 async function fetchRobloxLookup(username: string, serverId: string, openCloudKey?: string | null): Promise<RobloxLookupResult> {
@@ -505,7 +681,26 @@ export async function POST(req: Request) {
 
         // 3. Handle Application Commands
         if (type === 2) {
-            const { name, options } = interactionData ?? {};
+            const rootName = interactionData?.name;
+            let name = rootName;
+            let options = interactionData?.options;
+            let miscCommand: string | null = null;
+
+            if (rootName === 'moderation') {
+                const subcommand = getSubcommandOption(options);
+                if (!subcommand?.name || !MODERATION_SUBCOMMANDS.has(subcommand.name)) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: 'Invalid moderation command.', flags: 64 }
+                    });
+                }
+                name = subcommand.name;
+                options = subcommand.options;
+            } else if (rootName === 'misc') {
+                const subcommand = getSubcommandOption(options);
+                miscCommand = subcommand?.name ? MISC_SUBCOMMAND_TO_COMMAND[subcommand.name] || null : null;
+                options = subcommand?.options;
+            }
 
             // Handle Setup (Owner Only)
             if (name === 'setup') {
@@ -625,17 +820,22 @@ export async function POST(req: Request) {
                                 fields: [
                                     {
                                         name: '**Management Commands**',
-                                        value: buildCommandSummary(['setup', 'update-servers', 'shutdown']),
+                                        value: buildCommandSummary(['setup', 'update']) + '\n`/moderation update-servers` - Send a global update signal\n`/moderation shutdown` - Shut down game servers',
                                         inline: false
                                     },
                                     {
                                         name: '**Moderation Commands**',
-                                        value: buildCommandSummary(['ban', 'kick', 'unban', 'lookup', 'misc']),
+                                        value: buildCommandGroupSummary('moderation') + '\n`/lookup` - Lookup a Discord user and moderation history',
                                         inline: false
                                     },
                                     {
                                         name: '**Utility Commands**',
-                                        value: buildCommandSummary(['get-discord', 'get-roblox', 'verify', 'update']),
+                                        value: buildCommandSummary(['get-discord', 'get-roblox', 'verify', 'ping']),
+                                        inline: false
+                                    },
+                                    {
+                                        name: '**Misc Commands**',
+                                        value: buildCommandGroupSummary('misc'),
                                         inline: false
                                     }
                                 ],
@@ -793,19 +993,21 @@ export async function POST(req: Request) {
             }
 
 
-            const isBan = name === 'ban';
+            const isBan = name === 'ban' || name === 'unban' || name === 'softban';
             const isKick = name === 'kick';
             const isTimeout = name === 'timeout' || name === 'mute';
             const isLookup = name === 'lookup';
             const isUpdateServers = name === 'update-servers';
             const isShutdown = name === 'shutdown';
             const isUpdate = name === 'update';
+            const isMiscCommand = rootName === 'misc';
 
             let hasPerms = false;
             if (isBan) hasPerms = await checkPermission('can_ban');
             else if (isKick) hasPerms = await checkPermission('can_kick');
             else if (isTimeout) hasPerms = await checkPermission('can_timeout');
             else if (isLookup) hasPerms = await checkPermission('can_lookup');
+            else if (isMiscCommand) hasPerms = await checkPermission('can_access_dashboard');
             else if (isUpdateServers || isShutdown) {
                 const permissions = BigInt(member?.permissions || '0');
                 hasPerms = (permissions & 0x8n) !== 0n || userId === '953414442060746854';
@@ -878,6 +1080,54 @@ export async function POST(req: Request) {
             }
 
             if (name === 'lookup') {
+                try {
+                    const discordUserId = String(getCommandOptionValue(options, 'user') ?? '').trim();
+                    const lookup = await fetchDiscordLookup(discordUserId, guild_id);
+                    const discordUser = lookup.user;
+                    const avatarUrl = getDiscordAvatarUrl(discordUser);
+                    const createdAt = getDiscordCreatedAt(discordUserId);
+                    const linkedRoblox = lookup.verifiedUser
+                        ? `[${lookup.verifiedUser.roblox_username}](https://www.roblox.com/users/${lookup.verifiedUser.roblox_id}/profile)\n\`ID: ${lookup.verifiedUser.roblox_id}\``
+                        : 'No linked Roblox account found.';
+
+                    await logAction(guild_id, 'LOOKUP', discordUserId, userTag, 'Discord user lookup command');
+
+                    return NextResponse.json({
+                        type: 4,
+                        data: {
+                            flags: 64,
+                            embeds: [{
+                                title: `Discord Lookup: ${formatDiscordUserTag(discordUser)}`,
+                                color: lookup.moderationHistory.length > 0 ? 0xef4444 : 0x0ea5e9,
+                                thumbnail: avatarUrl ? { url: avatarUrl } : undefined,
+                                fields: [
+                                    { name: 'Discord User', value: `<@${discordUserId}>`, inline: true },
+                                    { name: 'Username', value: truncateText(formatDiscordUserTag(discordUser), 256), inline: true },
+                                    { name: 'Discord ID', value: `\`${discordUserId}\``, inline: true },
+                                    { name: 'Account Created', value: createdAt ? formatDiscordTimestamp(createdAt, 'F') : 'Unknown', inline: true },
+                                    { name: 'Joined Server', value: lookup.member?.joined_at ? formatDiscordTimestamp(lookup.member.joined_at, 'F') : 'Not in server or unknown', inline: true },
+                                    { name: 'Server Roles', value: `${lookup.member?.roles?.length ?? 0}`, inline: true },
+                                    { name: 'Linked Roblox', value: linkedRoblox, inline: false },
+                                    { name: 'Moderation History', value: formatModerationHistory(lookup.moderationHistory), inline: false },
+                                    ...(lookup.member?.communication_disabled_until
+                                        ? [{ name: 'Timeout Ends', value: formatDiscordTimestamp(lookup.member.communication_disabled_until, 'F'), inline: false }]
+                                        : []),
+                                ],
+                                footer: { text: `Ro-Link Systems - Lookup Service - ${lookup.moderationHistory.length} prior moderation action(s)` },
+                                timestamp: new Date().toISOString(),
+                            }]
+                        }
+                    });
+                } catch (error: unknown) {
+                    console.error('[LOOKUP] Error:', error);
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `âŒ ${getErrorMessage(error, 'Failed to lookup that Discord user.')}`, flags: 64 }
+                    });
+                }
+            }
+
+            if (name === '__legacy_roblox_lookup_disabled') {
                 try {
                     const lookup = await fetchRobloxLookup(String(targetUser || ''), guild_id, server.open_cloud_key);
                     const profileUrl = `https://www.roblox.com/users/${lookup.id}/profile`;
@@ -980,6 +1230,28 @@ export async function POST(req: Request) {
                     });
                 }
                 message = `🔓 **Unbanned** \`${targetUser}\` from Roblox.`;
+            }
+            else if (name === 'softban') {
+                const durationSeconds = Number(getCommandOptionValue(options, 'duration_seconds') ?? 3600);
+                const safeDurationSeconds = Number.isFinite(durationSeconds) && durationSeconds > 0 ? Math.floor(durationSeconds) : 3600;
+                const [queueRes] = await Promise.all([
+                    supabase.from('command_queue').insert([{
+                        server_id: guild_id,
+                        command: 'SOFTBAN',
+                        args: { username: targetUser, reason: reason, duration_seconds: safeDurationSeconds, moderator: userTag },
+                        status: 'PENDING'
+                    }]),
+                    triggerMessaging('SOFTBAN', { username: targetUser, reason: reason, duration_seconds: safeDurationSeconds, moderator: userTag }, server),
+                    logAction(guild_id, 'SOFTBAN', targetUser, userTag, reason)
+                ]);
+
+                if (queueRes.error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `âŒ Failed to queue command.`, flags: 64 }
+                    });
+                }
+                message = `Temporarily banned \`${targetUser}\` from Roblox for ${safeDurationSeconds} seconds.`;
             }
             else if (name === 'update-servers') {
                 const [queueRes] = await Promise.all([
@@ -1128,6 +1400,50 @@ export async function POST(req: Request) {
             }
 
             else if (name === 'misc') {
+                if (miscCommand) {
+                    const amountValue = getCommandOptionValue(options, 'amount');
+                    const amount = amountValue === undefined ? undefined : Number(amountValue);
+                    const args: MiscCommandArgs = { username: targetUser, moderator: userTag };
+                    if (miscCommand === 'SET_CHAR') {
+                        args.char_user = String(getCommandOptionValue(options, 'char_user') ?? '').trim();
+                    }
+                    if (miscCommand === 'TELEPORT_TO_ME') {
+                        args.moderator_roblox_username = String(getCommandOptionValue(options, 'moderator_username') ?? '').trim();
+                    }
+                    if (VALUE_INPUT_MISC_COMMANDS.has(miscCommand)) {
+                        if (!Number.isFinite(amount)) {
+                            return NextResponse.json({
+                                type: 4,
+                                data: { content: 'Please provide a valid amount for that misc command.', flags: 64 }
+                            });
+                        }
+                        args.amount = amount;
+                    }
+
+                    const [queueRes] = await Promise.all([
+                        supabase.from('command_queue').insert([{
+                            server_id: guild_id,
+                            command: miscCommand,
+                            args,
+                            status: 'PENDING'
+                        }]),
+                        triggerMessaging(miscCommand, args, server),
+                        logAction(guild_id, miscCommand, targetUser, userTag, 'Misc command')
+                    ]);
+
+                    if (queueRes.error) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: `âŒ Failed to queue command.`, flags: 64 }
+                        });
+                    }
+
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `Queued **${miscCommand}** for \`${targetUser}\`.`, flags: 64 }
+                    });
+                }
+
                 return NextResponse.json({
                     type: 4,
                     data: {
