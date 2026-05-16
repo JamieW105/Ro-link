@@ -13,7 +13,7 @@ export interface SanitizedAddonModuleInput {
     configSchema?: ModuleConfigSchema;
 }
 
-export type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer';
+export type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string';
 
 export interface ModuleConfigField {
     key: string;
@@ -31,7 +31,7 @@ export type SanitizedAddonModuleResult =
     | { errors: string[] };
 
 const VALID_MODULE_STATUSES = new Set<AddonModuleStatus>(['DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'ARCHIVED']);
-const VALID_CONFIG_TYPES = new Set<ModuleConfigFieldType>(['bool', 'dropdown', 'checkboxes', 'color', 'integer']);
+const VALID_CONFIG_TYPES = new Set<ModuleConfigFieldType>(['bool', 'dropdown', 'checkboxes', 'color', 'integer', 'string']);
 
 export function trimModuleString(value: unknown, maxLength = 5000) {
     return String(value ?? '').trim().slice(0, maxLength);
@@ -790,6 +790,9 @@ function normalizeConfigType(value: unknown): ModuleConfigFieldType | null {
     if (normalized === 'integer' || normalized === 'int' || normalized === 'wholenumber') {
         return 'integer';
     }
+    if (normalized === 'string' || normalized === 'str' || normalized === 'text') {
+        return 'string';
+    }
 
     return null;
 }
@@ -819,6 +822,9 @@ function defaultConfigValue(type: ModuleConfigFieldType, options: string[], rawD
             const integer = Number(rawDefault);
             return Number.isFinite(integer) ? Math.trunc(integer) : 0;
         }
+        if (type === 'string') {
+            return trimModuleString(rawDefault, 1000);
+        }
         const selected = String(rawDefault);
         return options.includes(selected) ? selected : (options[0] || '');
     }
@@ -827,6 +833,7 @@ function defaultConfigValue(type: ModuleConfigFieldType, options: string[], rawD
     if (type === 'checkboxes') return [];
     if (type === 'color') return '#38bdf8';
     if (type === 'integer') return 0;
+    if (type === 'string') return '';
     return options[0] || '';
 }
 
@@ -926,6 +933,11 @@ export function parseModuleConfigSettings(value: unknown, schema: ModuleConfigSc
         if (field.type === 'integer') {
             const integer = Number(rawValue ?? field.defaultValue);
             settings[key] = Number.isFinite(integer) ? Math.trunc(integer) : field.defaultValue;
+            continue;
+        }
+
+        if (field.type === 'string') {
+            settings[key] = trimModuleString(rawValue ?? field.defaultValue ?? '', 1000);
             continue;
         }
 

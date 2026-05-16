@@ -1180,6 +1180,12 @@ const docsPages: DocPage[] = [
         Default = "Sky",
         Options = { "Sky", "Emerald", "Amber" }
     },
+    Welcome_Message = {
+        Short_Description = "Message shown by the module.",
+        Type = "String",
+        Default = "Welcome to the server.",
+        Options = {}
+    },
     Max_Open_Reports = {
         Short_Description = "Maximum open reports to show in module UI.",
         Type = "Integer",
@@ -1217,7 +1223,7 @@ return {
                             <Checklist
                                 items={[
                                     'Declare a top-level CONFIG table in the uploaded module source.',
-                                    'Use Bool, Dropdown, CheckBoxes, Color Wheel, or Integer field types.',
+                                    'Use Bool, Dropdown, CheckBoxes, Color Wheel, Integer, or String field types.',
                                     'Server managers open Dashboard > Modules, choose the module, select Configure, then save the module config for that Discord server.',
                                     'Read saved values in Roblox from context.Settings or from the second settings argument passed to Init.',
                                     'Use context.Config only for schema metadata such as field type, default value, options, and description.',

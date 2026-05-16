@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type ModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
-type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer';
+type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string';
 
 interface ModuleConfigField {
     key: string;
@@ -78,6 +78,7 @@ function fieldDescription(field: ModuleConfigField) {
     if (field.type === 'dropdown') return 'Choose one available option.';
     if (field.type === 'checkboxes') return 'Choose any available options.';
     if (field.type === 'integer') return 'Whole-number value saved for this module.';
+    if (field.type === 'string') return 'Free-form text value saved for this module.';
     return 'Pick a hex color value.';
 }
 

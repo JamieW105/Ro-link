@@ -167,6 +167,12 @@ CONFIG = {
         Default = "Sky",
         Options = { "Sky", "Emerald", "Amber" }
     },
+    Welcome_Message = {
+        Short_Description = "Message shown by this module.",
+        Type = "String",
+        Default = "Welcome to the server.",
+        Options = {}
+    },
     Enabled_Checks = {
         Short_Description = "Checks the module should run.",
         Type = "CheckBoxes",

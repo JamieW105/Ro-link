@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer';
+type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string';
 
 interface ModuleConfigField {
     key: string;
@@ -46,6 +46,7 @@ function fieldDescription(field: ModuleConfigField) {
     if (field.type === 'dropdown') return 'Choose one option for this module setting.';
     if (field.type === 'checkboxes') return 'Choose any options that should be active.';
     if (field.type === 'integer') return 'Enter a whole-number value for this module setting.';
+    if (field.type === 'string') return 'Enter a text value for this module setting.';
     return 'Pick a hex color used by this module.';
 }
 
@@ -293,6 +294,15 @@ export default function DashboardModuleConfigPage() {
                                             value={Number(settings[field.key] ?? field.defaultValue ?? 0)}
                                             onChange={(event) => updateSetting(field.key, Math.trunc(Number(event.target.value || 0)))}
                                             className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 font-mono text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                        />
+                                    )}
+
+                                    {field.type === 'string' && (
+                                        <input
+                                            type="text"
+                                            value={String(settings[field.key] ?? field.defaultValue ?? '')}
+                                            onChange={(event) => updateSetting(field.key, event.target.value)}
+                                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
                                         />
                                     )}
                                 </div>

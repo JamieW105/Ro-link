@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer';
+type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string';
 
 interface ModuleConfigField {
     key: string;
