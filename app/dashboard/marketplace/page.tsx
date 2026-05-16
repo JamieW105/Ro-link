@@ -38,6 +38,8 @@ interface InstallTarget {
     id: string;
     name: string;
     icon: string | null;
+    installedModuleCount: number;
+    moduleLimit: number;
 }
 
 type SessionUserWithId = {
@@ -180,6 +182,11 @@ export default function DashboardMarketplacePage() {
     }
 
     function toggleServerSelection(serverId: string) {
+        const target = installTargets.find((server) => server.id === serverId);
+        if (target && target.installedModuleCount >= target.moduleLimit && !selectedServerIds.includes(serverId)) {
+            return;
+        }
+
         setSelectedServerIds((current) => (
             current.includes(serverId)
                 ? current.filter((id) => id !== serverId)
@@ -522,6 +529,7 @@ export default function DashboardMarketplacePage() {
                                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                         {installTargets.map((server) => {
                                             const selected = selectedServerIds.includes(server.id);
+                                            const full = server.installedModuleCount >= server.moduleLimit;
 
                                             return (
                                                 <button
@@ -540,7 +548,7 @@ export default function DashboardMarketplacePage() {
                                                         setMultiSelectInstall(true);
                                                         toggleServerSelection(server.id);
                                                     }}
-                                                    disabled={installing}
+                                                    disabled={installing || full}
                                                     className={`flex min-h-20 items-center gap-3 rounded-xl border p-4 text-left transition-colors disabled:opacity-50 ${selected ? 'border-sky-400 bg-sky-500/15' : 'border-slate-800 bg-slate-900/40 hover:border-sky-500/40'}`}
                                                 >
                                                     {server.icon ? (
@@ -557,7 +565,7 @@ export default function DashboardMarketplacePage() {
                                                     <span className="min-w-0">
                                                         <span className="block break-words text-sm font-bold text-white">{server.name}</span>
                                                         <span className="mt-1 block font-mono text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                                            {selected ? 'Selected' : 'Ready'}
+                                                            {full ? `${server.installedModuleCount}/${server.moduleLimit} installed` : selected ? 'Selected' : `${server.installedModuleCount}/${server.moduleLimit} installed`}
                                                         </span>
                                                     </span>
                                                 </button>

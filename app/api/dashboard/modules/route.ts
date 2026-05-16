@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
-import { normalizeAddonModule, parseModuleConfigSettings, parseStoredModuleConfigSchema, trimModuleString } from '@/lib/modules';
+import { MAX_SERVER_ADDON_MODULES, normalizeAddonModule, parseModuleConfigSettings, parseStoredModuleConfigSchema, trimModuleString } from '@/lib/modules';
 import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
 
@@ -70,6 +70,8 @@ export async function GET(req: Request) {
     const staffDiscordIds = await getRoLinkStaffDiscordIds();
 
     return NextResponse.json({
+        moduleLimit: MAX_SERVER_ADDON_MODULES,
+        installedCount: installedByModule.size,
         modules: applyOfficialModuleLabels((modules || []) as Record<string, unknown>[], staffDiscordIds)
             .filter((row) => (
                 row.status === 'PUBLISHED'
@@ -137,6 +139,36 @@ export async function POST(req: Request) {
     }
 
     if (action === 'install') {
+        const { data: existingInstall, error: existingInstallError } = await supabase
+            .from('server_addon_modules')
+            .select('module_id')
+            .eq('server_id', serverId)
+            .eq('module_id', moduleId)
+            .maybeSingle<{ module_id: string }>();
+
+        if (existingInstallError) {
+            return NextResponse.json({ error: existingInstallError.message }, { status: 500 });
+        }
+
+        if (!existingInstall) {
+            const { count, error: countError } = await supabase
+                .from('server_addon_modules')
+                .select('module_id', { count: 'exact', head: true })
+                .eq('server_id', serverId);
+
+            if (countError) {
+                return NextResponse.json({ error: countError.message }, { status: 500 });
+            }
+
+            if ((count || 0) >= MAX_SERVER_ADDON_MODULES) {
+                return NextResponse.json({
+                    error: `Servers can only have ${MAX_SERVER_ADDON_MODULES} custom modules installed at one time. Remove a module before installing another.`,
+                    moduleLimit: MAX_SERVER_ADDON_MODULES,
+                    installedCount: count || 0,
+                }, { status: 409 });
+            }
+        }
+
         const { error } = await supabase
             .from('server_addon_modules')
             .upsert({

@@ -79,6 +79,35 @@ CREATE INDEX IF NOT EXISTS idx_server_addon_modules_server
 CREATE INDEX IF NOT EXISTS idx_server_addon_modules_module
     ON public.server_addon_modules(module_id);
 
+CREATE OR REPLACE FUNCTION public.enforce_server_addon_module_limit()
+RETURNS TRIGGER AS $$
+DECLARE
+    installed_count INTEGER;
+BEGIN
+    SELECT COUNT(*)
+    INTO installed_count
+    FROM public.server_addon_modules
+    WHERE server_id = NEW.server_id
+      AND module_id <> NEW.module_id;
+
+    IF installed_count >= 5 THEN
+        RAISE EXCEPTION 'Servers can only have 5 custom modules installed at one time.'
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS enforce_server_addon_module_limit
+    ON public.server_addon_modules;
+
+CREATE TRIGGER enforce_server_addon_module_limit
+    BEFORE INSERT OR UPDATE OF server_id, module_id
+    ON public.server_addon_modules
+    FOR EACH ROW
+    EXECUTE FUNCTION public.enforce_server_addon_module_limit();
+
 UPDATE public.addon_modules
 SET
     source_code = '',

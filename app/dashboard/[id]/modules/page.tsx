@@ -59,8 +59,9 @@ export default function DashboardModulesPage() {
     const [savingId, setSavingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+    const [moduleLimit, setModuleLimit] = useState(5);
+    const [installedTotal, setInstalledTotal] = useState(0);
 
-    const installedCount = useMemo(() => modules.filter((addon) => addon.installed).length, [modules]);
     const enabledCount = useMemo(() => modules.filter((addon) => addon.installed && addon.enabled).length, [modules]);
     const selectedModule = useMemo(
         () => modules.find((addon) => addon.id === selectedModuleId) || null,
@@ -84,6 +85,8 @@ export default function DashboardModulesPage() {
 
             const nextModules = Array.isArray(payload.modules) ? payload.modules : [];
             setModules(nextModules);
+            setModuleLimit(Number(payload.moduleLimit || 5));
+            setInstalledTotal(Number(payload.installedCount || nextModules.filter((addon: MarketplaceModule) => addon.installed).length));
         } catch (loadError) {
             setError(loadError instanceof Error ? loadError.message : 'Failed to load modules.');
         } finally {
@@ -146,8 +149,8 @@ export default function DashboardModulesPage() {
 
                 <div className="grid grid-cols-2 gap-3 text-right">
                     <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4">
-                        <div className="text-2xl font-black text-white">{installedCount}</div>
-                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Installed</div>
+                        <div className="text-2xl font-black text-white">{installedTotal}</div>
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Installed / {moduleLimit}</div>
                     </div>
                     <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4">
                         <div className="text-2xl font-black text-emerald-400">{enabledCount}</div>

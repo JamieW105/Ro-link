@@ -5,6 +5,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { listVisibleGuildsForDiscordSession } from '@/lib/dashboardGuilds';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
 import {
+    MAX_SERVER_ADDON_MODULES,
     checksumModuleSource,
     normalizeAddonModule,
     sanitizeAddonModuleInput,
@@ -84,7 +85,7 @@ export async function GET() {
     }
 
     const staffDiscordIds = await getRoLinkStaffDiscordIds();
-    let installTargets: Array<{ id: string; name: string; icon: string | null }> = [];
+    let installTargets: Array<{ id: string; name: string; icon: string | null; installedModuleCount: number; moduleLimit: number }> = [];
 
     if (session.accessToken && userId) {
         try {
@@ -109,8 +110,32 @@ export async function GET() {
                 });
 
             const checkedGuilds = await Promise.all(guildChecks);
-            installTargets = checkedGuilds
-                .filter((guild): guild is { id: string; name: string; icon: string | null } => Boolean(guild))
+            const manageableGuilds = checkedGuilds
+                .filter((guild): guild is { id: string; name: string; icon: string | null } => Boolean(guild));
+            const installCountsByServer = new Map<string, number>();
+
+            if (manageableGuilds.length > 0) {
+                const { data: installedRows, error: installedError } = await supabase
+                    .from('server_addon_modules')
+                    .select('server_id')
+                    .in('server_id', manageableGuilds.map((guild) => guild.id));
+
+                if (installedError) {
+                    throw new Error(installedError.message);
+                }
+
+                for (const row of installedRows || []) {
+                    const targetServerId = String((row as { server_id?: string }).server_id || '');
+                    installCountsByServer.set(targetServerId, (installCountsByServer.get(targetServerId) || 0) + 1);
+                }
+            }
+
+            installTargets = manageableGuilds
+                .map((guild) => ({
+                    ...guild,
+                    installedModuleCount: installCountsByServer.get(guild.id) || 0,
+                    moduleLimit: MAX_SERVER_ADDON_MODULES,
+                }))
                 .sort((first, second) => first.name.localeCompare(second.name));
         } catch (error) {
             console.warn('[Marketplace] Failed to load module install targets.', error);

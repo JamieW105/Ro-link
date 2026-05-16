@@ -32,6 +32,7 @@ export type SanitizedAddonModuleResult =
 
 const VALID_MODULE_STATUSES = new Set<AddonModuleStatus>(['DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'ARCHIVED']);
 const VALID_CONFIG_TYPES = new Set<ModuleConfigFieldType>(['bool', 'dropdown', 'checkboxes', 'color', 'integer', 'string']);
+export const MAX_SERVER_ADDON_MODULES = 5;
 
 export function trimModuleString(value: unknown, maxLength = 5000) {
     return String(value ?? '').trim().slice(0, maxLength);
