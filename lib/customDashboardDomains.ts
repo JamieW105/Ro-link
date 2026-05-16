@@ -1,4 +1,26 @@
-export const ROLINK_ROOT_DOMAIN = 'rolink.cloud';
+const DEFAULT_ROLINK_ROOT_DOMAIN = 'rolink.cloud';
+
+export function getRolinkRootDomains() {
+    const configured = process.env.NEXT_PUBLIC_ROLINK_ROOT_DOMAINS
+        || process.env.NEXT_PUBLIC_ROLINK_ROOT_DOMAIN
+        || DEFAULT_ROLINK_ROOT_DOMAIN;
+
+    const domains = configured
+        .split(',')
+        .map((domain) => domain.trim().toLowerCase())
+        .filter(Boolean)
+        .map((domain) => domain.replace(/^https?:\/\//, '').replace(/\/.*$/, ''));
+
+    return Array.from(new Set(domains.length > 0 ? domains : [DEFAULT_ROLINK_ROOT_DOMAIN]));
+}
+
+export function getPrimaryRolinkRootDomain() {
+    return getRolinkRootDomains()[0] || DEFAULT_ROLINK_ROOT_DOMAIN;
+}
+
+export function buildDashboardHostname(subdomain: string, rootDomain = getPrimaryRolinkRootDomain()) {
+    return `${subdomain}.${rootDomain}`;
+}
 
 const RESERVED_SUBDOMAINS = new Set([
     'admin',
@@ -18,12 +40,17 @@ const RESERVED_SUBDOMAINS = new Set([
 ]);
 
 export function normalizeDashboardSubdomain(input: unknown) {
-    return String(input || '')
+    let value = String(input || '')
         .trim()
         .toLowerCase()
         .replace(/^https?:\/\//, '')
-        .replace(new RegExp(`\\.${ROLINK_ROOT_DOMAIN.replace('.', '\\.')}$`), '')
         .replace(/\/.*$/, '');
+
+    for (const rootDomain of getRolinkRootDomains()) {
+        value = value.replace(new RegExp(`\\.${rootDomain.replace(/\./g, '\\.')}$`), '');
+    }
+
+    return value;
 }
 
 export function validateDashboardSubdomain(input: unknown) {
@@ -47,4 +74,3 @@ export function validateDashboardSubdomain(input: unknown) {
 
     return { subdomain, error: null };
 }
-

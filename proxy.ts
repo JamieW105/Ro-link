@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { ROLINK_ROOT_DOMAIN } from '@/lib/customDashboardDomains';
+import { getRolinkRootDomains } from '@/lib/customDashboardDomains';
 
 const IGNORED_SUBDOMAINS = new Set([
     'admin',
@@ -44,12 +44,13 @@ async function resolveDashboardServerId(subdomain: string) {
 export async function proxy(req: NextRequest) {
     const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
     const hostname = host.split(':')[0].toLowerCase();
+    const rootDomain = getRolinkRootDomains().find((domain) => hostname.endsWith(`.${domain}`));
 
-    if (!hostname.endsWith(`.${ROLINK_ROOT_DOMAIN}`)) {
+    if (!rootDomain) {
         return NextResponse.next();
     }
 
-    const subdomain = hostname.slice(0, -`.${ROLINK_ROOT_DOMAIN}`.length);
+    const subdomain = hostname.slice(0, -`.${rootDomain}`.length);
     if (!subdomain || subdomain.includes('.') || IGNORED_SUBDOMAINS.has(subdomain)) {
         return NextResponse.next();
     }
@@ -73,4 +74,3 @@ export async function proxy(req: NextRequest) {
 export const config = {
     matcher: ['/((?!_next/static|_next/image|favicon.ico|Media).*)'],
 };
-

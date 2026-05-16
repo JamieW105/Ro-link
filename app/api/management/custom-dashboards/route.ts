@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { hasPermission } from '@/lib/management';
 import { supabase } from '@/lib/supabase';
-import { ROLINK_ROOT_DOMAIN, validateDashboardSubdomain } from '@/lib/customDashboardDomains';
+import { buildDashboardHostname, getRolinkRootDomains, validateDashboardSubdomain } from '@/lib/customDashboardDomains';
 
 async function requireManageServers() {
     const session = await getServerSession(authOptions);
@@ -36,7 +36,8 @@ export async function GET() {
 
     return NextResponse.json((data || []).map((domain) => ({
         ...domain,
-        hostname: `${domain.subdomain}.${ROLINK_ROOT_DOMAIN}`,
+        hostname: buildDashboardHostname(domain.subdomain),
+        hostnames: getRolinkRootDomains().map((rootDomain) => buildDashboardHostname(domain.subdomain, rootDomain)),
     })));
 }
 
@@ -87,7 +88,8 @@ export async function POST(req: Request) {
 
         return NextResponse.json({
             ...data,
-            hostname: `${data.subdomain}.${ROLINK_ROOT_DOMAIN}`,
+            hostname: buildDashboardHostname(data.subdomain),
+            hostnames: getRolinkRootDomains().map((rootDomain) => buildDashboardHostname(data.subdomain, rootDomain)),
         }, { status: 201 });
     } catch (error) {
         console.error('[Management/CustomDashboards] Create failed:', error);
@@ -97,4 +99,3 @@ export async function POST(req: Request) {
         );
     }
 }
-

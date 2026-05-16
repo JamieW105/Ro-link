@@ -18,6 +18,7 @@ interface CustomDashboard {
     server_id: string;
     subdomain: string;
     hostname: string;
+    hostnames?: string[];
     created_at: string;
 }
 
@@ -152,7 +153,7 @@ export default function ManageServers() {
                     <div className="max-w-2xl">
                         <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-white">Test Custom Dashboards</h2>
                         <p className="mt-2 text-sm text-slate-400">
-                            Create internal test mappings for wildcard dashboard URLs like <span className="font-mono text-sky-300">example.rolink.cloud</span>.
+                            Create internal test mappings for wildcard dashboard URLs. The same subdomain works across the configured production and testing root domains.
                         </p>
                     </div>
                     <div className="grid w-full gap-3 lg:w-auto lg:grid-cols-[minmax(220px,280px)_minmax(180px,220px)_auto]">
@@ -174,7 +175,7 @@ export default function ManageServers() {
                                 onChange={(e) => setDashboardSubdomain(e.target.value)}
                                 className="min-w-0 flex-1 bg-transparent px-4 py-2 text-sm text-white outline-none"
                             />
-                            <span className="hidden items-center border-l border-slate-800 px-3 font-mono text-xs text-slate-500 sm:flex">.rolink.cloud</span>
+                            <span className="hidden items-center border-l border-slate-800 px-3 font-mono text-xs text-slate-500 sm:flex">subdomain only</span>
                         </div>
                         <button
                             onClick={handleCreateDashboard}
@@ -206,7 +207,13 @@ export default function ManageServers() {
                             <tbody className="divide-y divide-slate-800">
                                 {customDashboards.map((dashboard) => (
                                     <tr key={dashboard.id}>
-                                        <td className="px-4 py-3 font-mono text-sky-300">{dashboard.hostname}</td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex flex-col gap-1">
+                                                {(dashboard.hostnames?.length ? dashboard.hostnames : [dashboard.hostname]).map((hostname) => (
+                                                    <span key={hostname} className="font-mono text-sky-300">{hostname}</span>
+                                                ))}
+                                            </div>
+                                        </td>
                                         <td className="px-4 py-3 text-slate-300">{serverNames.get(dashboard.server_id) || dashboard.server_id}</td>
                                         <td className="px-4 py-3 text-slate-500">{new Date(dashboard.created_at).toLocaleDateString()}</td>
                                         <td className="px-4 py-3 text-right">
