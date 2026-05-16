@@ -13,27 +13,43 @@ interface Server {
     bot_present?: boolean;
 }
 
+interface CustomDashboard {
+    id: string;
+    server_id: string;
+    subdomain: string;
+    hostname: string;
+    created_at: string;
+}
+
 export default function ManageServers() {
     const [servers, setServers] = useState<Server[]>([]);
+    const [customDashboards, setCustomDashboards] = useState<CustomDashboard[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [removeModal, setRemoveModal] = useState<Server | null>(null);
     const [reason, setReason] = useState("");
     const [processing, setProcessing] = useState(false);
+    const [dashboardServerId, setDashboardServerId] = useState("");
+    const [dashboardSubdomain, setDashboardSubdomain] = useState("");
+    const [dashboardNotice, setDashboardNotice] = useState("");
+    const [dashboardError, setDashboardError] = useState("");
+    const [creatingDashboard, setCreatingDashboard] = useState(false);
 
     useEffect(() => {
-        fetch('/api/management/servers')
-            .then(res => res.json())
-            .then(data => {
-                if (Array.isArray(data)) {
-                    setServers(data);
-                } else {
-                    setServers([]);
-                }
+        Promise.all([
+            fetch('/api/management/servers').then(res => res.json()),
+            fetch('/api/management/custom-dashboards').then(res => res.json()),
+        ])
+            .then(([serverData, dashboardData]) => {
+                const nextServers = Array.isArray(serverData) ? serverData : [];
+                setServers(nextServers);
+                setCustomDashboards(Array.isArray(dashboardData) ? dashboardData : []);
+                setDashboardServerId(nextServers.find((server) => server.is_setup)?.id || "");
                 setLoading(false);
             })
             .catch(() => {
                 setServers([]);
+                setCustomDashboards([]);
                 setLoading(false);
             });
     }, []);
@@ -71,12 +87,47 @@ export default function ManageServers() {
         }
     };
 
+    const handleCreateDashboard = async () => {
+        if (!dashboardServerId || !dashboardSubdomain.trim()) return;
+
+        setCreatingDashboard(true);
+        setDashboardNotice("");
+        setDashboardError("");
+
+        try {
+            const res = await fetch('/api/management/custom-dashboards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverId: dashboardServerId,
+                    subdomain: dashboardSubdomain,
+                }),
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                setDashboardError(data.error || 'Failed to create test dashboard.');
+                return;
+            }
+
+            setCustomDashboards((prev) => [data, ...prev]);
+            setDashboardSubdomain("");
+            setDashboardNotice(`Created ${data.hostname}`);
+        } catch (err) {
+            setDashboardError("Error creating test dashboard.");
+        } finally {
+            setCreatingDashboard(false);
+        }
+    };
+
     const filtered = Array.isArray(servers) ? servers.filter(s => {
         const name = (s.name || "").toLowerCase();
         const id = (s.id || "");
         const query = (search || "").toLowerCase();
         return name.includes(query) || id.includes(search);
     }) : [];
+    const setupServers = servers.filter((server) => server.is_setup);
+    const serverNames = new Map(servers.map((server) => [server.id, server.name || server.id]));
 
     return (
         <div className="space-y-6">
@@ -95,6 +146,86 @@ export default function ManageServers() {
                     />
                 </div>
             </header>
+
+            <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="max-w-2xl">
+                        <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-white">Test Custom Dashboards</h2>
+                        <p className="mt-2 text-sm text-slate-400">
+                            Create internal test mappings for wildcard dashboard URLs like <span className="font-mono text-sky-300">example.rolink.cloud</span>.
+                        </p>
+                    </div>
+                    <div className="grid w-full gap-3 lg:w-auto lg:grid-cols-[minmax(220px,280px)_minmax(180px,220px)_auto]">
+                        <select
+                            value={dashboardServerId}
+                            onChange={(e) => setDashboardServerId(e.target.value)}
+                            className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+                        >
+                            <option value="">Select setup server...</option>
+                            {setupServers.map((server) => (
+                                <option key={server.id} value={server.id}>{server.name || server.id}</option>
+                            ))}
+                        </select>
+                        <div className="flex rounded-xl border border-slate-800 bg-slate-950 focus-within:border-sky-500">
+                            <input
+                                type="text"
+                                placeholder="subdomain"
+                                value={dashboardSubdomain}
+                                onChange={(e) => setDashboardSubdomain(e.target.value)}
+                                className="min-w-0 flex-1 bg-transparent px-4 py-2 text-sm text-white outline-none"
+                            />
+                            <span className="hidden items-center border-l border-slate-800 px-3 font-mono text-xs text-slate-500 sm:flex">.rolink.cloud</span>
+                        </div>
+                        <button
+                            onClick={handleCreateDashboard}
+                            disabled={creatingDashboard || !dashboardServerId || !dashboardSubdomain.trim()}
+                            className="rounded-xl bg-sky-600 px-5 py-2 text-sm font-bold text-white transition-all hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {creatingDashboard ? "Creating..." : "Create Test"}
+                        </button>
+                    </div>
+                </div>
+
+                {(dashboardNotice || dashboardError) && (
+                    <p className={`mt-4 text-sm font-medium ${dashboardError ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {dashboardError || dashboardNotice}
+                    </p>
+                )}
+
+                {customDashboards.length > 0 && (
+                    <div className="mt-5 overflow-hidden rounded-xl border border-slate-800">
+                        <table className="w-full min-w-[640px] text-left text-sm">
+                            <thead className="bg-slate-800/50 text-[10px] font-medium uppercase tracking-widest text-slate-400">
+                                <tr>
+                                    <th className="px-4 py-3">Domain</th>
+                                    <th className="px-4 py-3">Server</th>
+                                    <th className="px-4 py-3">Created</th>
+                                    <th className="px-4 py-3 text-right">Open</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800">
+                                {customDashboards.map((dashboard) => (
+                                    <tr key={dashboard.id}>
+                                        <td className="px-4 py-3 font-mono text-sky-300">{dashboard.hostname}</td>
+                                        <td className="px-4 py-3 text-slate-300">{serverNames.get(dashboard.server_id) || dashboard.server_id}</td>
+                                        <td className="px-4 py-3 text-slate-500">{new Date(dashboard.created_at).toLocaleDateString()}</td>
+                                        <td className="px-4 py-3 text-right">
+                                            <a
+                                                href={`https://${dashboard.hostname}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-xs font-bold uppercase tracking-wider text-sky-400 hover:text-sky-300"
+                                            >
+                                                Open
+                                            </a>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </section>
 
             {loading ? (
                 <div className="flex items-center justify-center py-20">

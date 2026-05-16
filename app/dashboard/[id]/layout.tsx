@@ -4,7 +4,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { hasAnyAdminPanelCommand, MISC_ACTION_COMMAND_IDS } from "@/lib/adminPanelCommands";
-import { useSession } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { PermissionsProvider } from "@/context/PermissionsContext";
 
 interface VisibleGuild {
@@ -60,7 +60,7 @@ const LookupIcon = () => (
 export default function ServerLayout({ children }: { children: React.ReactNode }) {
     const { id } = useParams();
     const pathname = usePathname();
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
     const router = useRouter();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [userPermissions, setUserPermissions] = useState<DashboardPermissions | null>(null);
@@ -156,6 +156,28 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     useEffect(() => {
         setIsSidebarOpen(false);
     }, [pathname]);
+
+    if (status === 'loading') return null;
+
+    if (status === 'unauthenticated') {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-[#020617] p-6 text-white">
+                <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/70 p-8 text-center shadow-2xl shadow-black/30">
+                    <img src="/Media/Ro-LinkIcon.png" alt="" className="mx-auto mb-5 h-12 w-12 rounded-xl" />
+                    <h1 className="text-2xl font-bold tracking-tight">Sign in required</h1>
+                    <p className="mt-3 text-sm leading-6 text-slate-400">
+                        Sign in with Discord before accessing this Ro-Link dashboard.
+                    </p>
+                    <button
+                        onClick={() => signIn('discord', { callbackUrl: window.location.href })}
+                        className="mt-6 w-full rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold text-white transition-all hover:bg-sky-500"
+                    >
+                        Sign in with Discord
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     if (loading || !userPermissions) return null;
 
