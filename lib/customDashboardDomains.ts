@@ -1,5 +1,16 @@
 const DEFAULT_ROLINK_ROOT_DOMAIN = 'rolink.cloud';
 
+function readHostname(value: string | undefined) {
+    if (!value) return null;
+
+    try {
+        const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+        return new URL(withProtocol).hostname.toLowerCase();
+    } catch {
+        return null;
+    }
+}
+
 export function getRolinkRootDomains() {
     const configured = process.env.NEXT_PUBLIC_ROLINK_ROOT_DOMAINS
         || process.env.NEXT_PUBLIC_ROLINK_ROOT_DOMAIN
@@ -11,7 +22,17 @@ export function getRolinkRootDomains() {
         .filter(Boolean)
         .map((domain) => domain.replace(/^https?:\/\//, '').replace(/\/.*$/, ''));
 
-    return Array.from(new Set(domains.length > 0 ? domains : [DEFAULT_ROLINK_ROOT_DOMAIN]));
+    const automaticDomains = [
+        readHostname(process.env.NEXTAUTH_URL),
+        readHostname(process.env.NEXT_PUBLIC_BASE_URL),
+        readHostname(process.env.VERCEL_PROJECT_PRODUCTION_URL),
+        readHostname(process.env.VERCEL_URL),
+    ].filter((domain): domain is string => Boolean(domain));
+
+    return Array.from(new Set([
+        ...(domains.length > 0 ? domains : [DEFAULT_ROLINK_ROOT_DOMAIN]),
+        ...automaticDomains,
+    ]));
 }
 
 export function getPrimaryRolinkRootDomain() {

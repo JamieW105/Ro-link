@@ -35,7 +35,13 @@ async function resolveDashboardServerId(subdomain: string) {
         next: { revalidate: 30 },
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+        console.error('[CustomDashboardProxy] Failed to resolve dashboard subdomain.', {
+            subdomain,
+            status: response.status,
+        });
+        return null;
+    }
 
     const rows = await response.json() as Array<{ server_id?: string }>;
     return rows[0]?.server_id || null;
@@ -62,7 +68,10 @@ export async function proxy(req: NextRequest) {
 
     const serverId = await resolveDashboardServerId(subdomain);
     if (!serverId) {
-        return NextResponse.next();
+        const url = req.nextUrl.clone();
+        url.pathname = '/custom-dashboard/not-found';
+        url.searchParams.set('subdomain', subdomain);
+        return NextResponse.rewrite(url);
     }
 
     const url = req.nextUrl.clone();
