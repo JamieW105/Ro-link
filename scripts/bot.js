@@ -197,6 +197,98 @@ function formatDiscordUserTag(discordUser) {
         : `@${discordUser.username}`;
 }
 
+function normalizeLivePlayer(rawPlayer) {
+    if (typeof rawPlayer === 'string') {
+        const username = rawPlayer.trim();
+        return username ? { username, displayName: username, userId: null, avatarUrl: null } : null;
+    }
+
+    if (!rawPlayer || typeof rawPlayer !== 'object') {
+        return null;
+    }
+
+    const username = String(rawPlayer.username || rawPlayer.name || '').trim();
+    if (!username) {
+        return null;
+    }
+
+    const userId = String(rawPlayer.userId || rawPlayer.id || '').trim() || null;
+    return {
+        username,
+        displayName: String(rawPlayer.displayName || username).trim(),
+        userId,
+        avatarUrl: String(rawPlayer.avatarUrl || rawPlayer.thumbnailUrl || '').trim() || null,
+    };
+}
+
+function normalizeLivePlayerList(rawPlayers) {
+    if (!Array.isArray(rawPlayers)) {
+        return [];
+    }
+
+    return rawPlayers.map(normalizeLivePlayer).filter(Boolean);
+}
+
+function findLivePlayerInList(rawPlayers, identity) {
+    const normalizedIdentity = String(identity || '').trim().toLowerCase();
+    if (!normalizedIdentity) {
+        return null;
+    }
+
+    return normalizeLivePlayerList(rawPlayers).find((player) =>
+        player.username.toLowerCase() === normalizedIdentity
+        || (player.userId ? player.userId.toLowerCase() === normalizedIdentity : false)
+    ) || null;
+}
+
+function getVisiblePlayerCount(server) {
+    const players = normalizeLivePlayerList(server?.players);
+    const count = Number(server?.player_count || 0);
+    return players.length > 0 ? players.length : Number.isFinite(count) ? count : 0;
+}
+
+function formatJobId(jobId) {
+    const value = String(jobId || '').trim();
+    return value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value || 'Unknown';
+}
+
+function buildRobloxJoinUrl(placeId, jobId) {
+    const normalizedPlaceId = String(placeId || '').trim();
+    const normalizedJobId = String(jobId || '').trim();
+    if (!normalizedPlaceId || !normalizedJobId) {
+        return '';
+    }
+
+    return `https://www.roblox.com/games/start?placeId=${encodeURIComponent(normalizedPlaceId)}&gameInstanceId=${encodeURIComponent(normalizedJobId)}`;
+}
+
+async function fetchLiveServers(serverId) {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+        .from('live_servers')
+        .select('id, players, player_count, updated_at')
+        .eq('server_id', serverId)
+        .gte('updated_at', fiveMinutesAgo)
+        .order('updated_at', { ascending: false });
+
+    if (error) {
+        throw new Error('Failed to load live servers.');
+    }
+
+    return Array.isArray(data) ? data : [];
+}
+
+function findPlayerServer(liveServers, identity) {
+    for (const liveServer of liveServers) {
+        const player = findLivePlayerInList(liveServer.players, identity);
+        if (player) {
+            return { server: liveServer, player };
+        }
+    }
+
+    return { server: null, player: null };
+}
+
 async function fetchDiscordLookup(discordUser, guild, serverId) {
     const userId = String(discordUser?.id || '').trim();
     if (!userId) {
@@ -246,11 +338,29 @@ async function fetchDiscordLookup(discordUser, guild, serverId) {
         })
         .slice(0, 5);
 
+    let activeServer = null;
+    let activePlayer = null;
+    const robloxUsername = String(verifiedUserRes.data?.roblox_username || '').trim();
+    const robloxId = String(verifiedUserRes.data?.roblox_id || '').trim();
+    if (robloxUsername || robloxId) {
+        const liveServers = await fetchLiveServers(serverId);
+        const presence = findPlayerServer(liveServers, robloxUsername || robloxId);
+        activeServer = presence.server;
+        activePlayer = presence.player;
+        if (!activeServer && robloxUsername && robloxId) {
+            const fallbackPresence = findPlayerServer(liveServers, robloxId);
+            activeServer = fallbackPresence.server;
+            activePlayer = fallbackPresence.player;
+        }
+    }
+
     return {
         user: resolvedUser,
         member,
         verifiedUser: verifiedUserRes.data,
         moderationHistory,
+        activeServer,
+        activePlayer,
     };
 }
 
@@ -540,6 +650,7 @@ client.on('interactionCreate', async interaction => {
                 { name: '/ping', value: 'Check the bot response time and connection status.' },
                 { name: '/moderation', value: 'Open Ban, Kick, Unban, Softban, Update, and Shutdown actions.' },
                 { name: '/lookup', value: 'Lookup a Discord user and review their moderation history.' },
+                { name: '/servers', value: 'View and manage live Roblox servers.' },
                 { name: '/update', value: 'Update your linked Roblox profile and roles.' },
                 { name: '/misc', value: 'Open Fly, Kill, Heal, Freeze, and other miscellaneous actions.' },
                 { name: '/help', value: 'Show info and list of available commands.' }
@@ -654,6 +765,12 @@ client.on('interactionCreate', async interaction => {
         try {
             const lookup = await fetchDiscordLookup(discordUser, guild, guildId);
             const createdAt = getDiscordCreatedAt(discordUser.id);
+            const { data: serverSettings } = await supabase
+                .from('servers')
+                .select('place_id')
+                .eq('id', guildId)
+                .maybeSingle();
+            const joinUrl = buildRobloxJoinUrl(serverSettings?.place_id, lookup.activeServer?.id);
             const linkedRoblox = lookup.verifiedUser
                 ? `[${lookup.verifiedUser.roblox_username}](https://www.roblox.com/users/${lookup.verifiedUser.roblox_id}/profile)\n\`ID: ${lookup.verifiedUser.roblox_id}\``
                 : 'No linked Roblox account found.';
@@ -670,11 +787,18 @@ client.on('interactionCreate', async interaction => {
                     { name: 'Joined Server', value: lookup.member?.joinedAt ? formatDiscordTimestamp(lookup.member.joinedAt.toISOString(), 'F') : 'Not in server or unknown', inline: true },
                     { name: 'Server Roles', value: `${lookup.member?.roles?.cache?.size ?? 0}`, inline: true },
                     { name: 'Linked Roblox', value: linkedRoblox, inline: false },
+                    { name: 'Game Presence', value: lookup.activeServer ? `In game on job \`${lookup.activeServer.id}\`${lookup.activePlayer ? ` as **${lookup.activePlayer.username}**` : ''}` : 'Not currently in a live server.', inline: false },
                     { name: 'Moderation History', value: formatModerationHistory(lookup.moderationHistory), inline: false }
                 )
                 .setFooter({ text: `Ro-Link Utility System - ${lookup.moderationHistory.length} prior moderation action(s)` });
 
-            await interaction.editReply({ embeds: [lookupEmbed] });
+            const components = joinUrl
+                ? [new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setLabel('Join Game').setURL(joinUrl).setStyle(ButtonStyle.Link)
+                )]
+                : [];
+
+            await interaction.editReply({ embeds: [lookupEmbed], components });
 
             await supabase.from('logs').insert([{
                 server_id: guildId,
@@ -731,6 +855,93 @@ client.on('interactionCreate', async interaction => {
             console.error('[LOOKUP] Error:', e.message);
             return interaction.editReply(`âŒ ${e.message || 'Failed to lookup that Roblox user.'}`);
         }
+    } else if (commandName === 'servers') {
+        const search = String(interaction.options.getString('search') || '').trim().toLowerCase();
+        const { data: serverSettings } = await supabase
+            .from('servers')
+            .select('place_id')
+            .eq('id', guildId)
+            .maybeSingle();
+        const liveServers = await fetchLiveServers(guildId);
+        const matches = search
+            ? liveServers.filter((liveServer) => {
+                const jobId = String(liveServer.id || '').toLowerCase();
+                return jobId.includes(search)
+                    || normalizeLivePlayerList(liveServer.players).some((player) =>
+                        player.username.toLowerCase().includes(search)
+                        || player.displayName.toLowerCase().includes(search)
+                        || (player.userId ? player.userId.toLowerCase() === search : false)
+                    );
+            })
+            : liveServers;
+
+        if (search && matches.length === 1) {
+            const selectedServer = matches[0];
+            const player = normalizeLivePlayerList(selectedServer.players).find((candidate) =>
+                candidate.username.toLowerCase().includes(search)
+                || candidate.displayName.toLowerCase().includes(search)
+                || (candidate.userId ? candidate.userId.toLowerCase() === search : false)
+            ) || null;
+            const joinUrl = buildRobloxJoinUrl(serverSettings?.place_id, selectedServer.id);
+            const embed = new EmbedBuilder()
+                .setTitle(player ? `Live Player: ${player.username}` : `Live Server: ${formatJobId(selectedServer.id)}`)
+                .setColor(player ? '#10b981' : '#0ea5e9')
+                .addFields(
+                    { name: 'Job ID', value: `\`${selectedServer.id}\``, inline: false },
+                    { name: 'Players', value: `${getVisiblePlayerCount(selectedServer)}`, inline: true },
+                    { name: 'Updated', value: selectedServer.updated_at ? formatDiscordTimestamp(selectedServer.updated_at, 'R') : 'Unknown', inline: true },
+                    { name: player ? 'Matched Player' : 'Player List', value: player ? (player.userId ? `${player.username}\n\`ID: ${player.userId}\`` : player.username) : (normalizeLivePlayerList(selectedServer.players).slice(0, 10).map((livePlayer) => livePlayer.username).join('\n') || 'No resolved players reported.'), inline: false }
+                );
+            const menu = new StringSelectMenuBuilder()
+                .setCustomId(player ? `server_player_action|${encodeURIComponent(selectedServer.id)}|${encodeURIComponent(player.username)}` : `server_action|${encodeURIComponent(selectedServer.id)}`)
+                .setPlaceholder(player ? `Manage ${player.username}...` : 'Manage this server...')
+                .addOptions(player
+                    ? [
+                        new StringSelectMenuOptionBuilder().setLabel('Kick Player').setDescription('Kick this Roblox user').setValue('KICK'),
+                        new StringSelectMenuOptionBuilder().setLabel('Ban Player').setDescription('Ban this Roblox user').setValue('BAN'),
+                        new StringSelectMenuOptionBuilder().setLabel('Kill Player').setDescription('Kill this Roblox user').setValue('KILL'),
+                        new StringSelectMenuOptionBuilder().setLabel('Heal Player').setDescription('Heal this Roblox user').setValue('HEAL'),
+                    ]
+                    : [
+                        new StringSelectMenuOptionBuilder().setLabel('Shutdown Server').setDescription('Shut down this live server').setValue('SHUTDOWN'),
+                        new StringSelectMenuOptionBuilder().setLabel('Update Server').setDescription('Restart this live server').setValue('UPDATE'),
+                    ]);
+            const rows = [new ActionRowBuilder().addComponents(menu)];
+            if (joinUrl) {
+                rows.push(new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setLabel('Join Game').setURL(joinUrl).setStyle(ButtonStyle.Link)
+                ));
+            }
+            return interaction.reply({ embeds: [embed], components: rows, ephemeral: true });
+        }
+
+        const listedServers = matches.slice(0, 25);
+        const embed = new EmbedBuilder()
+            .setTitle(search ? 'Live Server Search Results' : 'Live Servers')
+            .setDescription(listedServers.length > 0
+                ? listedServers.map((liveServer, index) => {
+                    const players = normalizeLivePlayerList(liveServer.players);
+                    const sample = players.slice(0, 3).map((player) => player.username).join(', ');
+                    return `**${index + 1}.** \`${formatJobId(liveServer.id)}\` - ${getVisiblePlayerCount(liveServer)} player(s)${sample ? ` - ${sample}` : ''}`;
+                }).join('\n')
+                : 'No live servers found.')
+            .setColor('#0ea5e9');
+
+        const components = listedServers.length > 0
+            ? [new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('servers_select')
+                    .setPlaceholder('Choose a live server...')
+                    .addOptions(listedServers.map((liveServer) =>
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel(`Server ${formatJobId(liveServer.id)}`.slice(0, 100))
+                            .setDescription(`${getVisiblePlayerCount(liveServer)} player(s)`.slice(0, 100))
+                            .setValue(String(liveServer.id).slice(0, 100))
+                    ))
+            )]
+            : [];
+
+        return interaction.reply({ embeds: [embed], components, ephemeral: true });
     } else if (commandName === 'update-servers') {
         if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('ManageGuild')) {
             return interaction.reply({ content: 'You do not have permission to use this command. (Requires Administrator/Manage Server)', ephemeral: true });
@@ -1131,6 +1342,84 @@ client.on('interactionCreate', async interaction => {
     if (!supabase) return;
 
     if (!interaction.isStringSelectMenu()) return;
+
+    if (interaction.customId === 'servers_select') {
+        const jobId = interaction.values[0];
+        const [liveServers, serverSettingsRes] = await Promise.all([
+            fetchLiveServers(interaction.guildId),
+            supabase.from('servers').select('place_id').eq('id', interaction.guildId).maybeSingle(),
+        ]);
+        const selectedServer = liveServers.find((liveServer) => String(liveServer.id || '') === jobId);
+        if (!selectedServer) {
+            return interaction.reply({ content: 'That live server is no longer active.', ephemeral: true });
+        }
+
+        const joinUrl = buildRobloxJoinUrl(serverSettingsRes.data?.place_id, selectedServer.id);
+        const players = normalizeLivePlayerList(selectedServer.players);
+        const embed = new EmbedBuilder()
+            .setTitle(`Live Server: ${formatJobId(selectedServer.id)}`)
+            .setColor('#0ea5e9')
+            .addFields(
+                { name: 'Job ID', value: `\`${selectedServer.id}\``, inline: false },
+                { name: 'Players', value: `${getVisiblePlayerCount(selectedServer)}`, inline: true },
+                { name: 'Updated', value: selectedServer.updated_at ? formatDiscordTimestamp(selectedServer.updated_at, 'R') : 'Unknown', inline: true },
+                { name: 'Player List', value: players.slice(0, 10).map((player) => player.username).join('\n') || 'No resolved players reported.', inline: false }
+            );
+        const rows = [
+            new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId(`server_action|${encodeURIComponent(jobId)}`)
+                    .setPlaceholder('Manage this server...')
+                    .addOptions(
+                        new StringSelectMenuOptionBuilder().setLabel('Shutdown Server').setDescription('Shut down this live server').setValue('SHUTDOWN'),
+                        new StringSelectMenuOptionBuilder().setLabel('Update Server').setDescription('Restart this live server').setValue('UPDATE'),
+                    )
+            )
+        ];
+        if (joinUrl) {
+            rows.push(new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setLabel('Join Game').setURL(joinUrl).setStyle(ButtonStyle.Link)
+            ));
+        }
+
+        return interaction.update({ embeds: [embed], components: rows });
+    }
+
+    if (interaction.customId.startsWith('server_action|') || interaction.customId.startsWith('server_player_action|')) {
+        const parts = interaction.customId.split('|');
+        const isPlayerAction = parts[0] === 'server_player_action';
+        const jobId = decodeURIComponent(parts[1] || '');
+        const username = isPlayerAction ? decodeURIComponent(parts[2] || '') : '';
+        const command = interaction.values[0];
+        const args = {
+            job_id: jobId,
+            moderator: interaction.user.tag,
+            reason: 'Discord live server action',
+        };
+        if (isPlayerAction) {
+            args.username = username;
+        }
+
+        await Promise.all([
+            supabase.from('command_queue').insert([{
+                server_id: interaction.guildId,
+                command,
+                args,
+                status: 'PENDING',
+            }]),
+            supabase.from('logs').insert([{
+                server_id: interaction.guildId,
+                action: command === 'UPDATE' ? 'UPDATE_SERVERS' : command,
+                target: isPlayerAction ? username : jobId,
+                moderator: interaction.user.tag,
+            }])
+        ]);
+
+        return interaction.reply({
+            content: `Queued **${command}** for ${isPlayerAction ? `\`${username}\`` : `server \`${formatJobId(jobId)}\``}.`,
+            ephemeral: true,
+        });
+    }
 
     if (interaction.customId === 'moderation_menu') {
         const action = interaction.values[0];

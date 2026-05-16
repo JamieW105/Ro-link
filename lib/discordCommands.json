@@ -20,6 +20,18 @@
     ]
   },
   {
+    "name": "servers",
+    "description": "View and manage live Roblox servers",
+    "options": [
+      {
+        "name": "search",
+        "description": "Optional Roblox username, Roblox user ID, or server JobId",
+        "type": 3,
+        "required": false
+      }
+    ]
+  },
+  {
     "name": "update",
     "description": "Update your linked Roblox profile and roles",
     "options": [

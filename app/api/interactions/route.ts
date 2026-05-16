@@ -3,7 +3,7 @@ import nacl from 'tweetnacl';
 import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { logAction } from '@/lib/logger';
-import { findLivePlayer } from '@/lib/livePlayers';
+import { findLivePlayer, normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import discordCommands from '@/lib/discordCommands.json';
@@ -106,6 +106,8 @@ type RobloxSearchCandidate = {
 type LiveServerRow = {
     id?: string | null;
     players?: unknown;
+    player_count?: number | string | null;
+    updated_at?: string | null;
 };
 
 type DashboardRoleRow = Record<string, boolean | number | string | null | undefined>;
@@ -320,7 +322,199 @@ type DiscordApiMember = {
     communication_disabled_until?: string | null;
 };
 
-async function fetchDiscordLookup(userId: string, serverId: string) {
+type DiscordLookupResult = {
+    user: DiscordUser | null | undefined;
+    member: DiscordApiMember | null;
+    verifiedUser: Record<string, string | null | undefined> | null;
+    moderationHistory: LookupHistoryEntry[];
+    activeServer: LiveServerRow | null;
+    activePlayer: LivePlayer | null;
+};
+
+function getVisiblePlayerCount(server: LiveServerRow) {
+    const players = normalizeLivePlayerList(server.players);
+    const rawCount = Number(server.player_count ?? 0);
+    return players.length > 0 ? players.length : Number.isFinite(rawCount) ? rawCount : 0;
+}
+
+function formatJobId(jobId: unknown) {
+    const value = String(jobId ?? '').trim();
+    return value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value || 'Unknown';
+}
+
+function buildRobloxJoinUrl(placeId: unknown, jobId: unknown) {
+    const normalizedPlaceId = String(placeId ?? '').trim();
+    const normalizedJobId = String(jobId ?? '').trim();
+    if (!normalizedPlaceId || !normalizedJobId) {
+        return '';
+    }
+
+    return `https://www.roblox.com/games/start?placeId=${encodeURIComponent(normalizedPlaceId)}&gameInstanceId=${encodeURIComponent(normalizedJobId)}`;
+}
+
+function buildServerActionComponents(jobId: string, placeId?: unknown, player?: LivePlayer | null) {
+    const components: Array<Record<string, unknown>> = [
+        {
+            type: 1,
+            components: [
+                {
+                    type: 3,
+                    custom_id: player
+                        ? `server_player_action|${encodeURIComponent(jobId)}|${encodeURIComponent(player.username)}`
+                        : `server_action|${encodeURIComponent(jobId)}`,
+                    placeholder: player ? `Manage ${player.username}...` : 'Manage this server...',
+                    options: player
+                        ? [
+                            { label: 'Kick Player', value: 'KICK', description: 'Kick this Roblox user from the live server' },
+                            { label: 'Ban Player', value: 'BAN', description: 'Ban this Roblox user' },
+                            { label: 'Kill Player', value: 'KILL', description: 'Kill this Roblox user' },
+                            { label: 'Heal Player', value: 'HEAL', description: 'Heal this Roblox user' },
+                        ]
+                        : [
+                            { label: 'Shutdown Server', value: 'SHUTDOWN', description: 'Shut down this live server' },
+                            { label: 'Update Server', value: 'UPDATE', description: 'Restart this live server' },
+                        ],
+                },
+            ],
+        },
+    ];
+
+    const joinUrl = buildRobloxJoinUrl(placeId, jobId);
+    if (joinUrl) {
+        components.push({
+            type: 1,
+            components: [{
+                type: 2,
+                style: 5,
+                label: 'Join Game',
+                url: joinUrl,
+            }],
+        });
+    }
+
+    return components;
+}
+
+function buildServerEmbed(server: LiveServerRow, placeId?: unknown, player?: LivePlayer | null) {
+    const players = normalizeLivePlayerList(server.players);
+    const visiblePlayers = players.slice(0, 10).map((livePlayer) =>
+        livePlayer.userId
+            ? `${livePlayer.username} (${livePlayer.userId})`
+            : livePlayer.username
+    );
+
+    return {
+        title: player ? `Live Player: ${player.username}` : `Live Server: ${formatJobId(server.id)}`,
+        color: player ? 0x10b981 : 0x0ea5e9,
+        fields: [
+            { name: 'Job ID', value: `\`${server.id || 'Unknown'}\``, inline: false },
+            { name: 'Players', value: `${getVisiblePlayerCount(server)}`, inline: true },
+            { name: 'Updated', value: server.updated_at ? formatDiscordTimestamp(server.updated_at, 'R') : 'Unknown', inline: true },
+            ...(player
+                ? [
+                    { name: 'Matched Player', value: player.userId ? `${player.username}\n\`ID: ${player.userId}\`` : player.username, inline: false },
+                ]
+                : [
+                    { name: 'Player List', value: visiblePlayers.length > 0 ? visiblePlayers.join('\n') : 'No resolved players reported.', inline: false },
+                ]),
+            ...(buildRobloxJoinUrl(placeId, server.id) ? [{ name: 'Join', value: '[Open Roblox server](' + buildRobloxJoinUrl(placeId, server.id) + ')', inline: false }] : []),
+        ],
+        footer: { text: 'Ro-Link Systems - Live Servers' },
+        timestamp: new Date().toISOString(),
+    };
+}
+
+function buildServersListResponse(liveServers: LiveServerRow[], search: string, placeId?: unknown) {
+    const normalizedSearch = search.trim().toLowerCase();
+    const serverMatches = normalizedSearch
+        ? liveServers.filter((server) => {
+            const jobId = String(server.id || '').toLowerCase();
+            return jobId.includes(normalizedSearch)
+                || normalizeLivePlayerList(server.players).some((player) =>
+                    player.username.toLowerCase().includes(normalizedSearch)
+                    || player.displayName.toLowerCase().includes(normalizedSearch)
+                    || (player.userId ? player.userId.toLowerCase() === normalizedSearch : false)
+                );
+        })
+        : liveServers;
+
+    if (normalizedSearch && serverMatches.length === 1) {
+        const server = serverMatches[0];
+        const player = normalizeLivePlayerList(server.players).find((candidate) =>
+            candidate.username.toLowerCase().includes(normalizedSearch)
+            || candidate.displayName.toLowerCase().includes(normalizedSearch)
+            || (candidate.userId ? candidate.userId.toLowerCase() === normalizedSearch : false)
+        ) || null;
+
+        return {
+            embeds: [buildServerEmbed(server, placeId, player)],
+            components: buildServerActionComponents(String(server.id || ''), placeId, player),
+            flags: 64,
+        };
+    }
+
+    const listedServers = serverMatches.slice(0, 25);
+    return {
+        embeds: [{
+            title: normalizedSearch ? 'Live Server Search Results' : 'Live Servers',
+            description: listedServers.length > 0
+                ? listedServers.map((server, index) => {
+                    const players = normalizeLivePlayerList(server.players);
+                    const sample = players.slice(0, 3).map((player) => player.username).join(', ');
+                    return `**${index + 1}.** \`${formatJobId(server.id)}\` - ${getVisiblePlayerCount(server)} player(s)${sample ? ` - ${sample}` : ''}`;
+                }).join('\n')
+                : 'No live servers found.',
+            color: 0x0ea5e9,
+            footer: { text: 'Ro-Link Systems - Live Servers' },
+            timestamp: new Date().toISOString(),
+        }],
+        components: listedServers.length > 0
+            ? [{
+                type: 1,
+                components: [{
+                    type: 3,
+                    custom_id: 'servers_select',
+                    placeholder: 'Choose a live server...',
+                    options: listedServers.map((server) => ({
+                        label: `Server ${formatJobId(server.id)}`.slice(0, 100),
+                        value: String(server.id || '').slice(0, 100),
+                        description: `${getVisiblePlayerCount(server)} player(s) - updated ${server.updated_at ? 'recently' : 'unknown'}`.slice(0, 100),
+                    })),
+                }],
+            }]
+            : [],
+        flags: 64,
+    };
+}
+
+async function fetchLiveServers(serverId: string) {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+        .from('live_servers')
+        .select('id, players, player_count, updated_at')
+        .eq('server_id', serverId)
+        .gte('updated_at', fiveMinutesAgo)
+        .order('updated_at', { ascending: false });
+
+    if (error) {
+        throw new Error('Failed to load live servers.');
+    }
+
+    return (Array.isArray(data) ? data : []) as LiveServerRow[];
+}
+
+function findPlayerServer(liveServers: LiveServerRow[], identity: unknown) {
+    for (const liveServer of liveServers) {
+        const player = findLivePlayer(liveServer.players, identity);
+        if (player) {
+            return { server: liveServer, player };
+        }
+    }
+
+    return { server: null, player: null };
+}
+
+async function fetchDiscordLookup(userId: string, serverId: string): Promise<DiscordLookupResult> {
     const normalizedUserId = String(userId ?? '').trim();
     if (!normalizedUserId) {
         throw new Error('Please choose a Discord user to lookup.');
@@ -374,11 +568,29 @@ async function fetchDiscordLookup(userId: string, serverId: string) {
         })
         .slice(0, 5);
 
+    let activeServer: LiveServerRow | null = null;
+    let activePlayer: LivePlayer | null = null;
+    const robloxUsername = String(verifiedUser.data?.roblox_username ?? '').trim();
+    const robloxId = String(verifiedUser.data?.roblox_id ?? '').trim();
+    if (robloxUsername || robloxId) {
+        const liveServers = await fetchLiveServers(serverId);
+        const presence = findPlayerServer(liveServers, robloxUsername || robloxId);
+        activeServer = presence.server;
+        activePlayer = presence.player;
+        if (!activeServer && robloxUsername && robloxId) {
+            const fallbackPresence = findPlayerServer(liveServers, robloxId);
+            activeServer = fallbackPresence.server;
+            activePlayer = fallbackPresence.player;
+        }
+    }
+
     return {
         user: discordUser,
         member,
         verifiedUser: verifiedUser.data,
         moderationHistory,
+        activeServer,
+        activePlayer,
     };
 }
 
@@ -805,7 +1017,7 @@ export async function POST(req: Request) {
                                     },
                                     {
                                         name: '**Utility Commands**',
-                                        value: buildCommandSummary(['get-discord', 'get-roblox', 'verify', 'ping']),
+                                        value: buildCommandSummary(['get-discord', 'get-roblox', 'verify', 'ping', 'servers']),
                                         inline: false
                                     },
                                     {
@@ -975,6 +1187,7 @@ export async function POST(req: Request) {
             const isUpdateServers = name === 'update-servers';
             const isShutdown = name === 'shutdown';
             const isUpdate = name === 'update';
+            const isServers = name === 'servers';
             const isMiscCommand = rootName === 'misc';
             const isModerationMenu = rootName === 'moderation';
 
@@ -983,6 +1196,7 @@ export async function POST(req: Request) {
             else if (isKick) hasPerms = await checkPermission('can_kick');
             else if (isTimeout) hasPerms = await checkPermission('can_timeout');
             else if (isLookup) hasPerms = await checkPermission('can_lookup');
+            else if (isServers) hasPerms = await checkPermission('can_access_dashboard');
             else if (isMiscCommand) hasPerms = await checkPermission('can_access_dashboard');
             else if (isModerationMenu) hasPerms = await checkPermission('can_kick') || await checkPermission('can_ban');
             else if (isUpdateServers || isShutdown) {
@@ -1121,6 +1335,13 @@ export async function POST(req: Request) {
                                     { name: 'Joined Server', value: lookup.member?.joined_at ? formatDiscordTimestamp(lookup.member.joined_at, 'F') : 'Not in server or unknown', inline: true },
                                     { name: 'Server Roles', value: `${lookup.member?.roles?.length ?? 0}`, inline: true },
                                     { name: 'Linked Roblox', value: linkedRoblox, inline: false },
+                                    {
+                                        name: 'Game Presence',
+                                        value: lookup.activeServer
+                                            ? `In game on job \`${lookup.activeServer.id}\`${lookup.activePlayer ? ` as **${lookup.activePlayer.username}**` : ''}`
+                                            : 'Not currently in a live server.',
+                                        inline: false
+                                    },
                                     { name: 'Moderation History', value: formatModerationHistory(lookup.moderationHistory), inline: false },
                                     ...(lookup.member?.communication_disabled_until
                                         ? [{ name: 'Timeout Ends', value: formatDiscordTimestamp(lookup.member.communication_disabled_until, 'F'), inline: false }]
@@ -1129,6 +1350,18 @@ export async function POST(req: Request) {
                                 footer: { text: `Ro-Link Systems - Lookup Service - ${lookup.moderationHistory.length} prior moderation action(s)` },
                                 timestamp: new Date().toISOString(),
                             }]
+                            ,
+                            components: lookup.activeServer && buildRobloxJoinUrl(server.place_id, lookup.activeServer.id)
+                                ? [{
+                                    type: 1,
+                                    components: [{
+                                        type: 2,
+                                        style: 5,
+                                        label: 'Join Game',
+                                        url: buildRobloxJoinUrl(server.place_id, lookup.activeServer.id),
+                                    }],
+                                }]
+                                : []
                         }
                     });
                 } catch (error: unknown) {
@@ -1136,6 +1369,25 @@ export async function POST(req: Request) {
                     return NextResponse.json({
                         type: 4,
                         data: { content: `âŒ ${getErrorMessage(error, 'Failed to lookup that Discord user.')}`, flags: 64 }
+                    });
+                }
+            }
+
+            if (name === 'servers') {
+                try {
+                    const search = String(getCommandOptionValue(options, 'search') ?? '').trim();
+                    const liveServers = await fetchLiveServers(guild_id);
+                    const response = buildServersListResponse(liveServers, search, server.place_id);
+
+                    return NextResponse.json({
+                        type: 4,
+                        data: response,
+                    });
+                } catch (error: unknown) {
+                    console.error('[SERVERS] Error:', error);
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `Failed to load live servers: ${getErrorMessage(error, 'Unknown error')}`, flags: 64 }
                     });
                 }
             }
@@ -1560,7 +1812,15 @@ export async function POST(req: Request) {
             // Permission Check for buttons/components
             let requiredPerm = 'can_manage_reports'; // Default for most report/moderation buttons
 
-            if (cid === 'misc_menu' || cid.startsWith('misc_modal_') || cid === 'moderation_menu' || cid.startsWith('moderation_modal_')) {
+            if (
+                cid === 'misc_menu'
+                || cid.startsWith('misc_modal_')
+                || cid === 'moderation_menu'
+                || cid.startsWith('moderation_modal_')
+                || cid === 'servers_select'
+                || cid.startsWith('server_action|')
+                || cid.startsWith('server_player_action|')
+            ) {
                 // Determine if it should be a misc action check, for now we allow if they have dashboard access
                 requiredPerm = 'can_access_dashboard';
             } else if (cid === 'report_open' || cid === 'report_submit') {
@@ -1757,6 +2017,74 @@ export async function POST(req: Request) {
                         },
                     });
                 }
+            }
+
+            if (cid === 'servers_select') {
+                const jobId = String(interactionData?.values?.[0] ?? '').trim();
+                const liveServers = await fetchLiveServers(guild_id);
+                const selectedServer = liveServers.find((liveServer) => String(liveServer.id || '') === jobId);
+                const { data: serverSettings } = await supabase
+                    .from('servers')
+                    .select('place_id')
+                    .eq('id', guild_id)
+                    .maybeSingle<{ place_id?: string | null }>();
+
+                if (!selectedServer) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: 'That live server is no longer active.', flags: 64 }
+                    });
+                }
+
+                return NextResponse.json({
+                    type: 7,
+                    data: {
+                        embeds: [buildServerEmbed(selectedServer, serverSettings?.place_id)],
+                        components: buildServerActionComponents(jobId, serverSettings?.place_id),
+                    }
+                });
+            }
+
+            if (cid.startsWith('server_action|') || cid.startsWith('server_player_action|')) {
+                const parts = cid.split('|');
+                const isPlayerAction = parts[0] === 'server_player_action';
+                const jobId = decodeURIComponent(parts[1] || '');
+                const username = isPlayerAction ? decodeURIComponent(parts[2] || '') : '';
+                const command = String(interactionData?.values?.[0] ?? '').trim().toUpperCase();
+                const args: Record<string, unknown> = {
+                    job_id: jobId,
+                    moderator: userTag,
+                    reason: 'Discord live server action',
+                };
+
+                if (isPlayerAction) {
+                    args.username = username;
+                }
+
+                const target = isPlayerAction ? username : jobId;
+                const logActionName = command === 'UPDATE' ? 'UPDATE_SERVERS' : command;
+                const [queueRes] = await Promise.all([
+                    supabase.from('command_queue').insert([{
+                        server_id: guild_id,
+                        command,
+                        args,
+                        status: 'PENDING',
+                    }]),
+                    triggerMessaging(command, args),
+                    logAction(guild_id, logActionName, target, userTag, 'Discord live server action'),
+                ]);
+
+                if (queueRes.error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: 'Failed to queue live server action.', flags: 64 }
+                    });
+                }
+
+                return NextResponse.json({
+                    type: 4,
+                    data: { content: `Queued **${command}** for ${isPlayerAction ? `\`${username}\`` : `server \`${formatJobId(jobId)}\``}.`, flags: 64 }
+                });
             }
 
             if (cid.startsWith('discord_')) {
