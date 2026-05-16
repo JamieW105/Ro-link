@@ -489,18 +489,31 @@ function buildServersListResponse(liveServers: LiveServerRow[], search: string, 
 
 async function fetchLiveServers(serverId: string) {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const { data, error } = await supabase
+    const baseQuery = () => supabase
         .from('live_servers')
         .select('id, players, player_count, updated_at')
         .eq('server_id', serverId)
-        .gte('updated_at', fiveMinutesAgo)
         .order('updated_at', { ascending: false });
+
+    const { data, error } = await baseQuery()
+        .gte('updated_at', fiveMinutesAgo);
 
     if (error) {
         throw new Error('Failed to load live servers.');
     }
 
-    return (Array.isArray(data) ? data : []) as LiveServerRow[];
+    if (Array.isArray(data) && data.length > 0) {
+        return data as LiveServerRow[];
+    }
+
+    const { data: fallbackData, error: fallbackError } = await baseQuery()
+        .limit(25);
+
+    if (fallbackError) {
+        throw new Error('Failed to load live servers.');
+    }
+
+    return (Array.isArray(fallbackData) ? fallbackData : []) as LiveServerRow[];
 }
 
 function findPlayerServer(liveServers: LiveServerRow[], identity: unknown) {

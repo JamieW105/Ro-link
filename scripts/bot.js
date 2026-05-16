@@ -197,36 +197,121 @@ function formatDiscordUserTag(discordUser) {
         : `@${discordUser.username}`;
 }
 
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getLivePlayerScore(record) {
+    let score = 0;
+    if (String(record.username || record.name || '').trim()) score += 2;
+    if (String(record.displayName || '').trim()) score += 1;
+    if (String(record.userId || record.id || '').trim()) score += 1;
+    if (String(record.avatarUrl || record.thumbnailUrl || record.characterThumbnail || record.headshotUrl || '').trim()) score += 1;
+    return score;
+}
+
+function unwrapLivePlayerObject(value, seen = new WeakSet()) {
+    if (!isRecord(value) || seen.has(value)) {
+        return null;
+    }
+
+    seen.add(value);
+    const currentScore = getLivePlayerScore(value);
+    let bestMatch = currentScore > 0 ? value : null;
+    let bestScore = currentScore;
+
+    for (const nestedValue of Object.values(value)) {
+        if (!isRecord(nestedValue)) continue;
+        const nestedMatch = unwrapLivePlayerObject(nestedValue, seen);
+        if (!nestedMatch) continue;
+        const nestedScore = getLivePlayerScore(nestedMatch);
+        if (nestedScore > bestScore) {
+            bestMatch = nestedMatch;
+            bestScore = nestedScore;
+        }
+    }
+
+    return bestMatch;
+}
+
+function collectNestedLivePlayerEntries(value, depth = 0) {
+    if (depth > 3) {
+        return [];
+    }
+
+    if (Array.isArray(value)) {
+        return value.flatMap((entry) => collectNestedLivePlayerEntries(entry, depth + 1));
+    }
+
+    if (!isRecord(value)) {
+        return [];
+    }
+
+    if (getLivePlayerScore(value) > 0) {
+        return [value];
+    }
+
+    return Object.values(value).flatMap((entry) => collectNestedLivePlayerEntries(entry, depth + 1));
+}
+
+function toRawLivePlayerEntries(rawPlayers) {
+    if (Array.isArray(rawPlayers)) {
+        return rawPlayers;
+    }
+
+    if (!isRecord(rawPlayers)) {
+        return [];
+    }
+
+    if (getLivePlayerScore(rawPlayers) > 0) {
+        return [rawPlayers];
+    }
+
+    const nestedEntries = Object.values(rawPlayers).flatMap((entry) => collectNestedLivePlayerEntries(entry));
+    return nestedEntries.length > 0 ? nestedEntries : Object.values(rawPlayers);
+}
+
 function normalizeLivePlayer(rawPlayer) {
     if (typeof rawPlayer === 'string') {
         const username = rawPlayer.trim();
         return username ? { username, displayName: username, userId: null, avatarUrl: null } : null;
     }
 
-    if (!rawPlayer || typeof rawPlayer !== 'object') {
+    const player = unwrapLivePlayerObject(rawPlayer);
+    if (!player) {
         return null;
     }
 
-    const username = String(rawPlayer.username || rawPlayer.name || '').trim();
+    const username = String(player.username || player.name || '').trim();
     if (!username) {
         return null;
     }
 
-    const userId = String(rawPlayer.userId || rawPlayer.id || '').trim() || null;
+    const userId = String(player.userId || player.id || '').trim() || null;
     return {
         username,
-        displayName: String(rawPlayer.displayName || username).trim(),
+        displayName: String(player.displayName || username).trim(),
         userId,
-        avatarUrl: String(rawPlayer.avatarUrl || rawPlayer.thumbnailUrl || '').trim() || null,
+        avatarUrl: String(player.avatarUrl || player.thumbnailUrl || player.characterThumbnail || player.headshotUrl || '').trim() || null,
     };
 }
 
 function normalizeLivePlayerList(rawPlayers) {
-    if (!Array.isArray(rawPlayers)) {
-        return [];
+    const players = [];
+    const seen = new Set();
+
+    for (const rawPlayer of toRawLivePlayerEntries(rawPlayers)) {
+        const player = normalizeLivePlayer(rawPlayer);
+        if (!player) continue;
+
+        const key = player.userId ? `id:${player.userId}` : `username:${player.username.toLowerCase()}`;
+        if (seen.has(key)) continue;
+
+        seen.add(key);
+        players.push(player);
     }
 
-    return rawPlayers.map(normalizeLivePlayer).filter(Boolean);
+    return players;
 }
 
 function findLivePlayerInList(rawPlayers, identity) {
@@ -264,18 +349,31 @@ function buildRobloxJoinUrl(placeId, jobId) {
 
 async function fetchLiveServers(serverId) {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const { data, error } = await supabase
+    const baseQuery = () => supabase
         .from('live_servers')
         .select('id, players, player_count, updated_at')
         .eq('server_id', serverId)
-        .gte('updated_at', fiveMinutesAgo)
         .order('updated_at', { ascending: false });
+
+    const { data, error } = await baseQuery()
+        .gte('updated_at', fiveMinutesAgo);
 
     if (error) {
         throw new Error('Failed to load live servers.');
     }
 
-    return Array.isArray(data) ? data : [];
+    if (Array.isArray(data) && data.length > 0) {
+        return data;
+    }
+
+    const { data: fallbackData, error: fallbackError } = await baseQuery()
+        .limit(25);
+
+    if (fallbackError) {
+        throw new Error('Failed to load live servers.');
+    }
+
+    return Array.isArray(fallbackData) ? fallbackData : [];
 }
 
 function findPlayerServer(liveServers, identity) {
