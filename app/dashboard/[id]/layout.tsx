@@ -4,7 +4,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { hasAnyAdminPanelCommand, MISC_ACTION_COMMAND_IDS } from "@/lib/adminPanelCommands";
-import { signIn, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { PermissionsProvider } from "@/context/PermissionsContext";
 
 interface VisibleGuild {
@@ -65,14 +65,20 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [userPermissions, setUserPermissions] = useState<DashboardPermissions | null>(null);
     const [loading, setLoading] = useState(true);
+    const [accessDenied, setAccessDenied] = useState(false);
     const [apiLatencyMs, setApiLatencyMs] = useState<number | null>(null);
     const [apiLatencyState, setApiLatencyState] = useState<'measuring' | 'ready' | 'error'>('measuring');
+
+    function signInFromCustomDashboard() {
+        window.location.href = `/api/auth/custom-dashboard?callbackUrl=${encodeURIComponent(window.location.href)}`;
+    }
 
     useEffect(() => {
         if (!session || !id) return;
 
         async function checkAccess() {
             setLoading(true);
+            setAccessDenied(false);
             try {
                 // 1. Fetch User Guilds to ensure they are even in the server
                 const guildsRes = await fetch('/api/guilds');
@@ -81,7 +87,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
                 if (!g || !g.hasBot) {
                     console.log("[Guard] Access denied or bot not present.");
-                    router.push('/dashboard');
+                    setAccessDenied(true);
                     return;
                 }
 
@@ -91,14 +97,14 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
                 if (!perms || !perms.can_access_dashboard) {
                     console.log("[Guard] No dashboard access for this server.");
-                    router.push('/dashboard');
+                    setAccessDenied(true);
                     return;
                 }
 
                 setUserPermissions(perms);
             } catch (err) {
                 console.error("[Guard] Error checking access:", err);
-                router.push('/dashboard');
+                setAccessDenied(true);
             } finally {
                 setLoading(false);
             }
@@ -169,11 +175,25 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                         Sign in with Discord before accessing this Ro-Link dashboard.
                     </p>
                     <button
-                        onClick={() => signIn('discord', { callbackUrl: window.location.href })}
+                        onClick={signInFromCustomDashboard}
                         className="mt-6 w-full rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold text-white transition-all hover:bg-sky-500"
                     >
                         Sign in with Discord
                     </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (accessDenied) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-[#020617] p-6 text-white">
+                <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/70 p-8 text-center shadow-2xl shadow-black/30">
+                    <img src="/Media/Ro-LinkIcon.png" alt="" className="mx-auto mb-5 h-12 w-12 rounded-xl" />
+                    <h1 className="text-2xl font-bold tracking-tight">Sorry, you do not have access to this dashboard.</h1>
+                    <p className="mt-3 text-sm leading-6 text-slate-400">
+                        If this is a mistake, please contact the server owner.
+                    </p>
                 </div>
             </div>
         );

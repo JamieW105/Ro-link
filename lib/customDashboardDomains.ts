@@ -22,6 +22,20 @@ export function buildDashboardHostname(subdomain: string, rootDomain = getPrimar
     return `${subdomain}.${rootDomain}`;
 }
 
+export function isAllowedDashboardUrl(input: unknown) {
+    try {
+        const url = new URL(String(input || ''));
+        if (!['http:', 'https:'].includes(url.protocol)) return false;
+
+        const hostname = url.hostname.toLowerCase();
+        return getRolinkRootDomains().some((rootDomain) => (
+            hostname === rootDomain || hostname.endsWith(`.${rootDomain}`)
+        ));
+    } catch {
+        return false;
+    }
+}
+
 const RESERVED_SUBDOMAINS = new Set([
     'admin',
     'api',

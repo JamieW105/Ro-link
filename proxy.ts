@@ -66,7 +66,9 @@ export async function proxy(req: NextRequest) {
     }
 
     const url = req.nextUrl.clone();
-    url.pathname = `/dashboard/${serverId}${pathname === '/' ? '' : pathname}`;
+    url.pathname = pathname === '/'
+        ? `/custom-dashboard/${serverId}`
+        : `/dashboard/${serverId}${pathname}`;
     url.search = search;
     return NextResponse.rewrite(url);
 }

@@ -1,6 +1,7 @@
 import NextAuth from "next-auth"
 import type { Session } from "next-auth"
 import DiscordProvider from "next-auth/providers/discord"
+import { isAllowedDashboardUrl } from "@/lib/customDashboardDomains"
 
 type TokenShape = {
     accessToken?: string
@@ -108,6 +109,12 @@ export const authOptions = {
                 session.user.id = token.sub
             }
             return session
+        },
+        async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
+            if (url.startsWith('/')) return `${baseUrl}${url}`
+            if (url.startsWith(baseUrl)) return url
+            if (isAllowedDashboardUrl(url)) return url
+            return baseUrl
         }
     },
     secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
