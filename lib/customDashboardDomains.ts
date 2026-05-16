@@ -57,6 +57,22 @@ export function isAllowedDashboardUrl(input: unknown) {
     }
 }
 
+export function resolveDashboardSubdomainFromHostname(hostnameInput: unknown) {
+    const hostname = String(hostnameInput || '').split(':')[0].trim().toLowerCase();
+    if (!hostname) return null;
+
+    for (const rootDomain of getRolinkRootDomains()) {
+        if (hostname === rootDomain) return null;
+        if (!hostname.endsWith(`.${rootDomain}`)) continue;
+
+        const subdomain = hostname.slice(0, -`.${rootDomain}`.length);
+        if (!subdomain || subdomain.includes('.')) return null;
+        return subdomain;
+    }
+
+    return null;
+}
+
 const RESERVED_SUBDOMAINS = new Set([
     'admin',
     'api',

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getRolinkRootDomains } from '@/lib/customDashboardDomains';
+import { resolveDashboardSubdomainFromHostname } from '@/lib/customDashboardDomains';
 
 const IGNORED_SUBDOMAINS = new Set([
     'admin',
@@ -50,13 +50,7 @@ async function resolveDashboardServerId(subdomain: string) {
 export async function proxy(req: NextRequest) {
     const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
     const hostname = host.split(':')[0].toLowerCase();
-    const rootDomain = getRolinkRootDomains().find((domain) => hostname.endsWith(`.${domain}`));
-
-    if (!rootDomain) {
-        return NextResponse.next();
-    }
-
-    const subdomain = hostname.slice(0, -`.${rootDomain}`.length);
+    const subdomain = resolveDashboardSubdomainFromHostname(hostname);
     if (!subdomain || subdomain.includes('.') || IGNORED_SUBDOMAINS.has(subdomain)) {
         return NextResponse.next();
     }

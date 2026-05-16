@@ -47,6 +47,40 @@ export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function redirectCustomDashboardHost() {
+      try {
+        const hostname = window.location.hostname;
+        const res = await fetch(`/api/custom-dashboard/resolve?hostname=${encodeURIComponent(hostname)}`, {
+          cache: 'no-store',
+        });
+
+        if (!res.ok || cancelled) return;
+
+        const data = await res.json() as { found?: boolean; serverId?: string; subdomain?: string };
+
+        if (data.found && data.serverId) {
+          window.location.replace(`/custom-dashboard/${encodeURIComponent(data.serverId)}`);
+          return;
+        }
+
+        if (data.subdomain) {
+          window.location.replace(`/custom-dashboard/not-found?subdomain=${encodeURIComponent(data.subdomain)}`);
+        }
+      } catch (error) {
+        console.error('Failed to resolve custom dashboard host', error);
+      }
+    }
+
+    redirectCustomDashboardHost();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     async function fetchStats() {
       // Real-time Bot Server Count (From Discord API)
       try {
