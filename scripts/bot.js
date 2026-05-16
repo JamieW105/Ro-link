@@ -451,9 +451,7 @@ client.on('interactionCreate', async interaction => {
     const { commandName: rawCommandName, guildId, user, guild } = interaction;
     let commandName = rawCommandName;
     let miscCommand = null;
-    if (rawCommandName === 'moderation') {
-        commandName = interaction.options.getSubcommand();
-    } else if (rawCommandName === 'misc') {
+    if (rawCommandName === 'misc') {
         const subcommand = interaction.options.getSubcommand(false);
         miscCommand = subcommand ? MISC_SUBCOMMAND_TO_COMMAND[subcommand] || null : null;
     }
@@ -540,15 +538,10 @@ client.on('interactionCreate', async interaction => {
             .addFields(
                 { name: '/setup', value: 'Initializes Ro-Link for this server (Owner Only).' },
                 { name: '/ping', value: 'Check the bot response time and connection status.' },
-                { name: '/moderation ban', value: 'Permanently ban a user from the Roblox game.' },
-                { name: '/moderation kick', value: 'Kick a user from the game server.' },
-                { name: '/moderation unban', value: 'Unban a user from the Roblox game.' },
-                { name: '/moderation softban', value: 'Temporarily ban and remove a user from the game.' },
+                { name: '/moderation', value: 'Open Ban, Kick, Unban, Softban, Update, and Shutdown actions.' },
                 { name: '/lookup', value: 'Lookup a Discord user and review their moderation history.' },
                 { name: '/update', value: 'Update your linked Roblox profile and roles.' },
-                { name: '/moderation update-servers', value: 'Send a global update signal to all Roblox servers (restarts them).' },
-                { name: '/moderation shutdown', value: 'Immediately shut down game servers.' },
-                { name: '/misc fly', value: 'Access miscellaneous player actions like Fly, Kill, Heal, Freeze, and more.' },
+                { name: '/misc', value: 'Open Fly, Kill, Heal, Freeze, and other miscellaneous actions.' },
                 { name: '/help', value: 'Show info and list of available commands.' }
             );
 
@@ -847,6 +840,33 @@ client.on('interactionCreate', async interaction => {
             }]),
             interaction.reply(`🛑 **SHUTDOWN SIGNAL SENT**! Closing \`\${jobId || 'all active game servers'}\`.`)
         ]);
+    } else if (commandName === 'moderation') {
+        const embed = new EmbedBuilder()
+            .setTitle('Moderation Actions')
+            .setDescription('Select an action from the menu below.')
+            .setColor('#ef4444')
+            .addFields(
+                { name: 'Player Actions', value: '`BAN` `KICK` `UNBAN` `SOFTBAN`', inline: false },
+                { name: 'Server Actions', value: '`UPDATE` `SHUTDOWN`', inline: false }
+            )
+            .setFooter({ text: 'Ro-Link Moderation System' });
+
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('moderation_menu')
+                    .setPlaceholder('Choose a moderation action...')
+                    .addOptions(
+                        new StringSelectMenuOptionBuilder().setLabel('Ban').setDescription('Permanently ban a Roblox user').setValue('BAN'),
+                        new StringSelectMenuOptionBuilder().setLabel('Kick').setDescription('Kick a Roblox user from the server').setValue('KICK'),
+                        new StringSelectMenuOptionBuilder().setLabel('Unban').setDescription('Lift a Roblox ban').setValue('UNBAN'),
+                        new StringSelectMenuOptionBuilder().setLabel('Softban').setDescription('Temporarily ban and remove a Roblox user').setValue('SOFTBAN'),
+                        new StringSelectMenuOptionBuilder().setLabel('Update Servers').setDescription('Restart all Roblox servers').setValue('UPDATE'),
+                        new StringSelectMenuOptionBuilder().setLabel('Shutdown').setDescription('Shut down Roblox servers').setValue('SHUTDOWN'),
+                    ),
+            );
+
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
     } else if (commandName === 'misc') {
         if (miscCommand) {
             const targetUser = interaction.options.getString('username');
@@ -927,6 +947,22 @@ client.on('interactionCreate', async interaction => {
                             .setDescription('Restore health')
                             .setValue('HEAL'),
                         new StringSelectMenuOptionBuilder()
+                            .setLabel('Damage')
+                            .setDescription('Deal damage')
+                            .setValue('DAMAGE'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Max Health')
+                            .setDescription('Set maximum health')
+                            .setValue('MAX_HEALTH'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Walk Speed')
+                            .setDescription('Set walk speed')
+                            .setValue('WALK_SPEED'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Jump Power')
+                            .setDescription('Set jump power')
+                            .setValue('JUMP_POWER'),
+                        new StringSelectMenuOptionBuilder()
                             .setLabel('Kill')
                             .setDescription('Instant kill')
                             .setValue('KILL'),
@@ -938,6 +974,30 @@ client.on('interactionCreate', async interaction => {
                             .setLabel('Refresh')
                             .setDescription('Refresh character')
                             .setValue('REFRESH'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Freeze')
+                            .setDescription('Anchor in place')
+                            .setValue('FREEZE'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Unfreeze')
+                            .setDescription('Remove freeze')
+                            .setValue('UNFREEZE'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Bring To Spawn')
+                            .setDescription('Move to spawn')
+                            .setValue('BRING_TO_SPAWN'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Teleport To Me')
+                            .setDescription('Move to a moderator')
+                            .setValue('TELEPORT_TO_ME'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Add ForceField')
+                            .setDescription('Add a ForceField')
+                            .setValue('FORCEFIELD_ADD'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Remove ForceField')
+                            .setDescription('Remove ForceFields')
+                            .setValue('FORCEFIELD_REMOVE'),
                     ),
             );
 
@@ -1072,12 +1132,69 @@ client.on('interactionCreate', async interaction => {
 
     if (!interaction.isStringSelectMenu()) return;
 
+    if (interaction.customId === 'moderation_menu') {
+        const action = interaction.values[0];
+
+        const modal = new ModalBuilder()
+            .setCustomId(`moderation_modal_${action}`)
+            .setTitle(`Moderation: ${action}`);
+
+        const rows = [];
+
+        if (['BAN', 'KICK', 'UNBAN', 'SOFTBAN'].includes(action)) {
+            rows.push(new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('username')
+                    .setLabel('Roblox Username')
+                    .setPlaceholder('Enter the Roblox username')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true)
+            ));
+        }
+
+        if (['BAN', 'KICK', 'SOFTBAN', 'UPDATE'].includes(action)) {
+            rows.push(new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('reason')
+                    .setLabel(action === 'UPDATE' ? 'Update Message' : 'Reason')
+                    .setPlaceholder(action === 'UPDATE' ? 'Message shown when players are kicked' : 'Reason for this action')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setRequired(false)
+            ));
+        }
+
+        if (action === 'SOFTBAN') {
+            rows.push(new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('duration_seconds')
+                    .setLabel('Duration Seconds')
+                    .setPlaceholder('3600')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(false)
+            ));
+        }
+
+        if (action === 'SHUTDOWN') {
+            rows.push(new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('job_id')
+                    .setLabel('Job ID')
+                    .setPlaceholder('Leave blank for all active servers')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(false)
+            ));
+        }
+
+        modal.addComponents(...rows);
+        await interaction.showModal(modal);
+    }
+
     if (interaction.customId === 'misc_menu') {
         const action = interaction.values[0];
 
         const modal = new ModalBuilder()
-            .setCustomId(`misc_modal_\${action}`)
-            .setTitle(`Action: \${action}`);
+            .setCustomId(`misc_modal_${action}`)
+            .setTitle(`Action: ${action}`);
 
         const targetUserInput = new TextInputBuilder()
             .setCustomId('target_user')
@@ -1098,6 +1215,26 @@ client.on('interactionCreate', async interaction => {
             rows.push(new ActionRowBuilder().addComponents(charUserInput));
         }
 
+        if (VALUE_INPUT_MISC_COMMANDS.has(action)) {
+            const amountInput = new TextInputBuilder()
+                .setCustomId('amount')
+                .setLabel('Amount')
+                .setPlaceholder('Enter a number')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+            rows.push(new ActionRowBuilder().addComponents(amountInput));
+        }
+
+        if (action === 'TELEPORT_TO_ME') {
+            const moderatorUsernameInput = new TextInputBuilder()
+                .setCustomId('moderator_username')
+                .setLabel('Your Roblox Username')
+                .setPlaceholder('Moderator username in-game')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+            rows.push(new ActionRowBuilder().addComponents(moderatorUsernameInput));
+        }
+
         modal.addComponents(...rows);
         await interaction.showModal(modal);
     }
@@ -1109,17 +1246,92 @@ client.on('interactionCreate', async interaction => {
 
     if (!interaction.isModalSubmit()) return;
 
+    if (interaction.customId.startsWith('moderation_modal_')) {
+        const action = interaction.customId.replace('moderation_modal_', '');
+        const getOptionalField = (id) => {
+            try {
+                return interaction.fields.getTextInputValue(id);
+            } catch {
+                return '';
+            }
+        };
+
+        const targetUser = getOptionalField('username');
+        const reason = getOptionalField('reason') || 'No reason provided';
+        const jobId = getOptionalField('job_id');
+        const durationValue = Number(getOptionalField('duration_seconds') || 3600);
+        const durationSeconds = Number.isFinite(durationValue) && durationValue > 0 ? Math.floor(durationValue) : 3600;
+        const command = action === 'UPDATE' ? 'UPDATE' : action;
+        const args = { moderator: interaction.user.tag };
+        let target = targetUser || 'ALL';
+        let msgContent = `Queued **${command}**.`;
+
+        if (['BAN', 'KICK', 'UNBAN', 'SOFTBAN'].includes(command)) {
+            args.username = targetUser;
+            args.reason = reason;
+            target = targetUser;
+            msgContent = `Queued **${command}** for **${targetUser}**.`;
+        }
+
+        if (command === 'SOFTBAN') {
+            args.duration_seconds = durationSeconds;
+            msgContent = `Queued **SOFTBAN** for **${targetUser}** for ${durationSeconds} seconds.`;
+        }
+
+        if (command === 'UPDATE') {
+            args.reason = reason === 'No reason provided' ? 'Manual Update Triggered' : reason;
+            target = 'ALL';
+            msgContent = 'Queued **UPDATE** for all game servers.';
+        }
+
+        if (command === 'SHUTDOWN') {
+            args.job_id = jobId;
+            target = jobId || 'ALL';
+            msgContent = jobId ? `Queued **SHUTDOWN** for job **${jobId}**.` : 'Queued **SHUTDOWN** for all active game servers.';
+        }
+
+        await interaction.reply({ content: msgContent, ephemeral: true });
+
+        await supabase.from('command_queue').insert([{
+            server_id: interaction.guildId,
+            command,
+            args,
+            status: 'PENDING'
+        }]);
+
+        await supabase.from('logs').insert([{
+            server_id: interaction.guildId,
+            action: command === 'UPDATE' ? 'UPDATE_SERVERS' : command,
+            target,
+            moderator: interaction.user.tag
+        }]);
+    }
+
     if (interaction.customId.startsWith('misc_modal_')) {
         const action = interaction.customId.replace('misc_modal_', '');
         const targetUser = interaction.fields.getTextInputValue('target_user');
 
         let args = { username: targetUser, moderator: interaction.user.tag };
-        let msgContent = `Queuing **\${action}** for **\${targetUser}**...`;
+        let msgContent = `Queuing **${action}** for **${targetUser}**...`;
 
         if (action === 'SET_CHAR') {
             const charUser = interaction.fields.getTextInputValue('char_user');
             args.char_user = charUser;
-            msgContent = `Queuing **Set Character** (to \${charUser}) for **\${targetUser}**...`;
+            msgContent = `Queuing **Set Character** (to ${charUser}) for **${targetUser}**...`;
+        }
+
+        if (VALUE_INPUT_MISC_COMMANDS.has(action)) {
+            const amount = Number(interaction.fields.getTextInputValue('amount'));
+            if (!Number.isFinite(amount)) {
+                return interaction.reply({ content: 'Please provide a valid amount.', ephemeral: true });
+            }
+            args.amount = amount;
+            msgContent = `Queuing **${action}** (${amount}) for **${targetUser}**...`;
+        }
+
+        if (action === 'TELEPORT_TO_ME') {
+            args.moderator_roblox_username = interaction.fields.getTextInputValue('moderator_username');
+            msgContent = `Queuing **Teleport To Me** for **${targetUser}**...`;
         }
 
         await interaction.reply({ content: msgContent, ephemeral: true });

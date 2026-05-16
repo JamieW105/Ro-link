@@ -172,7 +172,6 @@ const REPORT_CUSTOM_ID_PREFIX = 'report|';
 const commandDefinitions = discordCommands as DiscordCommandDefinition[];
 const DISCORD_API_BASE_URL = 'https://discord.com/api/v10';
 const DISCORD_EPOCH = 1420070400000n;
-const MODERATION_SUBCOMMANDS = new Set(['ban', 'kick', 'unban', 'softban', 'update-servers', 'shutdown']);
 const MISC_SUBCOMMAND_TO_COMMAND: Record<string, string> = {
     fly: 'FLY',
     noclip: 'NOCLIP',
@@ -195,6 +194,7 @@ const MISC_SUBCOMMAND_TO_COMMAND: Record<string, string> = {
     'forcefield-remove': 'FORCEFIELD_REMOVE',
 };
 const VALUE_INPUT_MISC_COMMANDS = new Set(['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED', 'JUMP_POWER']);
+const MODERATION_MENU_ACTIONS = ['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'UPDATE', 'SHUTDOWN'] as const;
 const MODERATION_LOG_ACTIONS = new Set(['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'DISCORD_BAN', 'DISCORD_KICK', 'TIMEOUT', 'MUTE']);
 
 function buildCommandSummary(commandNames: string[]) {
@@ -203,21 +203,6 @@ function buildCommandSummary(commandNames: string[]) {
             const description = commandDefinitions.find((command) => command.name === commandName)?.description || 'No description available';
             return `\`/${commandName}\` - ${description}`;
         })
-        .join('\n');
-}
-
-function buildCommandGroupSummary(commandName: string) {
-    const command = commandDefinitions.find((definition) => definition.name === commandName);
-    const subcommands = Array.isArray(command?.options)
-        ? command.options.filter((option) => option.type === 1)
-        : [];
-
-    if (subcommands.length === 0) {
-        return `\`/${commandName}\` - ${command?.description || 'No description available'}`;
-    }
-
-    return subcommands
-        .map((subcommand) => `\`/${commandName} ${subcommand.name}\` - ${subcommand.description}`)
         .join('\n');
 }
 
@@ -682,21 +667,11 @@ export async function POST(req: Request) {
         // 3. Handle Application Commands
         if (type === 2) {
             const rootName = interactionData?.name;
-            let name = rootName;
+            const name = rootName;
             let options = interactionData?.options;
             let miscCommand: string | null = null;
 
-            if (rootName === 'moderation') {
-                const subcommand = getSubcommandOption(options);
-                if (!subcommand?.name || !MODERATION_SUBCOMMANDS.has(subcommand.name)) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: 'Invalid moderation command.', flags: 64 }
-                    });
-                }
-                name = subcommand.name;
-                options = subcommand.options;
-            } else if (rootName === 'misc') {
+            if (rootName === 'misc') {
                 const subcommand = getSubcommandOption(options);
                 miscCommand = subcommand?.name ? MISC_SUBCOMMAND_TO_COMMAND[subcommand.name] || null : null;
                 options = subcommand?.options;
@@ -820,12 +795,12 @@ export async function POST(req: Request) {
                                 fields: [
                                     {
                                         name: '**Management Commands**',
-                                        value: buildCommandSummary(['setup', 'update']) + '\n`/moderation update-servers` - Send a global update signal\n`/moderation shutdown` - Shut down game servers',
+                                        value: buildCommandSummary(['setup', 'update']) + '\n`/moderation` - Open moderation actions',
                                         inline: false
                                     },
                                     {
                                         name: '**Moderation Commands**',
-                                        value: buildCommandGroupSummary('moderation') + '\n`/lookup` - Lookup a Discord user and moderation history',
+                                        value: '`/moderation` - Ban, kick, unban, softban, update, or shutdown\n`/lookup` - Lookup a Discord user and moderation history',
                                         inline: false
                                     },
                                     {
@@ -835,7 +810,7 @@ export async function POST(req: Request) {
                                     },
                                     {
                                         name: '**Misc Commands**',
-                                        value: buildCommandGroupSummary('misc'),
+                                        value: '`/misc` - Open player action tools',
                                         inline: false
                                     }
                                 ],
@@ -1001,6 +976,7 @@ export async function POST(req: Request) {
             const isShutdown = name === 'shutdown';
             const isUpdate = name === 'update';
             const isMiscCommand = rootName === 'misc';
+            const isModerationMenu = rootName === 'moderation';
 
             let hasPerms = false;
             if (isBan) hasPerms = await checkPermission('can_ban');
@@ -1008,6 +984,7 @@ export async function POST(req: Request) {
             else if (isTimeout) hasPerms = await checkPermission('can_timeout');
             else if (isLookup) hasPerms = await checkPermission('can_lookup');
             else if (isMiscCommand) hasPerms = await checkPermission('can_access_dashboard');
+            else if (isModerationMenu) hasPerms = await checkPermission('can_kick') || await checkPermission('can_ban');
             else if (isUpdateServers || isShutdown) {
                 const permissions = BigInt(member?.permissions || '0');
                 hasPerms = (permissions & 0x8n) !== 0n || userId === '953414442060746854';
@@ -1077,6 +1054,42 @@ export async function POST(req: Request) {
                         data: { content: `❌ ${getErrorMessage(error, 'Failed to verify the role hierarchy for that moderation action.')}`, flags: 64 }
                     });
                 }
+            }
+
+            if (name === 'moderation') {
+                return NextResponse.json({
+                    type: 4,
+                    data: {
+                        embeds: [{
+                            title: 'Moderation Actions',
+                            description: 'Select an action from the menu below.',
+                            color: 0xef4444,
+                            fields: [
+                                { name: 'Player Actions', value: '`BAN` `KICK` `UNBAN` `SOFTBAN`', inline: false },
+                                { name: 'Server Actions', value: '`UPDATE` `SHUTDOWN`', inline: false },
+                            ],
+                            footer: { text: 'Ro-Link Systems - Moderation Tools' },
+                            timestamp: new Date().toISOString()
+                        }],
+                        flags: 64,
+                        components: [{
+                            type: 1,
+                            components: [{
+                                type: 3,
+                                custom_id: 'moderation_menu',
+                                placeholder: 'Choose a moderation action...',
+                                options: [
+                                    { label: 'Ban', value: 'BAN', description: 'Permanently ban a Roblox user' },
+                                    { label: 'Kick', value: 'KICK', description: 'Kick a Roblox user from the server' },
+                                    { label: 'Unban', value: 'UNBAN', description: 'Lift a Roblox ban' },
+                                    { label: 'Softban', value: 'SOFTBAN', description: 'Temporarily ban and remove a Roblox user' },
+                                    { label: 'Update Servers', value: 'UPDATE', description: 'Restart all Roblox servers' },
+                                    { label: 'Shutdown', value: 'SHUTDOWN', description: 'Shut down Roblox servers' }
+                                ]
+                            }]
+                        }]
+                    }
+                });
             }
 
             if (name === 'lookup') {
@@ -1474,9 +1487,19 @@ export async function POST(req: Request) {
                                     { label: 'Ghost', value: 'GHOST', description: 'Apply a ForceField material' },
                                     { label: 'Set Character', value: 'SET_CHAR', description: 'Change appearance' },
                                     { label: 'Heal', value: 'HEAL', description: 'Restore health' },
+                                    { label: 'Damage', value: 'DAMAGE', description: 'Deal damage' },
+                                    { label: 'Max Health', value: 'MAX_HEALTH', description: 'Set maximum health' },
+                                    { label: 'Walk Speed', value: 'WALK_SPEED', description: 'Set walk speed' },
+                                    { label: 'Jump Power', value: 'JUMP_POWER', description: 'Set jump power' },
                                     { label: 'Kill', value: 'KILL', description: 'Instant kill' },
                                     { label: 'Reset', value: 'RESET', description: 'Reset character' },
-                                    { label: 'Refresh', value: 'REFRESH', description: 'Refresh character' }
+                                    { label: 'Refresh', value: 'REFRESH', description: 'Refresh character' },
+                                    { label: 'Freeze', value: 'FREEZE', description: 'Anchor in place' },
+                                    { label: 'Unfreeze', value: 'UNFREEZE', description: 'Remove freeze' },
+                                    { label: 'Bring To Spawn', value: 'BRING_TO_SPAWN', description: 'Move to spawn' },
+                                    { label: 'Teleport To Me', value: 'TELEPORT_TO_ME', description: 'Move to a moderator' },
+                                    { label: 'Add ForceField', value: 'FORCEFIELD_ADD', description: 'Add a ForceField' },
+                                    { label: 'Remove ForceField', value: 'FORCEFIELD_REMOVE', description: 'Remove ForceFields' }
                                 ]
                             }]
                         }]
@@ -1537,7 +1560,7 @@ export async function POST(req: Request) {
             // Permission Check for buttons/components
             let requiredPerm = 'can_manage_reports'; // Default for most report/moderation buttons
 
-            if (cid === 'misc_menu' || cid.startsWith('misc_modal_')) {
+            if (cid === 'misc_menu' || cid.startsWith('misc_modal_') || cid === 'moderation_menu' || cid.startsWith('moderation_modal_')) {
                 // Determine if it should be a misc action check, for now we allow if they have dashboard access
                 requiredPerm = 'can_access_dashboard';
             } else if (cid === 'report_open' || cid === 'report_submit') {
@@ -1830,6 +1853,82 @@ export async function POST(req: Request) {
                 }
             }
 
+            if (cid === 'moderation_menu') {
+                const action = interactionData?.values?.[0] ?? '';
+                if (!MODERATION_MENU_ACTIONS.includes(action as typeof MODERATION_MENU_ACTIONS[number])) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: 'Invalid moderation action.', flags: 64 }
+                    });
+                }
+
+                const components = [];
+                if (['BAN', 'KICK', 'UNBAN', 'SOFTBAN'].includes(action)) {
+                    components.push({
+                        type: 1,
+                        components: [{
+                            type: 4,
+                            custom_id: 'username',
+                            label: 'Roblox Username',
+                            style: 1,
+                            placeholder: 'Enter the Roblox username',
+                            required: true
+                        }]
+                    });
+                }
+
+                if (['BAN', 'KICK', 'SOFTBAN', 'UPDATE'].includes(action)) {
+                    components.push({
+                        type: 1,
+                        components: [{
+                            type: 4,
+                            custom_id: 'reason',
+                            label: action === 'UPDATE' ? 'Update Message' : 'Reason',
+                            style: 2,
+                            placeholder: action === 'UPDATE' ? 'Message shown when players are kicked' : 'Reason for this action',
+                            required: false
+                        }]
+                    });
+                }
+
+                if (action === 'SOFTBAN') {
+                    components.push({
+                        type: 1,
+                        components: [{
+                            type: 4,
+                            custom_id: 'duration_seconds',
+                            label: 'Duration Seconds',
+                            style: 1,
+                            placeholder: '3600',
+                            required: false
+                        }]
+                    });
+                }
+
+                if (action === 'SHUTDOWN') {
+                    components.push({
+                        type: 1,
+                        components: [{
+                            type: 4,
+                            custom_id: 'job_id',
+                            label: 'Job ID',
+                            style: 1,
+                            placeholder: 'Leave blank for all active servers',
+                            required: false
+                        }]
+                    });
+                }
+
+                return NextResponse.json({
+                    type: 9,
+                    data: {
+                        title: `Moderation: ${action}`,
+                        custom_id: `moderation_modal_${action}`,
+                        components
+                    }
+                });
+            }
+
             if (cid === 'misc_menu') {
                 const action = interactionData?.values?.[0] ?? '';
                 if (!action) {
@@ -1860,6 +1959,34 @@ export async function POST(req: Request) {
                             label: "Character Username",
                             style: 1,
                             placeholder: 'Username of appearance to copy',
+                            required: true
+                        }]
+                    });
+                }
+
+                if (VALUE_INPUT_MISC_COMMANDS.has(action)) {
+                    components.push({
+                        type: 1,
+                        components: [{
+                            type: 4,
+                            custom_id: 'amount',
+                            label: 'Amount',
+                            style: 1,
+                            placeholder: 'Enter a number',
+                            required: true
+                        }]
+                    });
+                }
+
+                if (action === 'TELEPORT_TO_ME') {
+                    components.push({
+                        type: 1,
+                        components: [{
+                            type: 4,
+                            custom_id: 'moderator_username',
+                            label: 'Your Roblox Username',
+                            style: 1,
+                            placeholder: 'Moderator username in-game',
                             required: true
                         }]
                     });
@@ -1975,6 +2102,66 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: 'Missing modal custom_id' }, { status: 400 });
             }
 
+            if (custom_id.startsWith('moderation_modal_')) {
+                const action = custom_id.replace('moderation_modal_', '');
+                const targetUser = getModalField(modalComponents, 'username');
+                const reason = getModalField(modalComponents, 'reason') || 'No reason provided';
+                const jobId = getModalField(modalComponents, 'job_id');
+                const durationValue = Number(getModalField(modalComponents, 'duration_seconds') || 3600);
+                const durationSeconds = Number.isFinite(durationValue) && durationValue > 0 ? Math.floor(durationValue) : 3600;
+                const command = action === 'UPDATE' ? 'UPDATE' : action;
+                const args: Record<string, unknown> = { moderator: userTag };
+                let target = targetUser || 'ALL';
+                let msgContent = `Queued **${command}**.`;
+
+                if (['BAN', 'KICK', 'UNBAN', 'SOFTBAN'].includes(command)) {
+                    args.username = targetUser;
+                    args.reason = reason;
+                    target = targetUser;
+                    msgContent = `Queued **${command}** for \`${targetUser}\`.`;
+                }
+
+                if (command === 'SOFTBAN') {
+                    args.duration_seconds = durationSeconds;
+                    msgContent = `Queued **SOFTBAN** for \`${targetUser}\` for ${durationSeconds} seconds.`;
+                }
+
+                if (command === 'UPDATE') {
+                    args.reason = reason === 'No reason provided' ? 'Manual Update Triggered' : reason;
+                    target = 'ALL';
+                    msgContent = 'Queued **UPDATE** for all game servers.';
+                }
+
+                if (command === 'SHUTDOWN') {
+                    args.job_id = jobId;
+                    target = jobId || 'ALL';
+                    msgContent = jobId ? `Queued **SHUTDOWN** for job \`${jobId}\`.` : 'Queued **SHUTDOWN** for all active game servers.';
+                }
+
+                const [queueRes] = await Promise.all([
+                    supabase.from('command_queue').insert([{
+                        server_id: guild_id,
+                        command,
+                        args,
+                        status: 'PENDING'
+                    }]),
+                    triggerMessaging(command, args),
+                    logAction(guild_id, command === 'UPDATE' ? 'UPDATE_SERVERS' : command, target, userTag, reason)
+                ]);
+
+                if (queueRes.error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: 'Failed to queue moderation command.', flags: 64 }
+                    });
+                }
+
+                return NextResponse.json({
+                    type: 4,
+                    data: { content: msgContent, flags: 64 }
+                });
+            }
+
             if (custom_id.startsWith('misc_modal_')) {
                 const action = custom_id.replace('misc_modal_', '');
 
@@ -1987,6 +2174,23 @@ export async function POST(req: Request) {
                     const charUser = getModalField(modalComponents, 'char_user');
                     args.char_user = charUser;
                     msgContent = `✅ Queuing **Set Character** (to ${charUser}) for **${targetUser}**...`;
+                }
+
+                if (VALUE_INPUT_MISC_COMMANDS.has(action)) {
+                    const amount = Number(getModalField(modalComponents, 'amount'));
+                    if (!Number.isFinite(amount)) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: 'Please provide a valid amount.', flags: 64 }
+                        });
+                    }
+                    args.amount = amount;
+                    msgContent = `Queuing **${action}** (${amount}) for **${targetUser}**...`;
+                }
+
+                if (action === 'TELEPORT_TO_ME') {
+                    args.moderator_roblox_username = getModalField(modalComponents, 'moderator_username');
+                    msgContent = `Queuing **Teleport To Me** for **${targetUser}**...`;
                 }
 
                 await Promise.all([
