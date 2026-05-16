@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { DEFAULT_ROLINK_VERSION } from "@/lib/updatePosts";
+import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
 
 // SVGs
 const RocketIcon = () => (
@@ -165,7 +166,7 @@ export default function Home() {
 
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto justify-center px-6">
             <a
-              href="https://discord.com/api/oauth2/authorize?client_id=1466340007940722750&permissions=8&scope=bot%20applications.commands"
+              href={getDiscordBotInviteUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-slate-900 rounded-lg font-bold text-sm hover:bg-slate-100 transition-all w-full sm:w-auto"
