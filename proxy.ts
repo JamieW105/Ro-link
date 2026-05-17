@@ -47,6 +47,13 @@ async function resolveDashboardServerId(subdomain: string) {
     return rows[0]?.server_id || null;
 }
 
+function isDashboardIndexPath(pathname: string) {
+    return pathname === '/dashboard'
+        || pathname === '/dashboard/'
+        || pathname === '/dashboards'
+        || pathname === '/dashboards/';
+}
+
 export async function proxy(req: NextRequest) {
     const dashboardHost = resolveDashboardSubdomainFromHostnameCandidates(
         req.headers.get('host'),
@@ -64,7 +71,6 @@ export async function proxy(req: NextRequest) {
     if (
         pathname.startsWith('/api')
         || pathname.startsWith('/_next')
-        || pathname.startsWith('/dashboard')
         || pathname.startsWith('/custom-dashboard')
     ) {
         return NextResponse.next();
@@ -76,6 +82,24 @@ export async function proxy(req: NextRequest) {
         url.pathname = '/custom-dashboard/not-found';
         url.searchParams.set('subdomain', subdomain);
         return NextResponse.rewrite(url);
+    }
+
+    if (isDashboardIndexPath(pathname)) {
+        const url = req.nextUrl.clone();
+        url.pathname = `/custom-dashboard/${serverId}`;
+        url.search = '';
+        return NextResponse.redirect(url);
+    }
+
+    if (pathname === `/dashboard/${serverId}` || pathname.startsWith(`/dashboard/${serverId}/`)) {
+        return NextResponse.next();
+    }
+
+    if (pathname.startsWith('/dashboard/')) {
+        const url = req.nextUrl.clone();
+        url.pathname = `/dashboard/${serverId}`;
+        url.search = '';
+        return NextResponse.redirect(url);
     }
 
     const url = req.nextUrl.clone();

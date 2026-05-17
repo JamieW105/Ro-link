@@ -66,6 +66,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const [userPermissions, setUserPermissions] = useState<DashboardPermissions | null>(null);
     const [loading, setLoading] = useState(true);
     const [accessDenied, setAccessDenied] = useState(false);
+    const [isCustomDashboardHost, setIsCustomDashboardHost] = useState(false);
     const [apiLatencyMs, setApiLatencyMs] = useState<number | null>(null);
     const [apiLatencyState, setApiLatencyState] = useState<'measuring' | 'ready' | 'error'>('measuring');
 
@@ -112,6 +113,37 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
         checkAccess();
     }, [session, id, router]);
+
+    useEffect(() => {
+        if (!id) return;
+
+        let cancelled = false;
+
+        async function detectCustomDashboardHost() {
+            try {
+                const response = await fetch(`/api/custom-dashboard/resolve?hostname=${encodeURIComponent(window.location.hostname)}`, {
+                    cache: 'no-store',
+                });
+
+                if (!response.ok || cancelled) return;
+
+                const data = await response.json() as { found?: boolean; serverId?: string };
+                if (!cancelled) {
+                    setIsCustomDashboardHost(Boolean(data.found && data.serverId === String(id)));
+                }
+            } catch {
+                if (!cancelled) {
+                    setIsCustomDashboardHost(false);
+                }
+            }
+        }
+
+        detectCustomDashboardHost();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [id]);
 
     useEffect(() => {
         let cancelled = false;
@@ -216,6 +248,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         : apiLatencyMs !== null
             ? `${apiLatencyMs}ms`
             : '...';
+    const dashboardHomeHref = isCustomDashboardHost ? `/custom-dashboard/${id}` : '/dashboard';
 
     const utilityItems = [
         { label: "Home", icon: <HomeIcon />, href: `/dashboard/${id}` },
@@ -342,7 +375,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             `}>
                 <div className="p-6 flex flex-col h-full">
                     <div className="flex items-center justify-between mb-8">
-                        <Link href="/dashboard" className="flex items-center gap-3 pl-2 hover:opacity-80 transition-opacity cursor-pointer">
+                        <Link href={dashboardHomeHref} className="flex items-center gap-3 pl-2 hover:opacity-80 transition-opacity cursor-pointer">
                             <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 rounded object-contain shadow-lg shadow-sky-500/10" />
                             <span className="text-xl font-black tracking-tighter text-white uppercase italic">Ro-Link</span>
                         </Link>
@@ -427,15 +460,17 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                         )}
                     </nav>
 
-                    <div className="mt-auto pt-6 border-t border-slate-800">
-                        <Link
-                            href="/dashboard"
-                            className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800/40 transition-all font-semibold text-sm group"
-                        >
-                            <BackIcon />
-                            Back to Servers
-                        </Link>
-                    </div>
+                    {!isCustomDashboardHost && (
+                        <div className="mt-auto pt-6 border-t border-slate-800">
+                            <Link
+                                href="/dashboard"
+                                className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800/40 transition-all font-semibold text-sm group"
+                            >
+                                <BackIcon />
+                                Back to Servers
+                            </Link>
+                        </div>
+                    )}
                 </div>
             </aside>
 
