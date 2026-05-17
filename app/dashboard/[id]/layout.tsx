@@ -178,7 +178,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     }, [id]);
 
     useEffect(() => {
-        if (!id || !userPermissions?.can_manage_settings) {
+        if (!id || !(userPermissions?.is_admin || userPermissions?.can_manage_settings)) {
             setHasCustomDashboardSetup(false);
             return;
         }
@@ -206,7 +206,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         return () => {
             cancelled = true;
         };
-    }, [id, userPermissions?.can_manage_settings]);
+    }, [id, userPermissions?.is_admin, userPermissions?.can_manage_settings]);
 
     useEffect(() => {
         let cancelled = false;
@@ -311,6 +311,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         : apiLatencyMs !== null
             ? `${apiLatencyMs}ms`
             : '...';
+    const canManageDashboardSettings = userPermissions.is_admin || userPermissions.can_manage_settings;
     const dashboardHomeHref = isCustomDashboardHost ? `/custom-dashboard/${id}` : '/dashboard';
     const customDashboardTheme = isCustomDashboardHost
         ? getCustomDashboardTheme(customDashboardInfo?.theme || DEFAULT_CUSTOM_DASHBOARD_THEME)
@@ -368,7 +369,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 </svg>
             ),
             href: `/dashboard/${id}/modules`,
-            hide: !userPermissions.can_manage_settings
+            hide: !canManageDashboardSettings
         },
     ].filter(item => !item.hide);
 
@@ -412,7 +413,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 </svg>
             ),
             href: `/dashboard/${id}/settings`,
-            hide: !userPermissions.can_manage_settings
+            hide: !canManageDashboardSettings
         },
         {
             label: "Roles",
@@ -422,7 +423,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 </svg>
             ),
             href: `/dashboard/${id}/settings/roles`,
-            hide: !userPermissions.can_manage_settings
+            hide: !canManageDashboardSettings
         },
         {
             label: "Commands",
@@ -432,7 +433,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 </svg>
             ),
             href: `/dashboard/${id}/settings/commands`,
-            hide: !userPermissions.can_manage_settings
+            hide: !canManageDashboardSettings
         },
         {
             label: "Reports",
@@ -442,7 +443,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 </svg>
             ),
             href: `/dashboard/${id}/settings/reports`,
-            hide: !userPermissions.can_manage_settings
+            hide: !canManageDashboardSettings
         },
         {
             label: "Dashboard",
@@ -452,13 +453,13 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 </svg>
             ),
             href: `/dashboard/${id}/settings/dashboard`,
-            hide: !userPermissions.can_manage_settings || !hasCustomDashboardSetup
+            hide: !canManageDashboardSettings || !hasCustomDashboardSetup
         },
         {
             label: "Logs",
             icon: <ScrollIcon />,
             href: `/dashboard/${id}/settings/logs`,
-            hide: !userPermissions.can_manage_settings
+            hide: !canManageDashboardSettings
         },
     ].filter(item => !item.hide);
 

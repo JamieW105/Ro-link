@@ -23,6 +23,14 @@ const CUSTOM_DASHBOARD_COLUMNS = [
     'updated_at',
 ].join(', ');
 
+const CUSTOM_DASHBOARD_BASE_COLUMNS = [
+    'id',
+    'server_id',
+    'subdomain',
+    'created_by',
+    'created_at',
+].join(', ');
+
 function decorateDashboard(row: Record<string, unknown> | null, serverId: string) {
     const subdomain = trimString(row?.subdomain);
 
@@ -43,11 +51,11 @@ function decorateDashboard(row: Record<string, unknown> | null, serverId: string
     };
 }
 
-async function getExistingDashboard(serverId: string) {
+async function getExistingDashboard(serverId: string, columns = CUSTOM_DASHBOARD_COLUMNS) {
     const client = getSupabaseAdmin();
     const { data, error } = await client
         .from('custom_dashboard_domains')
-        .select(CUSTOM_DASHBOARD_COLUMNS)
+        .select(columns)
         .eq('server_id', serverId)
         .order('created_at', { ascending: true })
         .limit(1);
@@ -67,7 +75,10 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const dashboard = await getExistingDashboard(serverId);
+        const dashboard = await getExistingDashboard(serverId).catch(async (error) => {
+            console.warn('[Dashboard/CustomDashboard] Full settings lookup failed, falling back to base row:', error);
+            return getExistingDashboard(serverId, CUSTOM_DASHBOARD_BASE_COLUMNS);
+        });
         if (!dashboard) {
             return NextResponse.json({ error: 'No custom dashboard is configured for this server.' }, { status: 404 });
         }
