@@ -1,5 +1,5 @@
 import NextAuth from "next-auth"
-import type { Session } from "next-auth"
+import type { AuthOptions, Session } from "next-auth"
 import DiscordProvider from "next-auth/providers/discord"
 import { isAllowedDashboardUrl } from "@/lib/customDashboardDomains"
 
@@ -17,6 +17,10 @@ type DiscordAccount = {
     expires_at?: number
     expires_in?: number
 } | null
+
+const cookieDomain = process.env.NEXTAUTH_COOKIE_DOMAIN?.trim()
+const secureCookies = process.env.NODE_ENV === "production"
+    || Boolean(process.env.NEXTAUTH_URL?.startsWith("https://"))
 
 async function refreshDiscordAccessToken(token: TokenShape) {
     if (!token.refreshToken) {
@@ -76,7 +80,7 @@ async function refreshDiscordAccessToken(token: TokenShape) {
     }
 }
 
-export const authOptions = {
+export const authOptions: AuthOptions = {
     providers: [
         DiscordProvider({
             clientId: process.env.DISCORD_CLIENT_ID!,
@@ -84,6 +88,23 @@ export const authOptions = {
             authorization: { params: { scope: 'identify guilds' } },
         }),
     ],
+    pages: {
+        signIn: "/auth/signin",
+    },
+    cookies: cookieDomain
+        ? {
+            sessionToken: {
+                name: `${secureCookies ? "__Secure-" : ""}next-auth.session-token`,
+                options: {
+                    httpOnly: true,
+                    sameSite: "lax",
+                    path: "/",
+                    secure: secureCookies,
+                    domain: cookieDomain,
+                },
+            },
+        }
+        : undefined,
     callbacks: {
         async jwt({ token, account }: { token: TokenShape; account?: DiscordAccount }) {
             if (account) {
