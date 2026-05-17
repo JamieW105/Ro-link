@@ -68,6 +68,10 @@ export async function GET(req: NextRequest) {
 
     try {
         const dashboard = await getExistingDashboard(serverId);
+        if (!dashboard) {
+            return NextResponse.json({ error: 'No custom dashboard is configured for this server.' }, { status: 404 });
+        }
+
         return NextResponse.json(decorateDashboard(dashboard, serverId));
     } catch (error) {
         console.error('[Dashboard/CustomDashboard] Load failed:', error);
@@ -90,6 +94,11 @@ export async function PATCH(req: NextRequest) {
         console.error('[Dashboard/CustomDashboard] Existing lookup failed:', error);
         return null;
     });
+
+    if (!existingDashboard) {
+        return NextResponse.json({ error: 'No custom dashboard is configured for this server.' }, { status: 404 });
+    }
+
     const currentSubdomain = trimString(existingDashboard?.subdomain);
     const requestedSubdomain = trimString(body?.subdomain || currentSubdomain);
     const { subdomain, error: validationError } = validateDashboardSubdomain(requestedSubdomain);
@@ -109,16 +118,10 @@ export async function PATCH(req: NextRequest) {
     };
 
     const client = getSupabaseAdmin();
-    const query = existingDashboard?.id
-        ? client
-            .from('custom_dashboard_domains')
-            .update(row)
-            .eq('id', existingDashboard.id)
-        : client
-            .from('custom_dashboard_domains')
-            .insert(row);
-
-    const { data, error } = await query
+    const { data, error } = await client
+        .from('custom_dashboard_domains')
+        .update(row)
+        .eq('id', existingDashboard.id)
         .select(CUSTOM_DASHBOARD_COLUMNS)
         .single();
 

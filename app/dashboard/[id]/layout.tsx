@@ -84,6 +84,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const [accessDenied, setAccessDenied] = useState(false);
     const [isCustomDashboardHost, setIsCustomDashboardHost] = useState(false);
     const [customDashboardInfo, setCustomDashboardInfo] = useState<CustomDashboardInfo | null>(null);
+    const [hasCustomDashboardSetup, setHasCustomDashboardSetup] = useState(false);
     const [apiLatencyMs, setApiLatencyMs] = useState<number | null>(null);
     const [apiLatencyState, setApiLatencyState] = useState<'measuring' | 'ready' | 'error'>('measuring');
 
@@ -175,6 +176,37 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             cancelled = true;
         };
     }, [id]);
+
+    useEffect(() => {
+        if (!id || !userPermissions?.can_manage_settings) {
+            setHasCustomDashboardSetup(false);
+            return;
+        }
+
+        let cancelled = false;
+
+        async function loadCustomDashboardAvailability() {
+            try {
+                const response = await fetch(`/api/dashboard/custom-dashboard?serverId=${encodeURIComponent(String(id))}`, {
+                    cache: 'no-store',
+                });
+
+                if (!cancelled) {
+                    setHasCustomDashboardSetup(response.ok);
+                }
+            } catch {
+                if (!cancelled) {
+                    setHasCustomDashboardSetup(false);
+                }
+            }
+        }
+
+        loadCustomDashboardAvailability();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [id, userPermissions?.can_manage_settings]);
 
     useEffect(() => {
         let cancelled = false;
@@ -420,7 +452,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 </svg>
             ),
             href: `/dashboard/${id}/settings/dashboard`,
-            hide: !userPermissions.can_manage_settings
+            hide: !userPermissions.can_manage_settings || !hasCustomDashboardSetup
         },
         {
             label: "Logs",

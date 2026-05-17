@@ -181,6 +181,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
         supportUrl: "",
     });
     const [customDashboardHostnames, setCustomDashboardHostnames] = useState<string[]>([]);
+    const [hasCustomDashboardSetup, setHasCustomDashboardSetup] = useState(false);
 
     // Role Management
     const [discordRoles, setDiscordRoles] = useState<DiscordRole[]>([]);
@@ -317,7 +318,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                 console.error("Failed to fetch configured roles", e);
             }
 
-            if (view === 'dashboard') {
+            if (view === 'overview' || view === 'dashboard') {
                 try {
                     const dashboardRes = await fetch(`/api/dashboard/custom-dashboard?serverId=${encodeURIComponent(String(id))}`, {
                         cache: 'no-store',
@@ -325,6 +326,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     if (dashboardRes.ok) {
                         const dashboardSettings = await dashboardRes.json() as CustomDashboardSettings;
+                        setHasCustomDashboardSetup(Boolean(dashboardSettings.id));
                         setCustomDashboardSubdomain(dashboardSettings.subdomain || "");
                         setCustomDashboardLayout(dashboardSettings.layout || DEFAULT_CUSTOM_DASHBOARD_LAYOUT);
                         setCustomDashboardTheme(dashboardSettings.theme || DEFAULT_CUSTOM_DASHBOARD_THEME);
@@ -335,9 +337,20 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                             supportUrl: dashboardSettings.metadata?.supportUrl || "",
                         });
                         setCustomDashboardHostnames(dashboardSettings.hostnames || []);
+                    } else {
+                        setHasCustomDashboardSetup(false);
+                        if (view === 'dashboard') {
+                            router.replace(`/dashboard/${id}/settings`);
+                            return;
+                        }
                     }
                 } catch (e) {
                     console.error("Failed to fetch custom dashboard settings", e);
+                    setHasCustomDashboardSetup(false);
+                    if (view === 'dashboard') {
+                        router.replace(`/dashboard/${id}/settings`);
+                        return;
+                    }
                 }
             }
 
@@ -607,12 +620,12 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
             href: `/dashboard/${id}/settings/reports`,
             tone: 'red',
         },
-        {
+        ...(hasCustomDashboardSetup ? [{
             title: 'Custom Dashboard',
             description: 'Edit the custom URL, sign-in metadata, layout, and color scheme.',
             href: `/dashboard/${id}/settings/dashboard`,
             tone: 'amber',
-        },
+        }] : []),
         {
             title: 'Activity Logs',
             description: 'Review recent dashboard and moderation activity for this server.',
@@ -645,6 +658,39 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         { title: "Misc Commands", text: "Fun and utility commands. Can be disabled if they interfere with gameplay." },
                     ];
     const selectedCustomDashboardTheme = getCustomDashboardTheme(customDashboardTheme);
+    const selectedCustomDashboardLayout = CUSTOM_DASHBOARD_LAYOUTS.find((layout) => layout.id === customDashboardLayout)
+        || CUSTOM_DASHBOARD_LAYOUTS[0];
+    const previewHostname = customDashboardSubdomain.trim()
+        ? customDashboardHostnames[0]
+            ? customDashboardHostnames[0].replace(/^[^.]+/, customDashboardSubdomain.trim().toLowerCase())
+            : `${customDashboardSubdomain.trim().toLowerCase()}.rolink.cloud`
+        : 'custom-dashboard.rolink.cloud';
+    const previewLayoutStyles = {
+        compact: {
+            shell: 'grid-cols-[76px_1fr]',
+            sidebarPadding: 'p-2',
+            contentPadding: 'p-3',
+            navHeight: 'h-6',
+            cardPadding: 'p-2',
+            gap: 'gap-2',
+        },
+        standard: {
+            shell: 'grid-cols-[104px_1fr]',
+            sidebarPadding: 'p-3',
+            contentPadding: 'p-4',
+            navHeight: 'h-8',
+            cardPadding: 'p-3',
+            gap: 'gap-3',
+        },
+        spacious: {
+            shell: 'grid-cols-[132px_1fr]',
+            sidebarPadding: 'p-4',
+            contentPadding: 'p-5',
+            navHeight: 'h-10',
+            cardPadding: 'p-4',
+            gap: 'gap-4',
+        },
+    }[customDashboardLayout];
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full pb-20">
@@ -1033,7 +1079,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     </div>
 
                                     <div
-                                        className="min-h-full rounded-2xl border p-6"
+                                        className="min-h-full rounded-2xl border p-6 transition-all duration-300"
                                         style={{
                                             background: selectedCustomDashboardTheme.gradient,
                                             borderColor: selectedCustomDashboardTheme.border,
@@ -1051,27 +1097,63 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                 )}
                                             </div>
                                             <div>
-                                                <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: selectedCustomDashboardTheme.accentText }}>Preview</p>
+                                                <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: selectedCustomDashboardTheme.accentText }}>Live Preview</p>
                                                 <h4 className="text-lg font-black text-white">{customDashboardMetadata.title || 'Community Dashboard'}</h4>
                                             </div>
+                                        </div>
+                                        <div className="mb-5 flex flex-wrap items-center gap-2">
+                                            <span
+                                                className="rounded-md border px-2 py-1 font-mono text-[10px]"
+                                                style={{
+                                                    borderColor: selectedCustomDashboardTheme.border,
+                                                    color: selectedCustomDashboardTheme.accentText,
+                                                    background: selectedCustomDashboardTheme.softBg,
+                                                }}
+                                            >
+                                                {previewHostname}
+                                            </span>
+                                            <span className="rounded-md border border-slate-700/70 bg-slate-950/50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                                {selectedCustomDashboardLayout.name}
+                                            </span>
                                         </div>
                                         <p className="text-sm leading-6 text-slate-300">
                                             {customDashboardMetadata.description || 'Sign in with Discord to access this custom Ro-Link dashboard.'}
                                         </p>
-                                        <div className="mt-8 grid grid-cols-3 gap-2">
-                                            {['Home', 'Servers', 'Reports'].map((item, index) => (
-                                                <div
-                                                    key={item}
-                                                    className="rounded-lg border px-3 py-2 text-center text-[10px] font-bold uppercase tracking-wider"
-                                                    style={{
-                                                        background: index === 0 ? selectedCustomDashboardTheme.softBg : 'rgba(15, 23, 42, 0.68)',
-                                                        borderColor: index === 0 ? selectedCustomDashboardTheme.border : 'rgba(51, 65, 85, 0.75)',
-                                                        color: index === 0 ? selectedCustomDashboardTheme.accentText : '#94a3b8',
-                                                    }}
-                                                >
-                                                    {item}
+                                        <div className={`mt-8 grid overflow-hidden rounded-xl border border-slate-800/80 bg-slate-950/70 transition-all duration-300 ${previewLayoutStyles.shell}`}>
+                                            <div className={`space-y-2 border-r border-slate-800/80 bg-slate-950/70 transition-all duration-300 ${previewLayoutStyles.sidebarPadding}`}>
+                                                {['Home', 'Servers', 'Reports', 'Settings'].map((item, index) => (
+                                                    <div
+                                                        key={item}
+                                                        className={`rounded-md border px-2 transition-all duration-300 ${previewLayoutStyles.navHeight} flex items-center text-[9px] font-bold uppercase tracking-wider`}
+                                                        style={{
+                                                            background: index === 0 ? selectedCustomDashboardTheme.softBg : 'rgba(15, 23, 42, 0.68)',
+                                                            borderColor: index === 0 ? selectedCustomDashboardTheme.border : 'rgba(51, 65, 85, 0.75)',
+                                                            color: index === 0 ? selectedCustomDashboardTheme.accentText : '#94a3b8',
+                                                        }}
+                                                    >
+                                                        <span className="truncate">{item}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className={`transition-all duration-300 ${previewLayoutStyles.contentPadding}`}>
+                                                <div className={`grid grid-cols-2 transition-all duration-300 ${previewLayoutStyles.gap}`}>
+                                                    {['Live Servers', 'Reports', 'Modules', 'Logs'].map((item, index) => (
+                                                        <div
+                                                            key={item}
+                                                            className={`rounded-lg border bg-slate-900/70 transition-all duration-300 ${previewLayoutStyles.cardPadding}`}
+                                                            style={{ borderColor: index === 0 ? selectedCustomDashboardTheme.border : 'rgba(51, 65, 85, 0.75)' }}
+                                                        >
+                                                            <div
+                                                                className="mb-2 h-2 w-8 rounded-full"
+                                                                style={{ background: index === 0 ? selectedCustomDashboardTheme.accent : '#475569' }}
+                                                            />
+                                                            <div className="h-2 w-full rounded-full bg-slate-700/70" />
+                                                            <div className="mt-2 h-2 w-2/3 rounded-full bg-slate-800" />
+                                                            <span className="sr-only">{item}</span>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            ))}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1091,7 +1173,14 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                         onClick={() => setCustomDashboardLayout(layout.id)}
                                         className={`rounded-xl border p-5 text-left transition-all ${customDashboardLayout === layout.id ? 'border-amber-500/50 bg-amber-500/10' : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'}`}
                                     >
-                                        <div className="text-sm font-black uppercase tracking-[0.16em] text-white">{layout.name}</div>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="text-sm font-black uppercase tracking-[0.16em] text-white">{layout.name}</div>
+                                            {customDashboardLayout === layout.id && (
+                                                <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-amber-200">
+                                                    Previewing
+                                                </span>
+                                            )}
+                                        </div>
                                         <p className="mt-2 text-xs leading-relaxed text-slate-500">{layout.description}</p>
                                     </button>
                                 ))}
@@ -1118,7 +1207,12 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                 borderColor: theme.border,
                                             }}
                                         />
-                                        <span className="text-xs font-black uppercase tracking-[0.16em] text-white">{theme.name}</span>
+                                        <span className="flex items-center justify-between gap-2">
+                                            <span className="text-xs font-black uppercase tracking-[0.16em] text-white">{theme.name}</span>
+                                            {customDashboardTheme === theme.id && (
+                                                <span className="h-2 w-2 rounded-full" style={{ background: theme.accent }} />
+                                            )}
+                                        </span>
                                     </button>
                                 ))}
                             </div>
