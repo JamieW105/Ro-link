@@ -4,6 +4,15 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { hasPermission } from '@/lib/management';
 import { supabase } from '@/lib/supabase';
 import { buildDashboardHostname, getRolinkRootDomains, validateDashboardSubdomain } from '@/lib/customDashboardDomains';
+import {
+    DEFAULT_CUSTOM_DASHBOARD_LAYOUT,
+    DEFAULT_CUSTOM_DASHBOARD_THEME,
+    normalizeCustomDashboardLayout,
+    normalizeCustomDashboardMetadata,
+    normalizeCustomDashboardTheme,
+} from '@/lib/customDashboardSettings';
+
+const CUSTOM_DASHBOARD_COLUMNS = 'id, server_id, subdomain, layout, theme, metadata, created_by, created_at, updated_at';
 
 async function requireManageServers() {
     const session = await getServerSession(authOptions);
@@ -26,7 +35,7 @@ export async function GET() {
 
     const { data, error } = await supabase
         .from('custom_dashboard_domains')
-        .select('id, server_id, subdomain, created_by, created_at')
+        .select(CUSTOM_DASHBOARD_COLUMNS)
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -74,9 +83,12 @@ export async function POST(req: Request) {
             .insert({
                 server_id: serverId,
                 subdomain,
+                layout: normalizeCustomDashboardLayout(body?.layout || DEFAULT_CUSTOM_DASHBOARD_LAYOUT),
+                theme: normalizeCustomDashboardTheme(body?.theme || DEFAULT_CUSTOM_DASHBOARD_THEME),
+                metadata: normalizeCustomDashboardMetadata(body?.metadata),
                 created_by: auth.userId,
             })
-            .select('id, server_id, subdomain, created_by, created_at')
+            .select(CUSTOM_DASHBOARD_COLUMNS)
             .single();
 
         if (error) {

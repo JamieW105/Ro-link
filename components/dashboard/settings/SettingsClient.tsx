@@ -8,6 +8,16 @@ import {
     hasAdminPanelCommandAccess,
     normalizeAdminPanelCommandList,
 } from "@/lib/adminPanelCommands";
+import {
+    CUSTOM_DASHBOARD_LAYOUTS,
+    CUSTOM_DASHBOARD_THEMES,
+    DEFAULT_CUSTOM_DASHBOARD_LAYOUT,
+    DEFAULT_CUSTOM_DASHBOARD_THEME,
+    getCustomDashboardTheme,
+    type CustomDashboardLayout,
+    type CustomDashboardMetadata,
+    type CustomDashboardTheme,
+} from "@/lib/customDashboardSettings";
 import { useSession } from "next-auth/react";
 
 // Icons
@@ -96,7 +106,18 @@ interface ServerSettingsConfig {
     reports_channel_id?: string | null;
 }
 
-type SettingsView = 'overview' | 'roles' | 'commands' | 'logging' | 'reports';
+interface CustomDashboardSettings {
+    id?: string | null;
+    server_id: string;
+    subdomain: string;
+    hostname: string;
+    hostnames: string[];
+    layout: CustomDashboardLayout;
+    theme: CustomDashboardTheme;
+    metadata: CustomDashboardMetadata;
+}
+
+type SettingsView = 'overview' | 'roles' | 'commands' | 'logging' | 'reports' | 'dashboard';
 
 interface SettingsClientProps {
     view?: SettingsView;
@@ -123,6 +144,10 @@ const PAGE_COPY: Record<SettingsView, { title: string; description: string }> = 
         title: 'Report System',
         description: 'Configure player reports and where report notifications are delivered.',
     },
+    dashboard: {
+        title: 'Custom Dashboard',
+        description: 'Control the custom dashboard URL, layout, theme, and public sign-in metadata.',
+    },
 };
 
 export default function SettingsClient({ view = 'overview' }: SettingsClientProps) {
@@ -146,6 +171,16 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     const [loggingChannelId, setLoggingChannelId] = useState("");
     const [reportsEnabled, setReportsEnabled] = useState(false);
     const [reportsChannelId, setReportsChannelId] = useState("");
+    const [customDashboardSubdomain, setCustomDashboardSubdomain] = useState("");
+    const [customDashboardLayout, setCustomDashboardLayout] = useState<CustomDashboardLayout>(DEFAULT_CUSTOM_DASHBOARD_LAYOUT);
+    const [customDashboardTheme, setCustomDashboardTheme] = useState<CustomDashboardTheme>(DEFAULT_CUSTOM_DASHBOARD_THEME);
+    const [customDashboardMetadata, setCustomDashboardMetadata] = useState<CustomDashboardMetadata>({
+        title: "",
+        description: "",
+        logoUrl: "",
+        supportUrl: "",
+    });
+    const [customDashboardHostnames, setCustomDashboardHostnames] = useState<string[]>([]);
 
     // Role Management
     const [discordRoles, setDiscordRoles] = useState<DiscordRole[]>([]);
@@ -222,6 +257,13 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
         ));
     }
 
+    function updateCustomDashboardMetadata(field: keyof CustomDashboardMetadata, value: string) {
+        setCustomDashboardMetadata((current) => ({
+            ...current,
+            [field]: value,
+        }));
+    }
+
     useEffect(() => {
         async function fetchData() {
             if (!id || !session) return;
@@ -275,10 +317,34 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                 console.error("Failed to fetch configured roles", e);
             }
 
+            if (view === 'dashboard') {
+                try {
+                    const dashboardRes = await fetch(`/api/dashboard/custom-dashboard?serverId=${encodeURIComponent(String(id))}`, {
+                        cache: 'no-store',
+                    });
+
+                    if (dashboardRes.ok) {
+                        const dashboardSettings = await dashboardRes.json() as CustomDashboardSettings;
+                        setCustomDashboardSubdomain(dashboardSettings.subdomain || "");
+                        setCustomDashboardLayout(dashboardSettings.layout || DEFAULT_CUSTOM_DASHBOARD_LAYOUT);
+                        setCustomDashboardTheme(dashboardSettings.theme || DEFAULT_CUSTOM_DASHBOARD_THEME);
+                        setCustomDashboardMetadata({
+                            title: dashboardSettings.metadata?.title || "",
+                            description: dashboardSettings.metadata?.description || "",
+                            logoUrl: dashboardSettings.metadata?.logoUrl || "",
+                            supportUrl: dashboardSettings.metadata?.supportUrl || "",
+                        });
+                        setCustomDashboardHostnames(dashboardSettings.hostnames || []);
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch custom dashboard settings", e);
+                }
+            }
+
             setLoading(false);
         }
         fetchData();
-    }, [id, session, router]);
+    }, [id, session, router, view]);
 
     async function handleSave() {
         setSaving(true);
@@ -293,6 +359,34 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
         if (view === 'reports' && reportsChannelId && !channels.some((channel) => channel.id === reportsChannelId)) {
             setError('The selected reports channel is not accessible to the bot anymore. Choose another channel and save again.');
+            setSaving(false);
+            return;
+        }
+
+        if (view === 'dashboard') {
+            const response = await fetch('/api/dashboard/custom-dashboard', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverId: id,
+                    subdomain: customDashboardSubdomain,
+                    layout: customDashboardLayout,
+                    theme: customDashboardTheme,
+                    metadata: customDashboardMetadata,
+                }),
+            });
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                setError(String(payload.error || 'Failed to save custom dashboard settings.'));
+            } else {
+                const dashboardSettings = payload as CustomDashboardSettings;
+                setCustomDashboardSubdomain(dashboardSettings.subdomain || "");
+                setCustomDashboardHostnames(dashboardSettings.hostnames || []);
+                setSuccess(true);
+                setTimeout(() => setSuccess(false), 3000);
+            }
+
             setSaving(false);
             return;
         }
@@ -481,7 +575,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     );
 
     const pageCopy = PAGE_COPY[view];
-    const showsSaveButton = view === 'commands' || view === 'logging' || view === 'reports';
+    const showsSaveButton = view === 'commands' || view === 'logging' || view === 'reports' || view === 'dashboard';
     const settingsTiles = [
         {
             title: 'Game Connection',
@@ -514,6 +608,12 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
             tone: 'red',
         },
         {
+            title: 'Custom Dashboard',
+            description: 'Edit the custom URL, sign-in metadata, layout, and color scheme.',
+            href: `/dashboard/${id}/settings/dashboard`,
+            tone: 'amber',
+        },
+        {
             title: 'Activity Logs',
             description: 'Review recent dashboard and moderation activity for this server.',
             href: `/dashboard/${id}/settings/logs`,
@@ -535,10 +635,16 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     { title: "Dashboard Reports", text: "Reports remain visible in the dashboard even when no Discord channel is selected." },
                     { title: "Notifications", text: "Choose a reports channel when staff should receive new report notifications in Discord." },
                 ]
-                : [
-                    { title: "Admin Commands", text: "Essential moderation tools. Disabling this prevents any kick/ban actions from Discord." },
-                    { title: "Misc Commands", text: "Fun and utility commands. Can be disabled if they interfere with gameplay." },
-                ];
+                : view === 'dashboard'
+                    ? [
+                        { title: "Custom URL", text: "The subdomain controls the wildcard dashboard address staff can use to sign in." },
+                        { title: "Branding", text: "Metadata appears before sign-in and the theme carries into the custom-host dashboard shell." },
+                    ]
+                    : [
+                        { title: "Admin Commands", text: "Essential moderation tools. Disabling this prevents any kick/ban actions from Discord." },
+                        { title: "Misc Commands", text: "Fun and utility commands. Can be disabled if they interfere with gameplay." },
+                    ];
+    const selectedCustomDashboardTheme = getCustomDashboardTheme(customDashboardTheme);
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full pb-20">
@@ -589,6 +695,8 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                             ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 group-hover:border-indigo-500/40'
                                             : tile.tone === 'red'
                                                 ? 'bg-red-500/10 text-red-400 border-red-500/20 group-hover:border-red-500/40'
+                                                : tile.tone === 'amber'
+                                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 group-hover:border-amber-500/40'
                                                 : tile.tone === 'sky'
                                                     ? 'bg-sky-500/10 text-sky-400 border-sky-500/20 group-hover:border-sky-500/40'
                                                     : 'bg-slate-500/10 text-slate-400 border-slate-500/20 group-hover:border-slate-500/40';
@@ -830,6 +938,191 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                 </div>
                             </div>
                         )}
+                    </div>
+                    )}
+
+
+                    {/* Custom Dashboard Config Section */}
+                    {view === 'dashboard' && (
+                    <div className="space-y-6">
+                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                            <div className="flex items-start gap-6 mb-8">
+                                <div className="p-3 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/10">
+                                    <SettingsIcon />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Custom Dashboard</h3>
+                                    <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Set the custom dashboard address and control how the branded sign-in and dashboard shell appear.</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-6">
+                                <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
+                                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Dashboard Subdomain</label>
+                                    <div className="flex rounded-xl border border-slate-800 bg-black/30 focus-within:border-amber-500">
+                                        <input
+                                            value={customDashboardSubdomain}
+                                            onChange={(e) => setCustomDashboardSubdomain(e.target.value)}
+                                            placeholder="my-community"
+                                            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-white outline-none"
+                                        />
+                                        <span className="hidden items-center border-l border-slate-800 px-4 font-mono text-xs text-slate-500 sm:flex">subdomain</span>
+                                    </div>
+                                    {customDashboardHostnames.length > 0 && (
+                                        <div className="mt-4 flex flex-wrap gap-2">
+                                            {customDashboardHostnames.map((hostname) => (
+                                                <a
+                                                    key={hostname}
+                                                    href={`https://${hostname}`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 font-mono text-[11px] text-amber-200 hover:border-amber-400/50"
+                                                >
+                                                    {hostname}
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                                    <div className="space-y-6">
+                                        <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
+                                            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Dashboard Title</label>
+                                            <input
+                                                value={customDashboardMetadata.title}
+                                                onChange={(e) => updateCustomDashboardMetadata('title', e.target.value)}
+                                                placeholder="Community Staff Dashboard"
+                                                maxLength={80}
+                                                className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                            />
+                                        </div>
+
+                                        <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
+                                            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Description</label>
+                                            <textarea
+                                                value={customDashboardMetadata.description}
+                                                onChange={(e) => updateCustomDashboardMetadata('description', e.target.value)}
+                                                placeholder="Sign in with Discord to access this community dashboard."
+                                                maxLength={180}
+                                                className="h-28 w-full resize-none rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
+                                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Logo URL</label>
+                                                <input
+                                                    value={customDashboardMetadata.logoUrl}
+                                                    onChange={(e) => updateCustomDashboardMetadata('logoUrl', e.target.value)}
+                                                    placeholder="https://..."
+                                                    className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                                />
+                                            </div>
+
+                                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
+                                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Support URL</label>
+                                                <input
+                                                    value={customDashboardMetadata.supportUrl}
+                                                    onChange={(e) => updateCustomDashboardMetadata('supportUrl', e.target.value)}
+                                                    placeholder="https://discord.gg/..."
+                                                    className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        className="min-h-full rounded-2xl border p-6"
+                                        style={{
+                                            background: selectedCustomDashboardTheme.gradient,
+                                            borderColor: selectedCustomDashboardTheme.border,
+                                        }}
+                                    >
+                                        <div className="mb-6 flex items-center gap-3">
+                                            <div
+                                                className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border bg-slate-950/80"
+                                                style={{ borderColor: selectedCustomDashboardTheme.border }}
+                                            >
+                                                {customDashboardMetadata.logoUrl ? (
+                                                    <img src={customDashboardMetadata.logoUrl} alt="" className="h-full w-full object-cover" />
+                                                ) : (
+                                                    <img src="/Media/Ro-LinkIcon.png" alt="" className="h-8 w-8 object-contain" />
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: selectedCustomDashboardTheme.accentText }}>Preview</p>
+                                                <h4 className="text-lg font-black text-white">{customDashboardMetadata.title || 'Community Dashboard'}</h4>
+                                            </div>
+                                        </div>
+                                        <p className="text-sm leading-6 text-slate-300">
+                                            {customDashboardMetadata.description || 'Sign in with Discord to access this custom Ro-Link dashboard.'}
+                                        </p>
+                                        <div className="mt-8 grid grid-cols-3 gap-2">
+                                            {['Home', 'Servers', 'Reports'].map((item, index) => (
+                                                <div
+                                                    key={item}
+                                                    className="rounded-lg border px-3 py-2 text-center text-[10px] font-bold uppercase tracking-wider"
+                                                    style={{
+                                                        background: index === 0 ? selectedCustomDashboardTheme.softBg : 'rgba(15, 23, 42, 0.68)',
+                                                        borderColor: index === 0 ? selectedCustomDashboardTheme.border : 'rgba(51, 65, 85, 0.75)',
+                                                        color: index === 0 ? selectedCustomDashboardTheme.accentText : '#94a3b8',
+                                                    }}
+                                                >
+                                                    {item}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm">
+                            <div className="mb-6">
+                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Layout</h3>
+                                <p className="text-sm text-slate-500 leading-relaxed">Choose how dense the custom-host dashboard shell should feel.</p>
+                            </div>
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                {CUSTOM_DASHBOARD_LAYOUTS.map((layout) => (
+                                    <button
+                                        key={layout.id}
+                                        type="button"
+                                        onClick={() => setCustomDashboardLayout(layout.id)}
+                                        className={`rounded-xl border p-5 text-left transition-all ${customDashboardLayout === layout.id ? 'border-amber-500/50 bg-amber-500/10' : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'}`}
+                                    >
+                                        <div className="text-sm font-black uppercase tracking-[0.16em] text-white">{layout.name}</div>
+                                        <p className="mt-2 text-xs leading-relaxed text-slate-500">{layout.description}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm">
+                            <div className="mb-6">
+                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Theme</h3>
+                                <p className="text-sm text-slate-500 leading-relaxed">Choose one of seven color schemes for custom dashboard branding.</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                                {CUSTOM_DASHBOARD_THEMES.map((theme) => (
+                                    <button
+                                        key={theme.id}
+                                        type="button"
+                                        onClick={() => setCustomDashboardTheme(theme.id)}
+                                        className={`rounded-xl border p-4 text-left transition-all ${customDashboardTheme === theme.id ? 'border-white/40 bg-white/10' : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'}`}
+                                    >
+                                        <span
+                                            className="mb-4 block h-9 w-full rounded-lg border"
+                                            style={{
+                                                background: theme.gradient,
+                                                borderColor: theme.border,
+                                            }}
+                                        />
+                                        <span className="text-xs font-black uppercase tracking-[0.16em] text-white">{theme.name}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                     )}
 

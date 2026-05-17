@@ -4,6 +4,14 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { hasAnyAdminPanelCommand, MISC_ACTION_COMMAND_IDS } from "@/lib/adminPanelCommands";
+import {
+    DEFAULT_CUSTOM_DASHBOARD_LAYOUT,
+    DEFAULT_CUSTOM_DASHBOARD_THEME,
+    getCustomDashboardTheme,
+    type CustomDashboardLayout,
+    type CustomDashboardMetadata,
+    type CustomDashboardTheme,
+} from "@/lib/customDashboardSettings";
 import { useSession } from "next-auth/react";
 import { PermissionsProvider } from "@/context/PermissionsContext";
 
@@ -23,6 +31,14 @@ interface DashboardPermissions {
     can_manage_settings: boolean;
     allowed_misc_cmds: string[];
     is_admin: boolean;
+}
+
+interface CustomDashboardInfo {
+    name: string;
+    icon?: string | null;
+    layout?: CustomDashboardLayout;
+    theme?: CustomDashboardTheme;
+    metadata?: CustomDashboardMetadata;
 }
 
 // --- PREMIUM SVG ICONS ---
@@ -67,6 +83,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const [loading, setLoading] = useState(true);
     const [accessDenied, setAccessDenied] = useState(false);
     const [isCustomDashboardHost, setIsCustomDashboardHost] = useState(false);
+    const [customDashboardInfo, setCustomDashboardInfo] = useState<CustomDashboardInfo | null>(null);
     const [apiLatencyMs, setApiLatencyMs] = useState<number | null>(null);
     const [apiLatencyState, setApiLatencyState] = useState<'measuring' | 'ready' | 'error'>('measuring');
 
@@ -129,11 +146,25 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
                 const data = await response.json() as { found?: boolean; serverId?: string };
                 if (!cancelled) {
-                    setIsCustomDashboardHost(Boolean(data.found && data.serverId === String(id)));
+                    const isCurrentCustomDashboard = Boolean(data.found && data.serverId === String(id));
+                    setIsCustomDashboardHost(isCurrentCustomDashboard);
+
+                    if (isCurrentCustomDashboard) {
+                        const infoResponse = await fetch(`/api/custom-dashboard/${encodeURIComponent(String(id))}`, {
+                            cache: 'no-store',
+                        });
+
+                        if (infoResponse.ok && !cancelled) {
+                            setCustomDashboardInfo(await infoResponse.json() as CustomDashboardInfo);
+                        }
+                    } else {
+                        setCustomDashboardInfo(null);
+                    }
                 }
             } catch {
                 if (!cancelled) {
                     setIsCustomDashboardHost(false);
+                    setCustomDashboardInfo(null);
                 }
             }
         }
@@ -249,6 +280,38 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             ? `${apiLatencyMs}ms`
             : '...';
     const dashboardHomeHref = isCustomDashboardHost ? `/custom-dashboard/${id}` : '/dashboard';
+    const customDashboardTheme = isCustomDashboardHost
+        ? getCustomDashboardTheme(customDashboardInfo?.theme || DEFAULT_CUSTOM_DASHBOARD_THEME)
+        : getCustomDashboardTheme(DEFAULT_CUSTOM_DASHBOARD_THEME);
+    const customDashboardLayout = isCustomDashboardHost
+        ? customDashboardInfo?.layout || DEFAULT_CUSTOM_DASHBOARD_LAYOUT
+        : DEFAULT_CUSTOM_DASHBOARD_LAYOUT;
+    const customDashboardLogo = isCustomDashboardHost
+        ? customDashboardInfo?.metadata?.logoUrl || (customDashboardInfo?.icon ? `https://cdn.discordapp.com/icons/${id}/${customDashboardInfo.icon}.png` : '/Media/Ro-LinkIcon.png')
+        : '/Media/Ro-LinkIcon.png';
+    const customDashboardBrand = isCustomDashboardHost
+        ? customDashboardInfo?.metadata?.title || customDashboardInfo?.name || 'Ro-Link'
+        : 'Ro-Link';
+
+    function getNavLinkStyle(isActive: boolean) {
+        if (!isCustomDashboardHost || !isActive) {
+            return undefined;
+        }
+
+        return {
+            backgroundColor: customDashboardTheme.softBg,
+            color: customDashboardTheme.accentText,
+            borderColor: customDashboardTheme.border,
+        };
+    }
+
+    function getNavIconStyle(isActive: boolean) {
+        if (!isCustomDashboardHost || !isActive) {
+            return undefined;
+        }
+
+        return { color: customDashboardTheme.accent };
+    }
 
     const utilityItems = [
         { label: "Home", icon: <HomeIcon />, href: `/dashboard/${id}` },
@@ -350,6 +413,16 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             hide: !userPermissions.can_manage_settings
         },
         {
+            label: "Dashboard",
+            icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="18" height="14" x="3" y="5" rx="2" /><path d="M7 9h10" /><path d="M7 13h4" />
+                </svg>
+            ),
+            href: `/dashboard/${id}/settings/dashboard`,
+            hide: !userPermissions.can_manage_settings
+        },
+        {
             label: "Logs",
             icon: <ScrollIcon />,
             href: `/dashboard/${id}/settings/logs`,
@@ -358,7 +431,11 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     ].filter(item => !item.hide);
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-200 flex min-w-0 flex-col md:flex-row font-sans">
+        <div
+            className="custom-dashboard-shell min-h-screen bg-[#020617] text-slate-200 flex min-w-0 flex-col md:flex-row font-sans"
+            data-dashboard-layout={customDashboardLayout}
+            style={isCustomDashboardHost ? { background: customDashboardTheme.gradient } : undefined}
+        >
             {/* Sidebar Overlay (Mobile) */}
             {isSidebarOpen && (
                 <div
@@ -375,9 +452,9 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             `}>
                 <div className="p-6 flex flex-col h-full">
                     <div className="flex items-center justify-between mb-8">
-                        <Link href={dashboardHomeHref} className="flex items-center gap-3 pl-2 hover:opacity-80 transition-opacity cursor-pointer">
-                            <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 rounded object-contain shadow-lg shadow-sky-500/10" />
-                            <span className="text-xl font-black tracking-tighter text-white uppercase italic">Ro-Link</span>
+                        <Link href={dashboardHomeHref} className="flex min-w-0 items-center gap-3 pl-2 hover:opacity-80 transition-opacity cursor-pointer">
+                            <img src={customDashboardLogo} alt="" className="w-8 h-8 rounded object-cover shadow-lg shadow-sky-500/10" />
+                            <span className="truncate text-xl font-black tracking-tighter text-white uppercase italic">{customDashboardBrand}</span>
                         </Link>
                         <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-2 text-slate-500 hover:text-white">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -394,12 +471,16 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                         <Link
                                             key={item.href}
                                             href={item.href}
+                                            style={getNavLinkStyle(isActive)}
                                             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group font-semibold text-sm ${isActive
                                                 ? "bg-sky-600/10 text-sky-400 border border-sky-500/10 shadow-sm shadow-sky-900/5"
                                                 : "text-slate-400 hover:text-white hover:bg-slate-800/40 border border-transparent"
                                                 }`}
                                         >
-                                            <span className={`${isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300 transition-colors"}`}>
+                                            <span
+                                                style={getNavIconStyle(isActive)}
+                                                className={`${isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300 transition-colors"}`}
+                                            >
                                                 {item.icon}
                                             </span>
                                             {item.label}
@@ -418,12 +499,16 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                         <Link
                                             key={item.href}
                                             href={item.href}
+                                            style={getNavLinkStyle(isActive)}
                                             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group font-semibold text-sm ${isActive
                                                 ? "bg-sky-600/10 text-sky-400 border border-sky-500/10 shadow-sm shadow-sky-900/5"
                                                 : "text-slate-400 hover:text-white hover:bg-slate-800/40 border border-transparent"
                                                 }`}
                                         >
-                                            <span className={`${isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300 transition-colors"}`}>
+                                            <span
+                                                style={getNavIconStyle(isActive)}
+                                                className={`${isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300 transition-colors"}`}
+                                            >
                                                 {item.icon}
                                             </span>
                                             {item.label}
@@ -443,12 +528,16 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                             <Link
                                                 key={item.href}
                                                 href={item.href}
+                                                style={getNavLinkStyle(isActive)}
                                                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group font-semibold text-sm ${isActive
                                                     ? "bg-sky-600/10 text-sky-400 border border-sky-500/10 shadow-sm shadow-sky-900/5"
                                                     : "text-slate-400 hover:text-white hover:bg-slate-800/40 border border-transparent"
                                                     }`}
                                             >
-                                                <span className={`${isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300 transition-colors"}`}>
+                                                <span
+                                                    style={getNavIconStyle(isActive)}
+                                                    className={`${isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300 transition-colors"}`}
+                                                >
                                                     {item.icon}
                                                 </span>
                                                 {item.label}
@@ -511,12 +600,39 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                     </div>
                 </header>
 
-                <div className="min-w-0 flex-1 bg-gradient-to-tr from-[#020617] via-[#020617] to-sky-950/5 p-4 md:p-10">
+                <div className="dashboard-content-frame min-w-0 flex-1 bg-gradient-to-tr from-[#020617] via-[#020617] to-sky-950/5 p-4 md:p-10">
                     <PermissionsProvider permissions={userPermissions}>
                         {children}
                     </PermissionsProvider>
                 </div>
             </main>
+            <style>{`
+                @media (min-width: 768px) {
+                    .custom-dashboard-shell[data-dashboard-layout="compact"] aside {
+                        width: 15rem;
+                    }
+
+                    .custom-dashboard-shell[data-dashboard-layout="compact"] main {
+                        margin-left: 15rem;
+                    }
+
+                    .custom-dashboard-shell[data-dashboard-layout="compact"] .dashboard-content-frame {
+                        padding: 1.5rem;
+                    }
+
+                    .custom-dashboard-shell[data-dashboard-layout="spacious"] aside {
+                        width: 20rem;
+                    }
+
+                    .custom-dashboard-shell[data-dashboard-layout="spacious"] main {
+                        margin-left: 20rem;
+                    }
+
+                    .custom-dashboard-shell[data-dashboard-layout="spacious"] .dashboard-content-frame {
+                        padding: 3.25rem;
+                    }
+                }
+            `}</style>
         </div>
     );
 }
