@@ -15,6 +15,7 @@ function normalizeRootDomain(domain: string) {
     return domain
         .replace(/^https?:\/\//, '')
         .replace(/\/.*$/, '')
+        .replace(/^\./, '')
         .replace(/^wildcard\./, '');
 }
 
@@ -66,6 +67,49 @@ export function isAllowedDashboardUrl(input: unknown) {
     } catch {
         return false;
     }
+}
+
+function isIpAddress(hostname: string) {
+    return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname) || hostname.includes(':');
+}
+
+function canUseCookieDomain(domain: string) {
+    return Boolean(domain)
+        && domain !== 'localhost'
+        && !isIpAddress(domain)
+        && domain.includes('.');
+}
+
+function matchesRootDomain(hostname: string, rootDomain: string) {
+    return hostname === rootDomain || hostname.endsWith(`.${rootDomain}`);
+}
+
+export function getSharedDashboardCookieDomain() {
+    const explicitCookieDomain = process.env.NEXTAUTH_COOKIE_DOMAIN?.trim();
+    if (explicitCookieDomain) {
+        const normalized = normalizeRootDomain(explicitCookieDomain).toLowerCase();
+        return canUseCookieDomain(normalized) ? `.${normalized}` : explicitCookieDomain;
+    }
+
+    const rootDomains = getRolinkRootDomains();
+    const authHostCandidates = [
+        readHostname(process.env.NEXT_PUBLIC_AUTH_BASE_URL),
+        readHostname(process.env.NEXT_PUBLIC_CANONICAL_AUTH_URL),
+        readHostname(process.env.NEXTAUTH_URL),
+        readHostname(process.env.NEXT_PUBLIC_BASE_URL),
+        readHostname(process.env.VERCEL_PROJECT_PRODUCTION_URL),
+        readHostname(process.env.VERCEL_URL),
+    ].filter((hostname): hostname is string => Boolean(hostname));
+
+    for (const hostname of authHostCandidates) {
+        for (const rootDomain of rootDomains) {
+            if (canUseCookieDomain(rootDomain) && matchesRootDomain(hostname, rootDomain)) {
+                return `.${rootDomain}`;
+            }
+        }
+    }
+
+    return undefined;
 }
 
 export function resolveDashboardSubdomainFromHostname(hostnameInput: unknown) {

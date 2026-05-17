@@ -1,7 +1,7 @@
 import NextAuth from "next-auth"
 import type { AuthOptions, Session } from "next-auth"
 import DiscordProvider from "next-auth/providers/discord"
-import { isAllowedDashboardUrl } from "@/lib/customDashboardDomains"
+import { getSharedDashboardCookieDomain, isAllowedDashboardUrl } from "@/lib/customDashboardDomains"
 
 type TokenShape = {
     accessToken?: string
@@ -18,7 +18,7 @@ type DiscordAccount = {
     expires_in?: number
 } | null
 
-const cookieDomain = process.env.NEXTAUTH_COOKIE_DOMAIN?.trim()
+const cookieDomain = getSharedDashboardCookieDomain()
 const secureCookies = process.env.NODE_ENV === "production"
     || Boolean(process.env.NEXTAUTH_URL?.startsWith("https://"))
 
