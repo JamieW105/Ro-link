@@ -36,7 +36,7 @@ async function resolveDashboardServerId(subdomain: string) {
     });
 
     if (!response.ok) {
-        console.error('[CustomDashboardMiddleware] Failed to resolve dashboard subdomain.', {
+        console.error('[CustomDashboardProxy] Failed to resolve dashboard subdomain.', {
             subdomain,
             status: response.status,
         });
@@ -47,7 +47,7 @@ async function resolveDashboardServerId(subdomain: string) {
     return rows[0]?.server_id || null;
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
     const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
     const hostname = host.split(':')[0].toLowerCase();
     const subdomain = resolveDashboardSubdomainFromHostname(hostname);
@@ -56,7 +56,12 @@ export async function middleware(req: NextRequest) {
     }
 
     const { pathname, search } = req.nextUrl;
-    if (pathname.startsWith('/api') || pathname.startsWith('/_next') || pathname.startsWith('/dashboard')) {
+    if (
+        pathname.startsWith('/api')
+        || pathname.startsWith('/_next')
+        || pathname.startsWith('/dashboard')
+        || pathname.startsWith('/custom-dashboard')
+    ) {
         return NextResponse.next();
     }
 
@@ -79,4 +84,3 @@ export async function middleware(req: NextRequest) {
 export const config = {
     matcher: ['/((?!_next/static|_next/image|favicon.ico|Media).*)'],
 };
-
