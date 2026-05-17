@@ -11,6 +11,13 @@ function readHostname(value: string | undefined) {
     }
 }
 
+function normalizeRootDomain(domain: string) {
+    return domain
+        .replace(/^https?:\/\//, '')
+        .replace(/\/.*$/, '')
+        .replace(/^wildcard\./, '');
+}
+
 export function getRolinkRootDomains() {
     const configured = process.env.NEXT_PUBLIC_ROLINK_ROOT_DOMAINS
         || process.env.NEXT_PUBLIC_ROLINK_ROOT_DOMAIN
@@ -20,17 +27,21 @@ export function getRolinkRootDomains() {
         .split(',')
         .map((domain) => domain.trim().toLowerCase())
         .filter(Boolean)
-        .map((domain) => domain.replace(/^https?:\/\//, '').replace(/\/.*$/, ''));
+        .map(normalizeRootDomain);
 
     const automaticDomains = [
         readHostname(process.env.NEXTAUTH_URL),
         readHostname(process.env.NEXT_PUBLIC_BASE_URL),
         readHostname(process.env.VERCEL_PROJECT_PRODUCTION_URL),
         readHostname(process.env.VERCEL_URL),
-    ].filter((domain): domain is string => Boolean(domain));
+    ].filter((domain): domain is string => Boolean(domain))
+        .map(normalizeRootDomain);
+
+    const explicitDomains = domains.length > 0 ? domains : [DEFAULT_ROLINK_ROOT_DOMAIN];
 
     return Array.from(new Set([
-        ...(domains.length > 0 ? domains : [DEFAULT_ROLINK_ROOT_DOMAIN]),
+        ...explicitDomains,
+        DEFAULT_ROLINK_ROOT_DOMAIN,
         ...automaticDomains,
     ]));
 }
@@ -68,6 +79,52 @@ export function resolveDashboardSubdomainFromHostname(hostnameInput: unknown) {
         const subdomain = hostname.slice(0, -`.${rootDomain}`.length);
         if (!subdomain || subdomain.includes('.')) return null;
         return subdomain;
+    }
+
+    return null;
+}
+
+function readForwardedHostValues(value: unknown) {
+    const header = String(value || '').trim();
+    if (!header) return [];
+
+    return header
+        .split(',')
+        .map((entry) => entry
+            .split(';')
+            .map((part) => part.trim())
+            .find((part) => part.toLowerCase().startsWith('host=')))
+        .filter((part): part is string => Boolean(part))
+        .map((part) => part.slice(part.indexOf('=') + 1).trim().replace(/^"|"$/g, ''));
+}
+
+function readHostnameCandidate(value: unknown) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+
+    return readHostname(raw) || raw.split(':')[0].toLowerCase();
+}
+
+export function resolveDashboardSubdomainFromHostnameCandidates(...hostnameInputs: unknown[]) {
+    const seen = new Set<string>();
+
+    for (const input of hostnameInputs) {
+        const values = readForwardedHostValues(input);
+        if (values.length === 0) {
+            values.push(...String(input || '').split(','));
+        }
+
+        for (const value of values) {
+            const hostname = readHostnameCandidate(value);
+            if (!hostname || seen.has(hostname)) continue;
+
+            seen.add(hostname);
+
+            const subdomain = resolveDashboardSubdomainFromHostname(hostname);
+            if (subdomain) {
+                return { hostname, subdomain };
+            }
+        }
     }
 
     return null;

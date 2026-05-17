@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { resolveDashboardSubdomainFromHostname } from '@/lib/customDashboardDomains';
+import { resolveDashboardSubdomainFromHostnameCandidates } from '@/lib/customDashboardDomains';
 
 const IGNORED_SUBDOMAINS = new Set([
     'admin',
@@ -48,9 +48,14 @@ async function resolveDashboardServerId(subdomain: string) {
 }
 
 export async function proxy(req: NextRequest) {
-    const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
-    const hostname = host.split(':')[0].toLowerCase();
-    const subdomain = resolveDashboardSubdomainFromHostname(hostname);
+    const dashboardHost = resolveDashboardSubdomainFromHostnameCandidates(
+        req.headers.get('host'),
+        req.headers.get('x-original-host'),
+        req.headers.get('x-forwarded-host'),
+        req.headers.get('forwarded'),
+        req.nextUrl.host,
+    );
+    const subdomain = dashboardHost?.subdomain;
     if (!subdomain || subdomain.includes('.') || IGNORED_SUBDOMAINS.has(subdomain)) {
         return NextResponse.next();
     }

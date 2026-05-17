@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { resolveDashboardSubdomainFromHostname } from '@/lib/customDashboardDomains';
+import { resolveDashboardSubdomainFromHostnameCandidates } from '@/lib/customDashboardDomains';
 import { supabase } from '@/lib/supabase';
 
 const IGNORED_SUBDOMAINS = new Set([
@@ -20,8 +20,15 @@ const IGNORED_SUBDOMAINS = new Set([
 
 export async function GET(req: Request) {
     const url = new URL(req.url);
-    const requestedHostname = url.searchParams.get('hostname') || req.headers.get('x-forwarded-host') || req.headers.get('host');
-    const subdomain = resolveDashboardSubdomainFromHostname(requestedHostname);
+    const dashboardHost = resolveDashboardSubdomainFromHostnameCandidates(
+        url.searchParams.get('hostname'),
+        req.headers.get('host'),
+        req.headers.get('x-original-host'),
+        req.headers.get('x-forwarded-host'),
+        req.headers.get('forwarded'),
+        url.host,
+    );
+    const subdomain = dashboardHost?.subdomain;
 
     if (!subdomain || IGNORED_SUBDOMAINS.has(subdomain)) {
         return NextResponse.json({ found: false });
@@ -48,4 +55,3 @@ export async function GET(req: Request) {
         serverId: data.server_id,
     });
 }
-
