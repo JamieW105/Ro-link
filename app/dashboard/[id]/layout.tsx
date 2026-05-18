@@ -41,6 +41,12 @@ interface CustomDashboardInfo {
     metadata?: CustomDashboardMetadata;
 }
 
+type CustomDashboardPreview = {
+    layout?: CustomDashboardLayout;
+    theme?: CustomDashboardTheme;
+    metadata?: CustomDashboardMetadata;
+};
+
 // --- PREMIUM SVG ICONS ---
 
 const HomeIcon = () => (
@@ -84,6 +90,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const [accessDenied, setAccessDenied] = useState(false);
     const [isCustomDashboardHost, setIsCustomDashboardHost] = useState(false);
     const [customDashboardInfo, setCustomDashboardInfo] = useState<CustomDashboardInfo | null>(null);
+    const [customDashboardPreview, setCustomDashboardPreview] = useState<CustomDashboardPreview | null>(null);
     const [hasCustomDashboardSetup, setHasCustomDashboardSetup] = useState(false);
     const [apiLatencyMs, setApiLatencyMs] = useState<number | null>(null);
     const [apiLatencyState, setApiLatencyState] = useState<'measuring' | 'ready' | 'error'>('measuring');
@@ -209,6 +216,19 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     }, [id, userPermissions?.is_admin, userPermissions?.can_manage_settings]);
 
     useEffect(() => {
+        function handleCustomDashboardPreview(event: Event) {
+            const customEvent = event as CustomEvent<CustomDashboardPreview | null>;
+            setCustomDashboardPreview(customEvent.detail || null);
+        }
+
+        window.addEventListener('rolink:custom-dashboard-preview', handleCustomDashboardPreview);
+
+        return () => {
+            window.removeEventListener('rolink:custom-dashboard-preview', handleCustomDashboardPreview);
+        };
+    }, []);
+
+    useEffect(() => {
         let cancelled = false;
         let inFlight = false;
 
@@ -313,21 +333,25 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             : '...';
     const canManageDashboardSettings = userPermissions.is_admin || userPermissions.can_manage_settings;
     const dashboardHomeHref = isCustomDashboardHost ? `/custom-dashboard/${id}` : '/dashboard';
-    const customDashboardTheme = isCustomDashboardHost
-        ? getCustomDashboardTheme(customDashboardInfo?.theme || DEFAULT_CUSTOM_DASHBOARD_THEME)
-        : getCustomDashboardTheme(DEFAULT_CUSTOM_DASHBOARD_THEME);
-    const customDashboardLayout = isCustomDashboardHost
-        ? customDashboardInfo?.layout || DEFAULT_CUSTOM_DASHBOARD_LAYOUT
-        : DEFAULT_CUSTOM_DASHBOARD_LAYOUT;
-    const customDashboardLogo = isCustomDashboardHost
-        ? customDashboardInfo?.metadata?.logoUrl || (customDashboardInfo?.icon ? `https://cdn.discordapp.com/icons/${id}/${customDashboardInfo.icon}.png` : '/Media/Ro-LinkIcon.png')
+    const isCustomDashboardStyled = Boolean(customDashboardPreview || isCustomDashboardHost);
+    const customDashboardMetadata = customDashboardPreview?.metadata || customDashboardInfo?.metadata;
+    const customDashboardTheme = getCustomDashboardTheme(
+        customDashboardPreview?.theme
+        || (isCustomDashboardHost ? customDashboardInfo?.theme : undefined)
+        || DEFAULT_CUSTOM_DASHBOARD_THEME,
+    );
+    const customDashboardLayout = customDashboardPreview?.layout
+        || (isCustomDashboardHost ? customDashboardInfo?.layout : undefined)
+        || DEFAULT_CUSTOM_DASHBOARD_LAYOUT;
+    const customDashboardLogo = isCustomDashboardStyled
+        ? customDashboardMetadata?.logoUrl || (customDashboardInfo?.icon ? `https://cdn.discordapp.com/icons/${id}/${customDashboardInfo.icon}.png` : '/Media/Ro-LinkIcon.png')
         : '/Media/Ro-LinkIcon.png';
-    const customDashboardBrand = isCustomDashboardHost
-        ? customDashboardInfo?.metadata?.title || customDashboardInfo?.name || 'Ro-Link'
+    const customDashboardBrand = isCustomDashboardStyled
+        ? customDashboardMetadata?.title || customDashboardInfo?.name || 'Ro-Link'
         : 'Ro-Link';
 
     function getNavLinkStyle(isActive: boolean) {
-        if (!isCustomDashboardHost || !isActive) {
+        if (!isCustomDashboardStyled || !isActive) {
             return undefined;
         }
 
@@ -339,7 +363,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     }
 
     function getNavIconStyle(isActive: boolean) {
-        if (!isCustomDashboardHost || !isActive) {
+        if (!isCustomDashboardStyled || !isActive) {
             return undefined;
         }
 
@@ -467,7 +491,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         <div
             className="custom-dashboard-shell min-h-screen bg-[#020617] text-slate-200 flex min-w-0 flex-col md:flex-row font-sans"
             data-dashboard-layout={customDashboardLayout}
-            style={isCustomDashboardHost ? { background: customDashboardTheme.gradient } : undefined}
+            style={isCustomDashboardStyled ? { background: customDashboardTheme.gradient } : undefined}
         >
             {/* Sidebar Overlay (Mobile) */}
             {isSidebarOpen && (

@@ -13,7 +13,6 @@ import {
     CUSTOM_DASHBOARD_THEMES,
     DEFAULT_CUSTOM_DASHBOARD_LAYOUT,
     DEFAULT_CUSTOM_DASHBOARD_THEME,
-    getCustomDashboardTheme,
     type CustomDashboardLayout,
     type CustomDashboardMetadata,
     type CustomDashboardTheme,
@@ -181,6 +180,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
         supportUrl: "",
     });
     const [customDashboardHostnames, setCustomDashboardHostnames] = useState<string[]>([]);
+    const [currentHostname, setCurrentHostname] = useState("");
     const [hasCustomDashboardSetup, setHasCustomDashboardSetup] = useState(false);
 
     // Role Management
@@ -264,6 +264,26 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
             [field]: value,
         }));
     }
+
+    useEffect(() => {
+        setCurrentHostname(window.location.hostname.toLowerCase());
+    }, []);
+
+    useEffect(() => {
+        if (view !== 'dashboard' || !hasCustomDashboardSetup) return;
+
+        window.dispatchEvent(new CustomEvent('rolink:custom-dashboard-preview', {
+            detail: {
+                layout: customDashboardLayout,
+                theme: customDashboardTheme,
+                metadata: customDashboardMetadata,
+            },
+        }));
+
+        return () => {
+            window.dispatchEvent(new CustomEvent('rolink:custom-dashboard-preview', { detail: null }));
+        };
+    }, [customDashboardLayout, customDashboardMetadata, customDashboardTheme, hasCustomDashboardSetup, view]);
 
     useEffect(() => {
         async function fetchData() {
@@ -657,40 +677,23 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         { title: "Admin Commands", text: "Essential moderation tools. Disabling this prevents any kick/ban actions from Discord." },
                         { title: "Misc Commands", text: "Fun and utility commands. Can be disabled if they interfere with gameplay." },
                     ];
-    const selectedCustomDashboardTheme = getCustomDashboardTheme(customDashboardTheme);
-    const selectedCustomDashboardLayout = CUSTOM_DASHBOARD_LAYOUTS.find((layout) => layout.id === customDashboardLayout)
-        || CUSTOM_DASHBOARD_LAYOUTS[0];
-    const previewHostname = customDashboardSubdomain.trim()
-        ? customDashboardHostnames[0]
-            ? customDashboardHostnames[0].replace(/^[^.]+/, customDashboardSubdomain.trim().toLowerCase())
-            : `${customDashboardSubdomain.trim().toLowerCase()}.rolink.cloud`
-        : 'custom-dashboard.rolink.cloud';
-    const previewLayoutStyles = {
-        compact: {
-            shell: 'grid-cols-[76px_1fr]',
-            sidebarPadding: 'p-2',
-            contentPadding: 'p-3',
-            navHeight: 'h-6',
-            cardPadding: 'p-2',
-            gap: 'gap-2',
-        },
-        standard: {
-            shell: 'grid-cols-[104px_1fr]',
-            sidebarPadding: 'p-3',
-            contentPadding: 'p-4',
-            navHeight: 'h-8',
-            cardPadding: 'p-3',
-            gap: 'gap-3',
-        },
-        spacious: {
-            shell: 'grid-cols-[132px_1fr]',
-            sidebarPadding: 'p-4',
-            contentPadding: 'p-5',
-            navHeight: 'h-10',
-            cardPadding: 'p-4',
-            gap: 'gap-4',
-        },
-    }[customDashboardLayout];
+    const currentDashboardHostname = (() => {
+        const subdomain = customDashboardSubdomain.trim().toLowerCase();
+        if (!subdomain) return "";
+
+        const hostnames = customDashboardHostnames.length > 0 ? customDashboardHostnames : [`${subdomain}.rolink.cloud`];
+        const exactRootMatch = hostnames.find((hostname) => {
+            const rootDomain = hostname.toLowerCase().replace(/^[^.]+\./, '');
+            return currentHostname === rootDomain;
+        });
+        const matchingHostname = exactRootMatch || hostnames.find((hostname) => {
+            const rootDomain = hostname.toLowerCase().replace(/^[^.]+\./, '');
+            return currentHostname.endsWith(`.${rootDomain}`)
+                || rootDomain.endsWith(`.${currentHostname}`);
+        }) || hostnames[0];
+
+        return matchingHostname.replace(/^[^.]+/, subdomain);
+    })();
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full pb-20">
@@ -1014,24 +1017,21 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                         />
                                         <span className="hidden items-center border-l border-slate-800 px-4 font-mono text-xs text-slate-500 sm:flex">subdomain</span>
                                     </div>
-                                    {customDashboardHostnames.length > 0 && (
-                                        <div className="mt-4 flex flex-wrap gap-2">
-                                            {customDashboardHostnames.map((hostname) => (
-                                                <a
-                                                    key={hostname}
-                                                    href={`https://${hostname}`}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 font-mono text-[11px] text-amber-200 hover:border-amber-400/50"
-                                                >
-                                                    {hostname}
-                                                </a>
-                                            ))}
+                                    {currentDashboardHostname && (
+                                        <div className="mt-4">
+                                            <a
+                                                href={`https://${currentDashboardHostname}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 font-mono text-[11px] text-amber-200 hover:border-amber-400/50"
+                                            >
+                                                {currentDashboardHostname}
+                                            </a>
                                         </div>
                                     )}
                                 </div>
 
-                                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                                <div className="space-y-6">
                                     <div className="space-y-6">
                                         <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
                                             <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Dashboard Title</label>
@@ -1077,85 +1077,6 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                             </div>
                                         </div>
                                     </div>
-
-                                    <div
-                                        className="min-h-full rounded-2xl border p-6 transition-all duration-300"
-                                        style={{
-                                            background: selectedCustomDashboardTheme.gradient,
-                                            borderColor: selectedCustomDashboardTheme.border,
-                                        }}
-                                    >
-                                        <div className="mb-6 flex items-center gap-3">
-                                            <div
-                                                className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border bg-slate-950/80"
-                                                style={{ borderColor: selectedCustomDashboardTheme.border }}
-                                            >
-                                                {customDashboardMetadata.logoUrl ? (
-                                                    <img src={customDashboardMetadata.logoUrl} alt="" className="h-full w-full object-cover" />
-                                                ) : (
-                                                    <img src="/Media/Ro-LinkIcon.png" alt="" className="h-8 w-8 object-contain" />
-                                                )}
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: selectedCustomDashboardTheme.accentText }}>Live Preview</p>
-                                                <h4 className="text-lg font-black text-white">{customDashboardMetadata.title || 'Community Dashboard'}</h4>
-                                            </div>
-                                        </div>
-                                        <div className="mb-5 flex flex-wrap items-center gap-2">
-                                            <span
-                                                className="rounded-md border px-2 py-1 font-mono text-[10px]"
-                                                style={{
-                                                    borderColor: selectedCustomDashboardTheme.border,
-                                                    color: selectedCustomDashboardTheme.accentText,
-                                                    background: selectedCustomDashboardTheme.softBg,
-                                                }}
-                                            >
-                                                {previewHostname}
-                                            </span>
-                                            <span className="rounded-md border border-slate-700/70 bg-slate-950/50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                                {selectedCustomDashboardLayout.name}
-                                            </span>
-                                        </div>
-                                        <p className="text-sm leading-6 text-slate-300">
-                                            {customDashboardMetadata.description || 'Sign in with Discord to access this custom Ro-Link dashboard.'}
-                                        </p>
-                                        <div className={`mt-8 grid overflow-hidden rounded-xl border border-slate-800/80 bg-slate-950/70 transition-all duration-300 ${previewLayoutStyles.shell}`}>
-                                            <div className={`space-y-2 border-r border-slate-800/80 bg-slate-950/70 transition-all duration-300 ${previewLayoutStyles.sidebarPadding}`}>
-                                                {['Home', 'Servers', 'Reports', 'Settings'].map((item, index) => (
-                                                    <div
-                                                        key={item}
-                                                        className={`rounded-md border px-2 transition-all duration-300 ${previewLayoutStyles.navHeight} flex items-center text-[9px] font-bold uppercase tracking-wider`}
-                                                        style={{
-                                                            background: index === 0 ? selectedCustomDashboardTheme.softBg : 'rgba(15, 23, 42, 0.68)',
-                                                            borderColor: index === 0 ? selectedCustomDashboardTheme.border : 'rgba(51, 65, 85, 0.75)',
-                                                            color: index === 0 ? selectedCustomDashboardTheme.accentText : '#94a3b8',
-                                                        }}
-                                                    >
-                                                        <span className="truncate">{item}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className={`transition-all duration-300 ${previewLayoutStyles.contentPadding}`}>
-                                                <div className={`grid grid-cols-2 transition-all duration-300 ${previewLayoutStyles.gap}`}>
-                                                    {['Live Servers', 'Reports', 'Modules', 'Logs'].map((item, index) => (
-                                                        <div
-                                                            key={item}
-                                                            className={`rounded-lg border bg-slate-900/70 transition-all duration-300 ${previewLayoutStyles.cardPadding}`}
-                                                            style={{ borderColor: index === 0 ? selectedCustomDashboardTheme.border : 'rgba(51, 65, 85, 0.75)' }}
-                                                        >
-                                                            <div
-                                                                className="mb-2 h-2 w-8 rounded-full"
-                                                                style={{ background: index === 0 ? selectedCustomDashboardTheme.accent : '#475569' }}
-                                                            />
-                                                            <div className="h-2 w-full rounded-full bg-slate-700/70" />
-                                                            <div className="mt-2 h-2 w-2/3 rounded-full bg-slate-800" />
-                                                            <span className="sr-only">{item}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1177,7 +1098,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                             <div className="text-sm font-black uppercase tracking-[0.16em] text-white">{layout.name}</div>
                                             {customDashboardLayout === layout.id && (
                                                 <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-amber-200">
-                                                    Previewing
+                                                    Selected
                                                 </span>
                                             )}
                                         </div>
