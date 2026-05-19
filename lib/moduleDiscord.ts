@@ -43,7 +43,9 @@ type DiscordEmbedPayload = {
     url?: string;
     color?: number;
     fields?: Array<{ name: string; value: string; inline?: boolean }>;
+    author?: { name: string; icon_url?: string };
     image?: { url: string };
+    thumbnail?: { url: string };
     footer?: { text: string; icon_url?: string };
 };
 

@@ -68,6 +68,7 @@ export default function ManagementLayout({
         { name: 'Servers', href: '/management/servers', icon: 'M5 12h14M12 5l7 7-7 7', perm: 'MANAGE_SERVERS' },
         { name: 'Job Apps', href: '/management/jobs', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', perm: 'POST_JOB_APPLICATION' },
         { name: 'Updates', href: '/management/posts', icon: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01', perm: 'POST_UPDATES' },
+        { name: 'DMs', href: '/management/dms', icon: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z', perm: 'MANAGE_RO_LINK' },
         { name: 'Modules', href: '/management/modules', icon: 'M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16zM3.3 7l8.7 5 8.7-5M12 22V12', perm: 'MANAGE_MODULES' },
         { name: 'Blocking', href: '/management/blocking', icon: 'M18.36 6.64a9 9 0 11-12.73 0M12 2v10', perm: 'BLOCK_SERVERS' },
         { name: 'People', href: '/management/people', icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m11-10a4 4 0 11-8 0 4 4 0 018 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zm-2 4v2', perm: 'MANAGE_RO_LINK' },
