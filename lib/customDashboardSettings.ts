@@ -1,4 +1,10 @@
-export type CustomDashboardLayout = 'standard' | 'compact' | 'spacious';
+export type CustomDashboardLayout =
+    | 'standard'
+    | 'compact'
+    | 'spacious'
+    | 'floating_dock'
+    | 'split_sidebar'
+    | 'minimalist_drawer';
 
 export type CustomDashboardTheme =
     | 'sky'
@@ -30,9 +36,12 @@ export const DEFAULT_CUSTOM_DASHBOARD_LAYOUT: CustomDashboardLayout = 'standard'
 export const DEFAULT_CUSTOM_DASHBOARD_THEME: CustomDashboardTheme = 'sky';
 
 export const CUSTOM_DASHBOARD_LAYOUTS: Array<{ id: CustomDashboardLayout; name: string; description: string }> = [
-    { id: 'standard', name: 'Standard', description: 'Balanced navigation and content spacing.' },
-    { id: 'compact', name: 'Compact', description: 'Tighter sidebar and content spacing for busy teams.' },
-    { id: 'spacious', name: 'Spacious', description: 'Larger navigation and roomier dashboard panels.' },
+    { id: 'standard', name: 'Classic Left Sidebar', description: 'Traditional persistent left sidebar layout.' },
+    { id: 'compact', name: 'Slim Left Dock', description: 'Floating vertical glassmorphic dock with expanding hover interactions.' },
+    { id: 'spacious', name: 'Horizontal Top Navigation', description: 'Sticky top bar menu with zero sidebar, maximizing viewport width.' },
+    { id: 'floating_dock', name: 'Floating Bottom Dock', description: 'A gorgeous, macOS-style bottom-floating glassmorphic navigation deck.' },
+    { id: 'split_sidebar', name: 'Split Double Sidebar', description: 'Split columns: category vertical icon column + nested items sidebar.' },
+    { id: 'minimalist_drawer', name: 'Minimalist Menu Overlay', description: 'Zero persistent navigation. Sleek floating hamburger reveals full-screen blur overlay.' },
 ];
 
 export const CUSTOM_DASHBOARD_THEMES: CustomDashboardThemeOption[] = [

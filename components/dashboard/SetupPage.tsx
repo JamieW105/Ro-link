@@ -168,7 +168,7 @@ export default function DashboardSetupPage() {
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className={`w-full transition-all duration-700 ${step === 1 ? "max-w-md mx-auto mt-20" : "max-w-7xl"}`}>
                 {step === 1 ? (
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-10 shadow-3xl">
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 shadow-3xl">
                         <div className="w-12 h-12 bg-sky-600/10 rounded-lg flex items-center justify-center text-sky-500 mb-8 border border-sky-500/10">
                             <SearchIcon />
                         </div>
@@ -229,8 +229,8 @@ export default function DashboardSetupPage() {
                         </form>
                     </div>
                 ) : (
-                    <div className="bg-slate-900 border border-slate-800 rounded-[1.5rem] p-10 shadow-3xl border-l-sky-600 border-l-4">
-                        <div className="flex flex-col lg:flex-row gap-12">
+                    <div className="bg-slate-900 border border-slate-800 rounded-[1.5rem] p-5 sm:p-6 md:p-8 xl:p-10 shadow-3xl border-l-sky-600 border-l-4">
+                        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-12">
                             <div className="flex-1">
                                 <div className="flex items-center gap-4 mb-10">
                                     <div className="w-12 h-12 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-500 border border-emerald-500/10">

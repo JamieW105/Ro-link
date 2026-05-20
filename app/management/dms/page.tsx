@@ -78,6 +78,7 @@ export default function ManagementDmsPage() {
     const [notice, setNotice] = useState('');
     const [error, setError] = useState('');
     const [result, setResult] = useState<SendResult | null>(null);
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -109,6 +110,7 @@ export default function ManagementDmsPage() {
         }
 
         loadCounts();
+        setMounted(true);
 
         return () => {
             cancelled = true;
@@ -128,6 +130,26 @@ export default function ManagementDmsPage() {
         || imageUrl.trim()
         || thumbnailUrl.trim(),
     );
+    const activeFooterText = useMemo(() => {
+        if (footerText.trim()) {
+            return footerText;
+        }
+
+        const sendingTypes: Record<string, string> = {
+            'verified-linked-users': 'Verified Linked Users',
+            'server-owners-all': 'Server Owners (All)',
+            'server-owners-setup': 'Server Owners with Setup',
+            'server-owners-without-setup': 'Server Owners without Setup',
+        };
+        const sendingType = sendingTypes[target] || 'Verified Linked Users';
+        
+        const date = mounted ? new Date() : new Date('2026-05-20T14:45:25+12:00');
+        const timestamp = date.toLocaleString('en-US', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        });
+        return `Sent by Ro-Link Staff to all ${sendingType}. | ${timestamp}`;
+    }, [footerText, target, mounted]);
     const canSend = Boolean(plainText.trim() || hasEmbedContent) && selectedCount > 0 && !sending;
 
     function updateField(index: number, patch: Partial<EmbedField>) {
@@ -379,7 +401,7 @@ export default function ManagementDmsPage() {
                             {plainText.trim() && (
                                 <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{plainText}</p>
                             )}
-                            {hasEmbedContent && (
+                            {(plainText.trim() || hasEmbedContent) && (
                                 <div className="mt-3 rounded-r-xl border-l-4 bg-slate-900/80 p-4" style={{ borderColor: parseHexColor(color) }}>
                                     <div className="mb-3 flex items-center gap-2">
                                         <img src={RO_LINK_ICON} alt="" className="h-5 w-5 rounded" />
@@ -399,12 +421,10 @@ export default function ManagementDmsPage() {
                                             ))}
                                         </div>
                                     )}
-                                    {footerText.trim() && (
-                                        <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-500">
-                                            <img src={footerIconUrl.trim() || RO_LINK_ICON} alt="" className="h-4 w-4 rounded" />
-                                            <span className="break-words">{footerText}</span>
-                                        </div>
-                                    )}
+                                    <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-500">
+                                        <img src={footerIconUrl.trim() || RO_LINK_ICON} alt="" className="h-4 w-4 rounded" />
+                                        <span className="break-words">{activeFooterText}</span>
+                                    </div>
                                 </div>
                             )}
                             {!plainText.trim() && !hasEmbedContent && (

@@ -158,11 +158,11 @@ export default function VerificationPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-12 gap-8">
+            <div className="grid grid-cols-12 gap-6 xl:gap-8">
                 {/* Main Settings Column */}
                 <div className="col-span-12 lg:col-span-8 space-y-8">
                     {/* Primary Config Section */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-10 backdrop-blur-sm relative overflow-hidden">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-8 opacity-[0.02] text-white">
                             <ShieldIcon />
                         </div>
@@ -255,7 +255,7 @@ export default function VerificationPage() {
                     </div>
 
                     {/* Status Box */}
-                    <div className="p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
+                    <div className="p-5 sm:p-6 md:p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
                         <div className="flex items-center gap-5">
                             <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/10">
                                 <InfoIcon />
@@ -277,7 +277,7 @@ export default function VerificationPage() {
 
                 {/* Info Column */}
                 <div className="col-span-12 lg:col-span-4 space-y-8">
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-8">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8">
                         <h4 className="text-xs font-bold text-white uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
                             <span className="w-6 h-px bg-sky-600"></span>
                             Documentation
@@ -300,7 +300,7 @@ export default function VerificationPage() {
                         </div>
                     </div>
 
-                    <div className="bg-sky-600/5 border border-sky-500/10 rounded-[2rem] p-8 relative overflow-hidden group hover:border-sky-500/30 transition-all">
+                    <div className="bg-sky-600/5 border border-sky-500/10 rounded-[2rem] p-5 sm:p-6 md:p-8 relative overflow-hidden group hover:border-sky-500/30 transition-all">
                         <div className="absolute -bottom-6 -right-6 opacity-[0.03] text-sky-400 group-hover:rotate-12 transition-transform duration-700">
                             <ShieldIcon />
                         </div>

@@ -729,7 +729,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                 </div>
             </div>
 
-            <div className="grid grid-cols-12 gap-8">
+            <div className="grid grid-cols-12 gap-6 xl:gap-8">
                 {/* Main Settings Column */}
                 <div className={`col-span-12 space-y-12 ${view === 'overview' ? '' : 'lg:col-span-8'}`}>
 
@@ -775,7 +775,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* --- ROLE PERMISSIONS SECTION (NEW) --- */}
                     {view === 'roles' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden transition-all duration-300">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden transition-all duration-300">
                         <div className="flex items-start justify-between mb-8 cursor-pointer" onClick={() => setIsRolesCollapsed(!isRolesCollapsed)}>
                             <div className="flex items-start gap-6">
                                 <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500 border border-purple-500/10">
@@ -868,7 +868,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                             {!roleCardCollapsed && (
                                                 <>
                                                     {/* Permissions Grid */}
-                                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-3 xl:gap-4">
                                                         {ROLE_PERMISSION_OPTIONS.map((perm) => (
                                                             <label key={perm.key} className="flex items-center gap-3 cursor-pointer group select-none">
                                                                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
@@ -931,7 +931,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                                             </div>
                                                                         </div>
 
-                                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
                                                                             {group.commands.map((command) => {
                                                                                 const enabled = hasAllCommands || hasAdminPanelCommandAccess(roleCommands, command.id);
 
@@ -994,7 +994,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     {/* Custom Dashboard Config Section */}
                     {view === 'dashboard' && (
                     <div className="space-y-6">
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
                             <div className="flex items-start gap-6 mb-8">
                                 <div className="p-3 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/10">
                                     <SettingsIcon />
@@ -1081,7 +1081,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                             </div>
                         </div>
 
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm">
+                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm">
                             <div className="mb-6">
                                 <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Layout</h3>
                                 <p className="text-sm text-slate-500 leading-relaxed">Choose how dense the custom-host dashboard shell should feel.</p>
@@ -1108,7 +1108,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                             </div>
                         </div>
 
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm">
+                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm">
                             <div className="mb-6">
                                 <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Theme</h3>
                                 <p className="text-sm text-slate-500 leading-relaxed">Choose one of seven color schemes for custom dashboard branding.</p>
@@ -1144,7 +1144,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* Command Config Section */}
                     {view === 'commands' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
                             <div className="p-3 bg-sky-500/10 rounded-xl text-sky-500 border border-sky-500/10">
                                 <CommandIcon />
@@ -1189,7 +1189,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* Logging Config Section */}
                     {view === 'logging' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
                             <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-500 border border-indigo-500/10">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -1225,7 +1225,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* Report System Config */}
                     {view === 'reports' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
                             <div className="p-3 bg-red-500/10 rounded-xl text-red-500 border border-red-500/10">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
@@ -1279,7 +1279,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     {/* Status Box */}
                     {showsSaveButton && (
                     <>
-                        <div className="p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
+                        <div className="p-5 sm:p-6 md:p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
                             <div className="flex items-center gap-5">
                                 <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/10">
                                     <InfoIcon />
@@ -1311,7 +1311,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* Remove Ro-Link */}
                     {view === 'overview' && (
-                    <div className="bg-red-950/20 border border-red-500/20 rounded-[2rem] p-10 backdrop-blur-sm">
+                    <div className="bg-red-950/20 border border-red-500/20 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm">
                         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                             <div className="flex items-start gap-5">
                                 <div className="p-3 bg-red-500/10 rounded-xl text-red-400 border border-red-500/20">
@@ -1345,7 +1345,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                 {/* Info Column */}
                 {view !== 'overview' && (
                 <div className="col-span-12 lg:col-span-4 space-y-8">
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-8">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8">
                         <h4 className="text-xs font-bold text-white uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
                             <span className="w-6 h-px bg-sky-600"></span>
                             Information

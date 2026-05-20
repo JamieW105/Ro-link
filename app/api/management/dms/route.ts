@@ -109,13 +109,29 @@ function buildMessagePayload(body: Record<string, unknown>): ModuleDiscordMessag
     const content = clampText(body.plainText, 2000);
     const title = clampText(body.embedTitle, 256);
     const description = clampText(body.description, 4096);
-    const footerText = clampText(body.footerText, 2048);
+    let footerText = clampText(body.footerText, 2048);
     const color = normalizeColor(body.color);
     const imageUrl = normalizeUrl(body.imageUrl);
     const thumbnailUrl = normalizeUrl(body.thumbnailUrl);
     const footerIconUrl = normalizeUrl(body.footerIconUrl);
     const fields = normalizeFields(body.fields);
     const roLinkIconUrl = getRoLinkIconUrl();
+
+    if (!footerText) {
+        const target = String(body.target || 'verified-linked-users');
+        const sendingTypes: Record<string, string> = {
+            'verified-linked-users': 'Verified Linked Users',
+            'server-owners-all': 'Server Owners (All)',
+            'server-owners-setup': 'Server Owners with Setup',
+            'server-owners-without-setup': 'Server Owners without Setup',
+        };
+        const sendingType = sendingTypes[target] || 'Verified Linked Users';
+        const timestamp = new Date().toLocaleString('en-US', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        });
+        footerText = `Sent by Ro-Link Staff to all ${sendingType}. | ${timestamp}`;
+    }
 
     const embed: NonNullable<ModuleDiscordMessagePayload['embeds']>[number] = {
         author: {
