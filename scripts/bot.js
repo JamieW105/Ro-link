@@ -57,6 +57,112 @@ const MISC_SUBCOMMAND_TO_COMMAND = {
 const VALUE_INPUT_MISC_COMMANDS = new Set(['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED', 'JUMP_POWER']);
 const MODERATION_LOG_ACTIONS = new Set(['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'DISCORD_BAN', 'DISCORD_KICK', 'TIMEOUT', 'MUTE']);
 
+function buildModerationPanel() {
+    const embed = new EmbedBuilder()
+        .setTitle('Moderation Actions')
+        .setDescription('Select an action from the menu below.')
+        .setColor('#ef4444')
+        .addFields(
+            { name: 'Player Actions', value: '`BAN` `KICK` `UNBAN` `SOFTBAN`', inline: false },
+            { name: 'Server Actions', value: '`UPDATE` `SHUTDOWN`', inline: false }
+        )
+        .setFooter({ text: 'Ro-Link Moderation System' });
+
+    const row = new ActionRowBuilder()
+        .addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('moderation_menu')
+                .setPlaceholder('Choose a moderation action...')
+                .addOptions(
+                    new StringSelectMenuOptionBuilder().setLabel('Ban').setDescription('Permanently ban a Roblox user').setValue('BAN'),
+                    new StringSelectMenuOptionBuilder().setLabel('Kick').setDescription('Kick a Roblox user from the server').setValue('KICK'),
+                    new StringSelectMenuOptionBuilder().setLabel('Unban').setDescription('Lift a Roblox ban').setValue('UNBAN'),
+                    new StringSelectMenuOptionBuilder().setLabel('Softban').setDescription('Temporarily ban and remove a Roblox user').setValue('SOFTBAN'),
+                    new StringSelectMenuOptionBuilder().setLabel('Update Servers').setDescription('Restart all Roblox servers').setValue('UPDATE'),
+                    new StringSelectMenuOptionBuilder().setLabel('Shutdown').setDescription('Shut down Roblox servers').setValue('SHUTDOWN'),
+                ),
+        );
+
+    return { embed, row };
+}
+
+function buildMiscPanel() {
+    const embed = new EmbedBuilder()
+        .setTitle('Miscellaneous Player Actions')
+        .setDescription('Select an action from the menu below to apply it to a Roblox player.')
+        .setColor('#0ea5e9')
+        .addFields(
+            { name: 'Fly', value: 'Enables hover/flight for the target player.', inline: false },
+            { name: 'Noclip', value: 'Allows the player to pass through walls.', inline: false },
+            { name: 'Invis', value: 'Makes the player and their accessories fully invisible.', inline: false },
+            { name: 'Ghost', value: 'Applies a ForceField material to the player character.', inline: false },
+            { name: 'Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: false },
+            { name: 'Heal', value: 'Restores player health to maximum.', inline: false },
+            { name: 'Kill', value: 'Immediately kills the target player.', inline: false },
+            { name: 'Reset', value: 'Resets the player character.', inline: false },
+            { name: 'Refresh', value: 'Respawn the player character.', inline: false }
+        )
+        .setFooter({ text: 'Ro-Link Utility System' });
+
+    const row = new ActionRowBuilder()
+        .addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('misc_menu')
+                .setPlaceholder('Choose an action...')
+                .addOptions(
+                    new StringSelectMenuOptionBuilder().setLabel('Fly').setDescription('Enable flight for the player').setValue('FLY'),
+                    new StringSelectMenuOptionBuilder().setLabel('Noclip').setDescription('Allow player to walk through walls').setValue('NOCLIP'),
+                    new StringSelectMenuOptionBuilder().setLabel('Invis').setDescription('Make the player invisible').setValue('INVIS'),
+                    new StringSelectMenuOptionBuilder().setLabel('Ghost').setDescription('Apply a ForceField material').setValue('GHOST'),
+                    new StringSelectMenuOptionBuilder().setLabel('Set Character').setDescription('Change appearance').setValue('SET_CHAR'),
+                    new StringSelectMenuOptionBuilder().setLabel('Heal').setDescription('Restore health').setValue('HEAL'),
+                    new StringSelectMenuOptionBuilder().setLabel('Damage').setDescription('Deal damage').setValue('DAMAGE'),
+                    new StringSelectMenuOptionBuilder().setLabel('Max Health').setDescription('Set maximum health').setValue('MAX_HEALTH'),
+                    new StringSelectMenuOptionBuilder().setLabel('Walk Speed').setDescription('Set walk speed').setValue('WALK_SPEED'),
+                    new StringSelectMenuOptionBuilder().setLabel('Jump Power').setDescription('Set jump power').setValue('JUMP_POWER'),
+                    new StringSelectMenuOptionBuilder().setLabel('Kill').setDescription('Instant kill').setValue('KILL'),
+                    new StringSelectMenuOptionBuilder().setLabel('Reset').setDescription('Reset character').setValue('RESET'),
+                    new StringSelectMenuOptionBuilder().setLabel('Refresh').setDescription('Refresh character').setValue('REFRESH'),
+                    new StringSelectMenuOptionBuilder().setLabel('Freeze').setDescription('Anchor in place').setValue('FREEZE'),
+                    new StringSelectMenuOptionBuilder().setLabel('Unfreeze').setDescription('Remove freeze').setValue('UNFREEZE'),
+                    new StringSelectMenuOptionBuilder().setLabel('Bring To Spawn').setDescription('Move to spawn').setValue('BRING_TO_SPAWN'),
+                    new StringSelectMenuOptionBuilder().setLabel('Teleport To Me').setDescription('Move to a moderator').setValue('TELEPORT_TO_ME'),
+                    new StringSelectMenuOptionBuilder().setLabel('Add ForceField').setDescription('Add a ForceField').setValue('FORCEFIELD_ADD'),
+                    new StringSelectMenuOptionBuilder().setLabel('Remove ForceField').setDescription('Remove ForceFields').setValue('FORCEFIELD_REMOVE'),
+                ),
+        );
+
+    return { embed, row };
+}
+
+async function isServerStaffInteraction(interaction) {
+    if (!interaction?.member) return false;
+    if (
+        interaction.member.permissions.has('Administrator')
+        || interaction.member.permissions.has('BanMembers')
+        || interaction.member.permissions.has('KickMembers')
+        || interaction.member.permissions.has('ManageGuild')
+    ) {
+        return true;
+    }
+
+    const roleIds = interaction.member.roles?.cache?.map((role) => role.id) || [];
+    if (!roleIds.length) return false;
+
+    const { data: roles } = await supabase
+        .from('dashboard_roles')
+        .select('can_lookup, can_kick, can_ban, can_access_dashboard')
+        .eq('server_id', interaction.guildId)
+        .in('discord_role_id', roleIds);
+
+    return Array.isArray(roles) && roles.some((role) =>
+        role.can_lookup === true
+        || role.can_kick === true
+        || role.can_ban === true
+        || role.can_access_dashboard === true
+    );
+}
+
 async function refreshCommands() {
     try {
         console.log('Started refreshing application (/) commands.');
@@ -888,7 +994,7 @@ client.on('interactionCreate', async interaction => {
     }
 
     // 4. Permission Check for Moderation Commands
-    if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('BanMembers') && !interaction.member.permissions.has('KickMembers')) {
+    if (commandName !== 'lookup' && !interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('BanMembers') && !interaction.member.permissions.has('KickMembers')) {
         return interaction.reply({
             content: 'You do not have permission to use moderation commands. (Requires Kick/Ban Members or Admin)',
             ephemeral: true
@@ -978,6 +1084,8 @@ client.on('interactionCreate', async interaction => {
         await interaction.deferReply({ ephemeral: true });
 
         try {
+            const showStaffControls = await isServerStaffInteraction(interaction);
+
             // If neither is provided, default to the command runner (interaction.user)
             if (!robloxUserArg && !discordUserArg) {
                 discordUserArg = interaction.user;
@@ -1053,16 +1161,16 @@ client.on('interactionCreate', async interaction => {
                 matchValues.add(String(verifiedUserForRoblox.roblox_id).toLowerCase());
             }
 
-            // Fetch the last 100 logs and filter them
-            const { data: logsRes, error: logsError } = await supabase
-                .from('logs')
-                .select('id, action, moderator, timestamp, target')
-                .eq('server_id', guildId)
-                .order('timestamp', { ascending: false })
-                .limit(100);
-
             let moderationHistory = [];
-            if (!logsError && Array.isArray(logsRes)) {
+            if (showStaffControls) {
+                const { data: logsRes, error: logsError } = await supabase
+                    .from('logs')
+                    .select('id, action, moderator, timestamp, target')
+                    .eq('server_id', guildId)
+                    .order('timestamp', { ascending: false })
+                    .limit(100);
+
+                if (!logsError && Array.isArray(logsRes)) {
                 moderationHistory = logsRes
                     .filter((entry) => {
                         const action = String(entry?.action || '').toUpperCase();
@@ -1076,6 +1184,7 @@ client.on('interactionCreate', async interaction => {
                         );
                     })
                     .slice(0, 5);
+                }
             }
 
             const embeds = [];
@@ -1154,26 +1263,28 @@ client.on('interactionCreate', async interaction => {
                 robloxUsername: finalRobloxLookup?.username || discordLookup?.verifiedUser?.roblox_username || verifiedUserForRoblox?.roblox_username || '',
             };
             let staffNotes = [];
-            try {
-                staffNotes = await fetchStaffNotes(guildId, staffNoteTarget, 5);
-            } catch (err) {
-                console.warn('[STAFF_NOTES] Failed to load notes for lookup:', err.message);
+            if (showStaffControls) {
+                try {
+                    staffNotes = await fetchStaffNotes(guildId, staffNoteTarget, 5);
+                } catch (err) {
+                    console.warn('[STAFF_NOTES] Failed to load notes for lookup:', err.message);
+                }
+
+                // 3. Build Moderation Embed
+                const modEmbed = new EmbedBuilder()
+                    .setTitle(`Server Moderation History`)
+                    .setColor(moderationHistory.length > 0 ? '#ef4444' : '#0ea5e9')
+                    .setDescription(formatModerationHistory(moderationHistory))
+                    .setFooter({ text: `Ro-Link Utility System - ${moderationHistory.length} prior moderation action(s)` });
+                embeds.push(modEmbed);
+
+                const notesEmbed = new EmbedBuilder()
+                    .setTitle('Staff Notes')
+                    .setColor(staffNotes.length > 0 ? '#f59e0b' : '#64748b')
+                    .setDescription(formatStaffNotes(staffNotes))
+                    .setFooter({ text: `Ro-Link Systems - ${staffNotes.length} staff note(s)` });
+                embeds.push(notesEmbed);
             }
-
-            // 3. Build Moderation Embed
-            const modEmbed = new EmbedBuilder()
-                .setTitle(`Server Moderation History`)
-                .setColor(moderationHistory.length > 0 ? '#ef4444' : '#0ea5e9')
-                .setDescription(formatModerationHistory(moderationHistory))
-                .setFooter({ text: `Ro-Link Utility System - ${moderationHistory.length} prior moderation action(s)` });
-            embeds.push(modEmbed);
-
-            const notesEmbed = new EmbedBuilder()
-                .setTitle('Staff Notes')
-                .setColor(staffNotes.length > 0 ? '#f59e0b' : '#64748b')
-                .setDescription(formatStaffNotes(staffNotes))
-                .setFooter({ text: `Ro-Link Systems - ${staffNotes.length} staff note(s)` });
-            embeds.push(notesEmbed);
 
             // Determine if Join button is needed
             let finalJobId = null;
@@ -1183,7 +1294,7 @@ client.on('interactionCreate', async interaction => {
                 finalJobId = discordLookup.activeServer.id;
             }
 
-            let components = [];
+            const actionButtons = [];
             if (finalJobId) {
                 const { data: serverSettings } = await supabase
                     .from('servers')
@@ -1192,18 +1303,20 @@ client.on('interactionCreate', async interaction => {
                     .maybeSingle();
                 const joinUrl = buildRobloxJoinUrl(serverSettings?.place_id, finalJobId);
                 if (joinUrl) {
-                    components = [new ActionRowBuilder().addComponents(
-                        new ButtonBuilder().setLabel('Join Game').setURL(joinUrl).setStyle(ButtonStyle.Link),
-                        new ButtonBuilder().setLabel('Add Staff Note').setCustomId(buildStaffNoteModalCustomId(staffNoteTarget)).setStyle(ButtonStyle.Primary)
-                    )];
+                    actionButtons.push(new ButtonBuilder().setLabel('Join Game').setURL(joinUrl).setStyle(ButtonStyle.Link));
                 }
             }
 
-            if (components.length === 0) {
-                components = [new ActionRowBuilder().addComponents(
+            if (showStaffControls) {
+                actionButtons.push(
+                    new ButtonBuilder().setLabel('Manage').setCustomId('lookup_manage').setStyle(ButtonStyle.Primary),
                     new ButtonBuilder().setLabel('Add Staff Note').setCustomId(buildStaffNoteModalCustomId(staffNoteTarget)).setStyle(ButtonStyle.Primary)
-                )];
+                );
             }
+
+            const components = actionButtons.length > 0
+                ? [new ActionRowBuilder().addComponents(...actionButtons)]
+                : [];
 
             await interaction.editReply({ embeds, components });
 
@@ -1904,7 +2017,7 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.isModalSubmit()) return;
 
     if (interaction.customId.startsWith('staff_note_modal|')) {
-        if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('BanMembers') && !interaction.member.permissions.has('KickMembers')) {
+        if (!await isServerStaffInteraction(interaction)) {
             return interaction.reply({ content: 'You do not have permission to add staff notes.', ephemeral: true });
         }
 
@@ -2053,8 +2166,22 @@ client.on('interactionCreate', async interaction => {
 
     const customId = interaction.customId;
 
+    if (customId === 'lookup_manage') {
+        if (!await isServerStaffInteraction(interaction)) {
+            return interaction.reply({ content: 'You need moderation permissions to use these actions.', ephemeral: true });
+        }
+
+        const moderationPanel = buildModerationPanel();
+        const miscPanel = buildMiscPanel();
+        return interaction.reply({
+            embeds: [moderationPanel.embed, miscPanel.embed],
+            components: [moderationPanel.row, miscPanel.row],
+            ephemeral: true,
+        });
+    }
+
     if (customId.startsWith('staff_note_modal|')) {
-        if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('BanMembers') && !interaction.member.permissions.has('KickMembers')) {
+        if (!await isServerStaffInteraction(interaction)) {
             return interaction.reply({ content: 'You do not have permission to add staff notes.', ephemeral: true });
         }
 

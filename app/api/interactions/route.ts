@@ -234,6 +234,103 @@ const VALUE_INPUT_MISC_COMMANDS = new Set(['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED',
 const MODERATION_MENU_ACTIONS = ['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'UPDATE', 'SHUTDOWN'] as const;
 const MODERATION_LOG_ACTIONS = new Set(['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'DISCORD_BAN', 'DISCORD_KICK', 'TIMEOUT', 'MUTE']);
 
+function buildModerationPanelResponse(): InteractionResponseData {
+    return {
+        embeds: [{
+            title: 'Moderation Actions',
+            description: 'Select an action from the menu below.',
+            color: 0xef4444,
+            fields: [
+                { name: 'Player Actions', value: '`BAN` `KICK` `UNBAN` `SOFTBAN`', inline: false },
+                { name: 'Server Actions', value: '`UPDATE` `SHUTDOWN`', inline: false },
+            ],
+            footer: { text: 'Ro-Link Systems - Moderation Tools' },
+            timestamp: new Date().toISOString()
+        }],
+        flags: 64,
+        components: [{
+            type: 1,
+            components: [{
+                type: 3,
+                custom_id: 'moderation_menu',
+                placeholder: 'Choose a moderation action...',
+                options: [
+                    { label: 'Ban', value: 'BAN', description: 'Permanently ban a Roblox user' },
+                    { label: 'Kick', value: 'KICK', description: 'Kick a Roblox user from the server' },
+                    { label: 'Unban', value: 'UNBAN', description: 'Lift a Roblox ban' },
+                    { label: 'Softban', value: 'SOFTBAN', description: 'Temporarily ban and remove a Roblox user' },
+                    { label: 'Update Servers', value: 'UPDATE', description: 'Restart all Roblox servers' },
+                    { label: 'Shutdown', value: 'SHUTDOWN', description: 'Shut down Roblox servers' }
+                ]
+            }]
+        }]
+    };
+}
+
+function buildMiscPanelResponse(): InteractionResponseData {
+    return {
+        embeds: [{
+            title: 'Miscellaneous Actions',
+            description: 'Select an action from the menu below to apply it to a Roblox player.',
+            color: 0x2b2d31,
+            fields: [
+                { name: 'Movement', value: "`FLY` `NOCLIP`", inline: true },
+                { name: 'Visibility', value: "`INVIS` `GHOST`", inline: true },
+                { name: 'Vitality', value: "`HEAL` `KILL` `RESET`", inline: true },
+                { name: 'Identity', value: "`SET_CHAR` `REFRESH`", inline: true }
+            ],
+            footer: { text: 'Ro-Link Systems - Admin Tools' },
+            timestamp: new Date().toISOString()
+        }],
+        flags: 64,
+        components: [{
+            type: 1,
+            components: [{
+                type: 3,
+                custom_id: `misc_menu`,
+                placeholder: 'Choose an action...',
+                options: [
+                    { label: 'Fly', value: 'FLY', description: 'Enable flight for the player' },
+                    { label: 'Noclip', value: 'NOCLIP', description: 'Allow player to walk through walls' },
+                    { label: 'Invis', value: 'INVIS', description: 'Make the player invisible' },
+                    { label: 'Ghost', value: 'GHOST', description: 'Apply a ForceField material' },
+                    { label: 'Set Character', value: 'SET_CHAR', description: 'Change appearance' },
+                    { label: 'Heal', value: 'HEAL', description: 'Restore health' },
+                    { label: 'Damage', value: 'DAMAGE', description: 'Deal damage' },
+                    { label: 'Max Health', value: 'MAX_HEALTH', description: 'Set maximum health' },
+                    { label: 'Walk Speed', value: 'WALK_SPEED', description: 'Set walk speed' },
+                    { label: 'Jump Power', value: 'JUMP_POWER', description: 'Set jump power' },
+                    { label: 'Kill', value: 'KILL', description: 'Instant kill' },
+                    { label: 'Reset', value: 'RESET', description: 'Reset character' },
+                    { label: 'Refresh', value: 'REFRESH', description: 'Refresh character' },
+                    { label: 'Freeze', value: 'FREEZE', description: 'Anchor in place' },
+                    { label: 'Unfreeze', value: 'UNFREEZE', description: 'Remove freeze' },
+                    { label: 'Bring To Spawn', value: 'BRING_TO_SPAWN', description: 'Move to spawn' },
+                    { label: 'Teleport To Me', value: 'TELEPORT_TO_ME', description: 'Move to a moderator' },
+                    { label: 'Add ForceField', value: 'FORCEFIELD_ADD', description: 'Add a ForceField' },
+                    { label: 'Remove ForceField', value: 'FORCEFIELD_REMOVE', description: 'Remove ForceFields' }
+                ]
+            }]
+        }]
+    };
+}
+
+function buildManagePanelResponse(): InteractionResponseData {
+    const moderationPanel = buildModerationPanelResponse();
+    const miscPanel = buildMiscPanelResponse();
+    return {
+        flags: 64,
+        embeds: [
+            ...(moderationPanel.embeds || []),
+            ...(miscPanel.embeds || []),
+        ],
+        components: [
+            ...(moderationPanel.components || []),
+            ...(miscPanel.components || []),
+        ],
+    };
+}
+
 function buildCommandSummary(commandNames: string[]) {
     return commandNames
         .map((commandName) => {
@@ -775,8 +872,9 @@ async function buildLookupInteractionResponse(input: {
     options: CommandOption[] | undefined;
     server: InteractionServerRecord;
     userId: string;
+    showStaffControls: boolean;
 }): Promise<LookupInteractionResult> {
-    const { guildId, options, server, userId } = input;
+    const { guildId, options, server, userId, showStaffControls } = input;
 
     // Resolve arguments - default to the command executor if nothing is provided.
     const robloxUserArg = String(getCommandOptionValue(options, 'roblox_user') ?? '').trim();
@@ -853,26 +951,29 @@ async function buildLookupInteractionResponse(input: {
         matchValues.add(String(verifiedUserForRoblox.roblox_id).toLowerCase());
     }
 
-    const { data: logsData } = await supabase
-        .from('logs')
-        .select('id, action, moderator, timestamp, target')
-        .eq('server_id', guildId)
-        .order('timestamp', { ascending: false })
-        .limit(100);
+    let combinedHistory: LookupHistoryEntry[] = [];
+    if (showStaffControls) {
+        const { data: logsData } = await supabase
+            .from('logs')
+            .select('id, action, moderator, timestamp, target')
+            .eq('server_id', guildId)
+            .order('timestamp', { ascending: false })
+            .limit(100);
 
-    const combinedHistory = ((Array.isArray(logsData) ? logsData : []) as LookupHistoryEntry[])
-        .filter((entry) => {
-            const action = String(entry?.action || '').toUpperCase();
-            const target = String(entry?.target || '').toLowerCase();
-            return matchValues.has(target) && (
-                MODERATION_LOG_ACTIONS.has(action)
-                || action.includes('BAN')
-                || action.includes('KICK')
-                || action.includes('MUTE')
-                || action.includes('TIMEOUT')
-            );
-        })
-        .slice(0, 5);
+        combinedHistory = ((Array.isArray(logsData) ? logsData : []) as LookupHistoryEntry[])
+            .filter((entry) => {
+                const action = String(entry?.action || '').toUpperCase();
+                const target = String(entry?.target || '').toLowerCase();
+                return matchValues.has(target) && (
+                    MODERATION_LOG_ACTIONS.has(action)
+                    || action.includes('BAN')
+                    || action.includes('KICK')
+                    || action.includes('MUTE')
+                    || action.includes('TIMEOUT')
+                );
+            })
+            .slice(0, 5);
+    }
 
     const embeds: object[] = [];
 
@@ -958,27 +1059,29 @@ async function buildLookupInteractionResponse(input: {
         robloxUsername: finalRobloxLookup?.username ?? discordLookup?.verifiedUser?.roblox_username ?? verifiedUserForRoblox?.roblox_username,
     };
     let staffNotes: StaffNoteRow[] = [];
-    try {
-        staffNotes = await fetchStaffNotes(supabase, guildId, staffNoteTarget, 5);
-    } catch (error) {
-        console.warn('[STAFF_NOTES] Failed to load notes for lookup:', error);
+    if (showStaffControls) {
+        try {
+            staffNotes = await fetchStaffNotes(supabase, guildId, staffNoteTarget, 5);
+        } catch (error) {
+            console.warn('[STAFF_NOTES] Failed to load notes for lookup:', error);
+        }
+
+        embeds.push({
+            title: 'Server Moderation History',
+            color: combinedHistory.length > 0 ? 0xef4444 : 0x0ea5e9,
+            description: formatModerationHistory(combinedHistory),
+            footer: { text: `Ro-Link Systems - ${combinedHistory.length} prior moderation action(s)` },
+            timestamp: new Date().toISOString(),
+        });
+
+        embeds.push({
+            title: 'Staff Notes',
+            color: staffNotes.length > 0 ? 0xf59e0b : 0x64748b,
+            description: formatStaffNotes(staffNotes),
+            footer: { text: `Ro-Link Systems - ${staffNotes.length} staff note(s)` },
+            timestamp: new Date().toISOString(),
+        });
     }
-
-    embeds.push({
-        title: 'Server Moderation History',
-        color: combinedHistory.length > 0 ? 0xef4444 : 0x0ea5e9,
-        description: formatModerationHistory(combinedHistory),
-        footer: { text: `Ro-Link Systems - ${combinedHistory.length} prior moderation action(s)` },
-        timestamp: new Date().toISOString(),
-    });
-
-    embeds.push({
-        title: 'Staff Notes',
-        color: staffNotes.length > 0 ? 0xf59e0b : 0x64748b,
-        description: formatStaffNotes(staffNotes),
-        footer: { text: `Ro-Link Systems - ${staffNotes.length} staff note(s)` },
-        timestamp: new Date().toISOString(),
-    });
 
     let finalJobId: string | null = null;
     if (finalRobloxLookup?.inGame && finalRobloxLookup?.jobId) {
@@ -989,11 +1092,15 @@ async function buildLookupInteractionResponse(input: {
 
     const joinUrl = finalJobId ? buildRobloxJoinUrl(server.place_id, finalJobId) : null;
     const targetLogStr = targetDiscordId || robloxUserArg || 'self';
-    const actionRowComponents: object[] = [
-        { type: 2, style: 1, label: 'Add Staff Note', custom_id: buildStaffNoteModalCustomId(staffNoteTarget) },
-    ];
+    const actionRowComponents: object[] = [];
     if (joinUrl) {
-        actionRowComponents.unshift({ type: 2, style: 5, label: 'Join Game', url: joinUrl });
+        actionRowComponents.push({ type: 2, style: 5, label: 'Join Game', url: joinUrl });
+    }
+    if (showStaffControls) {
+        actionRowComponents.push(
+            { type: 2, style: 1, label: 'Manage', custom_id: 'lookup_manage' },
+            { type: 2, style: 1, label: 'Add Staff Note', custom_id: buildStaffNoteModalCustomId(staffNoteTarget) },
+        );
     }
 
     return {
@@ -1001,7 +1108,7 @@ async function buildLookupInteractionResponse(input: {
         response: {
             flags: 64,
             embeds,
-            components: [{ type: 1, components: actionRowComponents }],
+            components: actionRowComponents.length > 0 ? [{ type: 1, components: actionRowComponents }] : [],
         },
     };
 }
@@ -1240,6 +1347,18 @@ export async function POST(req: Request) {
             // Check if any of the user's roles have the required permission
             const roleRows = roles as DashboardRoleRow[];
             return roleRows.some((role) => role[permissionKey] === true);
+        }
+
+        async function isServerStaff() {
+            const permissions = BigInt(member?.permissions || '0');
+            if ((permissions & 0x2n) !== 0n || (permissions & 0x4n) !== 0n || (permissions & 0x8n) !== 0n || (permissions & 0x20n) !== 0n) {
+                return true;
+            }
+
+            return await checkPermission('can_lookup')
+                || await checkPermission('can_kick')
+                || await checkPermission('can_ban')
+                || await checkPermission('can_access_dashboard');
         }
 
         // Helper to trigger Messaging Service
@@ -1517,15 +1636,7 @@ export async function POST(req: Request) {
                 if (applicationId && interactionToken) {
                     after(async () => {
                         try {
-                            const hasLookupPerms = await checkPermission('can_lookup');
-                            if (!hasLookupPerms) {
-                                await editOriginalInteractionResponse(
-                                    applicationId,
-                                    interactionToken,
-                                    buildEphemeralErrorResponse('You do not have permission to use this command. This action requires specific Ro-Link moderator permissions or Administrator.')
-                                );
-                                return;
-                            }
+                            const showStaffControls = await isServerStaff();
 
                             const { data: server, error: serverError } = await supabase
                                 .from('servers')
@@ -1548,6 +1659,7 @@ export async function POST(req: Request) {
                                 options,
                                 server,
                                 userId,
+                                showStaffControls,
                             });
 
                             await editOriginalInteractionResponse(applicationId, interactionToken, lookupResult.response);
@@ -1573,7 +1685,8 @@ export async function POST(req: Request) {
             if (isBan) hasPerms = await checkPermission('can_ban');
             else if (isKick) hasPerms = await checkPermission('can_kick');
             else if (isTimeout) hasPerms = await checkPermission('can_timeout');
-            else if (isLookup || isStaffNote) hasPerms = await checkPermission('can_lookup');
+            else if (isLookup) hasPerms = true;
+            else if (isStaffNote) hasPerms = await checkPermission('can_lookup');
             else if (isServers) hasPerms = await checkPermission('can_access_dashboard');
             else if (isMiscCommand) hasPerms = await checkPermission('can_access_dashboard');
             else if (isModerationMenu) hasPerms = await checkPermission('can_kick') || await checkPermission('can_ban');
@@ -1651,36 +1764,7 @@ export async function POST(req: Request) {
             if (name === 'moderation') {
                 return NextResponse.json({
                     type: 4,
-                    data: {
-                        embeds: [{
-                            title: 'Moderation Actions',
-                            description: 'Select an action from the menu below.',
-                            color: 0xef4444,
-                            fields: [
-                                { name: 'Player Actions', value: '`BAN` `KICK` `UNBAN` `SOFTBAN`', inline: false },
-                                { name: 'Server Actions', value: '`UPDATE` `SHUTDOWN`', inline: false },
-                            ],
-                            footer: { text: 'Ro-Link Systems - Moderation Tools' },
-                            timestamp: new Date().toISOString()
-                        }],
-                        flags: 64,
-                        components: [{
-                            type: 1,
-                            components: [{
-                                type: 3,
-                                custom_id: 'moderation_menu',
-                                placeholder: 'Choose a moderation action...',
-                                options: [
-                                    { label: 'Ban', value: 'BAN', description: 'Permanently ban a Roblox user' },
-                                    { label: 'Kick', value: 'KICK', description: 'Kick a Roblox user from the server' },
-                                    { label: 'Unban', value: 'UNBAN', description: 'Lift a Roblox ban' },
-                                    { label: 'Softban', value: 'SOFTBAN', description: 'Temporarily ban and remove a Roblox user' },
-                                    { label: 'Update Servers', value: 'UPDATE', description: 'Restart all Roblox servers' },
-                                    { label: 'Shutdown', value: 'SHUTDOWN', description: 'Shut down Roblox servers' }
-                                ]
-                            }]
-                        }]
-                    }
+                    data: buildModerationPanelResponse()
                 });
             }
 
@@ -1691,6 +1775,7 @@ export async function POST(req: Request) {
                         options,
                         server,
                         userId,
+                        showStaffControls: await isServerStaff(),
                     });
 
                     await logAction(guild_id, 'LOOKUP', lookupResult.targetLogStr, userTag, 'Unified lookup command');
@@ -2134,12 +2219,13 @@ export async function POST(req: Request) {
                 || cid.startsWith('misc_modal_')
                 || cid === 'moderation_menu'
                 || cid.startsWith('moderation_modal_')
+                || cid === 'lookup_manage'
                 || cid === 'servers_select'
                 || cid.startsWith('server_action|')
                 || cid.startsWith('server_player_action|')
             ) {
                 // Determine if it should be a misc action check, for now we allow if they have dashboard access
-                requiredPerm = 'can_access_dashboard';
+                requiredPerm = cid === 'lookup_manage' ? 'can_lookup' : 'can_access_dashboard';
             } else if (cid === 'report_open' || cid === 'report_submit') {
                 // Anyone can OPEN a report form
                 requiredPerm = '';
@@ -2147,7 +2233,9 @@ export async function POST(req: Request) {
                 requiredPerm = 'can_lookup';
             }
 
-            const hasPerms = requiredPerm === '' ? true : await checkPermission(requiredPerm);
+            const hasPerms = cid === 'lookup_manage'
+                ? await isServerStaff()
+                : requiredPerm === '' ? true : await checkPermission(requiredPerm);
 
             if (!hasPerms) {
                 return NextResponse.json({
@@ -2176,6 +2264,13 @@ export async function POST(req: Request) {
                             }]
                         }]
                     }
+                });
+            }
+
+            if (cid === 'lookup_manage') {
+                return NextResponse.json({
+                    type: 4,
+                    data: buildManagePanelResponse(),
                 });
             }
 
