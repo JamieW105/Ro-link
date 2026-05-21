@@ -31,6 +31,7 @@ interface StaffNote {
     created_by_discord_id?: string | null;
     created_by_tag?: string | null;
     created_at: string;
+    can_delete?: boolean;
 }
 
 // SVGs
@@ -78,6 +79,7 @@ function PlayerLookupContent() {
     const [loading, setLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [noteSaving, setNoteSaving] = useState(false);
+    const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [reasonText, setReasonText] = useState("Dashboard action");
     const [noteText, setNoteText] = useState("");
@@ -267,6 +269,28 @@ function PlayerLookupContent() {
         }
     }
 
+    async function handleDeleteNote(noteId: string) {
+        if (!id || !noteId) return;
+        if (!confirm("Delete this staff note?")) return;
+
+        setDeletingNoteId(noteId);
+        try {
+            const response = await fetch(`/api/dashboard/staff-notes?serverId=${encodeURIComponent(String(id))}&noteId=${encodeURIComponent(noteId)}`, {
+                method: 'DELETE',
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload.error || 'Failed to delete staff note.');
+            }
+
+            setStaffNotes((current) => current.filter((note) => note.id !== noteId));
+        } catch (err: any) {
+            alert(err.message || 'Failed to delete staff note.');
+        } finally {
+            setDeletingNoteId(null);
+        }
+    }
+
     return (
         <div className="space-y-8 max-w-5xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="flex flex-col gap-1">
@@ -425,9 +449,21 @@ function PlayerLookupContent() {
                                 <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar mb-6">
                                     {staffNotes.map((note) => (
                                         <div key={note.id} className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4">
-                                            <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{note.note}</p>
+                                            <div className="flex items-start justify-between gap-4">
+                                                <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap flex-1">{note.note}</p>
+                                                {note.can_delete ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteNote(note.id)}
+                                                        disabled={deletingNoteId === note.id}
+                                                        className="shrink-0 px-3 py-2 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] font-bold uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    >
+                                                        {deletingNoteId === note.id ? 'Deleting' : 'Delete'}
+                                                    </button>
+                                                ) : null}
+                                            </div>
                                             <p className="text-[11px] text-slate-500 mt-3 font-medium">
-                                                By {note.created_by_tag || note.created_by_discord_id || 'Unknown Staff'} â€¢ {new Date(note.created_at).toLocaleString()}
+                                                By {note.created_by_tag || note.created_by_discord_id || 'Unknown Staff'} - {new Date(note.created_at).toLocaleString()}
                                             </p>
                                         </div>
                                     ))}
