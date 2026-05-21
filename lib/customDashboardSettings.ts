@@ -30,6 +30,17 @@ export type CustomDashboardThemeOption = {
     softBg: string;
     border: string;
     gradient: string;
+    pageBg: string;
+    pageBgSoft: string;
+    surfaceBg: string;
+    surfaceBgSoft: string;
+    surfaceBgStrong: string;
+    textPrimary: string;
+    textSecondary: string;
+    textMuted: string;
+    textFaint: string;
+    neutralBorder: string;
+    neutralBorderStrong: string;
 };
 
 export const DEFAULT_CUSTOM_DASHBOARD_LAYOUT: CustomDashboardLayout = 'standard';
@@ -53,6 +64,17 @@ export const CUSTOM_DASHBOARD_THEMES: CustomDashboardThemeOption[] = [
         softBg: 'rgba(14, 165, 233, 0.14)',
         border: 'rgba(56, 189, 248, 0.28)',
         gradient: 'radial-gradient(circle at top left, rgba(14, 165, 233, 0.2), transparent 34%), #020617',
+        pageBg: '#020617',
+        pageBgSoft: '#07111f',
+        surfaceBg: '#0f172a',
+        surfaceBgSoft: '#111c31',
+        surfaceBgStrong: '#020617',
+        textPrimary: '#f8fafc',
+        textSecondary: '#cbd5e1',
+        textMuted: '#94a3b8',
+        textFaint: '#64748b',
+        neutralBorder: 'rgba(51, 65, 85, 0.72)',
+        neutralBorderStrong: 'rgba(71, 85, 105, 0.9)',
     },
     {
         id: 'emerald',
@@ -61,7 +83,18 @@ export const CUSTOM_DASHBOARD_THEMES: CustomDashboardThemeOption[] = [
         accentText: '#a7f3d0',
         softBg: 'rgba(16, 185, 129, 0.14)',
         border: 'rgba(52, 211, 153, 0.28)',
-        gradient: 'radial-gradient(circle at top left, rgba(16, 185, 129, 0.2), transparent 34%), #020617',
+        gradient: 'radial-gradient(circle at top left, rgba(16, 185, 129, 0.2), transparent 34%), #03130f',
+        pageBg: '#03130f',
+        pageBgSoft: '#062018',
+        surfaceBg: '#0b211a',
+        surfaceBgSoft: '#0e2b22',
+        surfaceBgStrong: '#04100d',
+        textPrimary: '#ecfdf5',
+        textSecondary: '#bbf7d0',
+        textMuted: '#86b9a4',
+        textFaint: '#4d806e',
+        neutralBorder: 'rgba(52, 211, 153, 0.16)',
+        neutralBorderStrong: 'rgba(110, 231, 183, 0.28)',
     },
     {
         id: 'violet',
@@ -70,7 +103,18 @@ export const CUSTOM_DASHBOARD_THEMES: CustomDashboardThemeOption[] = [
         accentText: '#ddd6fe',
         softBg: 'rgba(139, 92, 246, 0.14)',
         border: 'rgba(167, 139, 250, 0.28)',
-        gradient: 'radial-gradient(circle at top left, rgba(139, 92, 246, 0.2), transparent 34%), #020617',
+        gradient: 'radial-gradient(circle at top left, rgba(139, 92, 246, 0.2), transparent 34%), #0e0920',
+        pageBg: '#0e0920',
+        pageBgSoft: '#17102d',
+        surfaceBg: '#1b1533',
+        surfaceBgSoft: '#241b42',
+        surfaceBgStrong: '#090616',
+        textPrimary: '#faf5ff',
+        textSecondary: '#ddd6fe',
+        textMuted: '#b8a8d8',
+        textFaint: '#7d6b9a',
+        neutralBorder: 'rgba(167, 139, 250, 0.16)',
+        neutralBorderStrong: 'rgba(196, 181, 253, 0.28)',
     },
     {
         id: 'rose',
@@ -79,7 +123,18 @@ export const CUSTOM_DASHBOARD_THEMES: CustomDashboardThemeOption[] = [
         accentText: '#fecdd3',
         softBg: 'rgba(244, 63, 94, 0.14)',
         border: 'rgba(251, 113, 133, 0.28)',
-        gradient: 'radial-gradient(circle at top left, rgba(244, 63, 94, 0.2), transparent 34%), #020617',
+        gradient: 'radial-gradient(circle at top left, rgba(244, 63, 94, 0.2), transparent 34%), #1b0810',
+        pageBg: '#1b0810',
+        pageBgSoft: '#2a0e17',
+        surfaceBg: '#32131c',
+        surfaceBgSoft: '#401924',
+        surfaceBgStrong: '#12050a',
+        textPrimary: '#fff1f2',
+        textSecondary: '#fecdd3',
+        textMuted: '#d99aa6',
+        textFaint: '#925763',
+        neutralBorder: 'rgba(251, 113, 133, 0.16)',
+        neutralBorderStrong: 'rgba(253, 164, 175, 0.28)',
     },
     {
         id: 'amber',
@@ -88,7 +143,18 @@ export const CUSTOM_DASHBOARD_THEMES: CustomDashboardThemeOption[] = [
         accentText: '#fde68a',
         softBg: 'rgba(245, 158, 11, 0.14)',
         border: 'rgba(251, 191, 36, 0.28)',
-        gradient: 'radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 34%), #020617',
+        gradient: 'radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 34%), #1a1004',
+        pageBg: '#1a1004',
+        pageBgSoft: '#261807',
+        surfaceBg: '#30200b',
+        surfaceBgSoft: '#3c280e',
+        surfaceBgStrong: '#120a02',
+        textPrimary: '#fffbeb',
+        textSecondary: '#fde68a',
+        textMuted: '#d6b66e',
+        textFaint: '#8b7341',
+        neutralBorder: 'rgba(251, 191, 36, 0.16)',
+        neutralBorderStrong: 'rgba(252, 211, 77, 0.3)',
     },
     {
         id: 'cyan',
@@ -97,7 +163,18 @@ export const CUSTOM_DASHBOARD_THEMES: CustomDashboardThemeOption[] = [
         accentText: '#a5f3fc',
         softBg: 'rgba(6, 182, 212, 0.14)',
         border: 'rgba(34, 211, 238, 0.28)',
-        gradient: 'radial-gradient(circle at top left, rgba(6, 182, 212, 0.2), transparent 34%), #020617',
+        gradient: 'radial-gradient(circle at top left, rgba(6, 182, 212, 0.2), transparent 34%), #041318',
+        pageBg: '#041318',
+        pageBgSoft: '#071f27',
+        surfaceBg: '#0b2831',
+        surfaceBgSoft: '#0e3440',
+        surfaceBgStrong: '#031014',
+        textPrimary: '#ecfeff',
+        textSecondary: '#a5f3fc',
+        textMuted: '#86c9d3',
+        textFaint: '#4d818a',
+        neutralBorder: 'rgba(34, 211, 238, 0.16)',
+        neutralBorderStrong: 'rgba(103, 232, 249, 0.28)',
     },
     {
         id: 'slate',
@@ -106,7 +183,18 @@ export const CUSTOM_DASHBOARD_THEMES: CustomDashboardThemeOption[] = [
         accentText: '#f8fafc',
         softBg: 'rgba(148, 163, 184, 0.14)',
         border: 'rgba(203, 213, 225, 0.24)',
-        gradient: 'radial-gradient(circle at top left, rgba(148, 163, 184, 0.16), transparent 34%), #020617',
+        gradient: 'radial-gradient(circle at top left, rgba(148, 163, 184, 0.16), transparent 34%), #080c14',
+        pageBg: '#080c14',
+        pageBgSoft: '#101621',
+        surfaceBg: '#161d2a',
+        surfaceBgSoft: '#1d2634',
+        surfaceBgStrong: '#05080d',
+        textPrimary: '#f8fafc',
+        textSecondary: '#dbe4ef',
+        textMuted: '#a5b4c5',
+        textFaint: '#718196',
+        neutralBorder: 'rgba(148, 163, 184, 0.18)',
+        neutralBorderStrong: 'rgba(203, 213, 225, 0.28)',
     },
 ];
 

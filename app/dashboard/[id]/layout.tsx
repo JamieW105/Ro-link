@@ -451,6 +451,17 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         '--custom-dashboard-accent-soft': customDashboardTheme.softBg,
         '--custom-dashboard-accent-border': customDashboardTheme.border,
         '--custom-dashboard-gradient': customDashboardTheme.gradient,
+        '--custom-dashboard-page': customDashboardTheme.pageBg,
+        '--custom-dashboard-page-soft': customDashboardTheme.pageBgSoft,
+        '--custom-dashboard-surface': customDashboardTheme.surfaceBg,
+        '--custom-dashboard-surface-soft': customDashboardTheme.surfaceBgSoft,
+        '--custom-dashboard-surface-strong': customDashboardTheme.surfaceBgStrong,
+        '--custom-dashboard-text': customDashboardTheme.textPrimary,
+        '--custom-dashboard-text-secondary': customDashboardTheme.textSecondary,
+        '--custom-dashboard-text-muted': customDashboardTheme.textMuted,
+        '--custom-dashboard-text-faint': customDashboardTheme.textFaint,
+        '--custom-dashboard-neutral-border': customDashboardTheme.neutralBorder,
+        '--custom-dashboard-neutral-border-strong': customDashboardTheme.neutralBorderStrong,
         background: customDashboardTheme.gradient,
     } as CSSProperties : undefined;
 

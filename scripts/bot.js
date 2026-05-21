@@ -1037,7 +1037,7 @@ client.on('interactionCreate', async interaction => {
                 .setTitle(`Server Moderation History`)
                 .setColor(moderationHistory.length > 0 ? '#ef4444' : '#0ea5e9')
                 .setDescription(formatModerationHistory(moderationHistory))
-                .setFooter({ text: `Ro-Link Utility System • ${moderationHistory.length} prior moderation action(s)` });
+                .setFooter({ text: `Ro-Link Utility System - ${moderationHistory.length} prior moderation action(s)` });
             embeds.push(modEmbed);
 
             // Determine if Join button is needed

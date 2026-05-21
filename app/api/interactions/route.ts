@@ -342,7 +342,7 @@ async function fetchDiscordApi<T>(path: string, allowNotFound = false): Promise<
 
 function buildEphemeralErrorResponse(message: string): InteractionResponseData {
     return {
-        content: `âŒ ${message}`,
+        content: `Error: ${message}`,
         flags: 64,
     };
 }
@@ -861,7 +861,7 @@ async function buildLookupInteractionResponse(input: {
                     ? [{ name: 'Timeout Ends', value: formatDiscordTimestamp(discordLookup.member.communication_disabled_until, 'F'), inline: false }]
                     : []),
             ],
-            footer: { text: 'Ro-Link Systems â€¢ Discord Info' },
+            footer: { text: 'Ro-Link Systems - Discord Info' },
             timestamp: new Date().toISOString(),
         });
     }
@@ -906,7 +906,7 @@ async function buildLookupInteractionResponse(input: {
                 ? { url: finalRobloxLookup.avatarUrl }
                 : { url: `https://www.roblox.com/headshot-thumbnail/image?userId=${finalRobloxLookup.id}&width=420&height=420&format=png` },
             fields: robloxFields,
-            footer: { text: 'Ro-Link Systems â€¢ Roblox Info' },
+            footer: { text: 'Ro-Link Systems - Roblox Info' },
             timestamp: new Date().toISOString(),
         });
     }
@@ -915,7 +915,7 @@ async function buildLookupInteractionResponse(input: {
         title: 'Server Moderation History',
         color: combinedHistory.length > 0 ? 0xef4444 : 0x0ea5e9,
         description: formatModerationHistory(combinedHistory),
-        footer: { text: `Ro-Link Systems â€¢ ${combinedHistory.length} prior moderation action(s)` },
+        footer: { text: `Ro-Link Systems - ${combinedHistory.length} prior moderation action(s)` },
         timestamp: new Date().toISOString(),
     });
 
@@ -1380,7 +1380,7 @@ export async function POST(req: Request) {
                 if (!guild_id) {
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `âŒ This command can only be used in a Discord Server.`, flags: 64 }
+                        data: { content: `Error: This command can only be used in a Discord Server.`, flags: 64 }
                     });
                 }
 
@@ -1576,7 +1576,7 @@ export async function POST(req: Request) {
                     console.error('[LOOKUP] Error:', error);
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `âŒ ${getErrorMessage(error, 'Failed to lookup that user.')}`, flags: 64 }
+                        data: { content: `Error: ${getErrorMessage(error, 'Failed to lookup that user.')}`, flags: 64 }
                     });
                 }
             }
@@ -1680,7 +1680,7 @@ export async function POST(req: Request) {
                 if (queueRes.error) {
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `âŒ Failed to queue command.`, flags: 64 }
+                        data: { content: `Error: Failed to queue command.`, flags: 64 }
                     });
                 }
                 message = `Temporarily banned \`${targetUser}\` from Roblox for ${safeDurationSeconds} seconds.`;
@@ -1866,7 +1866,7 @@ export async function POST(req: Request) {
                     if (queueRes.error) {
                         return NextResponse.json({
                             type: 4,
-                            data: { content: `âŒ Failed to queue command.`, flags: 64 }
+                            data: { content: `Error: Failed to queue command.`, flags: 64 }
                         });
                     }
 
@@ -2010,7 +2010,7 @@ export async function POST(req: Request) {
                 if (!currentGuildId) {
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `âŒ Reports can only be managed from a server channel.`, flags: 64 }
+                        data: { content: `Error: Reports can only be managed from a server channel.`, flags: 64 }
                     });
                 }
 
@@ -2019,7 +2019,7 @@ export async function POST(req: Request) {
                 if (!resolvedReportId) {
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `âŒ The matching pending report could not be found for \`${target}\`.`, flags: 64 }
+                        data: { content: `Error: The matching pending report could not be found for \`${target}\`.`, flags: 64 }
                     });
                 }
 
@@ -2049,7 +2049,7 @@ export async function POST(req: Request) {
                     } catch (error) {
                         return NextResponse.json({
                             type: 4,
-                            data: { content: `âŒ Failed to dismiss report: ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
+                            data: { content: `Error: Failed to dismiss report: ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
                         });
                     }
 
@@ -2066,7 +2066,7 @@ export async function POST(req: Request) {
                     if (!targetId) {
                         return NextResponse.json({
                             type: 4,
-                            data: { content: `âŒ Could not resolve Discord ID for \`${target}\`.`, flags: 64 }
+                            data: { content: `Error: Could not resolve Discord ID for \`${target}\`.`, flags: 64 }
                         });
                     }
 
@@ -2084,7 +2084,7 @@ export async function POST(req: Request) {
                         const err = await res.text();
                         return NextResponse.json({
                             type: 4,
-                            data: { content: `âŒ Failed to ${discordAction} user: ${err}`, flags: 64 }
+                            data: { content: `Error: Failed to ${discordAction} user: ${err}`, flags: 64 }
                         });
                     }
 
@@ -2100,7 +2100,7 @@ export async function POST(req: Request) {
                     } catch (error) {
                         return NextResponse.json({
                             type: 4,
-                            data: { content: `âŒ The moderation action succeeded, but updating the report failed: ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
+                            data: { content: `Error: The moderation action succeeded, but updating the report failed: ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
                         });
                     }
 
@@ -2155,7 +2155,7 @@ export async function POST(req: Request) {
                 } catch (error) {
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `âŒ Failed to queue ${command} for \`${target}\`: ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
+                        data: { content: `Error: Failed to queue ${command} for \`${target}\`: ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
                     });
                 }
 
@@ -2264,7 +2264,7 @@ export async function POST(req: Request) {
                 if (!targetId) {
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `âŒ Could not resolve Discord ID for \`${target}\`.`, flags: 64 }
+                        data: { content: `Error: Could not resolve Discord ID for \`${target}\`.`, flags: 64 }
                     });
                 }
 
@@ -2281,7 +2281,7 @@ export async function POST(req: Request) {
                     const err = await res.text();
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `âŒ Failed to ${discAction} user: ${err}`, flags: 64 }
+                        data: { content: `Error: Failed to ${discAction} user: ${err}`, flags: 64 }
                     });
                 }
 
@@ -2304,7 +2304,7 @@ export async function POST(req: Request) {
 
                 return NextResponse.json({
                     type: 4,
-                    data: { content: `âœ… Successfully **${discAction.toUpperCase()}ED** <@${targetId}> from the server.`, flags: 64 }
+                    data: { content: `Success: Successfully **${discAction.toUpperCase()}ED** <@${targetId}> from the server.`, flags: 64 }
                 });
             }
 
@@ -2337,13 +2337,13 @@ export async function POST(req: Request) {
                     } catch (error) {
                         return NextResponse.json({
                             type: 4,
-                            data: { content: `âŒ Failed to queue ${action} for \`${username}\`: ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
+                            data: { content: `Error: Failed to queue ${action} for \`${username}\`: ${String(error instanceof Error ? error.message : error)}`, flags: 64 }
                         });
                     }
 
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `âœ… **${action}** command queued for \`${username}\`.`, flags: 64 }
+                        data: { content: `Success: **${action}** command queued for \`${username}\`.`, flags: 64 }
                     });
                 }
             }
@@ -2732,7 +2732,7 @@ export async function POST(req: Request) {
                     console.error('Report DB Error: missing report id after insert');
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `âŒ Failed to create the report record. Please try again later.`, flags: 64 }
+                        data: { content: `Error: Failed to create the report record. Please try again later.`, flags: 64 }
                     });
                 }
 
