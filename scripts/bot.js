@@ -178,6 +178,121 @@ function formatModerationHistory(entries) {
     }).join('\n');
 }
 
+function normalizeStaffNoteTarget(target = {}) {
+    const discordId = String(target.discordId ?? '').trim().slice(0, 32);
+    const robloxId = String(target.robloxId ?? '').trim().slice(0, 32);
+    const robloxUsername = String(target.robloxUsername ?? '').trim().slice(0, 64);
+
+    return {
+        discordId: discordId || null,
+        robloxId: robloxId || null,
+        robloxUsername: robloxUsername || null,
+        robloxUsernameLower: robloxUsername ? robloxUsername.toLowerCase() : null,
+    };
+}
+
+function getStaffNoteTargetLabel(target) {
+    const normalized = normalizeStaffNoteTarget(target);
+    if (normalized.robloxUsername) return normalized.robloxUsername;
+    if (normalized.robloxId) return `Roblox ID ${normalized.robloxId}`;
+    if (normalized.discordId) return `Discord ID ${normalized.discordId}`;
+    return 'Unknown User';
+}
+
+function formatStaffNotes(notes) {
+    if (!Array.isArray(notes) || notes.length === 0) {
+        return 'No staff notes found for this user.';
+    }
+
+    return notes.slice(0, 5).map((note) => {
+        const author = truncateText(note.created_by_tag || note.created_by_discord_id || 'Unknown Staff', 48);
+        return `- **${author}** ${formatDiscordTimestamp(note.created_at, 'R')}: ${truncateText(note.note, 220)}`;
+    }).join('\n');
+}
+
+function encodeStaffNoteModalTarget(target) {
+    const normalized = normalizeStaffNoteTarget(target);
+    return [
+        normalized.discordId || '-',
+        normalized.robloxId || '-',
+        normalized.robloxUsername ? encodeURIComponent(normalized.robloxUsername) : '-',
+    ].join('|');
+}
+
+function decodeStaffNoteModalTarget(encoded) {
+    const [discordId = '-', robloxId = '-', robloxUsername = '-'] = String(encoded || '').split('|');
+    return {
+        discordId: discordId === '-' ? '' : discordId,
+        robloxId: robloxId === '-' ? '' : robloxId,
+        robloxUsername: robloxUsername === '-' ? '' : decodeURIComponent(robloxUsername),
+    };
+}
+
+function buildStaffNoteModalCustomId(target) {
+    return `staff_note_modal|${encodeStaffNoteModalTarget(target)}`;
+}
+
+async function fetchStaffNotes(serverId, target, limit = 5) {
+    const normalized = normalizeStaffNoteTarget(target);
+    const safeLimit = Math.max(1, Math.min(Math.floor(limit), 25));
+    if (!serverId || (!normalized.discordId && !normalized.robloxId && !normalized.robloxUsernameLower)) return [];
+
+    const baseQuery = () => supabase
+        .from('staff_notes')
+        .select('id, server_id, target_discord_id, target_roblox_id, target_roblox_username, note, created_by_discord_id, created_by_tag, created_at')
+        .eq('server_id', serverId)
+        .order('created_at', { ascending: false })
+        .limit(safeLimit);
+
+    const queries = [];
+    if (normalized.discordId) queries.push(baseQuery().eq('target_discord_id', normalized.discordId));
+    if (normalized.robloxId) queries.push(baseQuery().eq('target_roblox_id', normalized.robloxId));
+    if (normalized.robloxUsernameLower) queries.push(baseQuery().eq('target_roblox_username_lower', normalized.robloxUsernameLower));
+
+    const results = await Promise.all(queries);
+    const rows = new Map();
+    for (const { data, error } of results) {
+        if (error) throw new Error(error.message || 'Failed to load staff notes.');
+        for (const row of Array.isArray(data) ? data : []) {
+            rows.set(row.id, row);
+        }
+    }
+
+    return Array.from(rows.values())
+        .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+        .slice(0, safeLimit);
+}
+
+async function createStaffNote({ serverId, target, note, createdByDiscordId, createdByTag }) {
+    const normalized = normalizeStaffNoteTarget(target);
+    const safeNote = String(note ?? '').trim().slice(0, 1500);
+
+    if (!normalized.discordId && !normalized.robloxId && !normalized.robloxUsername) {
+        throw new Error('Choose a Discord user or Roblox user before adding a note.');
+    }
+    if (!safeNote) {
+        throw new Error('Note cannot be empty.');
+    }
+
+    const { data, error } = await supabase
+        .from('staff_notes')
+        .insert([{
+            server_id: serverId,
+            target_discord_id: normalized.discordId,
+            target_roblox_id: normalized.robloxId,
+            target_roblox_username: normalized.robloxUsername,
+            target_roblox_username_lower: normalized.robloxUsernameLower,
+            note: safeNote,
+            created_by_discord_id: String(createdByDiscordId ?? '').trim().slice(0, 32) || null,
+            created_by_tag: String(createdByTag ?? '').trim().slice(0, 128) || 'Unknown Staff',
+        }])
+        .select('id, target_discord_id, target_roblox_id, target_roblox_username, note')
+        .single();
+
+    if (error) throw new Error(error.message || 'Failed to save staff note.');
+    return data;
+}
+
 function getDiscordCreatedAt(discordId) {
     try {
         const timestamp = Number((BigInt(discordId) >> 22n) + DISCORD_EPOCH);
@@ -747,7 +862,8 @@ client.on('interactionCreate', async interaction => {
                 { name: '/setup', value: 'Initializes Ro-Link for this server (Owner Only).' },
                 { name: '/ping', value: 'Check the bot response time and connection status.' },
                 { name: '/moderation', value: 'Open Ban, Kick, Unban, Softban, Update, and Shutdown actions.' },
-                { name: '/lookup', value: 'Lookup Discord info, linked Roblox info, and server moderation history.' },
+                { name: '/lookup', value: 'Lookup Discord info, linked Roblox info, server moderation history, and staff notes.' },
+                { name: '/staff-note', value: 'Add a staff-only note to a Discord or Roblox user.' },
                 { name: '/servers', value: 'View and manage live Roblox servers.' },
                 { name: '/update', value: 'Update your linked Roblox profile and roles.' },
                 { name: '/misc', value: 'Open Fly, Kill, Heal, Freeze, and other miscellaneous actions.' },
@@ -1032,6 +1148,18 @@ client.on('interactionCreate', async interaction => {
                 embeds.push(robloxEmbed);
             }
 
+            const staffNoteTarget = {
+                discordId: discordLookup?.user?.id || discordUserArg?.id || '',
+                robloxId: finalRobloxLookup?.id || discordLookup?.verifiedUser?.roblox_id || verifiedUserForRoblox?.roblox_id || '',
+                robloxUsername: finalRobloxLookup?.username || discordLookup?.verifiedUser?.roblox_username || verifiedUserForRoblox?.roblox_username || '',
+            };
+            let staffNotes = [];
+            try {
+                staffNotes = await fetchStaffNotes(guildId, staffNoteTarget, 5);
+            } catch (err) {
+                console.warn('[STAFF_NOTES] Failed to load notes for lookup:', err.message);
+            }
+
             // 3. Build Moderation Embed
             const modEmbed = new EmbedBuilder()
                 .setTitle(`Server Moderation History`)
@@ -1039,6 +1167,13 @@ client.on('interactionCreate', async interaction => {
                 .setDescription(formatModerationHistory(moderationHistory))
                 .setFooter({ text: `Ro-Link Utility System - ${moderationHistory.length} prior moderation action(s)` });
             embeds.push(modEmbed);
+
+            const notesEmbed = new EmbedBuilder()
+                .setTitle('Staff Notes')
+                .setColor(staffNotes.length > 0 ? '#f59e0b' : '#64748b')
+                .setDescription(formatStaffNotes(staffNotes))
+                .setFooter({ text: `Ro-Link Systems - ${staffNotes.length} staff note(s)` });
+            embeds.push(notesEmbed);
 
             // Determine if Join button is needed
             let finalJobId = null;
@@ -1058,9 +1193,16 @@ client.on('interactionCreate', async interaction => {
                 const joinUrl = buildRobloxJoinUrl(serverSettings?.place_id, finalJobId);
                 if (joinUrl) {
                     components = [new ActionRowBuilder().addComponents(
-                        new ButtonBuilder().setLabel('Join Game').setURL(joinUrl).setStyle(ButtonStyle.Link)
+                        new ButtonBuilder().setLabel('Join Game').setURL(joinUrl).setStyle(ButtonStyle.Link),
+                        new ButtonBuilder().setLabel('Add Staff Note').setCustomId(buildStaffNoteModalCustomId(staffNoteTarget)).setStyle(ButtonStyle.Primary)
                     )];
                 }
+            }
+
+            if (components.length === 0) {
+                components = [new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setLabel('Add Staff Note').setCustomId(buildStaffNoteModalCustomId(staffNoteTarget)).setStyle(ButtonStyle.Primary)
+                )];
             }
 
             await interaction.editReply({ embeds, components });
@@ -1076,6 +1218,63 @@ client.on('interactionCreate', async interaction => {
         } catch (e) {
             console.error('[LOOKUP] Error:', e.message);
             return interaction.editReply(`Failed to lookup user: ${e.message || 'Unknown error'}`);
+        }
+    } else if (commandName === 'staff-note') {
+        const noteBody = interaction.options.getString('note');
+        const robloxUserArg = interaction.options.getString('roblox_user');
+        let discordUserArg = interaction.options.getUser('discord_user');
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+            if (!robloxUserArg && !discordUserArg) {
+                discordUserArg = interaction.user;
+            }
+
+            let target = { discordId: discordUserArg?.id || '' };
+            if (discordUserArg) {
+                const discordLookup = await fetchDiscordLookup(discordUserArg, guild, guildId);
+                target = {
+                    discordId: discordUserArg.id,
+                    robloxId: discordLookup.verifiedUser?.roblox_id || '',
+                    robloxUsername: discordLookup.verifiedUser?.roblox_username || '',
+                };
+            }
+
+            if (robloxUserArg) {
+                const robloxLookup = await fetchRobloxLookup(robloxUserArg, guildId);
+                const { data: verified } = await supabase
+                    .from('verified_users')
+                    .select('discord_id, roblox_id, roblox_username')
+                    .eq('roblox_id', robloxLookup.id)
+                    .maybeSingle();
+
+                target = {
+                    discordId: verified?.discord_id || target.discordId || '',
+                    robloxId: robloxLookup.id,
+                    robloxUsername: robloxLookup.username,
+                };
+            }
+
+            const note = await createStaffNote({
+                serverId: guildId,
+                target,
+                note: noteBody,
+                createdByDiscordId: user.id,
+                createdByTag: user.tag,
+            });
+
+            await supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'STAFF_NOTE',
+                target: note.target_roblox_username || note.target_roblox_id || note.target_discord_id || 'Unknown User',
+                moderator: user.tag,
+            }]);
+
+            await interaction.editReply(`Saved staff note for **${getStaffNoteTargetLabel(target)}**.`);
+        } catch (e) {
+            console.error('[STAFF_NOTE] Error:', e.message);
+            return interaction.editReply(`Failed to save staff note: ${e.message || 'Unknown error'}`);
         }
     } else if (commandName === 'servers') {
         const search = String(interaction.options.getString('search') || '').trim().toLowerCase();
@@ -1704,6 +1903,40 @@ client.on('interactionCreate', async interaction => {
 
     if (!interaction.isModalSubmit()) return;
 
+    if (interaction.customId.startsWith('staff_note_modal|')) {
+        if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('BanMembers') && !interaction.member.permissions.has('KickMembers')) {
+            return interaction.reply({ content: 'You do not have permission to add staff notes.', ephemeral: true });
+        }
+
+        try {
+            const target = decodeStaffNoteModalTarget(interaction.customId.replace('staff_note_modal|', ''));
+            const note = await createStaffNote({
+                serverId: interaction.guildId,
+                target,
+                note: interaction.fields.getTextInputValue('staff_note'),
+                createdByDiscordId: interaction.user.id,
+                createdByTag: interaction.user.tag,
+            });
+
+            await supabase.from('logs').insert([{
+                server_id: interaction.guildId,
+                action: 'STAFF_NOTE',
+                target: note.target_roblox_username || note.target_roblox_id || note.target_discord_id || 'Unknown User',
+                moderator: interaction.user.tag,
+            }]);
+
+            return interaction.reply({
+                content: `Saved staff note for **${getStaffNoteTargetLabel(target)}**.`,
+                ephemeral: true,
+            });
+        } catch (e) {
+            return interaction.reply({
+                content: `Failed to save staff note: ${e.message || 'Unknown error'}`,
+                ephemeral: true,
+            });
+        }
+    }
+
     if (interaction.customId.startsWith('moderation_modal_')) {
         const action = interaction.customId.replace('moderation_modal_', '');
         const getOptionalField = (id) => {
@@ -1819,6 +2052,28 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
 
     const customId = interaction.customId;
+
+    if (customId.startsWith('staff_note_modal|')) {
+        if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('BanMembers') && !interaction.member.permissions.has('KickMembers')) {
+            return interaction.reply({ content: 'You do not have permission to add staff notes.', ephemeral: true });
+        }
+
+        const modal = new ModalBuilder()
+            .setCustomId(customId)
+            .setTitle('Add Staff Note');
+
+        const noteInput = new TextInputBuilder()
+            .setCustomId('staff_note')
+            .setLabel('Staff Note')
+            .setPlaceholder('Add context only server staff should see.')
+            .setStyle(TextInputStyle.Paragraph)
+            .setMinLength(1)
+            .setMaxLength(1500)
+            .setRequired(true);
+
+        modal.addComponents(new ActionRowBuilder().addComponents(noteInput));
+        return interaction.showModal(modal);
+    }
 
     // Handle Report Toggle
     if (customId.startsWith('switch_')) {

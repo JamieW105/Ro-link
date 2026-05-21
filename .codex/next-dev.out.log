@@ -6,3 +6,12 @@
 ✓ Starting...
 ✓ Ready in 2.4s
  GET / 200 in 3.5s (compile: 3.0s, proxy.ts: 204ms, render: 271ms)
+ GET /dashboard/test-server 200 in 2.5s (compile: 2.3s, proxy.ts: 65ms, render: 206ms)
+ GET /api/ping?ts=1779361151537 200 in 736ms (compile: 659ms, proxy.ts: 26ms, render: 51ms)
+ GET /api/custom-dashboard/resolve?hostname=localhost 200 in 988ms (compile: 954ms, proxy.ts: 23ms, render: 11ms)
+ GET /api/auth/session 200 in 2.0s (compile: 1997ms, proxy.ts: 25ms, render: 25ms)
+ GET /api/custom-dashboard/test-server 404 in 2.9s (compile: 1804ms, proxy.ts: 9ms, render: 1102ms)
+ GET /api/ping?ts=1779361181538 200 in 21ms (compile: 5ms, proxy.ts: 9ms, render: 7ms)
+ GET /api/ping?ts=1779361211539 200 in 14ms (compile: 3ms, proxy.ts: 5ms, render: 6ms)
+ GET /api/ping?ts=1779361241544 200 in 15ms (compile: 4ms, proxy.ts: 5ms, render: 6ms)
+ GET /api/ping?ts=1779361271546 200 in 24ms (compile: 5ms, proxy.ts: 8ms, render: 11ms)

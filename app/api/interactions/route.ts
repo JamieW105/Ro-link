@@ -7,6 +7,14 @@ import { findLivePlayer, normalizeLivePlayerList, type LivePlayer } from '@/lib/
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import discordCommands from '@/lib/discordCommands.json';
+import {
+    createStaffNote,
+    fetchStaffNotes,
+    getStaffNoteTargetLabel,
+    normalizeStaffNoteTarget,
+    type StaffNoteRow,
+    type StaffNoteTarget,
+} from '@/lib/staffNotes';
 
 export const runtime = 'edge';
 
@@ -288,6 +296,39 @@ function formatModerationHistory(entries: LookupHistoryEntry[]) {
         const moderator = truncateText(entry?.moderator || 'Unknown Moderator', 48);
         return `- \`${action}\` by **${moderator}** ${formatDiscordTimestamp(entry?.timestamp, 'R')}`;
     }).join('\n');
+}
+
+function formatStaffNotes(notes: StaffNoteRow[]) {
+    if (!Array.isArray(notes) || notes.length === 0) {
+        return 'No staff notes found for this user.';
+    }
+
+    return notes.slice(0, 5).map((note) => {
+        const author = truncateText(note.created_by_tag || note.created_by_discord_id || 'Unknown Staff', 48);
+        return `- **${author}** ${formatDiscordTimestamp(note.created_at, 'R')}: ${truncateText(note.note, 220)}`;
+    }).join('\n');
+}
+
+function encodeStaffNoteModalTarget(target: StaffNoteTarget) {
+    const normalized = normalizeStaffNoteTarget(target);
+    return [
+        normalized.discordId || '-',
+        normalized.robloxId || '-',
+        normalized.robloxUsername ? encodeURIComponent(normalized.robloxUsername) : '-',
+    ].join('|');
+}
+
+function decodeStaffNoteModalTarget(encoded: string): StaffNoteTarget {
+    const [discordId = '-', robloxId = '-', robloxUsername = '-'] = encoded.split('|');
+    return {
+        discordId: discordId === '-' ? '' : discordId,
+        robloxId: robloxId === '-' ? '' : robloxId,
+        robloxUsername: robloxUsername === '-' ? '' : decodeURIComponent(robloxUsername),
+    };
+}
+
+function buildStaffNoteModalCustomId(target: StaffNoteTarget) {
+    return `staff_note_modal|${encodeStaffNoteModalTarget(target)}`;
 }
 
 function formatDiscordUserTag(user: DiscordUser | null | undefined) {
@@ -911,11 +952,31 @@ async function buildLookupInteractionResponse(input: {
         });
     }
 
+    const staffNoteTarget: StaffNoteTarget = {
+        discordId: discordLookup?.user?.id ?? targetDiscordId,
+        robloxId: finalRobloxLookup?.id ?? discordLookup?.verifiedUser?.roblox_id ?? verifiedUserForRoblox?.roblox_id,
+        robloxUsername: finalRobloxLookup?.username ?? discordLookup?.verifiedUser?.roblox_username ?? verifiedUserForRoblox?.roblox_username,
+    };
+    let staffNotes: StaffNoteRow[] = [];
+    try {
+        staffNotes = await fetchStaffNotes(supabase, guildId, staffNoteTarget, 5);
+    } catch (error) {
+        console.warn('[STAFF_NOTES] Failed to load notes for lookup:', error);
+    }
+
     embeds.push({
         title: 'Server Moderation History',
         color: combinedHistory.length > 0 ? 0xef4444 : 0x0ea5e9,
         description: formatModerationHistory(combinedHistory),
         footer: { text: `Ro-Link Systems - ${combinedHistory.length} prior moderation action(s)` },
+        timestamp: new Date().toISOString(),
+    });
+
+    embeds.push({
+        title: 'Staff Notes',
+        color: staffNotes.length > 0 ? 0xf59e0b : 0x64748b,
+        description: formatStaffNotes(staffNotes),
+        footer: { text: `Ro-Link Systems - ${staffNotes.length} staff note(s)` },
         timestamp: new Date().toISOString(),
     });
 
@@ -928,16 +989,81 @@ async function buildLookupInteractionResponse(input: {
 
     const joinUrl = finalJobId ? buildRobloxJoinUrl(server.place_id, finalJobId) : null;
     const targetLogStr = targetDiscordId || robloxUserArg || 'self';
+    const actionRowComponents: object[] = [
+        { type: 2, style: 1, label: 'Add Staff Note', custom_id: buildStaffNoteModalCustomId(staffNoteTarget) },
+    ];
+    if (joinUrl) {
+        actionRowComponents.unshift({ type: 2, style: 5, label: 'Join Game', url: joinUrl });
+    }
 
     return {
         targetLogStr,
         response: {
             flags: 64,
             embeds,
-            components: joinUrl
-                ? [{ type: 1, components: [{ type: 2, style: 5, label: 'Join Game', url: joinUrl }] }]
-                : [],
+            components: [{ type: 1, components: actionRowComponents }],
         },
+    };
+}
+
+async function addStaffNoteFromCommand(input: {
+    guildId: string;
+    options: CommandOption[] | undefined;
+    server: InteractionServerRecord;
+    userId: string;
+    userTag: string;
+}) {
+    const { guildId, options, server, userId, userTag } = input;
+    const noteBody = String(getCommandOptionValue(options, 'note') ?? '').trim();
+    const robloxUserArg = String(getCommandOptionValue(options, 'roblox_user') ?? '').trim();
+    const discordUserArg = String(getCommandOptionValue(options, 'discord_user') ?? '').trim();
+    const targetDiscordId = discordUserArg || (!robloxUserArg ? userId : '');
+
+    let target: StaffNoteTarget = { discordId: targetDiscordId };
+
+    if (targetDiscordId) {
+        const discordLookup = await fetchDiscordLookup(targetDiscordId, guildId);
+        target = {
+            discordId: targetDiscordId,
+            robloxId: discordLookup.verifiedUser?.roblox_id,
+            robloxUsername: discordLookup.verifiedUser?.roblox_username,
+        };
+    }
+
+    if (robloxUserArg) {
+        const robloxLookup = await fetchRobloxLookup(robloxUserArg, guildId, server.open_cloud_key);
+        const { data: verified } = await supabase
+            .from('verified_users')
+            .select('discord_id, roblox_id, roblox_username')
+            .eq('roblox_id', robloxLookup.id)
+            .maybeSingle<Record<string, string | number | null | undefined>>();
+
+        target = {
+            discordId: verified?.discord_id ?? targetDiscordId,
+            robloxId: robloxLookup.id,
+            robloxUsername: robloxLookup.username,
+        };
+    }
+
+    const note = await createStaffNote(supabase, {
+        serverId: guildId,
+        target,
+        note: noteBody,
+        createdByDiscordId: userId,
+        createdByTag: userTag,
+    });
+
+    await logAction(
+        guildId,
+        'STAFF_NOTE',
+        note.target_roblox_username || note.target_roblox_id || note.target_discord_id || 'Unknown User',
+        userTag,
+        'Staff note added',
+    );
+
+    return {
+        content: `Saved staff note for **${getStaffNoteTargetLabel(target)}**.`,
+        flags: 64,
     };
 }
 
@@ -1263,7 +1389,7 @@ export async function POST(req: Request) {
                                     },
                                     {
                                         name: '**Moderation Commands**',
-                                        value: '`/moderation` - Ban, kick, unban, softban, update, or shutdown\n`/lookup` - Lookup Discord info, linked Roblox info, and server moderation history',
+                                        value: '`/moderation` - Ban, kick, unban, softban, update, or shutdown\n`/lookup` - Lookup Discord info, linked Roblox info, moderation history, and staff notes\n`/staff-note` - Add a staff-only user note',
                                         inline: false
                                     },
                                     {
@@ -1369,6 +1495,7 @@ export async function POST(req: Request) {
             const isKick = name === 'kick';
             const isTimeout = name === 'timeout' || name === 'mute';
             const isLookup = name === 'lookup';
+            const isStaffNote = name === 'staff-note';
             const isUpdateServers = name === 'update-servers';
             const isShutdown = name === 'shutdown';
             const isUpdate = name === 'update';
@@ -1446,7 +1573,7 @@ export async function POST(req: Request) {
             if (isBan) hasPerms = await checkPermission('can_ban');
             else if (isKick) hasPerms = await checkPermission('can_kick');
             else if (isTimeout) hasPerms = await checkPermission('can_timeout');
-            else if (isLookup) hasPerms = await checkPermission('can_lookup');
+            else if (isLookup || isStaffNote) hasPerms = await checkPermission('can_lookup');
             else if (isServers) hasPerms = await checkPermission('can_access_dashboard');
             else if (isMiscCommand) hasPerms = await checkPermission('can_access_dashboard');
             else if (isModerationMenu) hasPerms = await checkPermission('can_kick') || await checkPermission('can_ban');
@@ -1577,6 +1704,29 @@ export async function POST(req: Request) {
                     return NextResponse.json({
                         type: 4,
                         data: { content: `Error: ${getErrorMessage(error, 'Failed to lookup that user.')}`, flags: 64 }
+                    });
+                }
+            }
+
+            if (name === 'staff-note') {
+                try {
+                    const response = await addStaffNoteFromCommand({
+                        guildId: guild_id,
+                        options,
+                        server,
+                        userId,
+                        userTag,
+                    });
+
+                    return NextResponse.json({
+                        type: 4,
+                        data: response,
+                    });
+                } catch (error: unknown) {
+                    console.error('[STAFF_NOTE] Error:', error);
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `Error: ${getErrorMessage(error, 'Failed to save that staff note.')}`, flags: 64 }
                     });
                 }
             }
@@ -1993,6 +2143,8 @@ export async function POST(req: Request) {
             } else if (cid === 'report_open' || cid === 'report_submit') {
                 // Anyone can OPEN a report form
                 requiredPerm = '';
+            } else if (cid.startsWith('staff_note_modal|')) {
+                requiredPerm = 'can_lookup';
             }
 
             const hasPerms = requiredPerm === '' ? true : await checkPermission(requiredPerm);
@@ -2001,6 +2153,29 @@ export async function POST(req: Request) {
                 return NextResponse.json({
                     type: 4,
                     data: { content: `❌ You do not have permission to perform this action. Requires '${requiredPerm.replace('can_', '').replace('_', ' ')}' permission.`, flags: 64 }
+                });
+            }
+
+            if (cid.startsWith('staff_note_modal|')) {
+                return NextResponse.json({
+                    type: 9,
+                    data: {
+                        title: 'Add Staff Note',
+                        custom_id: cid,
+                        components: [{
+                            type: 1,
+                            components: [{
+                                type: 4,
+                                custom_id: 'staff_note',
+                                label: 'Staff Note',
+                                style: 2,
+                                min_length: 1,
+                                max_length: 1500,
+                                placeholder: 'Add context only server staff should see.',
+                                required: true
+                            }]
+                        }]
+                    }
                 });
             }
 
@@ -2595,6 +2770,45 @@ export async function POST(req: Request) {
 
             if (!custom_id) {
                 return NextResponse.json({ error: 'Missing modal custom_id' }, { status: 400 });
+            }
+
+            if (custom_id.startsWith('staff_note_modal|')) {
+                const hasLookupPerms = await checkPermission('can_lookup');
+                if (!hasLookupPerms) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: 'You do not have permission to add staff notes.', flags: 64 }
+                    });
+                }
+
+                try {
+                    const target = decodeStaffNoteModalTarget(custom_id.replace('staff_note_modal|', ''));
+                    const note = await createStaffNote(supabase, {
+                        serverId: guild_id,
+                        target,
+                        note: getModalField(modalComponents, 'staff_note'),
+                        createdByDiscordId: userId,
+                        createdByTag: userTag,
+                    });
+
+                    await logAction(
+                        guild_id,
+                        'STAFF_NOTE',
+                        note.target_roblox_username || note.target_roblox_id || note.target_discord_id || 'Unknown User',
+                        userTag,
+                        'Staff note added',
+                    );
+
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `Saved staff note for **${getStaffNoteTargetLabel(target)}**.`, flags: 64 }
+                    });
+                } catch (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `Error: ${getErrorMessage(error, 'Failed to save staff note.')}`, flags: 64 }
+                    });
+                }
             }
 
             if (custom_id.startsWith('moderation_modal_')) {

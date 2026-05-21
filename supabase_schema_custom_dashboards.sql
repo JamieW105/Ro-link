@@ -58,7 +58,7 @@ DROP CONSTRAINT IF EXISTS custom_dashboard_domains_layout_check;
 
 ALTER TABLE public.custom_dashboard_domains
 ADD CONSTRAINT custom_dashboard_domains_layout_check
-CHECK (layout IN ('standard', 'compact', 'spacious'));
+CHECK (layout IN ('standard', 'compact', 'spacious', 'floating_dock', 'split_sidebar', 'minimalist_drawer'));
 
 ALTER TABLE public.custom_dashboard_domains
 DROP CONSTRAINT IF EXISTS custom_dashboard_domains_theme_check;

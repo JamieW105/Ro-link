@@ -26,6 +26,30 @@
     ]
   },
   {
+    "name": "staff-note",
+    "description": "Add a staff-only note to a Discord or Roblox user",
+    "options": [
+      {
+        "name": "note",
+        "description": "The staff note to save",
+        "type": 3,
+        "required": true
+      },
+      {
+        "name": "roblox_user",
+        "description": "The Roblox username to attach this note to",
+        "type": 3,
+        "required": false
+      },
+      {
+        "name": "discord_user",
+        "description": "The Discord user to attach this note to",
+        "type": 6,
+        "required": false
+      }
+    ]
+  },
+  {
     "name": "servers",
     "description": "View and manage live Roblox servers",
     "options": [

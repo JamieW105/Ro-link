@@ -34,8 +34,11 @@ interface DashboardPermissions {
 }
 
 interface CustomDashboardInfo {
+    id?: string;
     name: string;
     icon?: string | null;
+    subdomain?: string;
+    hostname?: string;
     layout?: CustomDashboardLayout;
     theme?: CustomDashboardTheme;
     metadata?: CustomDashboardMetadata;
@@ -227,40 +230,44 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
         let cancelled = false;
 
-        async function detectCustomDashboardHost() {
+        async function loadCustomDashboardContext() {
             try {
                 const response = await fetch(`/api/custom-dashboard/resolve?hostname=${encodeURIComponent(window.location.hostname)}`, {
                     cache: 'no-store',
                 });
 
-                if (!response.ok || cancelled) return;
-
-                const data = await response.json() as { found?: boolean; serverId?: string };
-                if (!cancelled) {
-                    const isCurrentCustomDashboard = Boolean(data.found && data.serverId === String(id));
-                    setIsCustomDashboardHost(isCurrentCustomDashboard);
-
-                    if (isCurrentCustomDashboard) {
-                        const infoResponse = await fetch(`/api/custom-dashboard/${encodeURIComponent(String(id))}`, {
-                            cache: 'no-store',
-                        });
-
-                        if (infoResponse.ok && !cancelled) {
-                            setCustomDashboardInfo(await infoResponse.json() as CustomDashboardInfo);
-                        }
-                    } else {
-                        setCustomDashboardInfo(null);
-                    }
+                if (response.ok && !cancelled) {
+                    const data = await response.json() as { found?: boolean; serverId?: string };
+                    setIsCustomDashboardHost(Boolean(data.found && data.serverId === String(id)));
                 }
             } catch {
                 if (!cancelled) {
                     setIsCustomDashboardHost(false);
+                }
+            }
+
+            try {
+                const infoResponse = await fetch(`/api/custom-dashboard/${encodeURIComponent(String(id))}`, {
+                    cache: 'no-store',
+                });
+
+                if (!infoResponse.ok || cancelled) return;
+
+                const info = await infoResponse.json() as CustomDashboardInfo;
+                if (info.subdomain || info.hostname) {
+                    setCustomDashboardInfo(info);
+                    setHasCustomDashboardSetup(true);
+                } else {
+                    setCustomDashboardInfo(null);
+                }
+            } catch {
+                if (!cancelled) {
                     setCustomDashboardInfo(null);
                 }
             }
         }
 
-        detectCustomDashboardHost();
+        loadCustomDashboardContext();
 
         return () => {
             cancelled = true;
@@ -304,10 +311,26 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             setCustomDashboardPreview(customEvent.detail || null);
         }
 
+        function handleCustomDashboardSaved(event: Event) {
+            const customEvent = event as CustomEvent<CustomDashboardInfo | null>;
+            const dashboard = customEvent.detail;
+            if (!dashboard || (!dashboard.subdomain && !dashboard.hostname)) return;
+
+            setCustomDashboardInfo((current) => ({
+                ...current,
+                ...dashboard,
+                name: dashboard.metadata?.title || dashboard.name || current?.name || 'Ro-Link',
+                icon: dashboard.icon ?? current?.icon ?? null,
+            }));
+            setHasCustomDashboardSetup(true);
+        }
+
         window.addEventListener('rolink:custom-dashboard-preview', handleCustomDashboardPreview);
+        window.addEventListener('rolink:custom-dashboard-saved', handleCustomDashboardSaved);
 
         return () => {
             window.removeEventListener('rolink:custom-dashboard-preview', handleCustomDashboardPreview);
+            window.removeEventListener('rolink:custom-dashboard-saved', handleCustomDashboardSaved);
         };
     }, []);
 
@@ -429,15 +452,16 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             : '...';
     const canManageDashboardSettings = userPermissions.is_admin || userPermissions.can_manage_settings;
     const dashboardHomeHref = isCustomDashboardHost ? `/custom-dashboard/${id}` : '/dashboard';
-    const isCustomDashboardStyled = Boolean(customDashboardPreview || isCustomDashboardHost);
+    const hasConfiguredCustomDashboard = Boolean(customDashboardInfo?.subdomain || customDashboardInfo?.hostname);
+    const isCustomDashboardStyled = Boolean(customDashboardPreview || hasConfiguredCustomDashboard || isCustomDashboardHost);
     const customDashboardMetadata = customDashboardPreview?.metadata || customDashboardInfo?.metadata;
     const customDashboardTheme = getCustomDashboardTheme(
         customDashboardPreview?.theme
-        || (isCustomDashboardHost ? customDashboardInfo?.theme : undefined)
+        || customDashboardInfo?.theme
         || DEFAULT_CUSTOM_DASHBOARD_THEME,
     );
     const customDashboardLayout = customDashboardPreview?.layout
-        || (isCustomDashboardHost ? customDashboardInfo?.layout : undefined)
+        || customDashboardInfo?.layout
         || DEFAULT_CUSTOM_DASHBOARD_LAYOUT;
     const customDashboardLogo = isCustomDashboardStyled
         ? customDashboardMetadata?.logoUrl || (customDashboardInfo?.icon ? `https://cdn.discordapp.com/icons/${id}/${customDashboardInfo.icon}.png` : '/Media/Ro-LinkIcon.png')

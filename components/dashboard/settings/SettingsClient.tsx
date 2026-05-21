@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
     ADMIN_PANEL_COMMAND_GROUPS,
     ADMIN_PANEL_COMMAND_IDS,
@@ -118,6 +118,18 @@ interface CustomDashboardSettings {
 
 type SettingsView = 'overview' | 'roles' | 'commands' | 'logging' | 'reports' | 'dashboard';
 
+interface SavedSettingsSnapshot {
+    adminCmds: boolean;
+    miscCmds: boolean;
+    loggingChannelId: string;
+    reportsEnabled: boolean;
+    reportsChannelId: string;
+    customDashboardSubdomain: string;
+    customDashboardLayout: CustomDashboardLayout;
+    customDashboardTheme: CustomDashboardTheme;
+    customDashboardMetadata: CustomDashboardMetadata;
+}
+
 interface SettingsClientProps {
     view?: SettingsView;
 }
@@ -149,6 +161,67 @@ const PAGE_COPY: Record<SettingsView, { title: string; description: string }> = 
     },
 };
 
+const EMPTY_CUSTOM_DASHBOARD_METADATA: CustomDashboardMetadata = {
+    title: "",
+    description: "",
+    logoUrl: "",
+    supportUrl: "",
+};
+
+const DEFAULT_SAVED_SETTINGS: SavedSettingsSnapshot = {
+    adminCmds: true,
+    miscCmds: true,
+    loggingChannelId: "",
+    reportsEnabled: false,
+    reportsChannelId: "",
+    customDashboardSubdomain: "",
+    customDashboardLayout: DEFAULT_CUSTOM_DASHBOARD_LAYOUT,
+    customDashboardTheme: DEFAULT_CUSTOM_DASHBOARD_THEME,
+    customDashboardMetadata: EMPTY_CUSTOM_DASHBOARD_METADATA,
+};
+
+function normalizeDashboardMetadata(metadata?: Partial<CustomDashboardMetadata> | null): CustomDashboardMetadata {
+    return {
+        title: metadata?.title || "",
+        description: metadata?.description || "",
+        logoUrl: metadata?.logoUrl || "",
+        supportUrl: metadata?.supportUrl || "",
+    };
+}
+
+function getComparableSettingsForView(settings: SavedSettingsSnapshot, view: SettingsView) {
+    if (view === 'commands') {
+        return {
+            adminCmds: settings.adminCmds,
+            miscCmds: settings.miscCmds,
+        };
+    }
+
+    if (view === 'logging') {
+        return {
+            loggingChannelId: settings.loggingChannelId,
+        };
+    }
+
+    if (view === 'reports') {
+        return {
+            reportsEnabled: settings.reportsEnabled,
+            reportsChannelId: settings.reportsChannelId,
+        };
+    }
+
+    if (view === 'dashboard') {
+        return {
+            customDashboardSubdomain: settings.customDashboardSubdomain.trim(),
+            customDashboardLayout: settings.customDashboardLayout,
+            customDashboardTheme: settings.customDashboardTheme,
+            customDashboardMetadata: settings.customDashboardMetadata,
+        };
+    }
+
+    return {};
+}
+
 export default function SettingsClient({ view = 'overview' }: SettingsClientProps) {
     const { id } = useParams();
     const { data: session } = useSession();
@@ -158,6 +231,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [savedSettings, setSavedSettings] = useState<SavedSettingsSnapshot | null>(null);
     const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
     const [removeBotOption, setRemoveBotOption] = useState(true);
     const [deleteDataOption, setDeleteDataOption] = useState(false);
@@ -289,6 +363,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
         async function fetchData() {
             if (!id || !session) return;
             const sessionUserId = String((session.user as { id?: string }).id || "");
+            let nextSavedSettings: SavedSettingsSnapshot = { ...DEFAULT_SAVED_SETTINGS };
 
             // 1. Check Permissions
             const guildRes = await fetch('/api/guilds');
@@ -307,11 +382,25 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
             const data = settingsRes.ok ? await settingsRes.json() as ServerSettingsConfig | null : null;
 
             if (data) {
-                setAdminCmds(data.admin_cmds_enabled !== false);
-                setMiscCmds(data.misc_cmds_enabled !== false);
-                setLoggingChannelId(data.logging_channel_id || "");
-                setReportsEnabled(data.reports_enabled || false);
-                setReportsChannelId(data.reports_channel_id || "");
+                const nextAdminCmds = data.admin_cmds_enabled !== false;
+                const nextMiscCmds = data.misc_cmds_enabled !== false;
+                const nextLoggingChannelId = data.logging_channel_id || "";
+                const nextReportsEnabled = data.reports_enabled || false;
+                const nextReportsChannelId = data.reports_channel_id || "";
+
+                setAdminCmds(nextAdminCmds);
+                setMiscCmds(nextMiscCmds);
+                setLoggingChannelId(nextLoggingChannelId);
+                setReportsEnabled(nextReportsEnabled);
+                setReportsChannelId(nextReportsChannelId);
+                nextSavedSettings = {
+                    ...nextSavedSettings,
+                    adminCmds: nextAdminCmds,
+                    miscCmds: nextMiscCmds,
+                    loggingChannelId: nextLoggingChannelId,
+                    reportsEnabled: nextReportsEnabled,
+                    reportsChannelId: nextReportsChannelId,
+                };
             }
 
             // 3. Fetch Discord Roles & Channels
@@ -346,17 +435,21 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     if (dashboardRes.ok) {
                         const dashboardSettings = await dashboardRes.json() as CustomDashboardSettings;
+                        const nextDashboardMetadata = normalizeDashboardMetadata(dashboardSettings.metadata);
+
                         setHasCustomDashboardSetup(Boolean(dashboardSettings.id));
                         setCustomDashboardSubdomain(dashboardSettings.subdomain || "");
                         setCustomDashboardLayout(dashboardSettings.layout || DEFAULT_CUSTOM_DASHBOARD_LAYOUT);
                         setCustomDashboardTheme(dashboardSettings.theme || DEFAULT_CUSTOM_DASHBOARD_THEME);
-                        setCustomDashboardMetadata({
-                            title: dashboardSettings.metadata?.title || "",
-                            description: dashboardSettings.metadata?.description || "",
-                            logoUrl: dashboardSettings.metadata?.logoUrl || "",
-                            supportUrl: dashboardSettings.metadata?.supportUrl || "",
-                        });
+                        setCustomDashboardMetadata(nextDashboardMetadata);
                         setCustomDashboardHostnames(dashboardSettings.hostnames || []);
+                        nextSavedSettings = {
+                            ...nextSavedSettings,
+                            customDashboardSubdomain: dashboardSettings.subdomain || "",
+                            customDashboardLayout: dashboardSettings.layout || DEFAULT_CUSTOM_DASHBOARD_LAYOUT,
+                            customDashboardTheme: dashboardSettings.theme || DEFAULT_CUSTOM_DASHBOARD_THEME,
+                            customDashboardMetadata: nextDashboardMetadata,
+                        };
                     } else {
                         setHasCustomDashboardSetup(false);
                         if (view === 'dashboard') {
@@ -374,6 +467,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                 }
             }
 
+            setSavedSettings(nextSavedSettings);
             setLoading(false);
         }
         fetchData();
@@ -414,8 +508,30 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                 setError(String(payload.error || 'Failed to save custom dashboard settings.'));
             } else {
                 const dashboardSettings = payload as CustomDashboardSettings;
+                const nextDashboardMetadata = normalizeDashboardMetadata(dashboardSettings.metadata);
+                const nextDashboardLayout = dashboardSettings.layout || DEFAULT_CUSTOM_DASHBOARD_LAYOUT;
+                const nextDashboardTheme = dashboardSettings.theme || DEFAULT_CUSTOM_DASHBOARD_THEME;
+
                 setCustomDashboardSubdomain(dashboardSettings.subdomain || "");
+                setCustomDashboardLayout(nextDashboardLayout);
+                setCustomDashboardTheme(nextDashboardTheme);
+                setCustomDashboardMetadata(nextDashboardMetadata);
                 setCustomDashboardHostnames(dashboardSettings.hostnames || []);
+                setSavedSettings((current) => ({
+                    ...(current || DEFAULT_SAVED_SETTINGS),
+                    customDashboardSubdomain: dashboardSettings.subdomain || "",
+                    customDashboardLayout: nextDashboardLayout,
+                    customDashboardTheme: nextDashboardTheme,
+                    customDashboardMetadata: nextDashboardMetadata,
+                }));
+                window.dispatchEvent(new CustomEvent('rolink:custom-dashboard-saved', {
+                    detail: {
+                        ...dashboardSettings,
+                        layout: nextDashboardLayout,
+                        theme: nextDashboardTheme,
+                        metadata: nextDashboardMetadata,
+                    },
+                }));
                 setSuccess(true);
                 setTimeout(() => setSuccess(false), 3000);
             }
@@ -448,6 +564,24 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
         if (!response.ok) {
             setError(String(payload.error || 'Failed to save settings.'));
         } else {
+            const savedServerSettings = payload as ServerSettingsConfig;
+            const nextServerSettings = {
+                adminCmds: savedServerSettings.admin_cmds_enabled !== false,
+                miscCmds: savedServerSettings.misc_cmds_enabled !== false,
+                loggingChannelId: savedServerSettings.logging_channel_id || "",
+                reportsEnabled: savedServerSettings.reports_enabled || false,
+                reportsChannelId: savedServerSettings.reports_channel_id || "",
+            };
+
+            setAdminCmds(nextServerSettings.adminCmds);
+            setMiscCmds(nextServerSettings.miscCmds);
+            setLoggingChannelId(nextServerSettings.loggingChannelId);
+            setReportsEnabled(nextServerSettings.reportsEnabled);
+            setReportsChannelId(nextServerSettings.reportsChannelId);
+            setSavedSettings((current) => ({
+                ...(current || DEFAULT_SAVED_SETTINGS),
+                ...nextServerSettings,
+            }));
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
         }
@@ -601,6 +735,38 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
         }
     }
 
+    const showsSaveButton = view === 'commands' || view === 'logging' || view === 'reports' || view === 'dashboard';
+    const currentSettingsSnapshot = useMemo<SavedSettingsSnapshot>(() => ({
+        adminCmds,
+        miscCmds,
+        loggingChannelId,
+        reportsEnabled,
+        reportsChannelId,
+        customDashboardSubdomain,
+        customDashboardLayout,
+        customDashboardTheme,
+        customDashboardMetadata,
+    }), [
+        adminCmds,
+        customDashboardLayout,
+        customDashboardMetadata,
+        customDashboardSubdomain,
+        customDashboardTheme,
+        loggingChannelId,
+        miscCmds,
+        reportsChannelId,
+        reportsEnabled,
+    ]);
+    const hasUnsavedSettings = showsSaveButton
+        && Boolean(savedSettings)
+        && JSON.stringify(getComparableSettingsForView(currentSettingsSnapshot, view)) !== JSON.stringify(getComparableSettingsForView(savedSettings || DEFAULT_SAVED_SETTINGS, view));
+
+    useEffect(() => {
+        if (hasUnsavedSettings && success) {
+            setSuccess(false);
+        }
+    }, [hasUnsavedSettings, success]);
+
     if (loading) return (
         <div className="flex items-center justify-center min-h-[400px]">
             <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
@@ -608,7 +774,6 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     );
 
     const pageCopy = PAGE_COPY[view];
-    const showsSaveButton = view === 'commands' || view === 'logging' || view === 'reports' || view === 'dashboard';
     const settingsTiles = [
         {
             title: 'Game Connection',
@@ -696,7 +861,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     })();
 
     return (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full pb-20">
+        <div className={`animate-in fade-in slide-in-from-bottom-4 duration-700 w-full ${showsSaveButton ? 'pb-32' : 'pb-20'}`}>
             {/* Page Header */}
             <div className="mb-10 pb-8 border-b border-slate-800/60">
                 <div className="flex items-center justify-between">
@@ -710,22 +875,6 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         </div>
                     </div>
 
-                    {showsSaveButton && (
-                        <button
-                            onClick={handleSave}
-                            disabled={saving}
-                            className="hidden md:flex bg-sky-600 hover:bg-sky-500 text-white font-bold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-sky-900/20 text-xs disabled:opacity-50 items-center justify-center gap-3 active:scale-95 border border-sky-400/20"
-                        >
-                            {saving ? (
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            ) : (
-                                <>
-                                    <SaveIcon />
-                                    SAVE CHANGES
-                                </>
-                            )}
-                        </button>
-                    )}
                 </div>
             </div>
 
@@ -1278,7 +1427,6 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* Status Box */}
                     {showsSaveButton && (
-                    <>
                         <div className="p-5 sm:p-6 md:p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
                             <div className="flex items-center gap-5">
                                 <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/10">
@@ -1297,16 +1445,6 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                             )}
                             {error && <span className="text-red-500 text-[10px] font-bold uppercase tracking-widest">{error}</span>}
                         </div>
-                        <div className="md:hidden">
-                            <button
-                                onClick={handleSave}
-                                disabled={saving}
-                                className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-sky-900/10 text-xs disabled:opacity-50 flex items-center justify-center gap-3 active:scale-95"
-                            >
-                                {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "SAVE SETTINGS"}
-                            </button>
-                        </div>
-                    </>
                     )}
 
                     {/* Remove Ro-Link */}
@@ -1366,6 +1504,37 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                 </div>
                 )}
             </div>
+
+            {showsSaveButton && (hasUnsavedSettings || saving) && (
+                <div className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 pointer-events-none">
+                    <div className="pointer-events-auto flex w-full max-w-3xl flex-col gap-4 rounded-2xl border border-sky-500/30 bg-slate-950/95 p-4 shadow-2xl shadow-black/40 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-500/20 bg-sky-500/10 text-sky-300">
+                                <SaveIcon />
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-white">Save your settings</p>
+                                <p className="mt-0.5 text-xs font-medium text-slate-400">You have unsaved changes on this page.</p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="flex min-h-11 items-center justify-center gap-3 rounded-xl border border-sky-400/20 bg-sky-600 px-6 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-sky-950/30 transition-all hover:bg-sky-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {saving ? (
+                                <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin"></div>
+                            ) : (
+                                <>
+                                    <SaveIcon />
+                                    Save Settings
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {view === 'overview' && isRemoveModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">

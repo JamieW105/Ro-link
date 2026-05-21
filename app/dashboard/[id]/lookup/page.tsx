@@ -22,6 +22,17 @@ interface ServerPlaceConfig {
     place_id?: string | null;
 }
 
+interface StaffNote {
+    id: string;
+    target_discord_id?: string | null;
+    target_roblox_id?: string | null;
+    target_roblox_username?: string | null;
+    note: string;
+    created_by_discord_id?: string | null;
+    created_by_tag?: string | null;
+    created_at: string;
+}
+
 // SVGs
 const SearchIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
@@ -63,10 +74,13 @@ function PlayerLookupContent() {
     const [presence, setPresence] = useState<{ inGame: boolean, jobId?: string } | null>(null);
     const [linkedPlaceId, setLinkedPlaceId] = useState<string | null>(null);
     const [logs, setLogs] = useState<NormalizedDashboardLog[]>([]);
+    const [staffNotes, setStaffNotes] = useState<StaffNote[]>([]);
     const [loading, setLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
+    const [noteSaving, setNoteSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [reasonText, setReasonText] = useState("Dashboard action");
+    const [noteText, setNoteText] = useState("");
     const [softBanDurationMinutes, setSoftBanDurationMinutes] = useState("60");
 
     const perms = usePermissions();
@@ -95,6 +109,7 @@ function PlayerLookupContent() {
         setPlayer(null);
         setPresence(null);
         setLogs([]);
+        setStaffNotes([]);
 
         try {
             const res = await fetch(`/api/proxy?username=${searchQuery}&serverId=${id}`);
@@ -104,9 +119,10 @@ function PlayerLookupContent() {
             setPlayer(data);
 
             // Fetch Presence and Logs in Parallel
-            const [serversRes, logsRes] = await Promise.all([
+            const [serversRes, logsRes, notesRes] = await Promise.all([
                 fetch(`/api/dashboard/live-servers?serverId=${encodeURIComponent(String(id))}`, { cache: 'no-store' }),
-                fetch(`/api/dashboard/logs?serverId=${encodeURIComponent(String(id))}&target=${encodeURIComponent(data.username)}`, { cache: 'no-store' })
+                fetch(`/api/dashboard/logs?serverId=${encodeURIComponent(String(id))}&target=${encodeURIComponent(data.username)}`, { cache: 'no-store' }),
+                fetch(`/api/dashboard/staff-notes?serverId=${encodeURIComponent(String(id))}&robloxId=${encodeURIComponent(String(data.id))}&robloxUsername=${encodeURIComponent(data.username)}`, { cache: 'no-store' })
             ]);
 
             if (serversRes.ok) {
@@ -121,6 +137,10 @@ function PlayerLookupContent() {
 
             if (logsRes.ok) {
                 setLogs(normalizeDashboardLogs(await logsRes.json()));
+            }
+            if (notesRes.ok) {
+                const notesPayload = await notesRes.json();
+                setStaffNotes(Array.isArray(notesPayload.notes) ? notesPayload.notes : []);
             }
             if (data.username) {
                 await fetch('/api/logs', {
@@ -215,6 +235,36 @@ function PlayerLookupContent() {
             if (logsResponse.ok) setLogs(normalizeDashboardLogs(await logsResponse.json()));
         }
         setActionLoading(false);
+    }
+
+    async function handleAddNote(e: React.FormEvent) {
+        e.preventDefault();
+        if (!player || !id || !noteText.trim()) return;
+
+        setNoteSaving(true);
+        try {
+            const response = await fetch('/api/dashboard/staff-notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverId: id,
+                    robloxId: String(player.id),
+                    robloxUsername: player.username,
+                    note: noteText,
+                })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload.error || 'Failed to save staff note.');
+            }
+
+            setNoteText("");
+            setStaffNotes((current) => payload.note ? [payload.note, ...current].slice(0, 10) : current);
+        } catch (err: any) {
+            alert(err.message || 'Failed to save staff note.');
+        } finally {
+            setNoteSaving(false);
+        }
     }
 
     return (
@@ -362,6 +412,48 @@ function PlayerLookupContent() {
                                     <p className="text-xs font-bold text-slate-600 uppercase tracking-widest italic">No prior history found.</p>
                                 </div>
                             )}
+                        </div>
+
+                        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8 backdrop-blur-md">
+                            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-3">
+                                <div className="p-2 bg-yellow-600/10 rounded-lg text-yellow-500 border border-yellow-500/10">
+                                    <InfoIcon />
+                                </div>
+                                Staff Notes
+                            </h3>
+                            {staffNotes.length > 0 ? (
+                                <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar mb-6">
+                                    {staffNotes.map((note) => (
+                                        <div key={note.id} className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4">
+                                            <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{note.note}</p>
+                                            <p className="text-[11px] text-slate-500 mt-3 font-medium">
+                                                By {note.created_by_tag || note.created_by_discord_id || 'Unknown Staff'} â€¢ {new Date(note.created_at).toLocaleString()}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="py-8 text-center border-2 border-dashed border-slate-800 rounded-xl mb-6">
+                                    <p className="text-xs font-bold text-slate-600 uppercase tracking-widest italic">No staff notes found.</p>
+                                </div>
+                            )}
+                            <form onSubmit={handleAddNote} className="space-y-3">
+                                <textarea
+                                    value={noteText}
+                                    onChange={(event) => setNoteText(event.target.value)}
+                                    rows={3}
+                                    maxLength={1500}
+                                    className="w-full bg-black/40 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all resize-none"
+                                    placeholder="Add a staff-only note for this user..."
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={noteSaving || !noteText.trim()}
+                                    className="px-5 py-3 bg-yellow-600/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-yellow-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    {noteSaving ? "SAVING..." : "ADD NOTE"}
+                                </button>
+                            </form>
                         </div>
 
                         <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8 backdrop-blur-md">
