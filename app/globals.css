@@ -74,3 +74,165 @@ select option {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
+
+/* Custom dashboard theme bridge */
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] {
+  background: var(--custom-dashboard-gradient);
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] .dashboard-content-frame {
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--custom-dashboard-accent) 10%, transparent), transparent 36%),
+    #020617 !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] select:focus {
+  border-color: var(--custom-dashboard-accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--custom-dashboard-accent) 22%, transparent) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] :is(
+  [class~="text-sky-200"],
+  [class~="text-sky-300"],
+  [class~="text-sky-400"],
+  [class~="text-sky-500"],
+  [class~="text-sky-600"]
+) {
+  color: var(--custom-dashboard-accent) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] :is(
+  [class~="hover:text-sky-200"],
+  [class~="hover:text-sky-400"]
+):hover,
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] .group:hover :is(
+  [class~="group-hover:text-sky-400"]
+),
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] .group:focus-within :is(
+  [class~="group-focus-within:text-sky-500"]
+) {
+  color: var(--custom-dashboard-accent-text) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] :is(
+  [class~="bg-sky-400"],
+  [class~="bg-sky-500"],
+  [class~="bg-sky-600"]
+):not(:disabled),
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] :is(
+  [class~="hover:bg-sky-500"],
+  [class~="hover:bg-sky-600"]
+):not(:disabled):hover {
+  background-color: var(--custom-dashboard-accent) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] :is(
+  [class~="bg-sky-400/5"],
+  [class~="bg-sky-500/5"],
+  [class~="bg-sky-600/5"]
+) {
+  background-color: var(--custom-dashboard-accent-soft) !important;
+  background-color: color-mix(in srgb, var(--custom-dashboard-accent) 6%, transparent) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] [class~="hover:bg-sky-500/5"]:not(:disabled):hover {
+  background-color: var(--custom-dashboard-accent-soft) !important;
+  background-color: color-mix(in srgb, var(--custom-dashboard-accent) 6%, transparent) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] :is(
+  [class~="bg-sky-300/10"],
+  [class~="bg-sky-400/10"],
+  [class~="bg-sky-500/10"],
+  [class~="bg-sky-600/10"]
+) {
+  background-color: var(--custom-dashboard-accent-soft) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] [class~="hover:bg-sky-500/10"]:not(:disabled):hover {
+  background-color: var(--custom-dashboard-accent-soft) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] :is(
+  [class~="bg-sky-600/20"]
+) {
+  background-color: var(--custom-dashboard-accent-soft) !important;
+  background-color: color-mix(in srgb, var(--custom-dashboard-accent) 20%, transparent) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] [class~="bg-sky-900"] {
+  background-color: color-mix(in srgb, var(--custom-dashboard-accent) 24%, #020617) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] :is(
+  [class~="border-sky-300/30"],
+  [class~="border-sky-400/10"],
+  [class~="border-sky-400/20"],
+  [class~="border-sky-500"],
+  [class~="border-sky-500/10"],
+  [class~="border-sky-500/20"],
+  [class~="border-sky-500/30"],
+  [class~="border-sky-500/40"]
+) {
+  border-color: var(--custom-dashboard-accent-border) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] :is(
+  [class~="hover:border-sky-500"],
+  [class~="hover:border-sky-500/30"],
+  [class~="hover:border-sky-500/40"]
+):hover,
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] .group:hover :is(
+  [class~="group-hover:border-sky-500/40"]
+),
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] :is(
+  [class~="focus:border-sky-500"]
+):focus {
+  border-color: var(--custom-dashboard-accent) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] [class~="border-l-sky-600"] {
+  border-left-color: var(--custom-dashboard-accent) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] [class~="border-t-transparent"] {
+  border-top-color: transparent !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] :is(
+  [class~="focus:ring-sky-600"],
+  [class~="focus:ring-sky-600/30"]
+):focus {
+  --tw-ring-color: color-mix(in srgb, var(--custom-dashboard-accent) 35%, transparent) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] [class~="accent-sky-500"] {
+  accent-color: var(--custom-dashboard-accent);
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] [class~="from-sky-600"] {
+  --tw-gradient-from: var(--custom-dashboard-accent) var(--tw-gradient-from-position) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] :is(
+  [class~="to-sky-950/5"],
+  [class~="to-indigo-600"],
+  [class~="to-indigo-700"]
+) {
+  --tw-gradient-to: color-mix(in srgb, var(--custom-dashboard-accent) 32%, #020617) var(--tw-gradient-to-position) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] :is(
+  [class~="shadow-sky-500/5"],
+  [class~="shadow-sky-500/10"],
+  [class~="shadow-sky-900/5"],
+  [class~="shadow-sky-900/10"],
+  [class~="shadow-sky-900/20"]
+),
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] [class~="hover:shadow-sky-500/10"]:hover {
+  --tw-shadow-color: color-mix(in srgb, var(--custom-dashboard-accent) 20%, transparent) !important;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] [class*="rgba(2,132,199"] {
+  box-shadow: 0 0 20px color-mix(in srgb, var(--custom-dashboard-accent) 24%, transparent) !important;
+}

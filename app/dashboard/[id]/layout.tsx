@@ -2,7 +2,7 @@
 
 import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { hasAnyAdminPanelCommand, MISC_ACTION_COMMAND_IDS } from "@/lib/adminPanelCommands";
 import {
     DEFAULT_CUSTOM_DASHBOARD_LAYOUT,
@@ -445,6 +445,14 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const customDashboardBrand = isCustomDashboardStyled
         ? customDashboardMetadata?.title || customDashboardInfo?.name || 'Ro-Link'
         : 'Ro-Link';
+    const customDashboardStyle: CSSProperties | undefined = isCustomDashboardStyled ? {
+        '--custom-dashboard-accent': customDashboardTheme.accent,
+        '--custom-dashboard-accent-text': customDashboardTheme.accentText,
+        '--custom-dashboard-accent-soft': customDashboardTheme.softBg,
+        '--custom-dashboard-accent-border': customDashboardTheme.border,
+        '--custom-dashboard-gradient': customDashboardTheme.gradient,
+        background: customDashboardTheme.gradient,
+    } as CSSProperties : undefined;
 
     function getNavLinkStyle(isActive: boolean) {
         if (!isCustomDashboardStyled || !isActive) {
@@ -559,8 +567,9 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     return (
         <div
             className={`custom-dashboard-shell min-h-screen bg-[#020617] text-slate-200 flex min-w-0 flex-col ${flexDirClass} font-sans`}
+            data-custom-dashboard-themed={isCustomDashboardStyled ? 'true' : undefined}
             data-dashboard-layout={customDashboardLayout}
-            style={isCustomDashboardStyled ? { background: customDashboardTheme.gradient } : undefined}
+            style={customDashboardStyle}
         >
             {/* Sidebar Overlay (Mobile Drawer trigger) */}
             {isSidebarOpen && (
