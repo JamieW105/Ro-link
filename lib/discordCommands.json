@@ -9,13 +9,19 @@
   },
   {
     "name": "lookup",
-    "description": "Lookup a Discord user and their server moderation history",
+    "description": "Lookup a user's Discord and Roblox info, and their server moderation history",
     "options": [
       {
-        "name": "user",
+        "name": "roblox_user",
+        "description": "The Roblox username to lookup",
+        "type": 3,
+        "required": false
+      },
+      {
+        "name": "discord_user",
         "description": "The Discord user to lookup",
         "type": 6,
-        "required": true
+        "required": false
       }
     ]
   },
@@ -58,30 +64,6 @@
   {
     "name": "verify",
     "description": "Link your Roblox account with Ro-Link"
-  },
-  {
-    "name": "get-discord",
-    "description": "Find a Discord user from their Roblox account",
-    "options": [
-      {
-        "name": "roblox_username",
-        "description": "The Roblox username to lookup",
-        "type": 3,
-        "required": true
-      }
-    ]
-  },
-  {
-    "name": "get-roblox",
-    "description": "Find a Roblox account from a Discord user",
-    "options": [
-      {
-        "name": "discord_user",
-        "description": "The Discord user to lookup",
-        "type": 6,
-        "required": true
-      }
-    ]
   },
   {
     "name": "report",

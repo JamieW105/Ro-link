@@ -1025,12 +1025,12 @@ export async function POST(req: Request) {
                                     },
                                     {
                                         name: '**Moderation Commands**',
-                                        value: '`/moderation` - Ban, kick, unban, softban, update, or shutdown\n`/lookup` - Lookup a Discord user and moderation history',
+                                        value: '`/moderation` - Ban, kick, unban, softban, update, or shutdown\n`/lookup` - Lookup Discord info, linked Roblox info, and server moderation history',
                                         inline: false
                                     },
                                     {
                                         name: '**Utility Commands**',
-                                        value: buildCommandSummary(['get-discord', 'get-roblox', 'verify', 'ping', 'servers']),
+                                        value: buildCommandSummary(['lookup', 'verify', 'ping', 'servers']),
                                         inline: false
                                     },
                                     {
@@ -1079,73 +1079,7 @@ export async function POST(req: Request) {
                 });
             }
 
-            if (name === 'get-discord') {
-                const robloxUsername = String(getCommandOptionValue(options, 'roblox_username') ?? '').trim();
-                const { data, error } = await supabase
-                    .from('verified_users')
-                    .select('*')
-                    .ilike('roblox_username', robloxUsername)
-                    .maybeSingle();
 
-                if (error || !data) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: `❌ No Discord account found for **${robloxUsername}**.`, flags: 64 }
-                    });
-                }
-
-                return NextResponse.json({
-                    type: 4,
-                    data: {
-                        embeds: [{
-                            title: `Player Lookup: ${data.roblox_username}`,
-                            color: 0x2b2d31,
-                            thumbnail: { url: `https://www.roblox.com/headshot-thumbnail/image?userId=${data.roblox_id}&width=420&height=420&format=png` },
-                            fields: [
-                                { name: 'Roblox Account', value: `[${data.roblox_username}](https://www.roblox.com/users/${data.roblox_id}/profile)\n\`ID: ${data.roblox_id}\``, inline: true },
-                                { name: 'Discord Account', value: `<@${data.discord_id}>\n\`ID: ${data.discord_id}\``, inline: true },
-                                { name: 'Linked Date', value: `<t:${Math.floor(new Date(data.created_at).getTime() / 1000)}:R>`, inline: false }
-                            ],
-                            footer: { text: 'Ro-Link Systems • Lookup Service' },
-                            timestamp: new Date().toISOString()
-                        }]
-                    }
-                });
-            }
-
-            if (name === 'get-roblox') {
-                const discordUserId = String(getCommandOptionValue(options, 'discord_user') ?? '').trim();
-                const { data, error } = await supabase
-                    .from('verified_users')
-                    .select('*')
-                    .eq('discord_id', discordUserId)
-                    .maybeSingle();
-
-                if (error || !data) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: `❌ No Roblox account found for <@${discordUserId}>.`, flags: 64 }
-                    });
-                }
-
-                return NextResponse.json({
-                    type: 4,
-                    data: {
-                        embeds: [{
-                            title: `Player Lookup`,
-                            color: 0x2b2d31,
-                            thumbnail: { url: `https://www.roblox.com/headshot-thumbnail/image?userId=${data.roblox_id}&width=420&height=420&format=png` },
-                            fields: [
-                                { name: 'Discord Account', value: `<@${data.discord_id}>\n\`ID: ${data.discord_id}\``, inline: true },
-                                { name: 'Roblox Account', value: `[${data.roblox_username}](https://www.roblox.com/users/${data.roblox_id}/profile)\n\`ID: ${data.roblox_id}\``, inline: true },
-                                { name: 'Linked Date', value: `<t:${Math.floor(new Date(data.created_at).getTime() / 1000)}:R>`, inline: false }
-                            ],
-                            footer: { text: 'Ro-Link Systems • Lookup Service' },
-                            timestamp: new Date().toISOString()
-                        }]
-                    }
-                });
-            }
 
             if (name === 'report') {
                 const { data: server, error: serverError } = await supabase
@@ -1321,67 +1255,222 @@ export async function POST(req: Request) {
 
             if (name === 'lookup') {
                 try {
-                    const discordUserId = String(getCommandOptionValue(options, 'user') ?? '').trim();
-                    const lookup = await fetchDiscordLookup(discordUserId, guild_id);
-                    const discordUser = lookup.user;
-                    const avatarUrl = getDiscordAvatarUrl(discordUser);
-                    const createdAt = getDiscordCreatedAt(discordUserId);
-                    const linkedRoblox = lookup.verifiedUser
-                        ? `[${lookup.verifiedUser.roblox_username}](https://www.roblox.com/users/${lookup.verifiedUser.roblox_id}/profile)\n\`ID: ${lookup.verifiedUser.roblox_id}\``
-                        : 'No linked Roblox account found.';
+                    // Resolve arguments — default to the command executor if nothing is provided
+                    const robloxUserArg = String(getCommandOptionValue(options, 'roblox_user') ?? '').trim();
+                    const discordUserArg = String(getCommandOptionValue(options, 'discord_user') ?? '').trim();
+                    const targetDiscordId = discordUserArg || (!robloxUserArg ? userId : '');
 
-                    await logAction(guild_id, 'LOOKUP', discordUserId, userTag, 'Discord user lookup command');
+                    let discordLookup: DiscordLookupResult | null = null;
+                    let robloxLookup: RobloxLookupResult | null = null;
+                    let verifiedUserForRoblox: { roblox_username: string; roblox_id: string | number } | null = null;
+
+                    // Step 1: Fetch Discord profile if we have a Discord ID
+                    if (targetDiscordId) {
+                        discordLookup = await fetchDiscordLookup(targetDiscordId, guild_id);
+                    }
+
+                    // Step 2: Fetch Roblox profile if username was explicitly provided
+                    if (robloxUserArg) {
+                        robloxLookup = await fetchRobloxLookup(robloxUserArg, guild_id, server.open_cloud_key);
+                        // Check if there is a linked Discord account for this Roblox user
+                        const { data: verified } = await supabase
+                            .from('verified_users')
+                            .select('*')
+                            .eq('roblox_id', robloxLookup.id)
+                            .maybeSingle();
+                        if (verified) {
+                            verifiedUserForRoblox = verified;
+                            // If we didn't get a Discord lookup yet, fetch it now
+                            if (!discordLookup) {
+                                try {
+                                    discordLookup = await fetchDiscordLookup(String(verified.discord_id), guild_id);
+                                } catch {
+                                    // Non-fatal — Discord user may have left the server
+                                }
+                            }
+                        }
+                    } else if (discordLookup?.verifiedUser) {
+                        // Discord user has a linked Roblox account — fetch the full Roblox profile
+                        try {
+                            robloxLookup = await fetchRobloxLookup(
+                                String(discordLookup.verifiedUser.roblox_username ?? '').trim(),
+                                guild_id,
+                                server.open_cloud_key
+                            );
+                        } catch {
+                            // Non-fatal — fall back to basic verified_users data below
+                        }
+                    }
+
+                    if (!discordLookup && !robloxLookup) {
+                        throw new Error('Could not resolve any Discord or Roblox user to lookup.');
+                    }
+
+                    // Step 3: Build combined moderation history across all known identities
+                    const matchValues = new Set<string>();
+                    if (discordLookup?.user) {
+                        matchValues.add(discordLookup.user.id?.toLowerCase() ?? '');
+                        matchValues.add(`<@${discordLookup.user.id}>`);
+                        matchValues.add(`<@!${discordLookup.user.id}>`);
+                        if (discordLookup.user.username) matchValues.add(discordLookup.user.username.toLowerCase());
+                        const tag = formatDiscordUserTag(discordLookup.user);
+                        if (tag) matchValues.add(tag.toLowerCase());
+                    }
+                    if (discordLookup?.verifiedUser?.roblox_username) {
+                        matchValues.add(String(discordLookup.verifiedUser.roblox_username).toLowerCase());
+                    }
+                    if (discordLookup?.verifiedUser?.roblox_id) {
+                        matchValues.add(String(discordLookup.verifiedUser.roblox_id).toLowerCase());
+                    }
+                    if (robloxLookup?.username) {
+                        matchValues.add(robloxLookup.username.toLowerCase());
+                    }
+                    if (robloxLookup?.id) {
+                        matchValues.add(String(robloxLookup.id).toLowerCase());
+                    }
+                    if (verifiedUserForRoblox?.roblox_username) {
+                        matchValues.add(String(verifiedUserForRoblox.roblox_username).toLowerCase());
+                    }
+                    if (verifiedUserForRoblox?.roblox_id) {
+                        matchValues.add(String(verifiedUserForRoblox.roblox_id).toLowerCase());
+                    }
+
+                    const { data: logsData } = await supabase
+                        .from('logs')
+                        .select('id, action, moderator, timestamp, target')
+                        .eq('server_id', guild_id)
+                        .order('timestamp', { ascending: false })
+                        .limit(100);
+
+                    const combinedHistory = ((Array.isArray(logsData) ? logsData : []) as LookupHistoryEntry[])
+                        .filter((entry) => {
+                            const action = String(entry?.action || '').toUpperCase();
+                            const target = String(entry?.target || '').toLowerCase();
+                            return matchValues.has(target) && (
+                                MODERATION_LOG_ACTIONS.has(action)
+                                || action.includes('BAN')
+                                || action.includes('KICK')
+                                || action.includes('MUTE')
+                                || action.includes('TIMEOUT')
+                            );
+                        })
+                        .slice(0, 5);
+
+                    const embeds: object[] = [];
+
+                    // Embed 1: Discord Info
+                    if (discordLookup) {
+                        const discordUser = discordLookup.user;
+                        const avatarUrl = getDiscordAvatarUrl(discordUser);
+                        const createdAt = getDiscordCreatedAt(String(discordUser?.id ?? targetDiscordId));
+                        const linkedRobloxStr = discordLookup.verifiedUser
+                            ? `[${discordLookup.verifiedUser.roblox_username}](https://www.roblox.com/users/${discordLookup.verifiedUser.roblox_id}/profile)\n\`ID: ${discordLookup.verifiedUser.roblox_id}\``
+                            : verifiedUserForRoblox
+                                ? `[${verifiedUserForRoblox.roblox_username}](https://www.roblox.com/users/${verifiedUserForRoblox.roblox_id}/profile)\n\`ID: ${verifiedUserForRoblox.roblox_id}\``
+                                : 'No linked Roblox account found.';
+
+                        embeds.push({
+                            title: `Discord User Info: ${formatDiscordUserTag(discordUser)}`,
+                            color: 0x0ea5e9,
+                            thumbnail: avatarUrl ? { url: avatarUrl } : undefined,
+                            fields: [
+                                { name: 'Discord User', value: `<@${discordUser?.id ?? targetDiscordId}>`, inline: true },
+                                { name: 'Username', value: truncateText(formatDiscordUserTag(discordUser), 256), inline: true },
+                                { name: 'Discord ID', value: `\`${discordUser?.id ?? targetDiscordId}\``, inline: true },
+                                { name: 'Account Created', value: createdAt ? formatDiscordTimestamp(createdAt, 'F') : 'Unknown', inline: true },
+                                { name: 'Joined Server', value: discordLookup.member?.joined_at ? formatDiscordTimestamp(discordLookup.member.joined_at, 'F') : 'Not in server or unknown', inline: true },
+                                { name: 'Server Roles', value: `${discordLookup.member?.roles?.length ?? 0}`, inline: true },
+                                { name: 'Linked Roblox', value: linkedRobloxStr, inline: false },
+                                ...(discordLookup.member?.communication_disabled_until
+                                    ? [{ name: 'Timeout Ends', value: formatDiscordTimestamp(discordLookup.member.communication_disabled_until, 'F'), inline: false }]
+                                    : []),
+                            ],
+                            footer: { text: 'Ro-Link Systems • Discord Info' },
+                            timestamp: new Date().toISOString(),
+                        });
+                    }
+
+                    // Embed 2: Roblox Info
+                    let finalRobloxLookup = robloxLookup;
+                    if (!finalRobloxLookup && discordLookup?.verifiedUser) {
+                        // Fall back to basic verified_users data if full fetch failed
+                        finalRobloxLookup = {
+                            id: Number(discordLookup.verifiedUser.roblox_id),
+                            username: String(discordLookup.verifiedUser.roblox_username),
+                            displayName: String(discordLookup.verifiedUser.roblox_username),
+                            description: 'Full profile could not be loaded.',
+                            created: '',
+                            isBanned: false,
+                            avatarUrl: '',
+                            hasApiKey: false,
+                            inGame: false,
+                            jobId: null,
+                            moderationHistory: [],
+                        } as RobloxLookupResult;
+                    }
+
+                    if (finalRobloxLookup) {
+                        const profileUrl = `https://www.roblox.com/users/${finalRobloxLookup.id}/profile`;
+                        const robloxFields: object[] = [
+                            { name: 'Username', value: `[${finalRobloxLookup.username}](${profileUrl})`, inline: true },
+                            { name: 'Display Name', value: truncateText(finalRobloxLookup.displayName || finalRobloxLookup.username, 256), inline: true },
+                            { name: 'Roblox ID', value: `\`${finalRobloxLookup.id}\``, inline: true },
+                            { name: 'Account Created', value: finalRobloxLookup.created ? formatDiscordTimestamp(finalRobloxLookup.created, 'F') : 'Unknown', inline: true },
+                            { name: 'Status', value: finalRobloxLookup.isBanned ? 'Banned' : finalRobloxLookup.inGame ? 'In Game' : 'Offline', inline: true },
+                            { name: 'Description', value: truncateText(finalRobloxLookup.description || 'No description provided.', 1024), inline: false },
+                        ];
+                        if (finalRobloxLookup.inGame && finalRobloxLookup.jobId) {
+                            robloxFields.push({ name: 'Live Server', value: `User is active in job \`${finalRobloxLookup.jobId}\``, inline: false });
+                        }
+                        embeds.push({
+                            title: `Roblox Profile Info: ${finalRobloxLookup.username}`,
+                            url: profileUrl,
+                            color: finalRobloxLookup.isBanned ? 0xef4444 : finalRobloxLookup.inGame ? 0x10b981 : 0x0ea5e9,
+                            thumbnail: finalRobloxLookup.avatarUrl
+                                ? { url: finalRobloxLookup.avatarUrl }
+                                : { url: `https://www.roblox.com/headshot-thumbnail/image?userId=${finalRobloxLookup.id}&width=420&height=420&format=png` },
+                            fields: robloxFields,
+                            footer: { text: 'Ro-Link Systems • Roblox Info' },
+                            timestamp: new Date().toISOString(),
+                        });
+                    }
+
+                    // Embed 3: Server Moderation History
+                    embeds.push({
+                        title: 'Server Moderation History',
+                        color: combinedHistory.length > 0 ? 0xef4444 : 0x0ea5e9,
+                        description: formatModerationHistory(combinedHistory),
+                        footer: { text: `Ro-Link Systems • ${combinedHistory.length} prior moderation action(s)` },
+                        timestamp: new Date().toISOString(),
+                    });
+
+                    // Determine Join Game button
+                    let finalJobId: string | null = null;
+                    if (finalRobloxLookup?.inGame && finalRobloxLookup?.jobId) {
+                        finalJobId = finalRobloxLookup.jobId;
+                    } else if (discordLookup?.activeServer?.id) {
+                        finalJobId = discordLookup.activeServer.id;
+                    }
+                    const joinUrl = finalJobId ? buildRobloxJoinUrl(server.place_id, finalJobId) : null;
+
+                    const targetLogStr = targetDiscordId || robloxUserArg || 'self';
+                    await logAction(guild_id, 'LOOKUP', targetLogStr, userTag, 'Unified lookup command');
 
                     return NextResponse.json({
                         type: 4,
                         data: {
                             flags: 64,
-                            embeds: [{
-                                title: `Discord Lookup: ${formatDiscordUserTag(discordUser)}`,
-                                color: lookup.moderationHistory.length > 0 ? 0xef4444 : 0x0ea5e9,
-                                thumbnail: avatarUrl ? { url: avatarUrl } : undefined,
-                                fields: [
-                                    { name: 'Discord User', value: `<@${discordUserId}>`, inline: true },
-                                    { name: 'Username', value: truncateText(formatDiscordUserTag(discordUser), 256), inline: true },
-                                    { name: 'Discord ID', value: `\`${discordUserId}\``, inline: true },
-                                    { name: 'Account Created', value: createdAt ? formatDiscordTimestamp(createdAt, 'F') : 'Unknown', inline: true },
-                                    { name: 'Joined Server', value: lookup.member?.joined_at ? formatDiscordTimestamp(lookup.member.joined_at, 'F') : 'Not in server or unknown', inline: true },
-                                    { name: 'Server Roles', value: `${lookup.member?.roles?.length ?? 0}`, inline: true },
-                                    { name: 'Linked Roblox', value: linkedRoblox, inline: false },
-                                    {
-                                        name: 'Game Presence',
-                                        value: lookup.activeServer
-                                            ? `In game on job \`${lookup.activeServer.id}\`${lookup.activePlayer ? ` as **${lookup.activePlayer.username}**` : ''}`
-                                            : 'Not currently in a live server.',
-                                        inline: false
-                                    },
-                                    { name: 'Moderation History', value: formatModerationHistory(lookup.moderationHistory), inline: false },
-                                    ...(lookup.member?.communication_disabled_until
-                                        ? [{ name: 'Timeout Ends', value: formatDiscordTimestamp(lookup.member.communication_disabled_until, 'F'), inline: false }]
-                                        : []),
-                                ],
-                                footer: { text: `Ro-Link Systems - Lookup Service - ${lookup.moderationHistory.length} prior moderation action(s)` },
-                                timestamp: new Date().toISOString(),
-                            }]
-                            ,
-                            components: lookup.activeServer && buildRobloxJoinUrl(server.place_id, lookup.activeServer.id)
-                                ? [{
-                                    type: 1,
-                                    components: [{
-                                        type: 2,
-                                        style: 5,
-                                        label: 'Join Game',
-                                        url: buildRobloxJoinUrl(server.place_id, lookup.activeServer.id),
-                                    }],
-                                }]
-                                : []
-                        }
+                            embeds,
+                            components: joinUrl
+                                ? [{ type: 1, components: [{ type: 2, style: 5, label: 'Join Game', url: joinUrl }] }]
+                                : [],
+                        },
                     });
                 } catch (error: unknown) {
                     console.error('[LOOKUP] Error:', error);
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `âŒ ${getErrorMessage(error, 'Failed to lookup that Discord user.')}`, flags: 64 }
+                        data: { content: `❌ ${getErrorMessage(error, 'Failed to lookup that user.')}`, flags: 64 }
                     });
                 }
             }
@@ -1405,48 +1494,7 @@ export async function POST(req: Request) {
                 }
             }
 
-            if (name === '__legacy_roblox_lookup_disabled') {
-                try {
-                    const lookup = await fetchRobloxLookup(String(targetUser || ''), guild_id, server.open_cloud_key);
-                    const profileUrl = `https://www.roblox.com/users/${lookup.id}/profile`;
 
-                    await logAction(guild_id, 'LOOKUP', lookup.username, userTag, 'Discord lookup command');
-
-                    return NextResponse.json({
-                        type: 4,
-                        data: {
-                            flags: 64,
-                            embeds: [{
-                                title: `Roblox Lookup: ${lookup.username}`,
-                                url: profileUrl,
-                                color: lookup.isBanned ? 0xef4444 : lookup.inGame ? 0x10b981 : 0x0ea5e9,
-                                thumbnail: lookup.avatarUrl ? { url: lookup.avatarUrl } : undefined,
-                                fields: [
-                                    { name: 'Username', value: `[${lookup.username}](${profileUrl})`, inline: true },
-                                    { name: 'Display Name', value: truncateText(lookup.displayName || lookup.username, 256), inline: true },
-                                    { name: 'Roblox ID', value: `\`${lookup.id}\``, inline: true },
-                                    { name: 'Account Created', value: lookup.created ? formatDiscordTimestamp(lookup.created, 'F') : 'Unknown', inline: true },
-                                    { name: 'Status', value: lookup.isBanned ? 'Banned' : lookup.inGame ? 'In Game' : 'Offline', inline: true },
-                                    { name: 'Profile Source', value: lookup.hasApiKey ? 'Public Roblox API + configured Open Cloud key' : 'Public Roblox API', inline: true },
-                                    { name: 'Description', value: truncateText(lookup.description || 'No description provided.', 1024), inline: false },
-                                    { name: 'Moderation History', value: formatModerationHistory(lookup.moderationHistory), inline: false },
-                                    ...(lookup.inGame && lookup.jobId
-                                        ? [{ name: 'Live Server', value: `User is active in job \`${lookup.jobId}\``, inline: false }]
-                                        : []),
-                                ],
-                                footer: { text: `Ro-Link Systems • Lookup Service • ${lookup.moderationHistory.length} prior action(s)` },
-                                timestamp: new Date().toISOString(),
-                            }]
-                        }
-                    });
-                } catch (error: unknown) {
-                    console.error('[LOOKUP] Error:', error);
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: `❌ ${getErrorMessage(error, 'Failed to lookup that Roblox user.')}`, flags: 64 }
-                    });
-                }
-            }
 
             let message = '';
             if (name === 'ban') {
