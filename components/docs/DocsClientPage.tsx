@@ -516,6 +516,7 @@ const moduleDeveloperFunctions = [
     ['OnCommandBarOpened(handler)', 'function', 'Runs when an authorized user opens the in-game command bar. Handler receives player, payload, and context.'],
     ['SendBotMessage(target, user, channelId, content)', 'function', 'Sends a Discord bot message through Ro-Link after validating the server, channel, or member target.'],
     ['GetDiscordChannels()', 'function', 'Returns sendable Discord channels for the current server.'],
+    ['GetUserData(user)', 'function', 'Returns Roblox user data, server role rank, and linked Discord user/member data when the user is linked.'],
     ['GetReports(options)', 'function', 'Reads reports for the current server. options can include status, limit, target, or reporter.'],
     ['GetReport(reportId)', 'function', 'Reads one report from the current server.'],
     ['CreateReport(body)', 'function', 'Creates a pending report for the current server.'],
@@ -1368,6 +1369,30 @@ end`}
                             </Callout>
                         </div>
                     </div>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-user-data"
+                    eyebrow="Users"
+                    title="Read linked user data"
+                    description="GetUserData resolves a Roblox player, username, UserId, or identity table through Ro-Link and returns the linked Discord user/member and server role rank when available."
+                >
+                    <CodeBlock label="GetUserData">
+                        {`local ok, data = context.GetUserData(player)
+
+if ok then
+    context.Log("Roblox user", data.user.robloxUsername, data.user.robloxId)
+
+    if data.linked and data.discordUser then
+        context.Log("Discord user", data.discordUser.username, data.discordUser.id)
+    end
+
+    if data.serverRank then
+        context.Log("Highest role", data.serverRank.highestRole and data.serverRank.highestRole.name or "none")
+        context.Log("Role position", data.serverRank.highestPosition)
+    end
+end`}
+                    </CodeBlock>
                 </SectionCard>
 
                 <SectionCard

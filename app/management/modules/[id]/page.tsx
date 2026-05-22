@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { runModuleReviewChecks, type ModuleReviewCheckResult } from '@/lib/moduleReviewChecks';
+
 type ModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
 type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string';
 
@@ -82,6 +84,11 @@ function fieldDescription(field: ModuleConfigField) {
     return 'Pick a hex color value.';
 }
 
+function checkStatusClassName(status: ModuleReviewCheckResult['status']) {
+    if (status === 'pass') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
+    return 'border-red-400/20 bg-red-400/10 text-red-300';
+}
+
 export default function ManagementModuleReviewPage() {
     const params = useParams();
     const router = useRouter();
@@ -98,6 +105,25 @@ export default function ManagementModuleReviewPage() {
 
     const history = useMemo(() => module?.creatorHistory || [], [module]);
     const configFields = useMemo(() => Object.values(module?.configSchema || {}), [module]);
+    const reviewChecks = useMemo(() => {
+        if (!module) return [];
+
+        return runModuleReviewChecks({
+            name: module.name,
+            slug: module.slug,
+            description: module.description,
+            version: module.version,
+            category: module.category,
+            isOfficial: module.isOfficial,
+            sourceCode: editingSource ? editedSourceCode : module.sourceCode || '',
+            moderationNote: module.moderationNote,
+            configSchema: module.configSchema,
+        });
+    }, [editedSourceCode, editingSource, module]);
+    const failedReviewChecks = useMemo(
+        () => reviewChecks.filter((check) => check.status === 'fail'),
+        [reviewChecks],
+    );
     const creatorBlocked = useMemo(() => {
         if (!module?.authorDiscordId) return false;
         return creatorBlocks.some((block) => block.active && block.discord_id === module.authorDiscordId);
@@ -527,6 +553,42 @@ export default function ManagementModuleReviewPage() {
                 </div>
 
                 <aside className="space-y-6">
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+                        <div className="flex items-end justify-between gap-3">
+                            <div>
+                                <h2 className="text-sm font-bold uppercase tracking-widest text-white">Automatic Checks</h2>
+                                <p className="mt-1 text-xs text-slate-500">Runs against source, metadata, and config fields.</p>
+                            </div>
+                            <div className={failedReviewChecks.length > 0 ? 'text-2xl font-black text-red-300' : 'text-2xl font-black text-emerald-300'}>
+                                {failedReviewChecks.length}
+                            </div>
+                        </div>
+                        <div className="mt-4 space-y-3">
+                            {reviewChecks.map((check) => (
+                                <div key={check.id} className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="font-semibold text-white">{check.title}</div>
+                                            <p className="mt-1 text-xs leading-relaxed text-slate-500">{check.description}</p>
+                                        </div>
+                                        <span className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${checkStatusClassName(check.status)}`}>
+                                            {check.status}
+                                        </span>
+                                    </div>
+                                    {check.details.length > 0 ? (
+                                        <ul className="mt-3 space-y-2 text-xs leading-relaxed text-red-200">
+                                            {check.details.map((detail) => (
+                                                <li key={detail}>{detail}</li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="mt-3 text-xs text-slate-600">No issues found.</p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
                         <h2 className="text-sm font-bold uppercase tracking-widest text-white">Creator</h2>
                         <dl className="mt-4 space-y-4 text-sm">

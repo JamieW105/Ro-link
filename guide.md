@@ -248,6 +248,7 @@ return {
 | `context.OnCommandBarOpened(handler)` | Runs when an authorized player opens the command bar. |
 | `context.SendBotMessage(target, user, channelId, content)` | Sends a Discord bot message through Ro-Link with server and channel validation. |
 | `context.GetDiscordChannels()` | Returns Discord channels the bot can send to for the current server. |
+| `context.GetUserData(user)` | Returns Roblox user data, Discord server rank, and linked Discord user/member data when available. |
 | `context.GetReports(options)` | Reads reports for the current server. Options can include `status`, `limit`, `target`, and `reporter`. |
 | `context.GetReport(reportId)` | Reads one report for the current server. |
 | `context.CreateReport(body)` | Creates a pending report for the current server. |
@@ -281,6 +282,27 @@ context.SendBotMessage("channel", nil, "123456789012345678", {
 ```
 
 `Embed` is optional. `PlainText` is optional when an embed has content. `Footer` and `Footor` are both accepted for compatibility.
+
+### GetUserData
+
+`GetUserData` accepts a Roblox `Player`, username, UserId, or an identity table such as `{ robloxId = 123 }`, `{ robloxUsername = "Player" }`, or `{ discordId = "123456789012345678" }`. It returns Roblox user data, the user's highest Discord server role/rank, and linked Discord user/member data when the Roblox account is linked.
+
+```lua
+local ok, data = context.GetUserData(player)
+
+if ok then
+    context.Log("Roblox user", data.user.robloxUsername, data.user.robloxId)
+
+    if data.linked and data.discordUser then
+        context.Log("Discord user", data.discordUser.username, data.discordUser.id)
+    end
+
+    if data.serverRank then
+        context.Log("Highest role", data.serverRank.highestRole and data.serverRank.highestRole.name or "none")
+        context.Log("Role position", data.serverRank.highestPosition)
+    end
+end
+```
 
 ### Cmds Panel Commands and Reports
 

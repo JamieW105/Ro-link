@@ -3485,6 +3485,34 @@ function RoLink:GetModuleDiscordChannels()
 	return true, payload and payload.channels or {}
 end
 
+function RoLink:GetModuleUserData(user)
+	local identity = user
+	if typeof(user) == "Instance" and user:IsA("Player") then
+		identity = {
+			robloxId = user.UserId,
+			robloxUsername = user.Name
+		}
+	elseif type(user) == "number" then
+		identity = {
+			robloxId = user
+		}
+	elseif type(user) == "string" then
+		local numeric = tonumber(user)
+		if numeric then
+			identity = {
+				robloxId = user
+			}
+		else
+			identity = {
+				robloxUsername = user
+			}
+		end
+	end
+	return self:RequestModuleJson("/api/v1/game-admin/user-data", "POST", {
+		user = identity
+	})
+end
+
 function RoLink:GetModuleReports(options)
 	local query = ""
 	if type(options) == "table" then
@@ -3642,6 +3670,9 @@ function RoLink:BuildModuleContext(moduleInfo)
 		end,
 		GetDiscordChannels = function()
 			return self:GetModuleDiscordChannels()
+		end,
+		GetUserData = function(user)
+			return self:GetModuleUserData(user)
 		end,
 		GetReports = function(options)
 			return self:GetModuleReports(options)
