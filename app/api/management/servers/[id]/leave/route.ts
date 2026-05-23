@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { hasPermission } from "@/lib/management";
+import { createStaffActionForumThread } from "@/lib/staffForumNotifications";
 
 export async function POST(
     req: NextRequest,
@@ -11,7 +12,7 @@ export async function POST(
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const userId = (session.user as any).id;
+    const userId = String((session.user as { id?: string }).id ?? '');
     if (!(await hasPermission(userId, 'MANAGE_SERVERS'))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -27,6 +28,20 @@ export async function POST(
         });
         const guildData = await guildRes.json();
         const ownerId = guildData.owner_id;
+
+        try {
+            await createStaffActionForumThread({
+                actionType: 'removed',
+                actionId: guildId,
+                guildId,
+                guildName: guildData.name,
+                ownerId,
+                staffDiscordId: userId,
+                reason,
+            });
+        } catch (threadErr) {
+            console.error("[Management/Servers] Failed to create staff forum thread:", threadErr);
+        }
 
         if (ownerId) {
             // Create DM channel

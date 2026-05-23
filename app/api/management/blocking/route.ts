@@ -3,12 +3,13 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { hasPermission } from "@/lib/management";
 import { supabase } from "@/lib/supabase";
+import { createStaffActionForumThread } from "@/lib/staffForumNotifications";
 
 export async function GET() {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const userId = (session.user as any).id;
+    const userId = String((session.user as { id?: string }).id ?? '');
     if (!(await hasPermission(userId, 'BLOCK_SERVERS'))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const userId = (session.user as any).id;
+    const userId = String((session.user as { id?: string }).id ?? '');
     if (!(await hasPermission(userId, 'BLOCK_SERVERS'))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -62,6 +63,20 @@ export async function POST(req: Request) {
             .single();
 
         if (error) throw error;
+
+        try {
+            await createStaffActionForumThread({
+                actionType: 'blocked',
+                actionId: data.guild_id || guildId,
+                guildId,
+                guildName,
+                ownerId,
+                staffDiscordId: userId,
+                reason,
+            });
+        } catch (threadErr) {
+            console.error("[Management/Blocking] Failed to create staff forum thread:", threadErr);
+        }
 
         // 3. DM the owner about the block
         if (ownerId && botToken) {
