@@ -78,6 +78,8 @@ export async function POST(req: Request) {
             console.error("[Management/Blocking] Failed to create staff forum thread:", threadErr);
         }
 
+        const actionReferenceId = data.guild_id || guildId;
+
         // 3. DM the owner about the block
         if (ownerId && botToken) {
             try {
@@ -98,8 +100,10 @@ export async function POST(req: Request) {
                                 description: `Your server **${guildName}** has been blocked from using Ro-Link.`,
                                 color: 0xff4444,
                                 fields: [
+                                    { name: 'Reference', value: `\`${actionReferenceId}\`` },
                                     { name: 'Reason', value: reason || 'Violation of terms.' },
-                                    { name: 'Action', value: 'The bot has left your server and all data has been wiped.' }
+                                    { name: 'Action', value: 'The bot has left your server and all data has been wiped.' },
+                                    { name: 'Support Server', value: 'https://discord.gg/C3n4nAwYMw' }
                                 ],
                                 timestamp: new Date().toISOString()
                             }]

@@ -28,6 +28,7 @@ export async function POST(
         });
         const guildData = await guildRes.json();
         const ownerId = guildData.owner_id;
+        const actionReferenceId = guildId;
 
         try {
             await createStaffActionForumThread({
@@ -69,8 +70,9 @@ export async function POST(
                             description: `Ro-Link has been removed from your server **${guildData.name}** by management.`,
                             color: 0xff4444,
                             fields: [
+                                { name: 'Reference', value: `\`${actionReferenceId}\`` },
                                 { name: 'Reason', value: reason || 'No reason provided.' },
-                                { name: 'Support', value: 'If you believe this was an error, please contact support.' }
+                                { name: 'Support', value: 'If you believe this was an error, please contact support: https://discord.gg/C3n4nAwYMw' }
                             ],
                             timestamp: new Date().toISOString()
                         }]
