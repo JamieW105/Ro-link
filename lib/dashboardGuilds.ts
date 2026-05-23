@@ -149,12 +149,28 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
     }
 
     const botGuilds = await listBotGuilds();
+    const userGuildIds = userGuilds.map((guild) => guild.id);
+    const { data: blockedRows, error: blockedRowsError } = userGuildIds.length > 0
+        ? await supabase
+            .from('blocked_servers')
+            .select('guild_id')
+            .in('guild_id', userGuildIds)
+        : { data: [], error: null };
+
+    if (blockedRowsError) {
+        console.warn('[DASHBOARD][GUILDS] Failed to load blocked guild list. Continuing without filtering.', {
+            error: blockedRowsError.message,
+        });
+    }
+
+    const blockedGuildIds = new Set((blockedRows || []).map((row) => row.guild_id));
+    const allowedUserGuilds = userGuilds.filter((guild) => !blockedGuildIds.has(guild.id));
 
     const botGuildIds = new Set(botGuilds.map((guild) => guild.id));
 
-    const adminGuilds = userGuilds.filter((guild) => hasDiscordGuildManagePermission(guild.permissions, guild.owner));
+    const adminGuilds = allowedUserGuilds.filter((guild) => hasDiscordGuildManagePermission(guild.permissions, guild.owner));
     const adminGuildIds = new Set(adminGuilds.map((guild) => guild.id));
-    const potentialRoleAccessGuilds = userGuilds.filter((guild) => botGuildIds.has(guild.id) && !adminGuildIds.has(guild.id));
+    const potentialRoleAccessGuilds = allowedUserGuilds.filter((guild) => botGuildIds.has(guild.id) && !adminGuildIds.has(guild.id));
 
     let roleAccessGuilds: VisibleDashboardGuild[] = [];
     const discordRest = rest;

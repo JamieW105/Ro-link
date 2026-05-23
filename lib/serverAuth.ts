@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { findBlockedServer } from './blockedServers';
 
 export type ServerKeyLookupResult<T> = {
     server: T | null;
@@ -11,6 +12,12 @@ export async function findServerByKeyWithDiagnostics<T>(
     rawKey: string,
 ): Promise<ServerKeyLookupResult<T>> {
     const apiKey = String(rawKey ?? '').trim();
+    const selectWithId = selectClause
+        .split(',')
+        .some((column) => column.trim() === 'id')
+        ? selectClause
+        : `id, ${selectClause}`;
+
     if (!apiKey) {
         return {
             server: null,
@@ -21,11 +28,20 @@ export async function findServerByKeyWithDiagnostics<T>(
 
     const primaryLookup = await supabase
         .from('servers')
-        .select(selectClause)
+        .select(selectWithId)
         .eq('api_key', apiKey)
-        .maybeSingle<T>();
+        .maybeSingle<T & { id?: string }>();
 
     if (primaryLookup.data) {
+        const serverId = (primaryLookup.data as { id?: unknown }).id;
+        if (serverId && await findBlockedServer(supabase, serverId)) {
+            return {
+                server: null,
+                matchedBy: 'api_key',
+                error: 'server_blocked',
+            };
+        }
+
         return {
             server: primaryLookup.data,
             matchedBy: 'api_key',
@@ -42,11 +58,20 @@ export async function findServerByKeyWithDiagnostics<T>(
 
     const fallbackLookup = await supabase
         .from('servers')
-        .select(selectClause)
+        .select(selectWithId)
         .eq('open_cloud_key', apiKey)
-        .maybeSingle<T>();
+        .maybeSingle<T & { id?: string }>();
 
     if (fallbackLookup.data) {
+        const serverId = (fallbackLookup.data as { id?: unknown }).id;
+        if (serverId && await findBlockedServer(supabase, serverId)) {
+            return {
+                server: null,
+                matchedBy: 'open_cloud_key',
+                error: 'server_blocked',
+            };
+        }
+
         return {
             server: fallbackLookup.data,
             matchedBy: 'open_cloud_key',

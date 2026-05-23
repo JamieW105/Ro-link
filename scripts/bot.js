@@ -57,6 +57,29 @@ const MISC_SUBCOMMAND_TO_COMMAND = {
 const VALUE_INPUT_MISC_COMMANDS = new Set(['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED', 'JUMP_POWER']);
 const MODERATION_LOG_ACTIONS = new Set(['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'DISCORD_BAN', 'DISCORD_KICK', 'TIMEOUT', 'MUTE']);
 
+async function findBlockedServerForGuild(guildId) {
+    if (!supabase || !guildId) return null;
+
+    const { data, error } = await supabase
+        .from('blocked_servers')
+        .select('guild_id, reason')
+        .eq('guild_id', guildId)
+        .maybeSingle();
+
+    if (error) {
+        throw error;
+    }
+
+    return data;
+}
+
+function getBlockedServerMessage(blocked) {
+    const reason = String(blocked?.reason || '').trim();
+    return reason
+        ? `This server is blocked from using Ro-Link. Reason: ${reason}`
+        : 'This server is blocked from using Ro-Link.';
+}
+
 function buildModerationPanel() {
     const embed = new EmbedBuilder()
         .setTitle('Moderation Actions')
@@ -817,8 +840,23 @@ client.once('clientReady', () => {
     setInterval(cleanupLiveServers, 60000); // Cleanup every minute
 });
 
-client.on('guildCreate', guild => {
+client.on('guildCreate', async guild => {
     console.log(`[GUILD] Joined new guild: ${guild.name} (${guild.id})`);
+    if (supabase) {
+        try {
+            const blocked = await findBlockedServerForGuild(guild.id);
+            if (blocked) {
+                console.warn(`[GUILD] Leaving blocked guild: ${guild.name} (${guild.id})`);
+                await guild.leave();
+                syncStats();
+                updateStatus();
+                return;
+            }
+        } catch (error) {
+            console.error(`[GUILD] Failed to check blocked status for ${guild.id}:`, error.message);
+        }
+    }
+
     syncStats();
     updateStatus();
 });
@@ -890,6 +928,24 @@ client.on('interactionCreate', async interaction => {
         if (user.id !== guild?.ownerId) {
             return interaction.reply({
                 content: 'This command can only be run by the server owner.',
+                ephemeral: true
+            });
+        }
+
+        let blockedServer = null;
+        try {
+            blockedServer = await findBlockedServerForGuild(guildId);
+        } catch (error) {
+            console.error(`[SETUP] Failed to check blocked status for ${guildId}:`, error.message);
+            return interaction.reply({
+                content: 'Unable to verify whether this server is allowed to use Ro-Link. Try again later.',
+                ephemeral: true
+            });
+        }
+
+        if (blockedServer) {
+            return interaction.reply({
+                content: getBlockedServerMessage(blockedServer),
                 ephemeral: true
             });
         }
@@ -2319,6 +2375,18 @@ client.on('interactionCreate', async interaction => {
         const openCloudKey = interaction.fields.getTextInputValue('api_key');
 
         await interaction.deferReply({ ephemeral: true });
+
+        let blockedServer = null;
+        try {
+            blockedServer = await findBlockedServerForGuild(interaction.guildId);
+        } catch (error) {
+            console.error(`[SETUP] Failed to check blocked status for ${interaction.guildId}:`, error.message);
+            return interaction.editReply('Unable to verify whether this server is allowed to use Ro-Link. Try again later.');
+        }
+
+        if (blockedServer) {
+            return interaction.editReply(getBlockedServerMessage(blockedServer));
+        }
 
         const { data: existingServer } = await supabase
             .from('servers')

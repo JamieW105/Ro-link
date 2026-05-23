@@ -2,6 +2,7 @@ import { after, NextResponse } from 'next/server';
 import nacl from 'tweetnacl';
 import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
+import { findBlockedServer, getBlockedServerMessage } from '@/lib/blockedServers';
 import { logAction } from '@/lib/logger';
 import { findLivePlayer, normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
@@ -1391,6 +1392,14 @@ export async function POST(req: Request) {
                     return NextResponse.json({
                         type: 4,
                         data: { content: `❌ This command can only be used in a Discord Server.`, flags: 64 }
+                    });
+                }
+
+                const blocked = await findBlockedServer(supabase, guild_id);
+                if (blocked) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `âŒ ${getBlockedServerMessage(blocked)}`, flags: 64 }
                     });
                 }
 
@@ -3127,6 +3136,14 @@ export async function POST(req: Request) {
                 const placeId = getModalField(modalComponents, 'place_id').trim();
                 const universeId = getModalField(modalComponents, 'universe_id').trim();
                 const openCloudKey = getModalField(modalComponents, 'api_key').trim();
+                const blocked = await findBlockedServer(supabase, guild_id);
+                if (blocked) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `âŒ ${getBlockedServerMessage(blocked)}`, flags: 64 }
+                    });
+                }
+
                 const { data: existingServer } = await supabase
                     .from('servers')
                     .select('api_key')

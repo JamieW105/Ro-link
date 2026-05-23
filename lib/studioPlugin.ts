@@ -10,6 +10,7 @@ import {
     listVisibleGuildsForDiscordSession,
     type VisibleDashboardGuild,
 } from './dashboardGuilds';
+import { findBlockedServer, getBlockedServerMessage } from './blockedServers';
 import { supabase } from './supabase';
 
 const PLUGIN_SESSION_TTL_MS = 60 * 60 * 1000;
@@ -697,6 +698,11 @@ export async function installStudioPluginServer(req: Request, session: StudioPlu
 
     if (!selectedGuild) {
         throw new Error('You do not have permission to configure that Ro-Link server.');
+    }
+
+    const blocked = await findBlockedServer(client, input.serverId);
+    if (blocked) {
+        throw new StudioPluginError(getBlockedServerMessage(blocked), 403);
     }
 
     const { data: existing } = await client

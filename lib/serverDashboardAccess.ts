@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { findBlockedServer, getBlockedServerMessage } from '@/lib/blockedServers';
 import { resolveDashboardUserPermissions, type DashboardPermissions } from '@/lib/gameAdmin';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 export type DashboardAccess = {
     userId: string;
@@ -25,6 +27,11 @@ export async function requireDashboardAccess(serverId: string, predicate?: (perm
     }
 
     try {
+        const blocked = await findBlockedServer(getSupabaseAdmin(), serverId);
+        if (blocked) {
+            return { error: NextResponse.json({ error: getBlockedServerMessage(blocked) }, { status: 403 }) };
+        }
+
         const permissions = await resolveDashboardUserPermissions(serverId, userId);
         const hasAccess = predicate
             ? predicate(permissions)

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { canManageSettings, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { findBlockedServer, getBlockedServerMessage } from '@/lib/blockedServers';
 
 const READ_COLUMNS = [
     'id',
@@ -54,6 +55,11 @@ export async function GET(req: NextRequest) {
     }
 
     const client = getSupabaseAdmin();
+    const blocked = await findBlockedServer(client, serverId);
+    if (blocked) {
+        return NextResponse.json({ error: getBlockedServerMessage(blocked) }, { status: 403 });
+    }
+
     const { data, error } = await client
         .from('servers')
         .select(READ_COLUMNS)
