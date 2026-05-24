@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { buildStaffBlockServerComponents } from './staffActionComponents';
 
 const STAFF_ACTION_FORUM_CHANNEL_ID = '1507564385445613749';
 const DISCORD_EPOCH = 1420070400000n;
@@ -404,6 +405,9 @@ export async function createStaffActionForumThread(input: StaffActionNotificatio
     const actionLabel = input.actionType === 'blocked' ? 'Server Blocked' : 'Server Removed';
     const actionColor = input.actionType === 'blocked' ? 0xdc2626 : 0xef4444;
     const lookupEmbeds = ownerId ? await buildOwnerLookupEmbeds(botToken, input.guildId, ownerId) : [];
+    const components = input.actionType === 'removed'
+        ? buildStaffBlockServerComponents(input.guildId, ownerId)
+        : [];
 
     const embeds: DiscordEmbed[] = [
         {
@@ -436,6 +440,7 @@ export async function createStaffActionForumThread(input: StaffActionNotificatio
             message: {
                 content: staffDiscordId ? `<@${staffDiscordId}>` : undefined,
                 embeds,
+                components: components.length > 0 ? components : undefined,
                 allowed_mentions: staffDiscordId ? { users: [staffDiscordId] } : { parse: [] },
             },
         }),

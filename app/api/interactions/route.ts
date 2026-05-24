@@ -7,6 +7,7 @@ import { logAction } from '@/lib/logger';
 import { findLivePlayer, normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { buildStaffBlockServerComponents, parseStaffBlockServerCustomId } from '@/lib/staffActionComponents';
 import discordCommands from '@/lib/discordCommands.json';
 import {
     createStaffNote,
@@ -162,6 +163,12 @@ type DiscordMember = {
     roles?: string[];
 };
 
+type InteractionMessageEmbedField = {
+    name?: string;
+    value?: string;
+    inline?: boolean;
+};
+
 type DiscordInteractionPayload = {
     id: string;
     application_id?: string | null;
@@ -171,6 +178,11 @@ type DiscordInteractionPayload = {
     member?: DiscordMember | null;
     user?: DiscordUser | null;
     data?: InteractionData | null;
+    message?: {
+        embeds?: Array<{
+            fields?: InteractionMessageEmbedField[];
+        }>;
+    } | null;
 };
 
 type MiscCommandArgs = {
@@ -234,6 +246,7 @@ const MISC_SUBCOMMAND_TO_COMMAND: Record<string, string> = {
 const VALUE_INPUT_MISC_COMMANDS = new Set(['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED', 'JUMP_POWER']);
 const MODERATION_MENU_ACTIONS = ['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'UPDATE', 'SHUTDOWN'] as const;
 const MODERATION_LOG_ACTIONS = new Set(['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'DISCORD_BAN', 'DISCORD_KICK', 'TIMEOUT', 'MUTE']);
+const SUPER_ADMIN_DISCORD_ID = '953414442060746854';
 
 function buildModerationPanelResponse(): InteractionResponseData {
     return {
@@ -266,6 +279,167 @@ function buildModerationPanelResponse(): InteractionResponseData {
             }]
         }]
     };
+}
+
+function getStaffActionEmbedField(
+    message: DiscordInteractionPayload['message'] | undefined,
+    fieldName: string,
+) {
+    const normalizedFieldName = fieldName.trim().toLowerCase();
+    for (const embed of message?.embeds || []) {
+        const field = embed.fields?.find((candidate) =>
+            String(candidate.name || '').trim().toLowerCase() === normalizedFieldName
+        );
+        if (field?.value) return field.value;
+    }
+    return '';
+}
+
+function getStaffActionServerName(message: DiscordInteractionPayload['message'] | undefined) {
+    const serverField = getStaffActionEmbedField(message, 'Server');
+    const firstLine = serverField.split('\n')[0]?.trim();
+    return firstLine && !firstLine.startsWith('`') ? firstLine : '';
+}
+
+function getStaffActionReason(message: DiscordInteractionPayload['message'] | undefined) {
+    const reason = getStaffActionEmbedField(message, 'Reason')
+        .replace(/^`|`$/g, '')
+        .trim();
+    return reason && reason !== 'No reason provided.' ? reason : '';
+}
+
+async function hasGlobalManagementPermission(discordId: string, permission: string) {
+    const normalizedDiscordId = String(discordId ?? '').trim();
+    if (!normalizedDiscordId) return false;
+    if (normalizedDiscordId === SUPER_ADMIN_DISCORD_ID) return true;
+
+    const client = getSupabaseAdmin();
+    const { data, error } = await client
+        .from('management_users')
+        .select('role:management_roles(permissions)')
+        .eq('discord_id', normalizedDiscordId)
+        .maybeSingle();
+
+    if (error || !data) return false;
+
+    const role = Array.isArray(data.role) ? data.role[0] : data.role;
+    const permissions = Array.isArray(role?.permissions) ? role.permissions : [];
+    return permissions.includes(permission) || permissions.includes('MANAGE_RO_LINK');
+}
+
+async function fetchDiscordGuildSnapshot(guildId: string) {
+    const botToken = String(process.env.DISCORD_TOKEN ?? '').trim();
+    if (!botToken) return null;
+
+    const response = await fetch(`${DISCORD_API_BASE_URL}/guilds/${encodeURIComponent(guildId)}`, {
+        headers: { Authorization: `Bot ${botToken}` },
+    }).catch(() => null);
+
+    if (!response?.ok) return null;
+    return await response.json().catch(() => null) as { id?: string; name?: string; owner_id?: string } | null;
+}
+
+async function dmBlockedServerOwner(input: {
+    ownerId: string;
+    guildName: string;
+    guildId: string;
+    reason: string;
+}) {
+    const botToken = String(process.env.DISCORD_TOKEN ?? '').trim();
+    if (!botToken || !input.ownerId) return;
+
+    const dmChannelRes = await fetch(`${DISCORD_API_BASE_URL}/users/@me/channels`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bot ${botToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ recipient_id: input.ownerId }),
+    }).catch(() => null);
+
+    const dmChannel = dmChannelRes?.ok
+        ? await dmChannelRes.json().catch(() => null) as { id?: string } | null
+        : null;
+    if (!dmChannel?.id) return;
+
+    await fetch(`${DISCORD_API_BASE_URL}/channels/${encodeURIComponent(dmChannel.id)}/messages`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bot ${botToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            embeds: [{
+                title: 'Server Blocked',
+                description: `Your server **${input.guildName}** has been blocked from using Ro-Link.`,
+                color: 0xff4444,
+                fields: [
+                    { name: 'Reference', value: `\`${input.guildId}\`` },
+                    { name: 'Reason', value: input.reason },
+                    { name: 'Action', value: 'The bot has left your server and Ro-Link setup data has been removed.' },
+                    { name: 'Support Server', value: 'https://discord.gg/C3n4nAwYMw' },
+                ],
+                timestamp: new Date().toISOString(),
+            }],
+        }),
+    }).catch((error) => {
+        console.error('[STAFF_ACTION] Failed to DM blocked server owner:', error);
+    });
+}
+
+async function blockServerFromStaffAction(input: {
+    guildId: string;
+    fallbackGuildName: string;
+    fallbackOwnerId: string;
+    blockedBy: string;
+    reason: string;
+}) {
+    const client = getSupabaseAdmin();
+    const guildId = input.guildId.trim();
+    const existing = await findBlockedServer(client, guildId);
+    if (existing) {
+        return { alreadyBlocked: true, guildName: input.fallbackGuildName || guildId, ownerId: input.fallbackOwnerId };
+    }
+
+    const guildSnapshot = await fetchDiscordGuildSnapshot(guildId);
+    const guildName = String(guildSnapshot?.name || input.fallbackGuildName || guildId).trim();
+    const ownerId = String(guildSnapshot?.owner_id || input.fallbackOwnerId || '').trim();
+    const reason = input.reason.trim() || 'Blocked from Ro-Link after staff removal.';
+
+    const { data, error } = await client
+        .from('blocked_servers')
+        .insert({
+            guild_id: guildId,
+            guild_name: guildName,
+            owner_id: ownerId || null,
+            reason,
+            blocked_by: input.blockedBy,
+        })
+        .select('guild_id')
+        .single();
+
+    if (error) {
+        throw new Error(error.message);
+    }
+
+    const { error: deleteServerError } = await client.from('servers').delete().eq('id', guildId);
+    if (deleteServerError) {
+        throw new Error(deleteServerError.message);
+    }
+
+    const botToken = String(process.env.DISCORD_TOKEN ?? '').trim();
+    if (botToken) {
+        await fetch(`${DISCORD_API_BASE_URL}/users/@me/guilds/${encodeURIComponent(guildId)}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bot ${botToken}` },
+        }).catch(() => null);
+    }
+
+    if (ownerId) {
+        await dmBlockedServerOwner({ ownerId, guildName, guildId, reason });
+    }
+
+    return { alreadyBlocked: false, guildName, ownerId, guildId: data.guild_id };
 }
 
 function buildMiscPanelResponse(): InteractionResponseData {
@@ -2182,6 +2356,50 @@ export async function POST(req: Request) {
             const cid = interactionData?.custom_id ?? '';
             if (!cid) {
                 return NextResponse.json({ error: 'Missing component custom_id' }, { status: 400 });
+            }
+
+            const staffBlockServerAction = parseStaffBlockServerCustomId(cid);
+            if (staffBlockServerAction) {
+                if (!(await hasGlobalManagementPermission(userId, 'BLOCK_SERVERS'))) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: 'You do not have permission to block servers.', flags: 64 }
+                    });
+                }
+
+                const removalReason = getStaffActionReason(interaction.message);
+                const blockReason = removalReason
+                    ? `Blocked after staff removal: ${truncateText(removalReason, 900)}`
+                    : 'Blocked from Ro-Link after staff removal.';
+
+                try {
+                    const result = await blockServerFromStaffAction({
+                        guildId: staffBlockServerAction.guildId,
+                        fallbackGuildName: getStaffActionServerName(interaction.message),
+                        fallbackOwnerId: staffBlockServerAction.ownerId,
+                        blockedBy: userId,
+                        reason: blockReason,
+                    });
+
+                    return NextResponse.json({
+                        type: 7,
+                        data: {
+                            components: buildStaffBlockServerComponents(
+                                staffBlockServerAction.guildId,
+                                result.ownerId || staffBlockServerAction.ownerId,
+                                true,
+                            ),
+                        },
+                    });
+                } catch (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: {
+                            content: `Failed to block server: ${String(error instanceof Error ? error.message : error)}`,
+                            flags: 64,
+                        }
+                    });
+                }
             }
 
             // Public Button: Report Form
