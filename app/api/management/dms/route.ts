@@ -111,6 +111,7 @@ function buildMessagePayload(body: Record<string, unknown>): ModuleDiscordMessag
     const description = clampText(body.description, 4096);
     let footerText = clampText(body.footerText, 2048);
     const color = normalizeColor(body.color);
+    const removeSetColor = body.removeSetColor === true;
     const imageUrl = normalizeUrl(body.imageUrl);
     const thumbnailUrl = normalizeUrl(body.thumbnailUrl);
     const footerIconUrl = normalizeUrl(body.footerIconUrl);
@@ -142,7 +143,7 @@ function buildMessagePayload(body: Record<string, unknown>): ModuleDiscordMessag
 
     if (title) embed.title = title;
     if (description) embed.description = description;
-    if (color !== null) embed.color = color;
+    if (!removeSetColor && color !== null) embed.color = color;
     if (fields.length > 0) embed.fields = fields;
     if (imageUrl) embed.image = { url: imageUrl };
     if (thumbnailUrl) embed.thumbnail = { url: thumbnailUrl };
