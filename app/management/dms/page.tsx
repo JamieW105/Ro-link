@@ -415,7 +415,10 @@ export default function ManagementDmsPage() {
                                 <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{plainText}</p>
                             )}
                             {(plainText.trim() || hasEmbedContent) && (
-                                <div className="mt-3 rounded-r-xl border-l-4 bg-slate-900/80 p-4" style={{ borderColor: removeSetColor ? '#475569' : parseHexColor(color) }}>
+                                <div
+                                    className={`mt-3 bg-slate-900/80 p-4 ${removeSetColor ? 'rounded-xl' : 'rounded-r-xl border-l-4'}`}
+                                    style={removeSetColor ? undefined : { borderColor: parseHexColor(color) }}
+                                >
                                     <div className="mb-3 flex items-center gap-2">
                                         <img src={RO_LINK_ICON} alt="" className="h-5 w-5 rounded" />
                                         <span className="text-xs font-bold text-white">Ro-Link</span>
