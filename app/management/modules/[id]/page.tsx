@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { LuauCodeBlock, LuauCodeEditor } from '@/components/dashboard/LuauSyntax';
 import { runModuleReviewChecks, type ModuleReviewCheckResult } from '@/lib/moduleReviewChecks';
 
 type ModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
@@ -473,11 +474,10 @@ export default function ManagementModuleReviewPage() {
                         </div>
                         {editingSource ? (
                             <div className="space-y-4 p-5">
-                                <textarea
+                                <LuauCodeEditor
                                     value={editedSourceCode}
                                     onChange={(event) => setEditedSourceCode(event.target.value)}
-                                    className="min-h-[60vh] w-full resize-y rounded-lg border border-slate-800 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-200 outline-none transition-colors focus:border-sky-500"
-                                    spellCheck={false}
+                                    minHeightClassName="min-h-[60vh]"
                                 />
                                 <div>
                                     <label className="text-xs font-bold uppercase tracking-widest text-slate-500">
@@ -493,9 +493,11 @@ export default function ManagementModuleReviewPage() {
                                 </div>
                             </div>
                         ) : (
-                            <pre className="max-h-[70vh] overflow-auto p-5 text-xs leading-relaxed text-slate-300">
-                                <code>{module.sourceCode || 'Source was cleared or is unavailable.'}</code>
-                            </pre>
+                            <LuauCodeBlock
+                                code={module.sourceCode || ''}
+                                emptyFallback="Source was cleared or is unavailable."
+                                className="max-h-[70vh] p-5"
+                            />
                         )}
                     </div>
 

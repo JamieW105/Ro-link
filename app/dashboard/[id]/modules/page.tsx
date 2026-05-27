@@ -24,6 +24,9 @@ interface MarketplaceModule {
     category: string;
     status: string;
     isOfficial: boolean;
+    creatorIsVerified: boolean;
+    creatorApprovedModuleCount: number;
+    creatorMaxModuleInstallCount: number;
     authorDiscordId: string | null;
     sourceChecksum: string;
     configSchema: Record<string, ModuleConfigField>;
@@ -192,7 +195,12 @@ export default function DashboardModulesPage() {
                                             )}
                                             {addon.isOfficial && (
                                                 <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
-                                                    Offical
+                                                    Official
+                                                </span>
+                                            )}
+                                            {addon.creatorIsVerified && (
+                                                <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
+                                                    Verified Creator
                                                 </span>
                                             )}
                                         </div>
@@ -280,7 +288,12 @@ export default function DashboardModulesPage() {
                                     )}
                                     {selectedModule.isOfficial && (
                                         <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
-                                            Offical
+                                            Official
+                                        </span>
+                                    )}
+                                    {selectedModule.creatorIsVerified && (
+                                        <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
+                                            Verified Creator
                                         </span>
                                     )}
                                     <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">

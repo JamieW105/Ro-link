@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
 import { ChangeEvent, FormEvent, useState } from 'react';
 
+import { LuauCodeEditor } from '@/components/dashboard/LuauSyntax';
+
 interface ModuleForm {
     name: string;
     slug: string;
@@ -72,7 +74,7 @@ export default function CreateMarketplaceModulePage() {
                 throw new Error(String(payload.error || 'Failed to submit module.'));
             }
 
-            router.push('/dashboard/marketplace');
+            router.push('/dashboard/creator/modules');
         } catch (submitError) {
             setError(submitError instanceof Error ? submitError.message : 'Failed to submit module.');
         } finally {
@@ -110,6 +112,9 @@ export default function CreateMarketplaceModulePage() {
                     <div>
                         <Link href="/dashboard/marketplace" className="text-xs font-bold uppercase tracking-widest text-sky-300 hover:text-sky-200">
                             Back to Marketplace
+                        </Link>
+                        <Link href="/dashboard/creator/modules" className="ml-4 text-xs font-bold uppercase tracking-widest text-emerald-300 hover:text-emerald-200">
+                            Creator Dashboard
                         </Link>
                         <h1 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">Create Module</h1>
                         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
@@ -216,12 +221,11 @@ export default function CreateMarketplaceModulePage() {
 
                     <section className="flex min-h-[620px] flex-col rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
                         <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Source Code</label>
-                        <textarea
+                        <LuauCodeEditor
                             value={form.sourceCode}
                             onChange={(event) => updateForm('sourceCode', event.target.value)}
                             required
-                            className="min-h-[540px] flex-1 resize-none rounded-xl border border-slate-800 bg-black/50 p-4 font-mono text-xs leading-relaxed text-slate-100 outline-none transition-colors focus:border-sky-500"
-                            spellCheck={false}
+                            minHeightClassName="min-h-[540px]"
                         />
                     </section>
                 </div>

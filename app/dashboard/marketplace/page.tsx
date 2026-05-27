@@ -24,6 +24,9 @@ interface MarketplaceModule {
     category: string;
     status: string;
     isOfficial: boolean;
+    creatorIsVerified: boolean;
+    creatorApprovedModuleCount: number;
+    creatorMaxModuleInstallCount: number;
     sourceChecksum: string;
     configSchema: Record<string, ModuleConfigField>;
     authorDiscordId: string | null;
@@ -307,6 +310,12 @@ export default function DashboardMarketplacePage() {
                             Module Terms
                         </Link>
                         <Link
+                            href="/dashboard/creator/modules"
+                            className="inline-flex items-center justify-center rounded-xl border border-emerald-500/30 px-5 py-4 text-xs font-bold uppercase tracking-widest text-emerald-200 transition-colors hover:bg-emerald-500/10"
+                        >
+                            My Modules
+                        </Link>
+                        <Link
                             href="/dashboard/marketplace/create"
                             className="inline-flex items-center justify-center rounded-xl bg-sky-600 px-5 py-4 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500"
                         >
@@ -349,7 +358,12 @@ export default function DashboardMarketplacePage() {
                                     )}
                                     {addon.isOfficial && (
                                         <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
-                                            Offical
+                                            Official
+                                        </span>
+                                    )}
+                                    {addon.creatorIsVerified && (
+                                        <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
+                                            Verified Creator
                                         </span>
                                     )}
                                 </div>
@@ -391,7 +405,12 @@ export default function DashboardMarketplacePage() {
                                         </span>
                                         {selectedModule.isOfficial && (
                                             <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
-                                                Offical
+                                                Official
+                                            </span>
+                                        )}
+                                        {selectedModule.creatorIsVerified && (
+                                            <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
+                                                Verified Creator
                                             </span>
                                         )}
                                     </div>
