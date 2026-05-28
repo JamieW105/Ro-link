@@ -79,6 +79,58 @@ CREATE INDEX IF NOT EXISTS idx_server_addon_modules_server
 CREATE INDEX IF NOT EXISTS idx_server_addon_modules_module
     ON public.server_addon_modules(module_id);
 
+CREATE TABLE IF NOT EXISTS public.server_custom_modules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    server_id TEXT NOT NULL REFERENCES public.servers(id) ON DELETE CASCADE,
+    slug TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    version TEXT NOT NULL DEFAULT '1.0.0',
+    source_code TEXT NOT NULL,
+    source_checksum TEXT NOT NULL,
+    config_schema JSONB NOT NULL DEFAULT '{}',
+    settings JSONB NOT NULL DEFAULT '{}',
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    status TEXT NOT NULL DEFAULT 'READY' CHECK (status IN ('READY', 'NEEDS_REUPLOAD')),
+    review_results JSONB NOT NULL DEFAULT '[]',
+    uploaded_by TEXT,
+    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (server_id, slug)
+);
+
+CREATE INDEX IF NOT EXISTS idx_server_custom_modules_server
+    ON public.server_custom_modules(server_id);
+
+CREATE OR REPLACE FUNCTION public.enforce_server_custom_module_limit()
+RETURNS TRIGGER AS $$
+DECLARE
+    custom_count INTEGER;
+BEGIN
+    SELECT COUNT(*)
+    INTO custom_count
+    FROM public.server_custom_modules
+    WHERE server_id = NEW.server_id
+      AND id <> NEW.id;
+
+    IF custom_count >= 20 THEN
+        RAISE EXCEPTION 'Servers can only have 20 custom modules uploaded at one time.'
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS enforce_server_custom_module_limit
+    ON public.server_custom_modules;
+
+CREATE TRIGGER enforce_server_custom_module_limit
+    BEFORE INSERT OR UPDATE OF server_id
+    ON public.server_custom_modules
+    FOR EACH ROW
+    EXECUTE FUNCTION public.enforce_server_custom_module_limit();
+
 CREATE OR REPLACE FUNCTION public.enforce_server_addon_module_limit()
 RETURNS TRIGGER AS $$
 DECLARE

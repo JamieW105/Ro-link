@@ -28,6 +28,8 @@ interface MarketplaceModule {
     creatorMaxModuleInstallCount: number;
     sourceChecksum: string;
     installed: boolean;
+    isCustom?: boolean;
+    status?: string;
     enabled: boolean;
     settings: Record<string, unknown>;
     configSchema: Record<string, ModuleConfigField>;
@@ -121,7 +123,7 @@ export default function DashboardModuleConfigPage() {
                 body: JSON.stringify({
                     serverId,
                     moduleId: module.id,
-                    action: module.installed ? 'settings' : 'install',
+                    action: module.isCustom ? 'custom-settings' : module.installed ? 'settings' : 'install',
                     settings,
                 }),
             });
@@ -174,6 +176,11 @@ export default function DashboardModuleConfigPage() {
                                 Verified Creator
                             </div>
                         )}
+                        {module.isCustom && (
+                            <div className="inline-flex rounded-md border border-violet-300/30 bg-violet-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-violet-200">
+                                Server Custom
+                            </div>
+                        )}
                     </div>
                     <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">{module.description || 'No description provided.'}</p>
                 </div>
@@ -195,6 +202,11 @@ export default function DashboardModuleConfigPage() {
             {success && (
                 <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-5 py-4 text-sm font-medium text-emerald-300">
                     {success}
+                </div>
+            )}
+            {module.isCustom && module.status === 'NEEDS_REUPLOAD' && (
+                <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
+                    This custom module is disabled until it is re-uploaded and passes the automatic checks.
                 </div>
             )}
 

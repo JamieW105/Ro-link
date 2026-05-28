@@ -31,9 +31,16 @@ interface MarketplaceModule {
     sourceChecksum: string;
     configSchema: Record<string, ModuleConfigField>;
     installed: boolean;
+    isCustom?: boolean;
     enabled: boolean;
     settings: Record<string, unknown>;
     installedAt: string | null;
+    reviewResults?: Array<{
+        id: string;
+        title: string;
+        status: 'pass' | 'fail';
+        details: string[];
+    }>;
 }
 
 function formatDate(value: string | null) {
@@ -42,6 +49,8 @@ function formatDate(value: string | null) {
 }
 
 function reviewBadgeClassName(status: string) {
+    if (status === 'READY') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
+    if (status === 'NEEDS_REUPLOAD') return 'border-red-400/20 bg-red-400/10 text-red-300';
     if (status === 'PUBLISHED') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
     if (status === 'PENDING_REVIEW') return 'border-amber-400/20 bg-amber-400/10 text-amber-300';
     if (status === 'REJECTED') return 'border-red-400/20 bg-red-400/10 text-red-300';
@@ -49,6 +58,8 @@ function reviewBadgeClassName(status: string) {
 }
 
 function reviewLabel(status: string) {
+    if (status === 'READY') return 'Ready';
+    if (status === 'NEEDS_REUPLOAD') return 'Needs Re-upload';
     if (status === 'PENDING_REVIEW') return 'Creator Preview';
     if (status === 'REJECTED') return 'Rejected';
     return status.replace(/_/g, ' ');
@@ -63,7 +74,15 @@ export default function DashboardModulesPage() {
     const [error, setError] = useState<string | null>(null);
     const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
     const [moduleLimit, setModuleLimit] = useState(5);
+    const [customModuleLimit, setCustomModuleLimit] = useState(20);
     const [installedTotal, setInstalledTotal] = useState(0);
+    const [customInstalledTotal, setCustomInstalledTotal] = useState(0);
+    const [customName, setCustomName] = useState('');
+    const [customDescription, setCustomDescription] = useState('');
+    const [customVersion, setCustomVersion] = useState('');
+    const [customSourceCode, setCustomSourceCode] = useState('');
+    const [customUploadTarget, setCustomUploadTarget] = useState<MarketplaceModule | null>(null);
+    const [uploadingCustom, setUploadingCustom] = useState(false);
 
     const enabledCount = useMemo(() => modules.filter((addon) => addon.installed && addon.enabled).length, [modules]);
     const selectedModule = useMemo(
@@ -89,7 +108,9 @@ export default function DashboardModulesPage() {
             const nextModules = Array.isArray(payload.modules) ? payload.modules : [];
             setModules(nextModules);
             setModuleLimit(Number(payload.moduleLimit || 5));
+            setCustomModuleLimit(Number(payload.customModuleLimit || 20));
             setInstalledTotal(Number(payload.installedCount || nextModules.filter((addon: MarketplaceModule) => addon.installed).length));
+            setCustomInstalledTotal(Number(payload.customInstalledCount || nextModules.filter((addon: MarketplaceModule) => addon.isCustom).length));
         } catch (loadError) {
             setError(loadError instanceof Error ? loadError.message : 'Failed to load modules.');
         } finally {
@@ -101,7 +122,8 @@ export default function DashboardModulesPage() {
         loadModules();
     }, [loadModules]);
 
-    async function sendAction(moduleId: string, action: string) {
+    async function sendAction(addon: MarketplaceModule, action: string) {
+        const moduleId = addon.id;
         setSavingId(moduleId);
         setError(null);
 
@@ -109,7 +131,7 @@ export default function DashboardModulesPage() {
             const body: Record<string, unknown> = {
                 serverId,
                 moduleId,
-                action,
+                action: addon.isCustom ? `custom-${action}` : action,
             };
 
             const response = await fetch('/api/dashboard/modules', {
@@ -128,6 +150,56 @@ export default function DashboardModulesPage() {
             setError(actionError instanceof Error ? actionError.message : 'Module action failed.');
         } finally {
             setSavingId(null);
+        }
+    }
+
+    function startCustomUpload(target?: MarketplaceModule) {
+        setCustomUploadTarget(target || null);
+        setCustomName(target?.name || '');
+        setCustomDescription(target?.description || '');
+        setCustomVersion(target?.version || '');
+        setCustomSourceCode('');
+        setError(null);
+    }
+
+    async function submitCustomModule() {
+        setUploadingCustom(true);
+        setError(null);
+
+        try {
+            const response = await fetch('/api/dashboard/modules', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverId,
+                    moduleId: customUploadTarget?.id,
+                    action: customUploadTarget ? 'custom-reupload' : 'custom-create',
+                    name: customName,
+                    description: customDescription,
+                    version: customVersion,
+                    sourceCode: customSourceCode,
+                }),
+            });
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(String(payload.error || 'Custom module upload failed.'));
+            }
+
+            if (payload.warning) {
+                setError(`Custom module saved but cannot run yet. ${payload.warning}`);
+            }
+
+            setCustomName('');
+            setCustomDescription('');
+            setCustomVersion('');
+            setCustomSourceCode('');
+            setCustomUploadTarget(null);
+            await loadModules();
+        } catch (uploadError) {
+            setError(uploadError instanceof Error ? uploadError.message : 'Custom module upload failed.');
+        } finally {
+            setUploadingCustom(false);
         }
     }
 
@@ -150,10 +222,14 @@ export default function DashboardModulesPage() {
                     </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-right">
+                <div className="grid grid-cols-3 gap-3 text-right">
                     <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4">
                         <div className="text-2xl font-black text-white">{installedTotal}</div>
-                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Installed / {moduleLimit}</div>
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Marketplace / {moduleLimit}</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4">
+                        <div className="text-2xl font-black text-white">{customInstalledTotal}</div>
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Custom / {customModuleLimit}</div>
                     </div>
                     <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4">
                         <div className="text-2xl font-black text-emerald-400">{enabledCount}</div>
@@ -161,6 +237,72 @@ export default function DashboardModulesPage() {
                     </div>
                 </div>
             </header>
+
+            <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <h2 className="text-lg font-bold text-white">Server Custom Module</h2>
+                        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
+                            Upload Luau directly to this server. Auto checks run immediately; failed uploads stay disabled until re-uploaded.
+                        </p>
+                    </div>
+                    {customUploadTarget && (
+                        <button
+                            type="button"
+                            onClick={() => startCustomUpload()}
+                            className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
+                        >
+                            New Upload
+                        </button>
+                    )}
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
+                    <div className="space-y-3">
+                        <input
+                            value={customName}
+                            onChange={(event) => setCustomName(event.target.value)}
+                            placeholder="Module name"
+                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
+                        />
+                        <input
+                            value={customVersion}
+                            onChange={(event) => setCustomVersion(event.target.value)}
+                            placeholder="Version"
+                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
+                        />
+                        <textarea
+                            value={customDescription}
+                            onChange={(event) => setCustomDescription(event.target.value)}
+                            placeholder="Description"
+                            rows={4}
+                            className="w-full resize-none rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
+                        />
+                    </div>
+                    <div className="space-y-3">
+                        {customUploadTarget && (
+                            <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-xs font-semibold text-amber-200">
+                                Re-uploading {customUploadTarget.name}. Paste the replacement source below.
+                            </div>
+                        )}
+                        <textarea
+                            value={customSourceCode}
+                            onChange={(event) => setCustomSourceCode(event.target.value)}
+                            placeholder="Paste Luau module source"
+                            rows={10}
+                            className="custom-scrollbar w-full resize-y rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 font-mono text-xs text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
+                        />
+                        <button
+                            type="button"
+                            onClick={submitCustomModule}
+                            disabled={uploadingCustom || !customName.trim() || !customSourceCode.trim()}
+                            className="rounded-xl bg-sky-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
+                        >
+                            {uploadingCustom ? 'Uploading' : customUploadTarget ? 'Re-upload Module' : 'Upload Module'}
+                        </button>
+                    </div>
+                </div>
+            </section>
 
             {error && (
                 <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
@@ -193,6 +335,11 @@ export default function DashboardModulesPage() {
                                                     {reviewLabel(addon.status)}
                                                 </span>
                                             )}
+                                            {addon.isCustom && (
+                                                <span className="rounded-md border border-violet-300/30 bg-violet-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-violet-200">
+                                                    Server Custom
+                                                </span>
+                                            )}
                                             {addon.isOfficial && (
                                                 <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
                                                     Official
@@ -206,6 +353,15 @@ export default function DashboardModulesPage() {
                                         </div>
                                         <h2 className="mt-4 text-xl font-bold text-white">{addon.name}</h2>
                                         <p className="mt-2 text-sm leading-relaxed text-slate-400">{addon.description || 'No description provided.'}</p>
+                                        {addon.isCustom && addon.status === 'NEEDS_REUPLOAD' && (
+                                            <div className="mt-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-xs leading-relaxed text-red-200">
+                                                {(addon.reviewResults || [])
+                                                    .filter((result) => result.status === 'fail')
+                                                    .slice(0, 2)
+                                                    .map((result) => `${result.title}: ${result.details.join(' ')}`)
+                                                    .join(' ') || 'Auto checks failed. Re-upload this module before enabling it in game.'}
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="shrink-0 text-left sm:text-right">
@@ -227,7 +383,7 @@ export default function DashboardModulesPage() {
                                     </button>
                                     {!addon.installed ? (
                                         <button
-                                            onClick={() => sendAction(addon.id, 'install')}
+                                            onClick={() => sendAction(addon, 'install')}
                                             disabled={busy}
                                             className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
                                         >
@@ -235,6 +391,15 @@ export default function DashboardModulesPage() {
                                         </button>
                                     ) : (
                                         <>
+                                            {addon.isCustom && (
+                                                <button
+                                                    onClick={() => startCustomUpload(addon)}
+                                                    disabled={busy}
+                                                    className="rounded-xl border border-amber-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-amber-200 transition-colors hover:bg-amber-500/10 disabled:opacity-50"
+                                                >
+                                                    Re-upload
+                                                </button>
+                                            )}
                                             <Link
                                                 href={`/dashboard/${serverId}/modules/${addon.id}`}
                                                 className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
@@ -242,14 +407,14 @@ export default function DashboardModulesPage() {
                                                 Configure
                                             </Link>
                                             <button
-                                                onClick={() => sendAction(addon.id, addon.enabled ? 'disable' : 'enable')}
-                                                disabled={busy}
+                                                onClick={() => sendAction(addon, addon.enabled ? 'disable' : 'enable')}
+                                                disabled={busy || (addon.isCustom && addon.status === 'NEEDS_REUPLOAD')}
                                                 className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
                                             >
                                                 {addon.enabled ? 'Disable' : 'Enable'}
                                             </button>
                                             <button
-                                                onClick={() => sendAction(addon.id, 'remove')}
+                                                onClick={() => sendAction(addon, 'remove')}
                                                 disabled={busy}
                                                 className="rounded-xl border border-red-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
                                             >
@@ -286,6 +451,11 @@ export default function DashboardModulesPage() {
                                             {reviewLabel(selectedModule.status)}
                                         </span>
                                     )}
+                                    {selectedModule.isCustom && (
+                                        <span className="rounded-md border border-violet-300/30 bg-violet-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-violet-200">
+                                            Server Custom
+                                        </span>
+                                    )}
                                     {selectedModule.isOfficial && (
                                         <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
                                             Official
@@ -304,6 +474,14 @@ export default function DashboardModulesPage() {
                                 <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
                                     {selectedModule.description || 'No description provided.'}
                                 </p>
+                                {selectedModule.isCustom && selectedModule.status === 'NEEDS_REUPLOAD' && (
+                                    <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-xs leading-relaxed text-red-200">
+                                        {(selectedModule.reviewResults || [])
+                                            .filter((result) => result.status === 'fail')
+                                            .map((result) => `${result.title}: ${result.details.join(' ')}`)
+                                            .join(' ') || 'Auto checks failed. Re-upload this module before enabling it in game.'}
+                                    </div>
+                                )}
                             </div>
                             <button
                                 type="button"
@@ -384,21 +562,35 @@ export default function DashboardModulesPage() {
                                         {!selectedModule.installed ? (
                                             <button
                                                 type="button"
-                                                onClick={() => sendAction(selectedModule.id, 'install')}
+                                                onClick={() => sendAction(selectedModule, 'install')}
                                                 disabled={savingId === selectedModule.id}
                                                 className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
                                             >
                                                 {savingId === selectedModule.id ? 'Installing' : 'Install Module'}
                                             </button>
                                         ) : (
-                                            <button
-                                                type="button"
-                                                onClick={() => sendAction(selectedModule.id, selectedModule.enabled ? 'disable' : 'enable')}
-                                                disabled={savingId === selectedModule.id}
-                                                className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
-                                            >
-                                                {selectedModule.enabled ? 'Disable Module' : 'Enable Module'}
-                                            </button>
+                                            <>
+                                                {selectedModule.isCustom && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            startCustomUpload(selectedModule);
+                                                            setSelectedModuleId(null);
+                                                        }}
+                                                        className="rounded-xl border border-amber-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-amber-200 transition-colors hover:bg-amber-500/10"
+                                                    >
+                                                        Re-upload Module
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => sendAction(selectedModule, selectedModule.enabled ? 'disable' : 'enable')}
+                                                    disabled={savingId === selectedModule.id || (selectedModule.isCustom && selectedModule.status === 'NEEDS_REUPLOAD')}
+                                                    className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
+                                                >
+                                                    {selectedModule.enabled ? 'Disable Module' : 'Enable Module'}
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </aside>

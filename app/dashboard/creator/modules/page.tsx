@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { LuauCodeEditor } from '@/components/dashboard/LuauSyntax';
 
 type ModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
+type CreatorFilter = 'ALL' | ModuleStatus;
 type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string';
 
 interface ModuleConfigField {
@@ -58,6 +60,14 @@ const emptyForm: ModuleForm = {
     category: 'General',
     sourceCode: '',
 };
+
+const moduleFilters: { value: CreatorFilter; label: string }[] = [
+    { value: 'ALL', label: 'All' },
+    { value: 'PUBLISHED', label: 'Published' },
+    { value: 'PENDING_REVIEW', label: 'Review' },
+    { value: 'DRAFT', label: 'Drafts' },
+    { value: 'REJECTED', label: 'Needs Work' },
+];
 
 function moduleToForm(addon: CreatorModule): ModuleForm {
     return {
@@ -112,6 +122,7 @@ export default function CreatorModulesPage() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState<CreatorFilter>('ALL');
 
     const selectedModule = useMemo(
         () => modules.find((addon) => addon.id === selectedModuleId) || null,
@@ -120,21 +131,25 @@ export default function CreatorModulesPage() {
 
     const filteredModules = useMemo(() => {
         const query = search.trim().toLowerCase();
-        if (!query) return modules;
 
-        return modules.filter((addon) => (
-            addon.name.toLowerCase().includes(query)
-            || addon.slug.toLowerCase().includes(query)
-            || addon.category.toLowerCase().includes(query)
-            || addon.status.toLowerCase().includes(query)
-        ));
-    }, [modules, search]);
+        return modules.filter((addon) => {
+            const matchesStatus = statusFilter === 'ALL' || addon.status === statusFilter;
+            const matchesQuery = !query
+                || addon.name.toLowerCase().includes(query)
+                || addon.slug.toLowerCase().includes(query)
+                || addon.category.toLowerCase().includes(query)
+                || addon.status.toLowerCase().includes(query);
+
+            return matchesStatus && matchesQuery;
+        });
+    }, [modules, search, statusFilter]);
 
     const stats = useMemo(() => ({
         total: modules.length,
         pending: modules.filter((addon) => addon.status === 'PENDING_REVIEW').length,
         published: modules.filter((addon) => addon.status === 'PUBLISHED').length,
         drafts: modules.filter((addon) => addon.status === 'DRAFT').length,
+        rejected: modules.filter((addon) => addon.status === 'REJECTED').length,
     }), [modules]);
 
     const configFields = useMemo(
@@ -330,38 +345,41 @@ export default function CreatorModulesPage() {
 
     if (status === 'unauthenticated') {
         return (
-            <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-6 text-center">
-                <h1 className="text-2xl font-bold mb-2 tracking-tight">Sign in required</h1>
-                <p className="text-slate-400 mb-8 max-w-sm text-sm">Authenticate with Discord before managing marketplace modules.</p>
+            <div className="flex min-h-screen items-center justify-center bg-[#020617] p-6 text-center text-white">
+                <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900/35 p-8 shadow-2xl shadow-slate-950/40">
+                    <Image src="/Media/Ro-LinkIcon.png" alt="" width={48} height={48} className="mx-auto mb-5 h-12 w-12 rounded-xl border border-white/5 object-contain shadow-lg" />
+                    <h1 className="text-2xl font-bold">Sign in required</h1>
+                    <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-slate-400">Authenticate with Discord before managing creator modules and marketplace submissions.</p>
                 <button
                     onClick={() => signIn('discord')}
-                    className="bg-sky-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-sky-500 transition-all text-sm"
+                        className="mt-8 rounded-lg bg-sky-600 px-6 py-3 text-sm font-semibold transition-colors hover:bg-sky-500"
                 >
                     Sign In with Discord
                 </button>
+                </div>
             </div>
         );
     }
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200">
-            <nav className="sticky top-0 z-50 border-b border-slate-800 bg-[#020617]/80 backdrop-blur-md">
-                <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-8 md:h-20 md:py-0">
+            <nav className="sticky top-0 z-50 border-b border-slate-800/80 bg-[#020617]/90 backdrop-blur-md">
+                <div className="mx-auto flex min-h-16 max-w-[1500px] items-center justify-between gap-3 px-4 py-3 sm:px-8 md:h-20 md:py-0">
                     <Link href="/dashboard" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
-                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 md:w-9 md:h-9 rounded-lg object-contain shadow-lg border border-white/5" />
-                        <span className="text-base md:text-xl font-bold tracking-tight text-white">Ro-Link</span>
+                        <Image src="/Media/Ro-LinkIcon.png" alt="Ro-Link" width={36} height={36} className="h-8 w-8 rounded-lg border border-white/5 object-contain shadow-lg md:h-9 md:w-9" />
+                        <span className="text-base md:text-xl font-bold text-white">Ro-Link</span>
                     </Link>
                     <div className="flex items-center gap-2">
                         <Link
                             href="/dashboard/marketplace"
-                            className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
+                            className="rounded-lg border border-slate-700/80 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
                         >
                             Marketplace
                         </Link>
                         <button
                             type="button"
                             onClick={startNewModule}
-                            className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500"
+                            className="rounded-lg bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500"
                         >
                             New Module
                         </button>
@@ -369,29 +387,31 @@ export default function CreatorModulesPage() {
                 </div>
             </nav>
 
-            <main className="mx-auto max-w-7xl px-4 py-6 sm:px-8 md:py-10">
-                <header className="mb-8 flex flex-col gap-5 border-b border-slate-800 pb-6 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                        <Link href="/dashboard" className="text-xs font-bold uppercase tracking-widest text-sky-300 hover:text-sky-200">
-                            Back to Dashboard
-                        </Link>
-                        <h1 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">Creator Dashboard</h1>
-                        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
-                            Create modules, update submissions, review moderation status, and manage modules you have uploaded.
-                        </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        {[
-                            ['Total', stats.total],
-                            ['Published', stats.published],
-                            ['Review', stats.pending],
-                            ['Drafts', stats.drafts],
-                        ].map(([label, value]) => (
-                            <div key={label} className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4 text-right">
-                                <div className="text-2xl font-black text-white">{value}</div>
-                                <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{label}</div>
-                            </div>
-                        ))}
+            <main className="mx-auto max-w-[1500px] px-4 py-6 sm:px-8 md:py-10">
+                <header className="mb-6 border-b border-slate-800 pb-6">
+                    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                        <div className="min-w-0">
+                            <Link href="/dashboard" className="text-xs font-bold uppercase tracking-widest text-sky-300 hover:text-sky-200">
+                                Back to Dashboard
+                            </Link>
+                            <h1 className="mt-4 text-3xl font-black text-white md:text-5xl">Creator Dashboard</h1>
+                            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
+                                Build modules, track review progress, and manage published work from one focused workspace.
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[520px]">
+                            {[
+                                ['Total', stats.total, 'text-white'],
+                                ['Published', stats.published, 'text-emerald-300'],
+                                ['In Review', stats.pending, 'text-amber-300'],
+                                ['Needs Work', stats.rejected, 'text-red-300'],
+                            ].map(([label, value, color]) => (
+                                <div key={label} className="rounded-lg border border-slate-800 bg-[#020617]/55 px-4 py-4">
+                                    <div className={`text-2xl font-black ${color}`}>{value}</div>
+                                    <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">{label}</div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </header>
 
@@ -406,22 +426,46 @@ export default function CreatorModulesPage() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-                    <aside className="space-y-4">
-                        <input
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Search your modules..."
-                            className="w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
-                        />
-                        <div className="max-h-[72vh] space-y-3 overflow-y-auto pr-1 custom-scrollbar">
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+                    <aside className="space-y-4 xl:sticky xl:top-28 xl:self-start">
+                        <div className="rounded-xl border border-slate-800/80 bg-slate-900/35 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <h2 className="text-sm font-bold text-white">Module Library</h2>
+                                    <p className="mt-1 text-xs text-slate-500">{filteredModules.length} of {modules.length} shown</p>
+                                </div>
+                                <span className="rounded-md border border-slate-700 bg-[#020617]/70 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                    {stats.drafts} drafts
+                                </span>
+                            </div>
+                            <input
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Search name, slug, category..."
+                                className="mt-4 w-full rounded-lg border border-slate-800 bg-[#020617]/70 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
+                            />
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                {moduleFilters.map((filter) => (
+                                    <button
+                                        key={filter.value}
+                                        type="button"
+                                        onClick={() => setStatusFilter(filter.value)}
+                                        className={`rounded-md border px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors ${statusFilter === filter.value ? 'border-sky-500/50 bg-sky-500/10 text-sky-200' : 'border-slate-800 bg-slate-950/50 text-slate-500 hover:border-slate-700 hover:text-slate-300'}`}
+                                    >
+                                        {filter.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="max-h-[68vh] space-y-3 overflow-y-auto pr-1 custom-scrollbar">
                             <button
                                 type="button"
                                 onClick={startNewModule}
-                                className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedModule ? 'border-slate-800 bg-slate-900/40 hover:border-sky-500/40' : 'border-sky-500/40 bg-sky-500/10'}`}
+                                className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedModule ? 'border-dashed border-slate-700 bg-slate-900/25 hover:border-sky-500/40' : 'border-sky-500/40 bg-sky-500/10'}`}
                             >
                                 <span className="text-sm font-bold text-white">Create a new module</span>
-                                <span className="mt-1 block text-xs text-slate-500">Start a fresh draft or submit directly to moderation.</span>
+                                <span className="mt-1 block text-xs leading-relaxed text-slate-500">Start a draft with fresh metadata and source.</span>
                             </button>
 
                             {filteredModules.map((addon) => (
@@ -429,7 +473,7 @@ export default function CreatorModulesPage() {
                                     key={addon.id}
                                     type="button"
                                     onClick={() => setSelectedModuleId(addon.id)}
-                                    className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedModuleId === addon.id ? 'border-sky-500/50 bg-sky-500/10' : 'border-slate-800 bg-slate-900/40 hover:border-sky-500/40'}`}
+                                    className={`group w-full rounded-xl border p-4 text-left transition-colors ${selectedModuleId === addon.id ? 'border-sky-500/50 bg-sky-500/10 shadow-lg shadow-sky-950/20' : 'border-slate-800 bg-slate-900/35 hover:border-sky-500/40 hover:bg-slate-900/55'}`}
                                 >
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(addon.status)}`}>
@@ -446,24 +490,28 @@ export default function CreatorModulesPage() {
                                             </span>
                                         )}
                                     </div>
-                                    <span className="mt-3 block break-words text-sm font-bold text-white">{addon.name}</span>
-                                    <span className="mt-2 block break-all font-mono text-[10px] font-bold uppercase tracking-widest text-slate-600">
-                                        {addon.slug} / v{addon.version}
+                                    <span className="mt-3 block break-words text-sm font-bold text-white group-hover:text-sky-100">{addon.name}</span>
+                                    <span className="mt-2 block line-clamp-2 text-xs leading-relaxed text-slate-500">
+                                        {addon.description || 'No description yet.'}
+                                    </span>
+                                    <span className="mt-3 flex flex-wrap gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                        <span>{addon.slug || 'auto-slug'}</span>
+                                        <span>v{addon.version}</span>
                                     </span>
                                 </button>
                             ))}
 
-                            {filteredModules.length === 0 && modules.length > 0 && (
-                                <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-6 text-center text-sm text-slate-500">
-                                    No modules match this search.
+                            {filteredModules.length === 0 && (
+                                <div className="rounded-xl border border-slate-800 bg-slate-900/35 p-6 text-center text-sm text-slate-500">
+                                    {modules.length > 0 ? 'No modules match this view.' : 'No modules yet.'}
                                 </div>
                             )}
                         </div>
                     </aside>
 
-                    <form onSubmit={submitModule} className="min-w-0 space-y-6">
-                        <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-                            <div className="flex flex-col gap-4 border-b border-slate-800 pb-5 lg:flex-row lg:items-start lg:justify-between">
+                    <form onSubmit={submitModule} className="min-w-0 space-y-5">
+                        <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/35">
+                            <div className="flex flex-col gap-5 border-b border-slate-800 bg-[#020617]/35 p-5 md:p-6 lg:flex-row lg:items-start lg:justify-between">
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
                                         {selectedModule ? (
@@ -477,7 +525,7 @@ export default function CreatorModulesPage() {
                                         )}
                                         {selectedModule?.sourceChecksum && (
                                             <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                                {selectedModule.sourceChecksum.slice(0, 12)}
+                                                checksum {selectedModule.sourceChecksum.slice(0, 12)}
                                             </span>
                                         )}
                                         {selectedModule?.creatorIsVerified && (
@@ -486,16 +534,16 @@ export default function CreatorModulesPage() {
                                             </span>
                                         )}
                                     </div>
-                                    <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
+                                    <h2 className="mt-3 break-words text-2xl font-black text-white md:text-3xl">
                                         {selectedModule ? selectedModule.name : 'New Module'}
                                     </h2>
                                     <p className="mt-2 text-sm leading-relaxed text-slate-400">
                                         {selectedModule
                                             ? `Updated ${formatDate(selectedModule.updatedAt)}. Submitted ${formatDate(selectedModule.submittedAt)}.`
-                                            : 'Fill out metadata and source code, then save a draft or submit for moderation.'}
+                                            : 'Fill out the details, add source, then save or submit when it is ready.'}
                                     </p>
                                 </div>
-                                <div className="flex flex-wrap gap-2 lg:justify-end">
+                                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:max-w-md lg:justify-end">
                                     <button
                                         type="button"
                                         onClick={() => saveModule('DRAFT')}
@@ -535,19 +583,27 @@ export default function CreatorModulesPage() {
                             </div>
 
                             {selectedModule?.status === 'REJECTED' && selectedModule.moderationNote && (
-                                <div className="mt-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-200">
+                                <div className="mx-5 mt-5 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-200 md:mx-6">
                                     {selectedModule.moderationNote}
                                 </div>
                             )}
 
-                            <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <div className="p-5 md:p-6">
+                                <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-bold text-white">Module Details</h3>
+                                        <p className="mt-1 text-xs text-slate-500">Metadata shown in the marketplace and review queue.</p>
+                                    </div>
+                                    <span className="font-mono text-xs text-slate-500">{form.sourceCode.length.toLocaleString()} source chars</span>
+                                </div>
+                                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                 <div>
                                     <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Name</label>
                                     <input
                                         value={form.name}
                                         onChange={(event) => updateForm('name', event.target.value)}
                                         required
-                                        className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                        className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
                                     />
                                 </div>
                                 <div>
@@ -556,7 +612,7 @@ export default function CreatorModulesPage() {
                                         value={form.slug}
                                         onChange={(event) => updateForm('slug', event.target.value)}
                                         placeholder="Auto from name"
-                                        className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                        className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
                                     />
                                 </div>
                                 <div>
@@ -564,7 +620,7 @@ export default function CreatorModulesPage() {
                                     <input
                                         value={form.version}
                                         onChange={(event) => updateForm('version', event.target.value)}
-                                        className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                        className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
                                     />
                                 </div>
                                 <div>
@@ -572,7 +628,7 @@ export default function CreatorModulesPage() {
                                     <input
                                         value={form.category}
                                         onChange={(event) => updateForm('category', event.target.value)}
-                                        className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                        className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
                                     />
                                 </div>
                                 <div className="lg:col-span-2">
@@ -581,7 +637,7 @@ export default function CreatorModulesPage() {
                                         value={form.description}
                                         onChange={(event) => updateForm('description', event.target.value)}
                                         required
-                                        className="min-h-28 w-full resize-y rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                        className="min-h-28 w-full resize-y rounded-lg border border-slate-800 bg-slate-950/60 p-4 text-sm leading-relaxed text-white outline-none transition-colors focus:border-sky-500"
                                     />
                                 </div>
                                 <div className="lg:col-span-2">
@@ -590,47 +646,58 @@ export default function CreatorModulesPage() {
                                         type="file"
                                         accept=".lua,.luau,.txt"
                                         onChange={handleFileUpload}
-                                        className="w-full rounded-xl border border-dashed border-slate-700 bg-slate-950/60 px-4 py-3 text-xs text-slate-400 file:mr-4 file:rounded-lg file:border-0 file:bg-sky-600 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white hover:border-sky-500"
+                                        className="w-full rounded-lg border border-dashed border-slate-700 bg-slate-950/60 px-4 py-3 text-xs text-slate-400 file:mr-4 file:rounded-md file:border-0 file:bg-sky-600 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white hover:border-sky-500"
                                     />
+                                </div>
                                 </div>
                             </div>
                         </section>
 
-                        <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-                            <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-                                <div className="mb-3 flex items-center justify-between gap-3">
-                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500">Source Code</label>
-                                    <span className="font-mono text-xs text-slate-500">{form.sourceCode.length.toLocaleString()} chars</span>
+                        <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+                            <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/35">
+                                <div className="flex items-center justify-between gap-3 border-b border-slate-800 bg-[#020617]/35 px-5 py-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-white">Source Code</label>
+                                        <p className="mt-1 text-xs text-slate-500">Paste Luau source or upload a `.lua`, `.luau`, or `.txt` file.</p>
+                                    </div>
+                                    <span className="shrink-0 font-mono text-xs text-slate-500">{form.sourceCode.length.toLocaleString()} chars</span>
                                 </div>
-                                <LuauCodeEditor
-                                    value={form.sourceCode}
-                                    onChange={(event) => updateForm('sourceCode', event.target.value)}
-                                    required
-                                    minHeightClassName="min-h-[620px]"
-                                />
+                                <div className="p-4 md:p-5">
+                                    <LuauCodeEditor
+                                        value={form.sourceCode}
+                                        onChange={(event) => updateForm('sourceCode', event.target.value)}
+                                        required
+                                        minHeightClassName="min-h-[620px]"
+                                    />
+                                </div>
                             </div>
 
                             <aside className="space-y-4">
-                                <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-                                    <h3 className="text-sm font-bold uppercase tracking-widest text-white">Review State</h3>
-                                    <dl className="mt-4 space-y-4 text-sm">
-                                        <div>
+                                <div className="rounded-xl border border-slate-800 bg-slate-900/35 p-5">
+                                    <h3 className="text-sm font-bold text-white">Review State</h3>
+                                    <dl className="mt-4 divide-y divide-slate-800 text-sm">
+                                        <div className="flex items-center justify-between gap-4 py-3 first:pt-0">
                                             <dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Published</dt>
-                                            <dd className="mt-1 text-slate-300">{formatDate(selectedModule?.publishedAt || null)}</dd>
+                                            <dd className="text-right text-slate-300">{formatDate(selectedModule?.publishedAt || null)}</dd>
                                         </div>
-                                        <div>
+                                        <div className="flex items-center justify-between gap-4 py-3">
                                             <dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Reviewed</dt>
-                                            <dd className="mt-1 text-slate-300">{formatDate(selectedModule?.reviewedAt || null)}</dd>
+                                            <dd className="text-right text-slate-300">{formatDate(selectedModule?.reviewedAt || null)}</dd>
                                         </div>
-                                        <div>
+                                        <div className="flex items-center justify-between gap-4 py-3 last:pb-0">
                                             <dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Config Fields</dt>
-                                            <dd className="mt-1 text-slate-300">{configFields.length}</dd>
+                                            <dd className="text-right text-slate-300">{configFields.length}</dd>
                                         </div>
                                     </dl>
                                 </div>
 
-                                <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-                                    <h3 className="text-sm font-bold uppercase tracking-widest text-white">Submit Terms</h3>
+                                <div className="rounded-xl border border-slate-800 bg-slate-900/35 p-5">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <h3 className="text-sm font-bold text-white">Submit Terms</h3>
+                                        <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${acceptedCreatorTerms && acceptedUseTerms ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-slate-700 bg-slate-950 text-slate-500'}`}>
+                                            {acceptedCreatorTerms && acceptedUseTerms ? 'Ready' : 'Required'}
+                                        </span>
+                                    </div>
                                     <div className="mt-4 space-y-3">
                                         <label className="flex items-start gap-3 text-xs leading-relaxed text-slate-300">
                                             <input
@@ -653,8 +720,13 @@ export default function CreatorModulesPage() {
                                     </div>
                                 </div>
 
-                                <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-                                    <h3 className="text-sm font-bold uppercase tracking-widest text-white">Parsed Config</h3>
+                                <div className="rounded-xl border border-slate-800 bg-slate-900/35 p-5">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <h3 className="text-sm font-bold text-white">Parsed Config</h3>
+                                        <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                            {configFields.length}
+                                        </span>
+                                    </div>
                                     {configFields.length > 0 ? (
                                         <div className="mt-4 space-y-3">
                                             {configFields.map((field) => (

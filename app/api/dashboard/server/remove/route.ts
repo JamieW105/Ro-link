@@ -36,7 +36,7 @@ function getServerSupabaseClient() {
 
 async function deleteServerData(serverId: string) {
     const client = getServerSupabaseClient();
-    const childTables = ['logs', 'live_servers', 'command_queue', 'dashboard_roles', 'reports', 'server_addon_modules'];
+    const childTables = ['logs', 'live_servers', 'command_queue', 'dashboard_roles', 'reports', 'server_addon_modules', 'server_custom_modules'];
 
     for (const table of childTables) {
         const { error } = await client

@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 
 export type AddonModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
+export type ServerCustomModuleStatus = 'READY' | 'NEEDS_REUPLOAD';
 
 export interface SanitizedAddonModuleInput {
     name?: string;
@@ -33,6 +34,7 @@ export type SanitizedAddonModuleResult =
 const VALID_MODULE_STATUSES = new Set<AddonModuleStatus>(['DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'ARCHIVED']);
 const VALID_CONFIG_TYPES = new Set<ModuleConfigFieldType>(['bool', 'dropdown', 'checkboxes', 'color', 'integer', 'string']);
 export const MAX_SERVER_ADDON_MODULES = 5;
+export const MAX_SERVER_CUSTOM_MODULES = 20;
 
 export function trimModuleString(value: unknown, maxLength = 5000) {
     return String(value ?? '').trim().slice(0, maxLength);
@@ -766,7 +768,7 @@ export function obfuscateModuleSourceForStudio(sourceCode: string) {
     });
 
     return [
-        '-- Ro-Link managed marketplace module. Source is statically obfuscated before Studio insertion.',
+        '-- Ro-Link managed module. Source is statically obfuscated before Studio insertion.',
         buildObfuscatedPrelude(decodeFunctionName, hash),
         fragments.join(''),
         '',
@@ -1166,6 +1168,42 @@ export function normalizeAddonModule(row: Record<string, unknown> | null | undef
         createdAt: row.created_at || null,
         updatedAt: row.updated_at || null,
         publishedAt: row.published_at || null,
+        ...(includeSource ? { sourceCode: String(row.source_code || '') } : {}),
+    };
+}
+
+export function normalizeServerCustomModule(row: Record<string, unknown> | null | undefined, includeSource = false) {
+    if (!row) {
+        return null;
+    }
+
+    const status = String(row.status || 'NEEDS_REUPLOAD').toUpperCase() as ServerCustomModuleStatus;
+
+    return {
+        id: String(row.id || ''),
+        serverId: String(row.server_id || ''),
+        slug: String(row.slug || ''),
+        name: String(row.name || 'Untitled Module'),
+        description: String(row.description || ''),
+        version: String(row.version || '1.0.0'),
+        category: 'Server Custom',
+        status: status === 'READY' ? 'READY' : 'NEEDS_REUPLOAD',
+        isCustom: true,
+        isOfficial: false,
+        creatorIsVerified: false,
+        creatorApprovedModuleCount: 0,
+        creatorMaxModuleInstallCount: 0,
+        sourceChecksum: String(row.source_checksum || ''),
+        configSchema: parseStoredModuleConfigSchema(row.config_schema),
+        enabled: row.enabled !== false && status === 'READY',
+        settings: parseModuleSettings(row.settings),
+        reviewResults: Array.isArray(row.review_results) ? row.review_results : [],
+        uploadedBy: row.uploaded_by ? String(row.uploaded_by) : null,
+        installed: true,
+        installedAt: row.uploaded_at || null,
+        createdAt: row.uploaded_at || null,
+        updatedAt: row.updated_at || null,
+        publishedAt: null,
         ...(includeSource ? { sourceCode: String(row.source_code || '') } : {}),
     };
 }
