@@ -211,7 +211,7 @@ export default function Home() {
           </div>
 
           {/* Social Proof / Stats */}
-          <div className="mt-16 md:mt-24 pt-12 border-t border-slate-800/50 w-full grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-4">
+          <div className="motion-list mt-16 md:mt-24 pt-12 border-t border-slate-800/50 w-full grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-4">
             <StatItem label="Servers" value={serverCount !== null ? serverCount.toLocaleString() : "0"} />
             <StatItem label="Commands" value={commandCount !== null ? commandCount.toLocaleString() : "0"} />
             <StatItem label="Response" value="< 45ms" />
@@ -219,7 +219,7 @@ export default function Home() {
           </div>
 
           {/* Features Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mt-24 md:mt-40 w-full text-left px-2">
+          <div className="motion-list grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mt-24 md:mt-40 w-full text-left px-2">
             <FeatureCard
               icon={<ZapIcon />}
               title="Real-time Execution"
@@ -275,7 +275,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="motion-list grid grid-cols-1 md:grid-cols-3 gap-5">
               <WorkflowStep
                 step="01"
                 title="Add the Discord bot"
@@ -509,7 +509,7 @@ function StatItem({ label, value }: { label: string, value: string }) {
 
 function FeatureCard({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
   return (
-    <div className="p-8 rounded-xl border border-slate-800 bg-slate-900/40 hover:border-slate-700 transition-all">
+    <div className="interactive-lift subtle-glow p-8 rounded-xl border border-slate-800 bg-slate-900/40 hover:border-slate-700 transition-all">
       <div className="text-sky-500 mb-6 bg-sky-500/10 w-10 h-10 rounded-lg flex items-center justify-center border border-sky-500/20">{icon}</div>
       <h3 className="text-lg font-semibold mb-3 text-white tracking-tight">{title}</h3>
       <p className="text-slate-400 text-sm leading-relaxed">{desc}</p>
@@ -519,7 +519,7 @@ function FeatureCard({ icon, title, desc }: { icon: React.ReactNode, title: stri
 
 function InfoPill({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3 text-sm font-semibold text-slate-300">
+    <div className="interactive-lift flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3 text-sm font-semibold text-slate-300">
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
         <CheckIcon />
       </span>
@@ -589,7 +589,7 @@ function SignalMini({ label, value }: { label: string, value: string }) {
 
 function WorkflowStep({ step, title, desc }: { step: string, title: string, desc: string }) {
   return (
-    <div className="home-workflow-card rounded-xl border border-slate-800 bg-slate-900/40 p-6 hover:border-sky-500/40 hover:bg-slate-900/70">
+    <div className="home-workflow-card subtle-glow rounded-xl border border-slate-800 bg-slate-900/40 p-6 hover:border-sky-500/40 hover:bg-slate-900/70">
       <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-lg border border-sky-500/20 bg-sky-500/10 text-sm font-bold text-sky-300">
         {step}
       </div>
@@ -601,7 +601,7 @@ function WorkflowStep({ step, title, desc }: { step: string, title: string, desc
 
 function UseCaseItem({ title, desc }: { title: string, desc: string }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 transition-all hover:-translate-y-1 hover:border-amber-400/30">
+    <div className="interactive-lift rounded-xl border border-slate-800 bg-slate-900/40 p-5 transition-all hover:border-amber-400/30">
       <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-lg border border-amber-400/20 bg-amber-400/10 text-amber-300">
         <UsersIcon />
       </div>
@@ -619,7 +619,7 @@ function MetricCard({ value, label, tone }: { value: string, label: string, tone
   }[tone];
 
   return (
-    <div className={`rounded-xl border p-5 ${toneClasses}`}>
+    <div className={`interactive-lift rounded-xl border p-5 ${toneClasses}`}>
       <div className="text-2xl font-bold text-white">{value}</div>
       <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</div>
     </div>

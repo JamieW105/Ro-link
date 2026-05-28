@@ -1172,7 +1172,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                     </div>
                 </header>
 
-                <div className="dashboard-content-frame min-w-0 flex-1 bg-gradient-to-tr from-[#020617] via-[#020617] to-sky-950/5 p-4 md:p-10">
+                <div className="dashboard-content-frame motion-page min-w-0 flex-1 bg-gradient-to-tr from-[#020617] via-[#020617] to-sky-950/5 p-4 md:p-10">
                     <PermissionsProvider permissions={userPermissions}>
                         {children}
                     </PermissionsProvider>

@@ -144,7 +144,7 @@ export default function Dashboard() {
                 </div>
             </nav>
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 md:py-12">
+            <div className="motion-page max-w-7xl mx-auto px-4 sm:px-8 py-6 md:py-12">
                 <header className="mb-6 flex flex-col gap-4 md:mb-12 md:flex-row md:items-end md:justify-between">
                     <div>
                         <h1 className="text-xl md:text-4xl font-extrabold text-white tracking-tight mb-1">Select a Server</h1>
@@ -165,9 +165,9 @@ export default function Dashboard() {
                         <p className="text-slate-500 text-sm font-medium animate-pulse">Loading servers...</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+                    <div className="motion-list grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
                         {guilds.map(guild => (
-                            <div key={guild.id} className="group relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40 p-5 transition-all hover:border-sky-500/30 sm:p-6">
+                            <div key={guild.id} className="interactive-lift subtle-glow group relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40 p-5 transition-all hover:border-sky-500/30 sm:p-6">
                                 <div className="mb-5 flex flex-col items-start gap-4 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
                                     <div className="relative">
                                         {guild.icon ? (

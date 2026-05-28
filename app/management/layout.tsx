@@ -150,7 +150,7 @@ export default function ManagementLayout({
                         </svg>
                     </button>
                 </header>
-                <div className="min-w-0 p-4 md:p-8">
+                <div className="motion-page min-w-0 p-4 md:p-8">
                     {children}
                 </div>
             </main>

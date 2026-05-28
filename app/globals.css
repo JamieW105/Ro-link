@@ -25,6 +25,197 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+:root {
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-sharp: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  .site-page-transition {
+    animation: sitePageEnter 460ms var(--motion-ease) both;
+  }
+
+  .animate-in {
+    --enter-opacity: 1;
+    --enter-translate-x: 0;
+    --enter-translate-y: 0;
+    --enter-scale: 1;
+    animation: siteEnter 420ms var(--motion-ease) both;
+  }
+
+  .animate-in.duration-200 {
+    animation-duration: 200ms;
+  }
+
+  .animate-in.duration-300 {
+    animation-duration: 300ms;
+  }
+
+  .animate-in.duration-500 {
+    animation-duration: 500ms;
+  }
+
+  .animate-in.duration-700 {
+    animation-duration: 700ms;
+  }
+
+  .fade-in {
+    --enter-opacity: 0;
+  }
+
+  .zoom-in,
+  .zoom-in-95 {
+    --enter-scale: 0.95;
+  }
+
+  .slide-in-from-bottom-2 {
+    --enter-translate-y: 0.5rem;
+  }
+
+  .slide-in-from-bottom-4 {
+    --enter-translate-y: 1rem;
+  }
+
+  .slide-in-from-top-4 {
+    --enter-translate-y: -1rem;
+  }
+
+  .slide-in-from-right-2 {
+    --enter-translate-x: 0.5rem;
+  }
+
+  .motion-page {
+    animation: siteContentRise 560ms var(--motion-ease) both;
+  }
+
+  .motion-list > * {
+    animation: siteItemRise 520ms var(--motion-ease) both;
+    animation-delay: var(--motion-delay, 0ms);
+  }
+
+  .motion-list > :nth-child(1) { --motion-delay: 40ms; }
+  .motion-list > :nth-child(2) { --motion-delay: 95ms; }
+  .motion-list > :nth-child(3) { --motion-delay: 150ms; }
+  .motion-list > :nth-child(4) { --motion-delay: 205ms; }
+  .motion-list > :nth-child(5) { --motion-delay: 260ms; }
+  .motion-list > :nth-child(6) { --motion-delay: 315ms; }
+  .motion-list > :nth-child(7) { --motion-delay: 370ms; }
+  .motion-list > :nth-child(8) { --motion-delay: 425ms; }
+  .motion-list > :nth-child(9) { --motion-delay: 480ms; }
+  .motion-list > :nth-child(10) { --motion-delay: 535ms; }
+
+  .interactive-lift {
+    transition:
+      transform 220ms var(--motion-ease),
+      border-color 220ms var(--motion-ease),
+      background-color 220ms var(--motion-ease),
+      box-shadow 220ms var(--motion-ease),
+      color 220ms var(--motion-ease);
+    will-change: transform;
+  }
+
+  .interactive-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 45px rgba(2, 6, 23, 0.28);
+  }
+
+  .interactive-lift:active {
+    transform: translateY(-1px) scale(0.99);
+  }
+
+  .subtle-glow {
+    isolation: isolate;
+    position: relative;
+  }
+
+  .subtle-glow::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.24), rgba(16, 185, 129, 0.12), transparent 62%);
+    opacity: 0;
+    transition: opacity 260ms var(--motion-ease);
+  }
+
+  .subtle-glow:hover::before,
+  .subtle-glow:focus-within::before {
+    opacity: 1;
+  }
+
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    transition-timing-function: var(--motion-ease);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes sitePageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes siteEnter {
+  from {
+    opacity: var(--enter-opacity);
+    transform: translate3d(var(--enter-translate-x), var(--enter-translate-y), 0) scale(var(--enter-scale));
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes siteContentRise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes siteItemRise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 /* Custom Select Styling */
 select {
   appearance: none !important;

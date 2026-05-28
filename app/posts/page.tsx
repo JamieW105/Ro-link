@@ -37,7 +37,7 @@ export default function PostsPage() {
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200">
-            <div className="mx-auto max-w-6xl px-6 py-20 sm:px-8">
+            <div className="motion-page mx-auto max-w-6xl px-6 py-20 sm:px-8">
                 <header className="max-w-3xl">
                     <Link href="/" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.25em] text-sky-400 transition-colors hover:text-sky-300">
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,12 +62,12 @@ export default function PostsPage() {
                         <p className="mt-3 text-sm text-slate-400">Check back after the next release.</p>
                     </div>
                 ) : (
-                    <div className="mt-16 grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    <div className="motion-list mt-16 grid grid-cols-1 gap-6 lg:grid-cols-2">
                         {posts.map((post) => {
                             const totalSubFeatures = post.major_features.reduce((total, feature) => total + feature.subFeatures.length, 0);
 
                             return (
-                                <article key={post.id} className="flex h-full flex-col rounded-3xl border border-slate-800 bg-slate-900/50 p-7 transition-all hover:border-slate-700">
+                                <article key={post.id} className="interactive-lift subtle-glow flex h-full flex-col rounded-3xl border border-slate-800 bg-slate-900/50 p-7 transition-all hover:border-slate-700">
                                     <div className="flex flex-wrap items-center gap-2">
                                         {post.version && (
                                             <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
