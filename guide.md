@@ -173,6 +173,14 @@ CONFIG = {
         Default = "Welcome to the server.",
         Options = {}
     },
+    Announcement = {
+        Short_Description = "Message to send immediately to live game servers.",
+        Type = "String",
+        Default = "",
+        LIVE = true,
+        ButtonText = "Send",
+        Options = {}
+    },
     Enabled_Checks = {
         Short_Description = "Checks the module should run.",
         Type = "CheckBoxes",
@@ -212,6 +220,7 @@ Module config has two parts:
 
 - `CONFIG` is the schema you declare in the uploaded module source. Ro-Link reads this table to build the dashboard form for each server.
 - Saved module settings are the per-server values chosen in the dashboard at **Dashboard > Modules > Configure** for the module. At runtime, Ro-Link passes those saved values into the module as `context.Settings` and as the second `settings` argument to `Init`.
+- Live config fields set `LIVE = true`. These fields show a dashboard send button, are not saved into `context.Settings`, and are delivered to running Roblox servers as a live module action. Use `ButtonText`, `LiveButtonText`, or `SendText` to customize the button label.
 
 Use `context.Settings.<FieldName>` or `settings.<FieldName>` to read the values saved in Ro-Link. Use `context.Config` only when you need the schema metadata, such as the field type, default, options, or description.
 
@@ -229,6 +238,30 @@ return {
     Commands = {
         theme = function(command, context)
             return context.Notify(command.Player, "Theme: " .. tostring(context.Settings.Theme), true)
+        end
+    }
+}
+```
+
+Live config handlers can be declared with `LiveConfig`, `LiveActions`, `Live`, or `OnLiveConfig`. The handler receives the command payload, a runtime context, the submitted value, and the field key.
+
+```lua
+CONFIG = {
+    Announcement = {
+        Short_Description = "Send an announcement to live servers.",
+        Type = "String",
+        Default = "",
+        LIVE = true,
+        ButtonText = "Send"
+    }
+}
+
+return {
+    LiveConfig = {
+        Announcement = function(command, context, value)
+            for _, player in ipairs(context.GetPlayers()) do
+                context.Notify(player, tostring(value), true)
+            end
         end
     }
 }

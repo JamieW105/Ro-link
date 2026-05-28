@@ -120,6 +120,21 @@ async function getFreshLiveServers(serverId: string) {
     return (liveServers || []) as LiveServerRecord[];
 }
 
+export async function resolveLiveServerTargets(serverId: string) {
+    const liveServers = await getFreshLiveServers(serverId);
+    const jobIds = Array.from(new Set(
+        liveServers
+            .map((server) => trimString(server.id))
+            .filter(Boolean),
+    ));
+
+    return jobIds.map((jobId) => ({
+        deliveryId: crypto.randomUUID(),
+        jobId,
+        scope: 'SERVER' as const,
+    })) satisfies DeliveryTarget[];
+}
+
 function liveServerHasPlayer(server: LiveServerRecord, targetIdentity: string) {
     return Array.isArray(server.players)
         && server.players.some((player) => playerMatchesIdentity(player, targetIdentity));

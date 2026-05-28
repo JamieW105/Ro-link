@@ -1187,6 +1187,14 @@ const docsPages: DocPage[] = [
         Default = "Welcome to the server.",
         Options = {}
     },
+    Announcement = {
+        Short_Description = "Message to send immediately to live servers.",
+        Type = "String",
+        Default = "",
+        LIVE = true,
+        ButtonText = "Send",
+        Options = {}
+    },
     Max_Open_Reports = {
         Short_Description = "Maximum open reports to show in module UI.",
         Type = "Integer",
@@ -1208,7 +1216,7 @@ return {
 }`}
                         </CodeBlock>
                         <Callout title="Runtime requirements" tone="warn">
-                            Dashboard config is declared with a top-level CONFIG table. CONFIG.Version can drive module updates, saved values are available as context.Settings, and the schema is available as context.Config.
+                            Dashboard config is declared with a top-level CONFIG table. CONFIG.Version can drive module updates, saved values are available as context.Settings, and LIVE fields are sent to running Roblox servers instead of being saved.
                         </Callout>
                     </div>
                 </SectionCard>
@@ -1225,6 +1233,7 @@ return {
                                 items={[
                                     'Declare a top-level CONFIG table in the uploaded module source.',
                                     'Use Bool, Dropdown, CheckBoxes, Color Wheel, Integer, or String field types.',
+                                    'Set LIVE = true on a field when the dashboard should show a send button instead of saving the value.',
                                     'Server managers open Dashboard > Modules, choose the module, select Configure, then save the module config for that Discord server.',
                                     'Read saved values in Roblox from context.Settings or from the second settings argument passed to Init.',
                                     'Use context.Config only for schema metadata such as field type, default value, options, and description.',
@@ -1326,6 +1335,27 @@ end`}
 if ok then
     context.Log("Updated report", report.id)
 end`}
+                        </CodeBlock>
+                        <CodeBlock label="Handle live config actions">
+                            {`CONFIG = {
+    Announcement = {
+        Short_Description = "Send an announcement to live servers.",
+        Type = "String",
+        Default = "",
+        LIVE = true,
+        ButtonText = "Send"
+    }
+}
+
+return {
+    LiveConfig = {
+        Announcement = function(command, context, value)
+            for _, player in ipairs(context.GetPlayers()) do
+                context.Notify(player, tostring(value), true)
+            end
+        end
+    }
+}`}
                         </CodeBlock>
                     </div>
                 </SectionCard>

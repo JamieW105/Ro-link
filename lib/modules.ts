@@ -23,6 +23,8 @@ export interface ModuleConfigField {
     type: ModuleConfigFieldType;
     options: string[];
     defaultValue: boolean | string | string[] | number;
+    live: boolean;
+    liveButtonText: string;
 }
 
 export type ModuleConfigSchema = Record<string, ModuleConfigField>;
@@ -934,6 +936,16 @@ function normalizeConfigOptions(value: unknown) {
         .slice(0, 50);
 }
 
+function normalizeConfigLiveFlag(value: unknown) {
+    if (value === true) return true;
+    const normalized = String(value ?? '').trim().toLowerCase();
+    return normalized === 'true' || normalized === '1' || normalized === 'yes';
+}
+
+function normalizeLiveButtonText(value: unknown) {
+    return trimModuleString(value, 40) || 'Send';
+}
+
 function defaultConfigValue(type: ModuleConfigFieldType, options: string[], rawDefault: unknown) {
     if (rawDefault !== undefined && rawDefault !== null && rawDefault !== '') {
         if (type === 'bool') return rawDefault === true || String(rawDefault).toLowerCase() === 'true';
@@ -997,6 +1009,7 @@ export function parseModuleConfigSchema(sourceCode: string): ModuleConfigSchema 
             fieldRecord.Short_Description ?? fieldRecord.short_description ?? fieldRecord.description ?? '',
             300,
         );
+        const live = normalizeConfigLiveFlag(fieldRecord.LIVE ?? fieldRecord.Live ?? fieldRecord.live);
 
         schema[key] = {
             key,
@@ -1005,6 +1018,15 @@ export function parseModuleConfigSchema(sourceCode: string): ModuleConfigSchema 
             type,
             options,
             defaultValue: defaultConfigValue(type, options, fieldRecord.Default ?? fieldRecord.defaultValue ?? fieldRecord.Value),
+            live,
+            liveButtonText: normalizeLiveButtonText(
+                fieldRecord.ButtonText
+                ?? fieldRecord.buttonText
+                ?? fieldRecord.LiveButtonText
+                ?? fieldRecord.liveButtonText
+                ?? fieldRecord.SendText
+                ?? fieldRecord.sendText,
+            ),
         };
     }
 
@@ -1040,6 +1062,10 @@ export function parseModuleConfigSettings(value: unknown, schema: ModuleConfigSc
     const settings: Record<string, unknown> = {};
 
     for (const [key, field] of Object.entries(schema || {})) {
+        if (field.live) {
+            continue;
+        }
+
         const rawValue = rawSettings[key];
 
         if (field.type === 'bool') {
@@ -1075,12 +1101,43 @@ export function parseModuleConfigSettings(value: unknown, schema: ModuleConfigSc
     }
 
     for (const [key, rawValue] of Object.entries(rawSettings)) {
+        if (schema[key]?.live) {
+            continue;
+        }
         if (!(key in settings)) {
             settings[key] = rawValue;
         }
     }
 
     return settings;
+}
+
+export function parseModuleLiveConfigValue(rawValue: unknown, field: ModuleConfigField) {
+    if (field.type === 'bool') {
+        return rawValue === true || String(rawValue).toLowerCase() === 'true';
+    }
+
+    if (field.type === 'checkboxes') {
+        const values = Array.isArray(rawValue) ? rawValue.map((item) => String(item)) : [];
+        return values.filter((item) => field.options.includes(item));
+    }
+
+    if (field.type === 'color') {
+        const color = String(rawValue || field.defaultValue || '').trim();
+        return /^#[0-9a-f]{6}$/i.test(color) ? color : field.defaultValue;
+    }
+
+    if (field.type === 'integer') {
+        const integer = Number(rawValue ?? field.defaultValue);
+        return Number.isFinite(integer) ? Math.trunc(integer) : field.defaultValue;
+    }
+
+    if (field.type === 'string') {
+        return trimModuleString(rawValue ?? field.defaultValue ?? '', 1000);
+    }
+
+    const selected = String(rawValue || '');
+    return field.options.includes(selected) ? selected : field.defaultValue;
 }
 
 export function sanitizeAddonModuleInput(body: Record<string, unknown>, partial = false): SanitizedAddonModuleResult {
@@ -1238,6 +1295,15 @@ export function parseStoredModuleConfigSchema(value: unknown): ModuleConfigSchem
             type,
             options,
             defaultValue: defaultConfigValue(type, options, fieldRecord.defaultValue),
+            live: normalizeConfigLiveFlag(fieldRecord.live ?? fieldRecord.LIVE ?? fieldRecord.Live),
+            liveButtonText: normalizeLiveButtonText(
+                fieldRecord.liveButtonText
+                ?? fieldRecord.ButtonText
+                ?? fieldRecord.buttonText
+                ?? fieldRecord.LiveButtonText
+                ?? fieldRecord.SendText
+                ?? fieldRecord.sendText,
+            ),
         };
     }
 

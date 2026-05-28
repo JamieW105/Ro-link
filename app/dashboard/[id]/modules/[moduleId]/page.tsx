@@ -13,6 +13,8 @@ interface ModuleConfigField {
     type: ModuleConfigFieldType;
     options: string[];
     defaultValue: boolean | string | string[] | number;
+    live?: boolean;
+    liveButtonText?: string;
 }
 
 interface MarketplaceModule {
@@ -38,7 +40,21 @@ interface MarketplaceModule {
 function normalizeInitialSettings(module: MarketplaceModule) {
     const next: Record<string, unknown> = { ...(module.settings || {}) };
     for (const [key, field] of Object.entries(module.configSchema || {})) {
+        if (field.live) {
+            delete next[key];
+            continue;
+        }
         if (next[key] === undefined) {
+            next[key] = field.defaultValue;
+        }
+    }
+    return next;
+}
+
+function normalizeInitialLiveValues(module: MarketplaceModule) {
+    const next: Record<string, unknown> = {};
+    for (const [key, field] of Object.entries(module.configSchema || {})) {
+        if (field.live) {
             next[key] = field.defaultValue;
         }
     }
@@ -47,6 +63,7 @@ function normalizeInitialSettings(module: MarketplaceModule) {
 
 function fieldDescription(field: ModuleConfigField) {
     if (field.shortDescription) return field.shortDescription;
+    if (field.live) return 'Send this value to live Roblox servers without saving it as module config.';
     if (field.type === 'bool') return 'Toggle this module setting on or off.';
     if (field.type === 'dropdown') return 'Choose one option for this module setting.';
     if (field.type === 'checkboxes') return 'Choose any options that should be active.';
@@ -62,12 +79,15 @@ export default function DashboardModuleConfigPage() {
 
     const [module, setModule] = useState<MarketplaceModule | null>(null);
     const [settings, setSettings] = useState<Record<string, unknown>>({});
+    const [liveValues, setLiveValues] = useState<Record<string, unknown>>({});
+    const [liveSending, setLiveSending] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
     const fields = useMemo(() => Object.values(module?.configSchema || {}), [module]);
+    const savedFields = useMemo(() => fields.filter((field) => !field.live), [fields]);
 
     const loadModule = useCallback(async () => {
         if (!serverId || !moduleId) return;
@@ -92,6 +112,7 @@ export default function DashboardModuleConfigPage() {
 
             setModule(found);
             setSettings(normalizeInitialSettings(found));
+            setLiveValues(normalizeInitialLiveValues(found));
         } catch (loadError) {
             setError(loadError instanceof Error ? loadError.message : 'Failed to load module config.');
         } finally {
@@ -110,8 +131,27 @@ export default function DashboardModuleConfigPage() {
         }));
     }
 
+    function updateLiveValue(key: string, value: unknown) {
+        setLiveValues((current) => ({
+            ...current,
+            [key]: value,
+        }));
+    }
+
+    function getFieldValue(field: ModuleConfigField) {
+        return field.live ? liveValues[field.key] : settings[field.key];
+    }
+
+    function updateFieldValue(field: ModuleConfigField, value: unknown) {
+        if (field.live) {
+            updateLiveValue(field.key, value);
+        } else {
+            updateSetting(field.key, value);
+        }
+    }
+
     async function saveSettings() {
-        if (!module) return;
+        if (!module || savedFields.length === 0) return;
         setSaving(true);
         setError(null);
         setSuccess(null);
@@ -138,6 +178,36 @@ export default function DashboardModuleConfigPage() {
             setError(saveError instanceof Error ? saveError.message : 'Failed to save module config.');
         } finally {
             setSaving(false);
+        }
+    }
+
+    async function sendLiveSetting(field: ModuleConfigField) {
+        if (!module || !field.live) return;
+        setLiveSending(field.key);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const response = await fetch('/api/dashboard/modules/live', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverId,
+                    moduleId: module.id,
+                    fieldKey: field.key,
+                    value: liveValues[field.key],
+                }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(String(payload.error || 'Failed to send live module action.'));
+            }
+
+            setSuccess(`${field.label} sent to ${Number(payload.deliveredTargets || 0)} live server(s).`);
+        } catch (sendError) {
+            setError(sendError instanceof Error ? sendError.message : 'Failed to send live module action.');
+        } finally {
+            setLiveSending(null);
         }
     }
 
@@ -218,10 +288,10 @@ export default function DashboardModuleConfigPage() {
                     </div>
                     <button
                         onClick={saveSettings}
-                        disabled={saving}
+                        disabled={saving || savedFields.length === 0}
                         className="rounded-xl bg-sky-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
                     >
-                        {saving ? 'Saving' : module.installed ? 'Save Config' : 'Install And Save'}
+                        {saving ? 'Saving' : savedFields.length === 0 ? 'No Saved Config' : module.installed ? 'Save Config' : 'Install And Save'}
                     </button>
                 </div>
 
@@ -231,25 +301,37 @@ export default function DashboardModuleConfigPage() {
                     </div>
                 ) : (
                     <div className="mt-8 grid grid-cols-1 gap-5 xl:grid-cols-2">
-                        {fields.map((field) => (
+                        {fields.map((field) => {
+                            const fieldValue = getFieldValue(field);
+                            const sendButtonText = field.liveButtonText || 'Send';
+
+                            return (
                             <div key={field.key} className="rounded-xl border border-slate-800 bg-slate-950/50 p-5">
                                 <div className="flex items-start justify-between gap-4">
                                     <div>
                                         <label className="text-sm font-bold text-white">{field.label}</label>
                                         <p className="mt-1 text-xs leading-relaxed text-slate-500">{fieldDescription(field)}</p>
                                     </div>
-                                    <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                        {field.type}
-                                    </span>
+                                    <div className="flex flex-wrap justify-end gap-2">
+                                        {field.live && (
+                                            <span className="rounded-md border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-300">
+                                                Live
+                                            </span>
+                                        )}
+                                        <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                            {field.type}
+                                        </span>
+                                    </div>
                                 </div>
 
-                                <div className="mt-4">
+                                <div className={field.live ? 'mt-4 flex flex-col gap-3 sm:flex-row sm:items-start' : 'mt-4'}>
+                                    <div className="min-w-0 flex-1">
                                     {field.type === 'bool' && (
                                         <label className="inline-flex items-center gap-3 text-sm font-medium text-slate-200">
                                             <input
                                                 type="checkbox"
-                                                checked={settings[field.key] === true}
-                                                onChange={(event) => updateSetting(field.key, event.target.checked)}
+                                                checked={fieldValue === true}
+                                                onChange={(event) => updateFieldValue(field, event.target.checked)}
                                                 className="h-4 w-4 rounded border-slate-700 bg-slate-950 accent-sky-500"
                                             />
                                             Enabled
@@ -258,8 +340,8 @@ export default function DashboardModuleConfigPage() {
 
                                     {field.type === 'dropdown' && (
                                         <select
-                                            value={String(settings[field.key] ?? field.defaultValue ?? '')}
-                                            onChange={(event) => updateSetting(field.key, event.target.value)}
+                                            value={String(fieldValue ?? field.defaultValue ?? '')}
+                                            onChange={(event) => updateFieldValue(field, event.target.value)}
                                             className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
                                         >
                                             {field.options.map((option) => (
@@ -271,7 +353,7 @@ export default function DashboardModuleConfigPage() {
                                     {field.type === 'checkboxes' && (
                                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                             {field.options.map((option) => {
-                                                const selected = Array.isArray(settings[field.key]) ? settings[field.key] as string[] : [];
+                                                const selected = Array.isArray(fieldValue) ? fieldValue as string[] : [];
                                                 const checked = selected.includes(option);
                                                 return (
                                                     <label key={option} className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200">
@@ -282,7 +364,7 @@ export default function DashboardModuleConfigPage() {
                                                                 const next = event.target.checked
                                                                     ? Array.from(new Set([...selected, option]))
                                                                     : selected.filter((item) => item !== option);
-                                                                updateSetting(field.key, next);
+                                                                updateFieldValue(field, next);
                                                             }}
                                                             className="h-4 w-4 rounded border-slate-700 bg-slate-950 accent-sky-500"
                                                         />
@@ -297,13 +379,13 @@ export default function DashboardModuleConfigPage() {
                                         <div className="flex items-center gap-3">
                                             <input
                                                 type="color"
-                                                value={String(settings[field.key] || field.defaultValue || '#38bdf8')}
-                                                onChange={(event) => updateSetting(field.key, event.target.value)}
+                                                value={String(fieldValue || field.defaultValue || '#38bdf8')}
+                                                onChange={(event) => updateFieldValue(field, event.target.value)}
                                                 className="h-11 w-14 rounded-lg border border-slate-700 bg-slate-950 p-1"
                                             />
                                             <input
-                                                value={String(settings[field.key] || field.defaultValue || '#38bdf8')}
-                                                onChange={(event) => updateSetting(field.key, event.target.value)}
+                                                value={String(fieldValue || field.defaultValue || '#38bdf8')}
+                                                onChange={(event) => updateFieldValue(field, event.target.value)}
                                                 className="w-32 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 font-mono text-sm text-white outline-none transition-colors focus:border-sky-500"
                                             />
                                         </div>
@@ -313,8 +395,8 @@ export default function DashboardModuleConfigPage() {
                                         <input
                                             type="number"
                                             step="1"
-                                            value={Number(settings[field.key] ?? field.defaultValue ?? 0)}
-                                            onChange={(event) => updateSetting(field.key, Math.trunc(Number(event.target.value || 0)))}
+                                            value={Number(fieldValue ?? field.defaultValue ?? 0)}
+                                            onChange={(event) => updateFieldValue(field, Math.trunc(Number(event.target.value || 0)))}
                                             className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 font-mono text-sm text-white outline-none transition-colors focus:border-sky-500"
                                         />
                                     )}
@@ -322,14 +404,27 @@ export default function DashboardModuleConfigPage() {
                                     {field.type === 'string' && (
                                         <input
                                             type="text"
-                                            value={String(settings[field.key] ?? field.defaultValue ?? '')}
-                                            onChange={(event) => updateSetting(field.key, event.target.value)}
+                                            value={String(fieldValue ?? field.defaultValue ?? '')}
+                                            onChange={(event) => updateFieldValue(field, event.target.value)}
                                             className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
                                         />
                                     )}
+                                    </div>
+
+                                    {field.live && (
+                                        <button
+                                            type="button"
+                                            onClick={() => sendLiveSetting(field)}
+                                            disabled={liveSending === field.key}
+                                            className="rounded-xl bg-emerald-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-emerald-500 disabled:opacity-50 sm:min-w-28"
+                                        >
+                                            {liveSending === field.key ? 'Sending' : sendButtonText}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </section>

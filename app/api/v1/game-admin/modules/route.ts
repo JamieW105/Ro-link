@@ -69,7 +69,10 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    if (customError) {
+    const customModuleStorageMissing = customError
+        && /server_custom_modules|schema cache|could not find the table/i.test(customError.message || '');
+
+    if (customError && !customModuleStorageMissing) {
         return NextResponse.json({ error: customError.message }, { status: 500 });
     }
 
@@ -100,7 +103,7 @@ export async function GET(req: Request) {
         })
         .filter(Boolean);
 
-    const customModules = ((customRows || []) as ServerCustomModuleRow[])
+    const customModules = ((customModuleStorageMissing ? [] : customRows || []) as ServerCustomModuleRow[])
         .map((row) => {
             const configSchema = parseStoredModuleConfigSchema(row.config_schema);
             const normalized = normalizeServerCustomModule(row as unknown as Record<string, unknown>, true);
