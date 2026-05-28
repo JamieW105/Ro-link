@@ -52,6 +52,132 @@ export function checksumModuleSource(sourceCode: string) {
     return createHash('sha256').update(sourceCode, 'utf8').digest('hex');
 }
 
+export interface AddonModuleDuplicateCandidate {
+    id?: string | null;
+    name?: string | null;
+    status?: string | null;
+    source_code?: string | null;
+    source_checksum?: string | null;
+}
+
+export interface AddonModuleDuplicateMatch {
+    id: string;
+    name: string;
+    status: AddonModuleStatus | string;
+    reason: 'exact_source' | 'similar_source';
+    similarity: number;
+}
+
+export const MODULE_SOURCE_SIMILARITY_THRESHOLD = 0.92;
+
+function normalizeModuleTokensForSimilarity(sourceCode: string) {
+    return tokenizeLua(sourceCode)
+        .filter((token) => token.type !== 'whitespace')
+        .map((token) => {
+            if (token.type === 'identifier') return 'id';
+            if (token.type === 'number') return 'num';
+            if (token.type === 'string') return `str:${trimModuleString(token.decoded ?? token.value, 120).toLowerCase()}`;
+            return token.value.toLowerCase();
+        });
+}
+
+function buildModuleTokenGramSet(tokens: string[], size = 3) {
+    const grams = new Set<string>();
+    if (tokens.length < size) {
+        if (tokens.length > 0) {
+            grams.add(tokens.join(' '));
+        }
+        return grams;
+    }
+
+    for (let index = 0; index <= tokens.length - size; index += 1) {
+        grams.add(tokens.slice(index, index + size).join(' '));
+    }
+
+    return grams;
+}
+
+function calculateSetSimilarity(first: Set<string>, second: Set<string>) {
+    if (first.size === 0 || second.size === 0) return 0;
+
+    let shared = 0;
+    for (const value of first) {
+        if (second.has(value)) {
+            shared += 1;
+        }
+    }
+
+    return shared / (first.size + second.size - shared);
+}
+
+export function calculateModuleSourceSimilarity(firstSourceCode: string, secondSourceCode: string) {
+    const firstTokens = normalizeModuleTokensForSimilarity(firstSourceCode);
+    const secondTokens = normalizeModuleTokensForSimilarity(secondSourceCode);
+
+    if (firstTokens.length === 0 || secondTokens.length === 0) return 0;
+    if (firstTokens.join('\n') === secondTokens.join('\n')) return 1;
+
+    const tokenLengthRatio = Math.min(firstTokens.length, secondTokens.length) / Math.max(firstTokens.length, secondTokens.length);
+    if (tokenLengthRatio < 0.7) {
+        return 0;
+    }
+
+    return calculateSetSimilarity(
+        buildModuleTokenGramSet(firstTokens),
+        buildModuleTokenGramSet(secondTokens),
+    );
+}
+
+export function findDuplicateAddonModuleSubmission(
+    sourceCode: string,
+    candidates: AddonModuleDuplicateCandidate[],
+    threshold = MODULE_SOURCE_SIMILARITY_THRESHOLD,
+): AddonModuleDuplicateMatch | null {
+    const sourceChecksum = checksumModuleSource(sourceCode);
+    let strongestMatch: AddonModuleDuplicateMatch | null = null;
+
+    for (const candidate of candidates) {
+        const candidateId = trimModuleString(candidate.id, 80);
+        const candidateName = trimModuleString(candidate.name || 'Untitled Module', 120);
+        const candidateStatus = trimModuleString(candidate.status || 'DRAFT', 20) as AddonModuleStatus;
+
+        if (!candidateId) {
+            continue;
+        }
+
+        if (candidate.source_checksum && candidate.source_checksum === sourceChecksum) {
+            return {
+                id: candidateId,
+                name: candidateName,
+                status: candidateStatus,
+                reason: 'exact_source',
+                similarity: 1,
+            };
+        }
+
+        const candidateSourceCode = String(candidate.source_code || '');
+        if (!candidateSourceCode) {
+            continue;
+        }
+
+        const similarity = calculateModuleSourceSimilarity(sourceCode, candidateSourceCode);
+        if (
+            similarity >= threshold
+            && (!strongestMatch || similarity > strongestMatch.similarity)
+        ) {
+            strongestMatch = {
+                id: candidateId,
+                name: candidateName,
+                status: candidateStatus,
+                reason: 'similar_source',
+                similarity,
+            };
+        }
+    }
+
+    return strongestMatch;
+}
+
 type LuaTokenType = 'identifier' | 'keyword' | 'number' | 'punctuation' | 'string' | 'whitespace';
 
 interface LuaToken {
@@ -1027,6 +1153,9 @@ export function normalizeAddonModule(row: Record<string, unknown> | null | undef
         category: String(row.category || 'General'),
         status: String(row.status || 'DRAFT') as AddonModuleStatus,
         isOfficial: row.is_official_module === true,
+        creatorIsVerified: row.is_verified_creator === true,
+        creatorApprovedModuleCount: Number(row.creator_approved_module_count || 0),
+        creatorMaxModuleInstallCount: Number(row.creator_max_module_install_count || 0),
         sourceChecksum: String(row.source_checksum || ''),
         configSchema: parseStoredModuleConfigSchema(row.config_schema),
         authorDiscordId: row.author_discord_id ? String(row.author_discord_id) : null,

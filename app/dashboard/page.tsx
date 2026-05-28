@@ -157,6 +157,13 @@ export default function Dashboard() {
                         <MarketplaceIcon />
                         Open Marketplace
                     </Link>
+                    <Link
+                        href="/dashboard/creator/modules"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3 text-xs font-bold uppercase tracking-widest text-emerald-200 transition-colors hover:border-emerald-400/60 hover:bg-emerald-500/20"
+                    >
+                        <PlusIcon />
+                        Creator Dashboard
+                    </Link>
                 </header>
 
                 {loading ? (

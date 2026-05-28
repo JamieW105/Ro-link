@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { listVisibleGuildsForDiscordSession } from '@/lib/dashboardGuilds';
-import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
 import {
-    MAX_SERVER_ADDON_MODULES,
     checksumModuleSource,
     findDuplicateAddonModuleSubmission,
     normalizeAddonModule,
@@ -19,12 +16,26 @@ import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-type SessionWithDiscord = Awaited<ReturnType<typeof getServerSession>> & {
-    accessToken?: string;
-    user?: {
-        id?: string;
-    };
-};
+type CreatorStatus = 'DRAFT' | 'PENDING_REVIEW';
+
+async function requireCreator() {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+    }
+
+    const userId = String((session.user as { id?: string }).id || '');
+    if (!userId) {
+        return { error: NextResponse.json({ error: 'Discord user ID is required.' }, { status: 400 }) };
+    }
+
+    return { session, userId };
+}
+
+function getCreatorStatus(value: unknown): CreatorStatus {
+    const status = trimModuleString(value, 20).toUpperCase();
+    return status === 'DRAFT' ? 'DRAFT' : 'PENDING_REVIEW';
+}
 
 async function buildUniqueSlug(seed: string) {
     const baseSlug = slugifyModuleName(seed);
@@ -91,83 +102,29 @@ async function getDuplicateCreatorModuleSubmission(discordId: string, sourceCode
     );
 }
 
+function blockedCreatorResponse(block: { reason?: string | null }) {
+    return NextResponse.json({
+        error: block.reason
+            ? `You are blocked from creating modules. Reason: ${trimModuleString(block.reason, 500)}`
+            : 'You are blocked from creating modules.',
+    }, { status: 403 });
+}
+
 export async function GET() {
-    const session = await getServerSession(authOptions) as SessionWithDiscord | null;
-    if (!session?.user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireCreator();
+    if ('error' in auth) return auth.error;
 
-    const userId = String((session.user as { id?: string }).id || '');
-    const query = supabase
+    const { data, error } = await supabase
         .from('addon_modules')
-        .select('id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
-        .order('name', { ascending: true });
-
-    const { data, error } = userId
-        ? await query.or(`status.eq.PUBLISHED,author_discord_id.eq.${userId}`)
-        : await query.eq('status', 'PUBLISHED');
+        .select('*')
+        .eq('author_discord_id', auth.userId)
+        .order('updated_at', { ascending: false });
 
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     const staffDiscordIds = await getRoLinkStaffDiscordIds();
-    let installTargets: Array<{ id: string; name: string; icon: string | null; installedModuleCount: number; moduleLimit: number }> = [];
-
-    if (session.accessToken && userId) {
-        try {
-            const visibleGuilds = await listVisibleGuildsForDiscordSession(session.accessToken, userId);
-            const guildChecks = visibleGuilds
-                .filter((guild) => guild.hasBot)
-                .map(async (guild) => {
-                    try {
-                        const permissions = await resolveDashboardUserPermissions(guild.id, userId);
-                        if (!permissions.is_admin && !permissions.can_manage_settings) {
-                            return null;
-                        }
-
-                        return {
-                            id: guild.id,
-                            name: guild.name,
-                            icon: guild.icon || null,
-                        };
-                    } catch {
-                        return null;
-                    }
-                });
-
-            const checkedGuilds = await Promise.all(guildChecks);
-            const manageableGuilds = checkedGuilds
-                .filter((guild): guild is { id: string; name: string; icon: string | null } => Boolean(guild));
-            const installCountsByServer = new Map<string, number>();
-
-            if (manageableGuilds.length > 0) {
-                const { data: installedRows, error: installedError } = await supabase
-                    .from('server_addon_modules')
-                    .select('server_id')
-                    .in('server_id', manageableGuilds.map((guild) => guild.id));
-
-                if (installedError) {
-                    throw new Error(installedError.message);
-                }
-
-                for (const row of installedRows || []) {
-                    const targetServerId = String((row as { server_id?: string }).server_id || '');
-                    installCountsByServer.set(targetServerId, (installCountsByServer.get(targetServerId) || 0) + 1);
-                }
-            }
-
-            installTargets = manageableGuilds
-                .map((guild) => ({
-                    ...guild,
-                    installedModuleCount: installCountsByServer.get(guild.id) || 0,
-                    moduleLimit: MAX_SERVER_ADDON_MODULES,
-                }))
-                .sort((first, second) => first.name.localeCompare(second.name));
-        } catch (error) {
-            console.warn('[Marketplace] Failed to load module install targets.', error);
-        }
-    }
 
     const labeledModules = await applyVerifiedCreatorBadges(
         applyOfficialModuleLabels((data || []) as Record<string, unknown>[], staffDiscordIds),
@@ -175,36 +132,24 @@ export async function GET() {
 
     return NextResponse.json({
         modules: labeledModules
-            .map((row) => normalizeAddonModule(row, false))
+            .map((row) => normalizeAddonModule(row, true))
             .filter(Boolean),
-        installTargets,
     });
 }
 
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const userId = String((session.user as { id?: string }).id || '');
-    if (!userId) {
-        return NextResponse.json({ error: 'Discord user ID is required.' }, { status: 400 });
-    }
+    const auth = await requireCreator();
+    if ('error' in auth) return auth.error;
 
     let block: { reason?: string | null } | null = null;
     try {
-        block = await getActiveCreatorBlock(userId);
+        block = await getActiveCreatorBlock(auth.userId);
     } catch (error) {
         return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to check creator access.' }, { status: 500 });
     }
 
     if (block) {
-        return NextResponse.json({
-            error: block.reason
-                ? `You are blocked from creating modules. Reason: ${trimModuleString(block.reason, 500)}`
-                : 'You are blocked from creating modules.',
-        }, { status: 403 });
+        return blockedCreatorResponse(block);
     }
 
     const body = await req.json().catch(() => ({}));
@@ -214,8 +159,10 @@ export async function POST(req: Request) {
     }
 
     const input = sanitized.input;
+    const nextStatus = getCreatorStatus(body.status);
+
     try {
-        const duplicateSubmission = await getDuplicateCreatorModuleSubmission(userId, input.sourceCode || '');
+        const duplicateSubmission = await getDuplicateCreatorModuleSubmission(auth.userId, input.sourceCode || '');
         if (duplicateSubmission) {
             const duplicateType = duplicateSubmission.reason === 'exact_source' ? 'same' : 'very similar';
             return NextResponse.json({
@@ -243,17 +190,19 @@ export async function POST(req: Request) {
             description: input.description || '',
             version: input.version || '1.0.0',
             category: input.category || 'General',
-            status: 'PENDING_REVIEW',
+            status: nextStatus,
             source_code: input.sourceCode,
             source_checksum: checksumModuleSource(input.sourceCode || ''),
             config_schema: input.configSchema || {},
-            author_discord_id: userId,
-            submitted_at: now,
+            author_discord_id: auth.userId,
+            submitted_at: nextStatus === 'PENDING_REVIEW' ? now : null,
+            reviewed_at: null,
+            reviewed_by_discord_id: null,
             moderation_note: '',
             updated_at: now,
             published_at: null,
         })
-        .select('id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
+        .select('*')
         .single();
 
     if (error) {
@@ -265,5 +214,5 @@ export async function POST(req: Request) {
         applyOfficialModuleLabels([data as Record<string, unknown>], staffDiscordIds),
     );
 
-    return NextResponse.json({ module: normalizeAddonModule(labeledModule, false) }, { status: 201 });
+    return NextResponse.json({ module: normalizeAddonModule(labeledModule, true) }, { status: 201 });
 }

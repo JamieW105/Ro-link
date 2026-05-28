@@ -1,0 +1,249 @@
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3100". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+[next-auth][warn][NEXTAUTH_URL] 
+https://next-auth.js.org/warnings#nextauth_url
+[next-auth][warn][NO_SECRET] 
+https://next-auth.js.org/warnings#no_secret
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: TypeError: fetch failed
+    at async GET (app\api\stats\route.ts:6:57)
+  4 | export async function GET() {
+  5 |     try {
+> 6 |         const [discordResponse, commandCountResponse] = await Promise.all([
+    |                                                         ^
+  7 |             fetch('https://discord.com/api/v10/applications/@me', {
+  8 |                 headers: {
+  9 |                     Authorization: `Bot ${process.env.DISCORD_TOKEN}`, {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();

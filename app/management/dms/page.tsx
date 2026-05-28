@@ -67,6 +67,7 @@ export default function ManagementDmsPage() {
     const [plainText, setPlainText] = useState('');
     const [embedTitle, setEmbedTitle] = useState('');
     const [color, setColor] = useState(DEFAULT_COLOR);
+    const [removeSetColor, setRemoveSetColor] = useState(false);
     const [description, setDescription] = useState('');
     const [fields, setFields] = useState<EmbedField[]>([emptyField()]);
     const [footerText, setFooterText] = useState('');
@@ -182,6 +183,7 @@ export default function ManagementDmsPage() {
                     plainText,
                     embedTitle,
                     color,
+                    removeSetColor,
                     description,
                     fields: cleanFields,
                     footerText,
@@ -274,19 +276,30 @@ export default function ManagementDmsPage() {
                                 <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-white">Embed</h2>
                                 <p className="mt-1 text-sm text-slate-400">Author name and image are always set to Ro-Link.</p>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <label className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+                                    <input
+                                        type="checkbox"
+                                        checked={removeSetColor}
+                                        onChange={(event) => setRemoveSetColor(event.target.checked)}
+                                        className="h-4 w-4 rounded border-slate-700 bg-slate-950"
+                                    />
+                                    Remove setColor()
+                                </label>
                                 <input
                                     type="color"
                                     value={parseHexColor(color)}
                                     onChange={(event) => setColor(event.target.value)}
                                     className="h-10 w-12 rounded-lg border border-slate-700 bg-slate-950 p-1"
                                     aria-label="Embed color"
+                                    disabled={removeSetColor}
                                 />
                                 <input
                                     value={color}
                                     onChange={(event) => setColor(event.target.value)}
                                     placeholder="#38bdf8"
                                     className="w-28 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-white outline-none focus:border-sky-500"
+                                    disabled={removeSetColor}
                                 />
                             </div>
                         </div>
@@ -402,7 +415,10 @@ export default function ManagementDmsPage() {
                                 <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{plainText}</p>
                             )}
                             {(plainText.trim() || hasEmbedContent) && (
-                                <div className="mt-3 rounded-r-xl border-l-4 bg-slate-900/80 p-4" style={{ borderColor: parseHexColor(color) }}>
+                                <div
+                                    className={`mt-3 bg-slate-900/80 p-4 ${removeSetColor ? 'rounded-xl' : 'rounded-r-xl border-l-4'}`}
+                                    style={removeSetColor ? undefined : { borderColor: parseHexColor(color) }}
+                                >
                                     <div className="mb-3 flex items-center gap-2">
                                         <img src={RO_LINK_ICON} alt="" className="h-5 w-5 rounded" />
                                         <span className="text-xs font-bold text-white">Ro-Link</span>
