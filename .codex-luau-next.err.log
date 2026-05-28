@@ -247,3 +247,184 @@ https://next-auth.js.org/warnings#debug_enabled
   18 |         }
   19 |
   20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+[STATS] Failed to fetch guild count: Error: Discord API Error: 401
+    at GET (app\api\stats\route.ts:17:19)
+  15 |
+  16 |         if (!discordResponse.ok) {
+> 17 |             throw new Error(`Discord API Error: ${discordResponse.status}`);
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const app = await discordResponse.json();
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3100". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase

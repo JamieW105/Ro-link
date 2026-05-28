@@ -1870,7 +1870,7 @@ export default function DocsClientPage() {
             <div className="pt-16">
                 <aside
                     className={cn(
-                        'custom-scrollbar fixed bottom-0 left-0 top-16 z-30 flex w-[280px] flex-col overflow-y-auto overscroll-contain border-r border-white/8 bg-[#181818]/98 px-5 py-8 backdrop-blur-xl transition-transform duration-300',
+                        'fixed bottom-0 left-0 top-16 z-30 flex w-[280px] flex-col overflow-hidden border-r border-white/8 bg-[#181818]/98 px-5 py-8 backdrop-blur-xl transition-transform duration-300',
                         mobileMenuOpen ? 'translate-x-0' : '-translate-x-full',
                         'lg:translate-x-0',
                     )}
@@ -1899,7 +1899,7 @@ export default function DocsClientPage() {
 
                 {mobileMenuOpen && <button type="button" aria-label="Close navigation" onClick={() => setMobileMenuOpen(false)} className="fixed inset-0 z-20 bg-black/50 lg:hidden" />}
 
-                <aside className="custom-scrollbar fixed bottom-0 right-0 top-16 hidden w-[270px] overflow-y-auto overscroll-contain border-l border-white/8 bg-[#181818] px-7 py-10 xl:block">
+                <aside className="fixed bottom-0 right-0 top-16 hidden w-[270px] overflow-hidden border-l border-white/8 bg-[#181818] px-7 py-10 xl:block">
                     <nav className="space-y-1">
                         {activePage.toc.map((item) => (
                             <button
