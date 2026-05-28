@@ -26,15 +26,17 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
     }
 
+    const url = new URL(req.url);
+    const configOnly = ['1', 'true', 'yes'].includes((url.searchParams.get('configOnly') || '').toLowerCase());
+    const requestedModuleId = String(url.searchParams.get('moduleId') || url.searchParams.get('id') || '').trim();
+    const requestedModuleSlug = String(url.searchParams.get('moduleSlug') || url.searchParams.get('slug') || '').trim();
+
     const server = await getServerByApiKey(apiKey);
     if (!server) {
         return NextResponse.json({ error: 'Invalid API Key' }, { status: 403 });
     }
 
-    const [{ data, error }, { data: customRows, error: customError }] = await Promise.all([
-        supabase
-        .from('server_addon_modules')
-        .select(`
+    const addonModuleSelect = `
             enabled,
             settings,
             installed_by,
@@ -46,7 +48,7 @@ export async function GET(req: Request) {
                 version,
                 category,
                 status,
-                source_code,
+                ${configOnly ? '' : 'source_code,'}
                 source_checksum,
                 config_schema,
                 author_discord_id,
@@ -54,12 +56,35 @@ export async function GET(req: Request) {
                 updated_at,
                 published_at
             )
-        `)
+        `;
+    const customModuleSelect = [
+        'id',
+        'server_id',
+        'slug',
+        'name',
+        'description',
+        'version',
+        ...(configOnly ? [] : ['source_code']),
+        'source_checksum',
+        'config_schema',
+        'settings',
+        'enabled',
+        'status',
+        'review_results',
+        'uploaded_by',
+        'uploaded_at',
+        'updated_at',
+    ].join(', ');
+
+    const [{ data, error }, { data: customRows, error: customError }] = await Promise.all([
+        supabase
+        .from('server_addon_modules')
+        .select(addonModuleSelect)
         .eq('server_id', server.id)
         .eq('enabled', true),
         supabase
             .from('server_custom_modules')
-            .select('id, server_id, slug, name, description, version, source_code, source_checksum, config_schema, settings, enabled, status, review_results, uploaded_by, uploaded_at, updated_at')
+            .select(customModuleSelect)
             .eq('server_id', server.id)
             .eq('enabled', true)
             .eq('status', 'READY'),
@@ -76,9 +101,12 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: customError.message }, { status: 500 });
     }
 
+    const addonRows = (data || []) as unknown as ServerAddonModuleRow[];
+    const customModuleRows = (customModuleStorageMissing ? [] : customRows || []) as unknown as ServerCustomModuleRow[];
+
     const staffDiscordIds = await getRoLinkStaffDiscordIds();
 
-    const marketplaceModules = (data || [])
+    const marketplaceModules = addonRows
         .map((row: ServerAddonModuleRow) => {
             const moduleRow = Array.isArray(row.module) ? row.module[0] : row.module;
             const canRunCreatorPreview = moduleRow
@@ -90,39 +118,81 @@ export async function GET(req: Request) {
             const configSchema = parseStoredModuleConfigSchema(moduleRow.config_schema);
 
             const [labeledModule] = applyOfficialModuleLabels([moduleRow], staffDiscordIds);
-            const normalized = normalizeAddonModule(labeledModule, true);
+            const normalized = normalizeAddonModule(labeledModule, !configOnly);
             if (!normalized) {
                 return null;
             }
 
             return {
                 ...normalized,
-                sourceCode: obfuscateModuleSourceForStudio(String(normalized.sourceCode || '')),
+                ...(configOnly ? {} : { sourceCode: obfuscateModuleSourceForStudio(String(normalized.sourceCode || '')) }),
                 settings: parseModuleConfigSettings(row.settings, configSchema),
             };
         })
         .filter(Boolean);
 
-    const customModules = ((customModuleStorageMissing ? [] : customRows || []) as ServerCustomModuleRow[])
+    const customModules = customModuleRows
         .map((row) => {
             const configSchema = parseStoredModuleConfigSchema(row.config_schema);
-            const normalized = normalizeServerCustomModule(row as unknown as Record<string, unknown>, true);
+            const normalized = normalizeServerCustomModule(row as unknown as Record<string, unknown>, !configOnly);
             if (!normalized || normalized.status !== 'READY' || !normalized.enabled) {
                 return null;
             }
 
             return {
                 ...normalized,
-                sourceCode: obfuscateModuleSourceForStudio(String(normalized.sourceCode || '')),
+                ...(configOnly ? {} : { sourceCode: obfuscateModuleSourceForStudio(String(normalized.sourceCode || '')) }),
                 settings: parseModuleConfigSettings(row.settings, configSchema),
             };
         })
         .filter(Boolean);
 
+    const modules = [...marketplaceModules, ...customModules];
+    const filteredModules = requestedModuleId || requestedModuleSlug
+        ? modules.filter((module) => {
+            const row = module as { id?: string; slug?: string };
+            return (requestedModuleId && row.id === requestedModuleId)
+                || (requestedModuleSlug && row.slug === requestedModuleSlug);
+        })
+        : modules;
+
+    if (configOnly) {
+        if (requestedModuleId || requestedModuleSlug) {
+            const module = filteredModules[0] || null;
+            if (!module) {
+                return NextResponse.json({ error: 'Module not found.' }, { status: 404 });
+            }
+
+            return NextResponse.json(
+                {
+                    serverId: server.id,
+                    module,
+                },
+                {
+                    headers: {
+                        'Cache-Control': 'no-store',
+                    },
+                },
+            );
+        }
+
+        return NextResponse.json(
+            {
+                serverId: server.id,
+                modules: filteredModules,
+            },
+            {
+                headers: {
+                    'Cache-Control': 'no-store',
+                },
+            },
+        );
+    }
+
     return NextResponse.json(
         {
             serverId: server.id,
-            modules: [...marketplaceModules, ...customModules],
+            modules: filteredModules,
         },
         {
             headers: {

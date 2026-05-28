@@ -1644,6 +1644,7 @@ export default function DocsClientPage() {
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const mainContentRef = useRef<HTMLElement>(null);
 
     const activePage = docsPages.find((page) => page.id === activePageId) || docsPages[0];
     const ActivePageIcon = activePage.icon;
@@ -1717,6 +1718,10 @@ export default function DocsClientPage() {
         return () => window.clearTimeout(timeout);
     }, [activePageId, pendingSectionId]);
 
+    function scrollMainContentToTop() {
+        mainContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     function openPage(pageId: string) {
         const targetPage = docsPages.find((page) => page.id === pageId);
         if (!targetPage) return;
@@ -1726,7 +1731,7 @@ export default function DocsClientPage() {
         setMobileMenuOpen(false);
         setPendingSectionId(null);
         window.history.replaceState(null, '', `#${pageId}`);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        scrollMainContentToTop();
     }
 
     function openSection(sectionId: string) {
@@ -1753,7 +1758,7 @@ export default function DocsClientPage() {
         } else {
             setPendingSectionId(null);
             window.history.replaceState(null, '', `#${targetPage.id}`);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            scrollMainContentToTop();
         }
     }
 
@@ -1865,7 +1870,7 @@ export default function DocsClientPage() {
             <div className="pt-16">
                 <aside
                     className={cn(
-                        'custom-scrollbar fixed inset-y-16 left-0 z-30 flex w-[280px] flex-col overflow-y-auto border-r border-white/8 bg-[#181818]/98 px-5 py-8 backdrop-blur-xl transition-transform duration-300',
+                        'custom-scrollbar fixed bottom-0 left-0 top-16 z-30 flex w-[280px] flex-col overflow-y-auto overscroll-contain border-r border-white/8 bg-[#181818]/98 px-5 py-8 backdrop-blur-xl transition-transform duration-300',
                         mobileMenuOpen ? 'translate-x-0' : '-translate-x-full',
                         'lg:translate-x-0',
                     )}
@@ -1894,7 +1899,7 @@ export default function DocsClientPage() {
 
                 {mobileMenuOpen && <button type="button" aria-label="Close navigation" onClick={() => setMobileMenuOpen(false)} className="fixed inset-0 z-20 bg-black/50 lg:hidden" />}
 
-                <aside className="custom-scrollbar fixed inset-y-16 right-0 hidden w-[270px] overflow-y-auto border-l border-white/8 bg-[#181818] px-7 py-10 xl:block">
+                <aside className="custom-scrollbar fixed bottom-0 right-0 top-16 hidden w-[270px] overflow-y-auto overscroll-contain border-l border-white/8 bg-[#181818] px-7 py-10 xl:block">
                     <nav className="space-y-1">
                         {activePage.toc.map((item) => (
                             <button
@@ -1912,7 +1917,7 @@ export default function DocsClientPage() {
                     </nav>
                 </aside>
 
-                <main className="lg:pl-[280px] xl:pr-[270px]">
+                <main ref={mainContentRef} className="custom-scrollbar h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain lg:pl-[280px] xl:pr-[270px]">
                     <div className="mx-auto max-w-[880px] px-6 py-10 sm:px-10">
                         <div className="flex flex-col gap-6 border-b border-white/8 pb-10 sm:flex-row sm:items-start sm:justify-between">
                             <div className="max-w-3xl">

@@ -3801,6 +3801,7 @@ function RoLink:CreateModuleUi(moduleInfo, target, sourceOrTree, props)
 		sourceOrTree = target
 		target = "all"
 	end
+	local latestModuleInfo = self:RefreshModuleConfig(moduleInfo)
 	local results = {}
 	for _, player in ipairs(resolvePlayers(target, true)) do
 		local playerGui = player:FindFirstChildOfClass("PlayerGui") or player:WaitForChild("PlayerGui", 5)
@@ -3809,12 +3810,12 @@ function RoLink:CreateModuleUi(moduleInfo, target, sourceOrTree, props)
 				local result = buildUiTree(sourceOrTree, playerGui)
 				results[player.Name] = result ~= nil
 			elseif type(sourceOrTree) == "function" then
-				local ok, result = pcall(sourceOrTree, { Player = player, PlayerGui = playerGui, Module = moduleInfo, Config = moduleInfo and moduleInfo.configSchema or {}, Settings = moduleInfo and moduleInfo.settings or {} }, player, props or {})
+				local ok, result = pcall(sourceOrTree, { Player = player, PlayerGui = playerGui, Module = latestModuleInfo, Config = latestModuleInfo and latestModuleInfo.configSchema or {}, Settings = latestModuleInfo and latestModuleInfo.settings or {} }, player, props or {})
 				results[player.Name] = ok and attachUiResult(playerGui, moduleInfo, result) or tostring(result)
 			elseif type(sourceOrTree) == "string" and type(loadstring) == "function" then
 				local chunk, loadError = loadstring(sourceOrTree)
 				if chunk then
-					local ok, result = pcall(chunk, { Player = player, PlayerGui = playerGui, Module = moduleInfo, Config = moduleInfo and moduleInfo.configSchema or {}, Settings = moduleInfo and moduleInfo.settings or {} }, player, props or {})
+					local ok, result = pcall(chunk, { Player = player, PlayerGui = playerGui, Module = latestModuleInfo, Config = latestModuleInfo and latestModuleInfo.configSchema or {}, Settings = latestModuleInfo and latestModuleInfo.settings or {} }, player, props or {})
 					results[player.Name] = ok and attachUiResult(playerGui, moduleInfo, result) or tostring(result)
 				else
 					results[player.Name] = tostring(loadError)
@@ -3851,12 +3852,94 @@ function RoLink:FireModuleHook(hookName, player, payload)
 	end
 end
 
+local function moduleConfigOf(moduleInfo)
+	if type(moduleInfo) ~= "table" then
+		return {}
+	end
+	return type(moduleInfo.configSchema) == "table" and moduleInfo.configSchema
+		or type(moduleInfo.config) == "table" and moduleInfo.config
+		or type(moduleInfo.CONFIG) == "table" and moduleInfo.CONFIG
+		or {}
+end
+
+local function moduleSettingsOf(moduleInfo)
+	if type(moduleInfo) == "table" and type(moduleInfo.settings) == "table" then
+		return moduleInfo.settings
+	end
+	return {}
+end
+
+function RoLink:RefreshModuleConfig(moduleInfo)
+	if type(moduleInfo) ~= "table" then
+		return moduleInfo
+	end
+
+	local params = { "configOnly=1" }
+	local moduleId = tostring(moduleInfo.id or "")
+	local moduleSlug = tostring(moduleInfo.slug or "")
+	if moduleId ~= "" then
+		table.insert(params, "moduleId=" .. Http:UrlEncode(moduleId))
+	end
+	if moduleSlug ~= "" then
+		table.insert(params, "moduleSlug=" .. Http:UrlEncode(moduleSlug))
+	end
+
+	local ok, payload = self:RequestModuleJson("/api/v1/game-admin/modules?" .. table.concat(params, "&"), "GET")
+	if ok and type(payload) == "table" and type(payload.module) == "table" then
+		for key, value in pairs(payload.module) do
+			if key ~= "sourceCode" then
+				moduleInfo[key] = value
+			end
+		end
+	end
+
+	return moduleInfo
+end
+
+function RoLink:BuildFreshModuleValue(moduleInfo, valueName)
+	return setmetatable({}, {
+		__index = function(_, key)
+			local latestModule = self:RefreshModuleConfig(moduleInfo)
+			local values = valueName == "Config" and moduleConfigOf(latestModule) or moduleSettingsOf(latestModule)
+			return values[key]
+		end,
+		__newindex = function(_, key, value)
+			local values = valueName == "Config" and moduleConfigOf(moduleInfo) or moduleSettingsOf(moduleInfo)
+			values[key] = value
+		end,
+		__pairs = function()
+			local latestModule = self:RefreshModuleConfig(moduleInfo)
+			local values = valueName == "Config" and moduleConfigOf(latestModule) or moduleSettingsOf(latestModule)
+			return pairs(values)
+		end,
+		__iter = function()
+			local latestModule = self:RefreshModuleConfig(moduleInfo)
+			local values = valueName == "Config" and moduleConfigOf(latestModule) or moduleSettingsOf(latestModule)
+			return next, values
+		end,
+		__len = function()
+			local latestModule = self:RefreshModuleConfig(moduleInfo)
+			local values = valueName == "Config" and moduleConfigOf(latestModule) or moduleSettingsOf(latestModule)
+			return #values
+		end
+	})
+end
+
 function RoLink:BuildModuleContext(moduleInfo)
 	return {
 		RoLink = self,
 		Module = moduleInfo,
-		Config = moduleInfo and moduleInfo.configSchema or {},
-		Settings = moduleInfo and moduleInfo.settings or {},
+		Config = self:BuildFreshModuleValue(moduleInfo, "Config"),
+		Settings = self:BuildFreshModuleValue(moduleInfo, "Settings"),
+		GetConfig = function()
+			return moduleConfigOf(self:RefreshModuleConfig(moduleInfo))
+		end,
+		GetSettings = function()
+			return moduleSettingsOf(self:RefreshModuleConfig(moduleInfo))
+		end,
+		RefreshConfig = function()
+			return self:RefreshModuleConfig(moduleInfo)
+		end,
 		Services = {
 			HttpService = Http,
 			Players = Players,
@@ -4021,7 +4104,7 @@ function RoLink:LoadModules()
 								context.OnCommandBarOpened(exported.CommandBarOpened)
 							end
 							if type(exported.Init) == "function" then
-								local initOk, initError = pcall(exported.Init, context, moduleInfo.settings or {})
+								local initOk, initError = pcall(exported.Init, context, moduleSettingsOf(context.RefreshConfig()))
 								if not initOk then
 									warn("[Ro-Link] Module " .. moduleKey .. " init failed: " .. tostring(initError))
 									for commandName, binding in pairs(self.moduleCommands) do
