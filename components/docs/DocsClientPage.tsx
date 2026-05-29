@@ -321,6 +321,44 @@ function DataTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
     );
 }
 
+function InfoGrid({
+    items,
+    columns = 'md:grid-cols-3',
+}: {
+    items: Array<{ title: string; description: string; meta?: string }>;
+    columns?: string;
+}) {
+    return (
+        <div className={cn('grid gap-4', columns)}>
+            {items.map((item) => (
+                <div key={item.title} className="rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+                    {item.meta && <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-sky-400/85">{item.meta}</p>}
+                    <h3 className="mt-2 text-base font-semibold text-white first:mt-0">{item.title}</h3>
+                    <p className="mt-2 text-sm leading-7 text-slate-400">{item.description}</p>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function StepList({ steps }: { steps: Array<{ title: string; description: string }> }) {
+    return (
+        <ol className="space-y-3">
+            {steps.map((step, index) => (
+                <li key={step.title} className="flex gap-4 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sky-500/25 bg-sky-500/10 text-sm font-bold text-sky-300">
+                        {index + 1}
+                    </span>
+                    <div>
+                        <h3 className="text-sm font-semibold text-white">{step.title}</h3>
+                        <p className="mt-1 text-sm leading-7 text-slate-400">{step.description}</p>
+                    </div>
+                </li>
+            ))}
+        </ol>
+    );
+}
+
 function ResourceCard({
     href,
     icon: Icon,
@@ -522,6 +560,7 @@ const moduleDeveloperFunctions = [
     ['CreateReport(body)', 'function', 'Creates a pending report for the current server.'],
     ['UpdateReport(reportId, updates)', 'function', 'Edits report status, notes, target, reason, or moderator fields for the current server.'],
     ['CreateUI(target, functionOrTree, props)', 'function', 'Creates Roblox UI for one player, all players, or a target list. Installed modules should pass a function or UI tree table.'],
+    ['_G.RoLinkModuleUI.Bind(guiObject, handler, options)', 'function', 'Binds client UI input from CreateUI instances back to server-side module code.'],
     ['FindPlayer(target)', 'function', 'Finds one live Roblox player by Player instance, username, or UserId.'],
     ['GetPlayers()', 'function', 'Returns the current live Players list.'],
     ['Notify(target, message, success)', 'function', 'Shows admin-panel feedback where the Studio package exposes the feedback remote.'],
@@ -1139,7 +1178,7 @@ const docsPages: DocPage[] = [
         category: 'Developer',
         eyebrow: 'Module Runtime',
         title: 'Module Developer API',
-        summary: 'Build marketplace add-ons that run inside the Roblox admin panel runtime, register commands, react to panel lifecycle events, send validated Discord bot messages, and create player UI.',
+        summary: 'Use this page to understand what a Ro-Link module file looks like, how dashboard settings reach Roblox, and which context helpers are available for commands, reports, Discord messages, user data, and player UI.',
         icon: Icons.Terminal,
         stats: [
             { label: 'Runtime object', value: 'context' },
@@ -1147,12 +1186,13 @@ const docsPages: DocPage[] = [
             { label: 'Loaded by', value: 'Roblox admin panel' },
         ],
         toc: [
-            { id: 'module-api-overview', title: 'Module shape' },
-            { id: 'module-api-config', title: 'Module config' },
+            { id: 'module-api-overview', title: 'How modules work' },
+            { id: 'module-api-config', title: 'Configuration' },
             { id: 'module-api-functions', title: 'Context functions' },
             { id: 'module-api-command-panel', title: 'Cmds panel commands' },
             { id: 'module-api-reports', title: 'Reports data' },
             { id: 'module-api-discord', title: 'Discord messages' },
+            { id: 'module-api-user-data', title: 'Linked users' },
             { id: 'module-api-lifecycle', title: 'Lifecycle hooks' },
             { id: 'module-api-ui', title: 'CreateUI' },
             { id: 'module-api-example', title: 'Full example' },
@@ -1162,10 +1202,51 @@ const docsPages: DocPage[] = [
                 <SectionCard
                     id="module-api-overview"
                     eyebrow="Structure"
-                    title="Return a module table from your uploaded Luau"
-                    description="Marketplace modules are uploaded in the management portal, published by staff with the required permissions, enabled per server from the dashboard, obfuscated before being inserted into a person's game, installed into Custom Modules by the Studio plugin, and loaded by the Roblox admin panel at runtime."
+                    title="How a marketplace module runs"
+                    description="A module is uploaded once, reviewed by staff, enabled per Discord server, then installed into Roblox by the Studio plugin. The uploaded Luau returns a table of hooks and commands. Ro-Link provides the context object at runtime."
                 >
-                    <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+                    <InfoGrid
+                        items={[
+                            {
+                                meta: 'You upload',
+                                title: 'Module source',
+                                description: 'The Luau file contains an optional CONFIG table and returns Init, Commands, LiveConfig, and other handlers.',
+                            },
+                            {
+                                meta: 'Server owners set',
+                                title: 'Dashboard config',
+                                description: 'Each Discord server can save different settings for the same published module from Dashboard > Modules.',
+                            },
+                            {
+                                meta: 'Roblox receives',
+                                title: 'Runtime context',
+                                description: 'When the admin panel loads the module, Ro-Link passes context, settings, APIs, report helpers, Discord helpers, and UI helpers.',
+                            },
+                        ]}
+                    />
+
+                    <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+                        <div className="space-y-5">
+                            <StepList
+                                steps={[
+                                    {
+                                        title: 'Declare CONFIG only for dashboard fields.',
+                                        description: 'CONFIG describes the form Ro-Link should show. It is schema, not live game state.',
+                                    },
+                                    {
+                                        title: 'Return a module table.',
+                                        description: 'Put startup work in Init and command handlers in Commands or RegisterPanelCommand.',
+                                    },
+                                    {
+                                        title: 'Use context for every Ro-Link action.',
+                                        description: 'The context object is the stable bridge to Discord, reports, players, notifications, and module UI.',
+                                    },
+                                ]}
+                            />
+                            <Callout title="Keep these separate" tone="info">
+                                <InlineCode>context.Config</InlineCode> is the field schema. <InlineCode>context.Settings</InlineCode> is the saved value for the current Discord server. Use <InlineCode>settings</InlineCode> or <InlineCode>context.Settings</InlineCode> when your module needs an actual configured value.
+                            </Callout>
+                        </div>
                         <CodeBlock label="Minimal module shape">
                             {`CONFIG = {
     Version = "1.0.0",
@@ -1215,9 +1296,6 @@ return {
     }
 }`}
                         </CodeBlock>
-                        <Callout title="Runtime requirements" tone="warn">
-                            Dashboard config is declared with a top-level CONFIG table. CONFIG.Version can drive module updates, saved values are available as context.Settings, and LIVE fields are sent to running Roblox servers instead of being saved.
-                        </Callout>
                     </div>
                 </SectionCard>
 
@@ -1225,8 +1303,24 @@ return {
                     id="module-api-config"
                     eyebrow="Configuration"
                     title="Get module config from Ro-Link"
-                    description="A module declares its configurable fields with CONFIG. Ro-Link turns that schema into a per-server dashboard form, saves the selected values, then passes those values back into the Roblox runtime."
+                    description="A module declares configurable fields with CONFIG. Ro-Link turns that schema into a per-server dashboard form, saves the selected values, then passes those saved values back into Roblox."
                 >
+                    <InfoGrid
+                        columns="md:grid-cols-2"
+                        items={[
+                            {
+                                meta: 'Schema',
+                                title: 'CONFIG lives at the top of the file',
+                                description: 'Ro-Link reads CONFIG before the module runs so it can build the dashboard form and know which fields are live actions.',
+                            },
+                            {
+                                meta: 'Values',
+                                title: 'Settings arrive at runtime',
+                                description: 'Saved values are passed to Init as settings and are also available at context.Settings while commands and hooks run.',
+                            },
+                        ]}
+                    />
+
                     <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
                         <div className="space-y-5">
                             <Checklist
@@ -1242,6 +1336,17 @@ return {
                             <Callout title="Settings are per server" tone="info">
                                 The same published module can have different saved config values on different Discord servers. Always read the values from the runtime context instead of hard-coding dashboard choices in the module source.
                             </Callout>
+                            <DataTable
+                                headers={['Field type', 'Dashboard control', 'Runtime value']}
+                                rows={[
+                                    ['Bool', 'Toggle', 'true or false'],
+                                    ['Dropdown', 'Single select menu', 'Selected option string'],
+                                    ['CheckBoxes', 'Multi-select list', 'Array-like table of selected values'],
+                                    ['Color Wheel', 'Color picker', 'Selected color value'],
+                                    ['Integer', 'Number input', 'Number'],
+                                    ['String', 'Text input', 'String'],
+                                ]}
+                            />
                         </div>
                         <CodeBlock label="Read saved module config">
                             {`return {
@@ -1268,8 +1373,18 @@ return {
                     id="module-api-functions"
                     eyebrow="Reference"
                     title="Context functions and fields"
-                    description="Every module receives a context table. Use these helpers instead of calling Ro-Link internals directly so modules keep working as the runtime evolves."
+                    description="Every module receives a context table. Treat it as the module API: read settings from it, call helpers from it, and avoid reaching into Ro-Link internals directly."
                 >
+                    <DataTable
+                        headers={['Where you are', 'Arguments you get', 'Use it for']}
+                        rows={[
+                            ['Init', 'context, settings', 'Startup work, event hooks, panel commands, cached setup.'],
+                            ['Commands handler', 'command, context, args', 'Run a command from Roblox and respond with Notify, reports, or Discord messages.'],
+                            ['RegisterPanelCommand handler', 'command, commandContext, args', 'Handle a command launched from the in-game Cmds panel.'],
+                            ['LiveConfig handler', 'command, context, value', 'React to a live dashboard action without saving the value as a setting.'],
+                            ['Lifecycle hook', 'player, payload, hookContext', 'Refresh UI or audit when an admin opens the panel or command bar.'],
+                        ]}
+                    />
                     <DataTable
                         headers={['Name', 'Type', 'Description']}
                         rows={moduleDeveloperFunctions.map((row) => [...row])}
@@ -1450,12 +1565,11 @@ end`}
                     id="module-api-ui"
                     eyebrow="UI"
                     title="Create player UI from a module"
-                    description="CreateUI can target a Player instance, username, UserId, all/server/everyone, or a list of targets. It can run source code, call a function, or build a simple UI tree table."
+                    description="CreateUI can target a Player instance, username, UserId, all/server/everyone, or a list of targets. Use the UI interaction bridge when created controls need to send button or textbox events back to module code."
                 >
                     <div className="grid gap-6 xl:grid-cols-2">
-                        <CodeBlock label="CreateUI from source">
-                            {`context.CreateUI(player, [[
-    return function(ui)
+                        <CodeBlock label="CreateUI with interaction">
+                            {`context.CreateUI(player, function(ui)
         local frame = ui.Create("Frame", {
             Size = UDim2.new(0, 320, 0, 120),
             BackgroundColor3 = Color3.fromRGB(15, 23, 42)
@@ -1468,9 +1582,21 @@ end`}
             TextColor3 = Color3.fromRGB(255, 255, 255)
         }, frame)
 
+        local button = ui.Create("TextButton", {
+            Position = UDim2.new(0, 20, 1, -48),
+            Size = UDim2.new(0, 160, 0, 36),
+            Text = "Send ping"
+        }, frame)
+
+        _G.RoLinkModuleUI.Bind(button, function(clickingPlayer, payload)
+            context.Notify(clickingPlayer, "Clicked " .. payload.Name, true)
+        end, {
+            Module = context.Module,
+            Events = { "Activated" }
+        })
+
         return frame
-    end
-]])`}
+end)`}
                         </CodeBlock>
                         <CodeBlock label="CreateUI from tree">
                             {`context.CreateUI("all", {
@@ -1899,7 +2025,7 @@ export default function DocsClientPage() {
 
                 {mobileMenuOpen && <button type="button" aria-label="Close navigation" onClick={() => setMobileMenuOpen(false)} className="fixed inset-0 z-20 bg-black/50 lg:hidden" />}
 
-                <aside className="fixed bottom-0 right-0 top-16 hidden w-[270px] overflow-hidden border-l border-white/8 bg-[#181818] px-7 py-10 xl:block">
+                <aside className="fixed bottom-0 right-0 top-16 hidden w-[270px] overflow-hidden border-l border-white/8 bg-[#181818] px-7 py-10 2xl:block">
                     <nav className="space-y-1">
                         {activePage.toc.map((item) => (
                             <button
@@ -1917,8 +2043,8 @@ export default function DocsClientPage() {
                     </nav>
                 </aside>
 
-                <main ref={mainContentRef} className="custom-scrollbar h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain lg:pl-[280px] xl:pr-[270px]">
-                    <div className="mx-auto max-w-[880px] px-6 py-10 sm:px-10">
+                <main ref={mainContentRef} className="custom-scrollbar h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain lg:pl-[280px] 2xl:pr-[270px]">
+                    <div className="mx-auto max-w-[1080px] px-6 py-10 sm:px-10">
                         <div className="flex flex-col gap-6 border-b border-white/8 pb-10 sm:flex-row sm:items-start sm:justify-between">
                             <div className="max-w-3xl">
                                 <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-sky-400">{activePage.category}</p>

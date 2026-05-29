@@ -308,6 +308,12 @@ local function runAllTests(context, reason)
         return true, valueSummary(result)
     end)
 
+    callTest(results, "_G.RoLinkModuleUI", function()
+        local uiBridge = _G.RoLinkModuleUI
+        return type(uiBridge) == "table" and type(uiBridge.Bind) == "function",
+            "CreateUI interaction bridge " .. (type(uiBridge) == "table" and "available" or "missing")
+    end)
+
     callTest(results, "context.GetDiscordChannels", function()
         if not setting(context, "Enable_External_Read_Tests", false) then
             return true, "Skipped by Enable_External_Read_Tests."

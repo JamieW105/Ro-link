@@ -148,7 +148,7 @@ Once your web server is running and your Discord server is linked via `/setup`:
 
 ## Module Developer API
 
-Marketplace modules are uploaded from the management portal, published by users with the required management permissions, enabled per Discord server from the dashboard, installed by the Studio plugin into `ReplicatedStorage.ModularAdmin["Custom Modules"]`, and loaded by the Roblox admin panel at runtime. All modules are obfuscated before they are inserted into a person's game.
+Marketplace modules are uploaded from the management portal, published by users with the required management permissions, enabled per Discord server from the dashboard, installed by the Studio plugin into `ReplicatedStorage["RoLink Admin"]["Custom Modules"]`, and loaded by the Roblox admin panel at runtime. All modules are obfuscated before they are inserted into a person's game.
 
 Each uploaded Luau module can declare a top-level `CONFIG` table before returning its module table. `CONFIG.Version` is used as the module's update version when the upload form does not provide one. The dashboard reads the rest of that schema and saves per-server values.
 
@@ -325,6 +325,7 @@ return {
 | `context.CreateReport(body)` | Creates a pending report for the current server. |
 | `context.UpdateReport(reportId, updates)` | Edits report status, note, target, reason, or moderator fields for the current server. |
 | `context.CreateUI(target, functionOrTree, props)` | Creates Roblox UI for a player, all players, or a target list. Installed modules should pass a function or UI tree table. |
+| `_G.RoLinkModuleUI.Bind(guiObject, handler, options)` | Binds client UI interactions from `CreateUI` instances back to server-side module code. |
 | `context.FindPlayer(target)` | Finds one live Roblox player by player instance, username, or UserId. |
 | `context.GetPlayers()` | Returns live Roblox players. |
 | `context.Notify(target, message, success)` | Shows admin feedback where the Studio package has the feedback remote available. |
@@ -428,13 +429,21 @@ return {
 
         context.OnCommandBarOpened(function(player)
             context.CreateUI(player, function(ui)
-                local label = ui.Create("TextLabel", {
+                local button = ui.Create("TextButton", {
                     Size = UDim2.new(0, 260, 0, 48),
-                    Text = "Module UI",
+                    Text = "Send module ping",
                     BackgroundColor3 = Color3.fromRGB(15, 23, 42),
                     TextColor3 = Color3.fromRGB(255, 255, 255)
                 })
-                return label
+
+                _G.RoLinkModuleUI.Bind(button, function(clickingPlayer, payload)
+                    context.Notify(clickingPlayer, "Button clicked from " .. payload.Name, true)
+                end, {
+                    Module = context.Module,
+                    Events = { "Activated" }
+                })
+
+                return button
             end)
         end)
     end
@@ -442,6 +451,7 @@ return {
 ```
 
 Marketplace modules are installed by the Studio plugin as ModuleScripts, so `CreateUI` source strings are disabled in the runtime loader.
+Use `_G.RoLinkModuleUI.Bind` with instances returned by `ui.Create` when the UI needs button, textbox, or other client input events. The callback runs on the server with `(player, payload, instance)`.
 
 ---
 
