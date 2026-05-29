@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { buildDeliveryArgs, resolveLiveServerTargets, trimString, type CommandArgs } from '@/lib/commandDelivery';
+import { buildDeliveryArgs, resolveLiveServerTargets, trimString, type CommandArgs, type DeliveryTarget } from '@/lib/commandDelivery';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
 import { logAction } from '@/lib/logger';
-import { parseModuleLiveConfigValue, parseStoredModuleConfigSchema, type ModuleConfigSchema } from '@/lib/modules';
+import { parseModuleLiveConfigValue, parseStoredModuleConfigSchema, type ModuleConfigField, type ModuleConfigSchema } from '@/lib/modules';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { supabase } from '@/lib/supabase';
 
@@ -113,6 +113,57 @@ function getLiveField(schema: ModuleConfigSchema, fieldKey: string) {
     return field?.live ? field : null;
 }
 
+function readRecord(value: unknown) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : null;
+}
+
+function readDynamicJobId(value: unknown, includeGenericIds = false) {
+    const record = readRecord(value);
+    if (!record) return '';
+    const explicitJobId = trimString(record.jobId || record.JobId || record.job_id);
+    if (explicitJobId || !includeGenericIds) return explicitJobId;
+    return trimString(record.id || record.Id || record.value);
+}
+
+function findSelectedJobId(value: unknown, field: ModuleConfigField): string {
+    let directJobId = '';
+    if (field.type === 'server') {
+        directJobId = readDynamicJobId(value, true);
+    } else if (field.type === 'player') {
+        directJobId = readDynamicJobId(value);
+    }
+    if (directJobId) return directJobId;
+
+    const record = readRecord(value);
+    if (!record) return '';
+
+    for (const subField of field.subFields) {
+        const subJobId = findSelectedJobId(record[subField.key], subField);
+        if (subJobId) return subJobId;
+    }
+
+    if (field.type !== 'group' && 'value' in record) {
+        return readDynamicJobId(record.value, field.type === 'server');
+    }
+
+    return '';
+}
+
+async function resolveModuleLiveTargets(serverId: string, field: ModuleConfigField, value: unknown) {
+    const selectedJobId = findSelectedJobId(value, field);
+    if (selectedJobId) {
+        return [{
+            deliveryId: crypto.randomUUID(),
+            jobId: selectedJobId,
+            scope: 'SERVER',
+        }] satisfies DeliveryTarget[];
+    }
+
+    return resolveLiveServerTargets(serverId);
+}
+
 export async function POST(req: Request) {
     try {
         const body = await req.json().catch(() => ({}));
@@ -137,12 +188,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'That CONFIG field is not a live action.' }, { status: 400 });
         }
 
-        const deliveryTargets = await resolveLiveServerTargets(serverId);
+        const value = parseModuleLiveConfigValue(body.value, field);
+        const deliveryTargets = await resolveModuleLiveTargets(serverId, field, value);
         if (deliveryTargets.length === 0) {
             return NextResponse.json({ error: 'No live servers are available for this module action.' }, { status: 400 });
         }
-
-        const value = parseModuleLiveConfigValue(body.value, field);
         const moderator = trimString(auth.session.user?.name) || 'Web Admin';
         const baseArgs: CommandArgs = {
             module_id: moduleResult.id,
