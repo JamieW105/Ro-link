@@ -1,0 +1,12 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.68.102:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 2.9s
+○ Compiling /management/modules/[id] ...
+ GET /management/modules/test 200 in 4.5s (compile: 4.0s, proxy.ts: 219ms, render: 264ms)
+ GET /api/auth/session 200 in 1127ms (compile: 1088ms, proxy.ts: 11ms, render: 29ms)
+✓ Compiled in 560ms
+[?25h

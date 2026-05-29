@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { LuauCodeBlock, LuauCodeEditor } from '@/components/dashboard/LuauSyntax';
-import { runModuleReviewChecks, type ModuleReviewCheckResult } from '@/lib/moduleReviewChecks';
+import { runModuleReviewChecks } from '@/lib/moduleReviewChecks';
 
 type ModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
 type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string';
@@ -85,9 +85,31 @@ function fieldDescription(field: ModuleConfigField) {
     return 'Pick a hex color value.';
 }
 
-function checkStatusClassName(status: ModuleReviewCheckResult['status']) {
-    if (status === 'pass') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
-    return 'border-red-400/20 bg-red-400/10 text-red-300';
+function CheckIcon() {
+    return (
+        <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20" fill="none">
+            <path d="M4.5 10.4 8.2 14l7.3-8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+}
+
+function XIcon() {
+    return (
+        <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20" fill="none">
+            <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+        </svg>
+    );
+}
+
+function historyStatusTone(status: ModuleStatus) {
+    if (status === 'PUBLISHED') return 'text-emerald-300';
+    if (status === 'REJECTED' || status === 'ARCHIVED') return 'text-red-300';
+    if (status === 'PENDING_REVIEW') return 'text-amber-300';
+    return 'text-slate-500';
+}
+
+function historyStatusIcon(status: ModuleStatus) {
+    return status === 'PUBLISHED' ? <CheckIcon /> : <XIcon />;
 }
 
 export default function ManagementModuleReviewPage() {
@@ -565,30 +587,26 @@ export default function ManagementModuleReviewPage() {
                                 {failedReviewChecks.length}
                             </div>
                         </div>
-                        <div className="mt-4 space-y-3">
+                        <ul className="mt-4 space-y-2">
                             {reviewChecks.map((check) => (
-                                <div key={check.id} className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="font-semibold text-white">{check.title}</div>
-                                            <p className="mt-1 text-xs leading-relaxed text-slate-500">{check.description}</p>
-                                        </div>
-                                        <span className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${checkStatusClassName(check.status)}`}>
-                                            {check.status}
-                                        </span>
-                                    </div>
-                                    {check.details.length > 0 ? (
-                                        <ul className="mt-3 space-y-2 text-xs leading-relaxed text-red-200">
-                                            {check.details.map((detail) => (
-                                                <li key={detail}>{detail}</li>
-                                            ))}
-                                        </ul>
-                                    ) : (
-                                        <p className="mt-3 text-xs text-slate-600">No issues found.</p>
-                                    )}
-                                </div>
+                                <li key={check.id} className="flex min-w-0 items-start gap-2 text-sm leading-5">
+                                    <span className={`mt-0.5 shrink-0 ${check.status === 'pass' ? 'text-emerald-300' : 'text-red-300'}`}>
+                                        {check.status === 'pass' ? <CheckIcon /> : <XIcon />}
+                                    </span>
+                                    <span className="min-w-0 text-slate-400">
+                                        <span className="font-semibold text-white">{check.title}</span>
+                                        <span className="text-slate-600"> - </span>
+                                        {check.status === 'pass' ? (
+                                            <span className="text-emerald-300">Passed</span>
+                                        ) : (
+                                            <span className="text-red-200">
+                                                {check.details.length > 0 ? check.details.join('; ') : 'Failed without a reported reason.'}
+                                            </span>
+                                        )}
+                                    </span>
+                                </li>
                             ))}
-                        </div>
+                        </ul>
                     </div>
 
                     <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
@@ -629,37 +647,38 @@ export default function ManagementModuleReviewPage() {
                             </div>
                             <div className="text-2xl font-black text-slate-300">{history.length}</div>
                         </div>
-                        <div className="mt-4 space-y-3">
+                        <ul className="mt-4 space-y-2">
                             {history.map((item) => (
-                                <Link
-                                    key={item.id}
-                                    href={`/management/modules/${item.id}`}
-                                    className="block rounded-lg border border-slate-800 bg-slate-950/60 p-4 transition-colors hover:border-sky-500/40"
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="truncate font-semibold text-white">{item.name}</div>
-                                            <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-600">
-                                                <span>{item.slug}</span>
-                                                <span>v{item.version}</span>
-                                            </div>
-                                        </div>
-                                        <span className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(item.status)}`}>
-                                            {item.status}
+                                <li key={item.id}>
+                                    <Link
+                                        href={`/management/modules/${item.id}`}
+                                        className="flex min-w-0 items-start gap-2 text-sm leading-5 transition-colors hover:text-sky-200"
+                                    >
+                                        <span className={`mt-0.5 shrink-0 ${historyStatusTone(item.status)}`}>{historyStatusIcon(item.status)}</span>
+                                        <span className="min-w-0 text-slate-400">
+                                            <span className="font-semibold text-white">{item.name}</span>
+                                            <span className="text-slate-600"> - </span>
+                                            <span className={historyStatusTone(item.status)}>{item.status.replaceAll('_', ' ')}</span>
+                                            <span className="text-slate-600"> - </span>
+                                            <span>v{item.version}</span>
+                                            <span className="text-slate-600"> - </span>
+                                            <span>Reviewed {formatDate(item.reviewedAt)}</span>
+                                            {item.moderationNote && (
+                                                <>
+                                                    <span className="text-slate-600"> - </span>
+                                                    <span>{item.moderationNote}</span>
+                                                </>
+                                            )}
                                         </span>
-                                    </div>
-                                    <div className="mt-3 text-xs text-slate-500">Reviewed {formatDate(item.reviewedAt)}</div>
-                                    {item.moderationNote && (
-                                        <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-slate-400">{item.moderationNote}</p>
-                                    )}
-                                </Link>
+                                    </Link>
+                                </li>
                             ))}
                             {history.length === 0 && (
-                                <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-500">
+                                <li className="text-sm text-slate-500">
                                     No past reviewed module uploads were found for this creator.
-                                </div>
+                                </li>
                             )}
-                        </div>
+                        </ul>
                     </div>
                 </aside>
             </section>
