@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
 type ModuleConfigOptionSource = 'static' | 'roblox-users' | 'live-players' | 'live-server-players' | 'live-servers';
@@ -102,6 +102,22 @@ function optionValueLabel(value: unknown) {
     return String(value ?? '');
 }
 
+function optionValueDescription(value: unknown) {
+    if (isRecord(value)) {
+        return String(value.description || value.displayName || value.userId || value.jobId || value.id || '');
+    }
+
+    return '';
+}
+
+function optionValueIcon(value: unknown) {
+    if (isRecord(value)) {
+        return String(value.iconUrl || value.avatarUrl || '');
+    }
+
+    return '';
+}
+
 function readDynamicValue(value: unknown) {
     if (isRecord(value)) {
         return String(value.value || value.username || value.name || value.jobId || value.id || '');
@@ -169,14 +185,33 @@ function DynamicOptionSelect({
     const [query, setQuery] = useState(optionValueLabel(value));
     const [options, setOptions] = useState<DynamicOption[]>([]);
     const [loading, setLoading] = useState(false);
+    const [open, setOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement | null>(null);
     const source = field.optionSource || (field.type === 'server' ? 'live-servers' : 'live-players');
     const selectedValue = readDynamicValue(value);
+    const selectedLabel = optionValueLabel(value);
+    const selectedDescription = optionValueDescription(value);
+    const selectedIcon = optionValueIcon(value);
 
     useEffect(() => {
-        setQuery(optionValueLabel(value));
-    }, [value]);
+        if (!open) {
+            setQuery('');
+        }
+    }, [open, value]);
 
     useEffect(() => {
+        function handlePointerDown(event: MouseEvent) {
+            if (!containerRef.current?.contains(event.target as Node)) {
+                setOpen(false);
+            }
+        }
+
+        document.addEventListener('mousedown', handlePointerDown);
+        return () => document.removeEventListener('mousedown', handlePointerDown);
+    }, []);
+
+    useEffect(() => {
+        if (!open) return;
         let cancelled = false;
         const controller = new AbortController();
         const timeout = window.setTimeout(async () => {
@@ -205,7 +240,8 @@ function DynamicOptionSelect({
                     throw new Error(String(payload.error || 'Failed to load options.'));
                 }
                 if (!cancelled) {
-                    setOptions(Array.isArray(payload.options) ? payload.options : []);
+                    const nextOptions = Array.isArray(payload.options) ? payload.options : [];
+                    setOptions(nextOptions);
                 }
             } catch (error) {
                 if (!cancelled && !(error instanceof DOMException && error.name === 'AbortError')) {
@@ -221,7 +257,7 @@ function DynamicOptionSelect({
             controller.abort();
             window.clearTimeout(timeout);
         };
-    }, [field.type, query, referenceValue, serverId, source]);
+    }, [field.type, open, query, referenceValue, serverId, source]);
 
     function selectOption(option: DynamicOption) {
         const data = option.data || {};
@@ -229,62 +265,86 @@ function DynamicOptionSelect({
             ...data,
             value: option.value,
             label: option.label,
+            description: option.description || '',
+            iconUrl: option.iconUrl || null,
         });
-        setQuery(option.label);
+        setQuery('');
+        setOpen(false);
     }
 
     return (
-        <div className="space-y-2">
-            <input
-                value={query}
-                onChange={(event) => {
-                    setQuery(event.target.value);
-                    if (!event.target.value.trim()) {
-                        onChange('');
-                    }
-                }}
-                placeholder={field.type === 'server' ? 'Search live servers...' : source === 'roblox-users' ? 'Search Roblox users...' : 'Search live players...'}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
-            />
-            <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/80">
-                {loading && (
-                    <div className="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-slate-500">Loading</div>
+        <div ref={containerRef} className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen((current) => !current)}
+                className="flex h-12 w-full items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 px-4 text-left text-sm text-white outline-none transition-colors hover:border-slate-700 focus:border-sky-500"
+            >
+                {field.type === 'player' && selectedIcon && (
+                    <span
+                        aria-hidden="true"
+                        className="h-7 w-7 shrink-0 rounded-md border border-slate-700 bg-cover bg-center"
+                        style={{ backgroundImage: `url(${selectedIcon})` }}
+                    />
                 )}
-                {!loading && options.length === 0 && (
-                    <div className="px-4 py-3 text-sm text-slate-500">
-                        {source === 'roblox-users' && query.trim().length < 2 ? 'Type at least two characters.' : 'No matches found.'}
+                <span className="min-w-0 flex-1 truncate">
+                    {selectedLabel ? (
+                        <>
+                            <span className="font-semibold">{selectedLabel}</span>
+                            {selectedDescription && <span className="text-slate-500"> - {selectedDescription}</span>}
+                        </>
+                    ) : (
+                        <span className="text-slate-600">{field.type === 'server' ? 'Choose a live server...' : 'Choose a Roblox user...'}</span>
+                    )}
+                </span>
+                <span className="shrink-0 text-slate-500">{open ? '^' : 'v'}</span>
+            </button>
+
+            {open && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-800 bg-slate-950 shadow-2xl shadow-slate-950/60">
+                    <div className="border-b border-slate-800 p-2">
+                        <input
+                            value={query}
+                            autoFocus
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder={field.type === 'server' ? 'Search live servers...' : source === 'roblox-users' ? 'Search Roblox users...' : 'Search live players...'}
+                            className="h-10 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
+                        />
                     </div>
-                )}
-                {!loading && options.map((option) => {
-                    const isSelected = selectedValue && selectedValue === option.value;
-                    return (
-                        <button
-                            key={`${option.value}-${option.description || ''}`}
-                            type="button"
-                            onClick={() => selectOption(option)}
-                            className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-900 ${isSelected ? 'bg-sky-500/10' : ''}`}
-                        >
-                            {option.iconUrl ? (
-                                <span
-                                    aria-hidden="true"
-                                    className="h-9 w-9 rounded-lg border border-slate-700 bg-cover bg-center"
-                                    style={{ backgroundImage: `url(${option.iconUrl})` }}
-                                />
-                            ) : (
-                                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-[10px] font-black uppercase text-slate-500">
-                                    {field.type === 'server' ? 'SRV' : 'USR'}
-                                </span>
-                            )}
-                            <span className="min-w-0">
-                                <span className="block truncate text-sm font-semibold text-white">{option.label}</span>
-                                {option.description && (
-                                    <span className="block truncate text-xs text-slate-500">{option.description}</span>
-                                )}
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
+                    <div className="max-h-56 overflow-y-auto py-1">
+                        {loading && (
+                            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Loading</div>
+                        )}
+                        {!loading && options.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-slate-500">
+                                {source === 'roblox-users' && query.trim().length < 2 ? 'Type at least two characters.' : 'No matches found.'}
+                            </div>
+                        )}
+                        {!loading && options.map((option) => {
+                            const isSelected = selectedValue && selectedValue === option.value;
+                            return (
+                                <button
+                                    key={`${option.value}-${option.description || ''}`}
+                                    type="button"
+                                    onClick={() => selectOption(option)}
+                                    className={`flex h-10 w-full items-center gap-2 px-3 text-left transition-colors hover:bg-slate-900 ${isSelected ? 'bg-sky-500/10' : ''}`}
+                                >
+                                    {field.type === 'player' && option.iconUrl && (
+                                        <span
+                                            aria-hidden="true"
+                                            className="h-7 w-7 shrink-0 rounded-md border border-slate-700 bg-cover bg-center"
+                                            style={{ backgroundImage: `url(${option.iconUrl})` }}
+                                        />
+                                    )}
+                                    <span className="min-w-0 flex-1 truncate text-sm text-white">
+                                        <span className="font-semibold">{option.label}</span>
+                                        {option.description && <span className="text-slate-500"> - {option.description}</span>}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

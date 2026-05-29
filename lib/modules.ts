@@ -1395,21 +1395,42 @@ function normalizeDynamicOptionValue(rawValue: unknown, type: 'player' | 'server
     if (isPlainRecord(rawValue)) {
         if (type === 'server') {
             const jobId = trimModuleString(rawValue.jobId ?? rawValue.job_id ?? rawValue.id ?? rawValue.value, 120);
+            const label = trimModuleString(rawValue.label ?? rawValue.name ?? jobId, 160);
+            const playerCount = Number(rawValue.playerCount ?? rawValue.player_count ?? 0);
             return {
                 ...rawValue,
                 jobId,
+                JobId: jobId,
+                job_id: jobId,
+                id: jobId,
+                Id: jobId,
                 value: trimModuleString(rawValue.value ?? jobId, 120),
-                label: trimModuleString(rawValue.label ?? rawValue.name ?? jobId, 160),
+                label,
+                name: trimModuleString(rawValue.name ?? label, 160),
+                Name: trimModuleString(rawValue.Name ?? rawValue.name ?? label, 160),
+                playerCount,
+                PlayerCount: playerCount,
+                player_count: playerCount,
             };
         }
 
         const username = trimModuleString(rawValue.username ?? rawValue.name ?? rawValue.label ?? rawValue.value, 120);
         const userId = trimModuleString(rawValue.userId ?? rawValue.user_id ?? rawValue.id, 40);
+        const displayName = trimModuleString(rawValue.displayName ?? rawValue.display_name ?? username, 120);
         return {
             ...rawValue,
             username,
-            displayName: trimModuleString(rawValue.displayName ?? rawValue.display_name ?? username, 120),
+            Username: username,
+            name: trimModuleString(rawValue.name ?? username, 120),
+            Name: trimModuleString(rawValue.Name ?? rawValue.name ?? username, 120),
+            displayName,
+            DisplayName: displayName,
+            display_name: displayName,
             userId: userId || null,
+            UserId: userId || null,
+            user_id: userId || null,
+            id: userId || username,
+            Id: userId || username,
             value: trimModuleString(rawValue.value ?? username ?? userId, 160),
             label: trimModuleString(rawValue.label ?? username ?? userId, 160),
         };
