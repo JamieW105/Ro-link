@@ -1188,6 +1188,7 @@ const docsPages: DocPage[] = [
         toc: [
             { id: 'module-api-overview', title: 'How modules work' },
             { id: 'module-api-config', title: 'Configuration' },
+            { id: 'module-api-live-inputs', title: 'Live input dropdowns' },
             { id: 'module-api-functions', title: 'Context functions' },
             { id: 'module-api-command-panel', title: 'Cmds panel commands' },
             { id: 'module-api-reports', title: 'Reports data' },
@@ -1326,7 +1327,7 @@ return {
                             <Checklist
                                 items={[
                                     'Declare a top-level CONFIG table in the uploaded module source.',
-                                    'Use Bool, Dropdown, CheckBoxes, Color Wheel, Integer, or String field types.',
+                                    'Use Bool, Dropdown, CheckBoxes, Color Wheel, Integer, String, Player, Server, or Group field types.',
                                     'Set LIVE = true on a field when the dashboard should show a send button instead of saving the value.',
                                     'Server managers open Dashboard > Modules, choose the module, select Configure, then save the module config for that Discord server.',
                                     'Read saved values in Roblox from context.Settings or from the second settings argument passed to Init.',
@@ -1345,6 +1346,9 @@ return {
                                     ['Color Wheel', 'Color picker', 'Selected color value'],
                                     ['Integer', 'Number input', 'Number'],
                                     ['String', 'Text input', 'String'],
+                                    ['Player', 'Searchable Roblox/live player dropdown', 'String or selected player object'],
+                                    ['Server', 'Searchable live server dropdown', 'String or selected server object'],
+                                    ['Group', 'Nested field container', 'Object with subfield values'],
                                 ]}
                             />
                         </div>
@@ -1367,6 +1371,108 @@ return {
 }`}
                         </CodeBlock>
                     </div>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-live-inputs"
+                    eyebrow="Live Config"
+                    title="Use live player and server dropdowns"
+                    description="Live config fields can use special Player and Server inputs. These are meant for one-off dashboard actions: the value is sent to running Roblox servers, not saved into context.Settings."
+                >
+                    <InfoGrid
+                        columns="md:grid-cols-2"
+                        items={[
+                            {
+                                meta: 'Server input',
+                                title: 'Type = "Server"',
+                                description: 'Shows a searchable list of live Roblox jobs for the current Discord server. The selected value includes jobId, label, playerCount, updatedAt, and source.',
+                            },
+                            {
+                                meta: 'Player input',
+                                title: 'Type = "Player"',
+                                description: 'Shows a searchable player picker. By default it lists players currently in live servers, and it can be scoped to a selected server with ReferenceKey.',
+                            },
+                        ]}
+                    />
+
+                    <DataTable
+                        headers={['Property', 'Accepted values', 'Use']}
+                        rows={[
+                            ['Type', 'Player, User, RobloxPlayer, PlayerDropdown', 'Creates a player search dropdown.'],
+                            ['Type', 'Server, LiveServer, ServerDropdown, JobId', 'Creates a live server search dropdown.'],
+                            ['OptionSource', 'live-players, current-players, all-live-players', 'Player dropdown backed by all currently live players. This is the default for Type = Player.'],
+                            ['OptionSource', 'live-server-players, selected-server-players, job-players', 'Player dropdown backed only by the server selected in ReferenceKey.'],
+                            ['OptionSource', 'roblox-users, users', 'Player dropdown backed by Roblox user search instead of current live players.'],
+                            ['OptionSource', 'live-servers, servers, jobs', 'Server dropdown backed by currently live Roblox servers. This is the default for Type = Server.'],
+                            ['ReferenceKey', 'Any field key in the same live action', 'Lets a player dropdown read the selected server jobId from another input. Also accepted as DependsOn, ServerField, SourceField, or Reference.'],
+                        ]}
+                    />
+
+                    <div className="grid gap-6 xl:grid-cols-2">
+                        <CodeBlock label="Live action with server and player pickers">
+                            {`CONFIG = {
+    Teleport_Admin = {
+        Label = "Teleport admin to player",
+        Short_Description = "Choose a live server and one player in that server.",
+        Type = "Group",
+        LIVE = true,
+        ButtonText = "Teleport",
+        Fields = {
+            Target_Server = {
+                Label = "Live server",
+                Type = "Server",
+                OptionSource = "live-servers"
+            },
+            Target_Player = {
+                Label = "Player in server",
+                Type = "Player",
+                OptionSource = "live-server-players",
+                ReferenceKey = "Target_Server"
+            }
+        }
+    }
+}
+
+return {
+    LiveConfig = {
+        Teleport_Admin = function(command, context, value)
+            local selectedServer = value.Target_Server
+            local selectedPlayer = value.Target_Player
+
+            context.Log("Server job:", selectedServer.jobId)
+            context.Log("Player:", selectedPlayer.username, selectedPlayer.userId)
+        end
+    }
+}`}
+                        </CodeBlock>
+                        <CodeBlock label="Value received by LiveConfig">
+                            {`-- Server dropdown value
+{
+    jobId = "roblox-job-id",
+    value = "roblox-job-id",
+    label = "Server ABC12345",
+    playerCount = 8,
+    updatedAt = "2026-05-30T10:15:00.000Z",
+    source = "live-servers"
+}
+
+-- Player dropdown value
+{
+    username = "PlayerName",
+    displayName = "Display Name",
+    userId = "123456789",
+    avatarUrl = "https://...",
+    jobId = "roblox-job-id",
+    value = "PlayerName",
+    label = "PlayerName",
+    source = "live-server-players"
+}`}
+                        </CodeBlock>
+                    </div>
+
+                    <Callout title="Live actions are broadcast to live servers" tone="warn">
+                        Pressing the live button queues a <InlineCode>MODULE_LIVE</InlineCode> command for the server&apos;s live Roblox jobs. If your action should only affect the selected job, check <InlineCode>value.Target_Server.jobId</InlineCode> inside the handler and ignore commands running on other jobs.
+                    </Callout>
                 </SectionCard>
 
                 <SectionCard
