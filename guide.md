@@ -267,6 +267,44 @@ return {
 }
 ```
 
+Live config fields can also act as one-button action forms by declaring `SubInputs`, `Inputs`, or `Fields`. Sub inputs support the same field types as normal config fields. Use `Type = "Player"` for a searchable Roblox user selector and `Type = "Server"` for a searchable live server selector. Player selectors can use `Source = "roblox-users"` for Roblox-wide search, `Source = "live-players"` for everyone currently playing this game through Ro-Link, or `Source = "live-server-players"` with `Reference = "<server field key>"` to search players in a selected live server.
+
+```lua
+CONFIG = {
+    ServerMessage = {
+        Short_Description = "Send a targeted live message.",
+        Type = "Group",
+        LIVE = true,
+        ButtonText = "Send Message",
+        SubInputs = {
+            TargetServer = {
+                Type = "Server",
+                Source = "live-servers",
+                Label = "Server"
+            },
+            TargetPlayer = {
+                Type = "Player",
+                Source = "live-server-players",
+                Reference = "TargetServer",
+                Label = "Player"
+            },
+            Message = {
+                Type = "String",
+                Default = "Hello"
+            }
+        }
+    }
+}
+
+return {
+    LiveConfig = {
+        ServerMessage = function(command, context, value)
+            context.Log(value.TargetServer.jobId, value.TargetPlayer.username, value.Message)
+        end
+    }
+}
+```
+
 ### Context Fields and Helpers
 
 | API | Purpose |

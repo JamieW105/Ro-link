@@ -4129,7 +4129,8 @@ function RoLink:LoadModules()
 						if not initFailed then
 							self.loadedModules[moduleKey] = {
 								checksum = checksum,
-								module = moduleInfo
+								module = moduleInfo,
+								exported = exported
 							}
 						end
 					end
@@ -4149,6 +4150,49 @@ function RoLink:Execute(cmd)
 		local ok, moduleError = pcall(binding.handler, cmd, self:BuildModuleContext(binding.module), cmd.args)
 		if not ok then
 			warn("[Ro-Link] Module command " .. tostring(cmd.command) .. " failed: " .. tostring(moduleError))
+		end
+		return
+	end
+
+	if cmd.command == "MODULE_LIVE" then
+		local moduleId = tostring(cmd.args.module_id or "")
+		local moduleSlug = tostring(cmd.args.module_slug or "")
+		local fieldKey = tostring(cmd.args.field_key or "")
+		local value = cmd.args.value
+		local targetEntry = nil
+		for _, entry in pairs(self.loadedModules or {}) do
+			local moduleInfo = entry and entry.module
+			if moduleInfo and ((moduleId ~= "" and tostring(moduleInfo.id or "") == moduleId) or (moduleSlug ~= "" and tostring(moduleInfo.slug or "") == moduleSlug)) then
+				targetEntry = entry
+				break
+			end
+		end
+		if not targetEntry then return end
+
+		local exported = targetEntry.exported
+		local context = self:BuildModuleContext(targetEntry.module)
+		local handler = nil
+		if type(exported) == "table" then
+			local liveTables = { exported.LiveConfig, exported.LiveActions, exported.Live }
+			for _, liveTable in ipairs(liveTables) do
+				if type(liveTable) == "table" then
+					handler = liveTable[fieldKey] or liveTable[tostring(cmd.args.field_label or "")]
+					if type(handler) == "function" then
+						break
+					end
+				end
+			end
+			if type(handler) == "function" then
+				local ok, liveError = pcall(handler, cmd, context, value, fieldKey)
+				if not ok then
+					warn("[Ro-Link] Module live config " .. fieldKey .. " failed: " .. tostring(liveError))
+				end
+			elseif type(exported.OnLiveConfig) == "function" then
+				local ok, liveError = pcall(exported.OnLiveConfig, cmd, context, value, fieldKey)
+				if not ok then
+					warn("[Ro-Link] Module OnLiveConfig failed: " .. tostring(liveError))
+				end
+			end
 		end
 		return
 	end

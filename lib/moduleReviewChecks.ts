@@ -5,7 +5,8 @@ export interface ModuleReviewConfigFieldInput {
     label?: string;
     shortDescription?: string;
     options?: string[];
-    defaultValue?: boolean | string | string[] | number;
+    defaultValue?: boolean | string | string[] | number | Record<string, unknown>;
+    subFields?: ModuleReviewConfigFieldInput[];
 }
 
 export interface ModuleReviewInput {
@@ -136,8 +137,15 @@ function getConfigSamples(configSchema: ModuleReviewInput['configSchema']) {
         }
         if (Array.isArray(field.defaultValue)) {
             samples.push({ label: `config default "${key}"`, value: field.defaultValue.join(' ') });
+        } else if (field.defaultValue && typeof field.defaultValue === 'object') {
+            samples.push({ label: `config default "${key}"`, value: JSON.stringify(field.defaultValue).slice(0, 500) });
         } else {
             samples.push({ label: `config default "${key}"`, value: normalizeText(field.defaultValue) });
+        }
+        for (const subField of field.subFields || []) {
+            samples.push({ label: `sub config key "${key}.${subField.key}"`, value: subField.key });
+            samples.push({ label: `sub config label "${key}.${subField.key}"`, value: normalizeText(subField.label) });
+            samples.push({ label: `sub config description "${key}.${subField.key}"`, value: normalizeText(subField.shortDescription) });
         }
     }
 

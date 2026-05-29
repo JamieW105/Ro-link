@@ -14,7 +14,8 @@ export interface SanitizedAddonModuleInput {
     configSchema?: ModuleConfigSchema;
 }
 
-export type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string';
+export type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
+export type ModuleConfigOptionSource = 'static' | 'roblox-users' | 'live-players' | 'live-server-players' | 'live-servers';
 
 export interface ModuleConfigField {
     key: string;
@@ -22,9 +23,13 @@ export interface ModuleConfigField {
     shortDescription: string;
     type: ModuleConfigFieldType;
     options: string[];
-    defaultValue: boolean | string | string[] | number;
+    defaultValue: boolean | string | string[] | number | Record<string, unknown>;
     live: boolean;
     liveButtonText: string;
+    subFields: ModuleConfigField[];
+    optionSource: ModuleConfigOptionSource;
+    referenceKey: string;
+    searchable: boolean;
 }
 
 export type ModuleConfigSchema = Record<string, ModuleConfigField>;
@@ -34,7 +39,7 @@ export type SanitizedAddonModuleResult =
     | { errors: string[] };
 
 const VALID_MODULE_STATUSES = new Set<AddonModuleStatus>(['DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'ARCHIVED']);
-const VALID_CONFIG_TYPES = new Set<ModuleConfigFieldType>(['bool', 'dropdown', 'checkboxes', 'color', 'integer', 'string']);
+const VALID_CONFIG_TYPES = new Set<ModuleConfigFieldType>(['bool', 'dropdown', 'checkboxes', 'color', 'integer', 'string', 'group', 'player', 'server']);
 export const MAX_SERVER_ADDON_MODULES = 5;
 export const MAX_SERVER_CUSTOM_MODULES = 20;
 
@@ -924,6 +929,30 @@ function normalizeConfigType(value: unknown): ModuleConfigFieldType | null {
     if (normalized === 'string' || normalized === 'str' || normalized === 'text') {
         return 'string';
     }
+    if (normalized === 'group' || normalized === 'object' || normalized === 'container' || normalized === 'action') {
+        return 'group';
+    }
+    if (
+        normalized === 'player'
+        || normalized === 'user'
+        || normalized === 'robloxuser'
+        || normalized === 'robloxplayer'
+        || normalized === 'playerdropdown'
+        || normalized === 'userdropdown'
+        || normalized === 'searchableplayer'
+    ) {
+        return 'player';
+    }
+    if (
+        normalized === 'server'
+        || normalized === 'liveserver'
+        || normalized === 'serverdropdown'
+        || normalized === 'searchableserver'
+        || normalized === 'job'
+        || normalized === 'jobid'
+    ) {
+        return 'server';
+    }
 
     return null;
 }
@@ -946,6 +975,91 @@ function normalizeLiveButtonText(value: unknown) {
     return trimModuleString(value, 40) || 'Send';
 }
 
+function normalizeConfigOptionSource(value: unknown, type: ModuleConfigFieldType): ModuleConfigOptionSource {
+    const normalized = String(value || '')
+        .toLowerCase()
+        .replace(/[\s_-]+/g, '');
+
+    if (
+        normalized === 'roblox'
+        || normalized === 'robloxusers'
+        || normalized === 'robloxwide'
+        || normalized === 'globalrobloxusers'
+        || normalized === 'users'
+    ) {
+        return 'roblox-users';
+    }
+    if (
+        normalized === 'liveplayers'
+        || normalized === 'currentplayers'
+        || normalized === 'gameplayers'
+        || normalized === 'currentgame'
+        || normalized === 'everyoneplaying'
+        || normalized === 'allliveplayers'
+    ) {
+        return 'live-players';
+    }
+    if (
+        normalized === 'serverplayers'
+        || normalized === 'liveserverplayers'
+        || normalized === 'selectedserverplayers'
+        || normalized === 'jobplayers'
+    ) {
+        return 'live-server-players';
+    }
+    if (
+        normalized === 'servers'
+        || normalized === 'liveservers'
+        || normalized === 'serverlist'
+        || normalized === 'jobs'
+    ) {
+        return 'live-servers';
+    }
+
+    if (type === 'player') return 'live-players';
+    if (type === 'server') return 'live-servers';
+    return 'static';
+}
+
+function normalizeConfigSearchable(value: unknown, type: ModuleConfigFieldType, optionSource: ModuleConfigOptionSource) {
+    if (value === false) return false;
+    const normalized = String(value ?? '').trim().toLowerCase();
+    if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+    return type === 'player' || type === 'server' || optionSource !== 'static' || normalized === 'true' || normalized === '1' || normalized === 'yes';
+}
+
+function readSubInputRecord(fieldRecord: Record<string, unknown>) {
+    const rawSubInputs = fieldRecord.SubInputs
+        ?? fieldRecord.subInputs
+        ?? fieldRecord.Inputs
+        ?? fieldRecord.inputs
+        ?? fieldRecord.Fields
+        ?? fieldRecord.fields
+        ?? fieldRecord.SubConfigs
+        ?? fieldRecord.subConfigs
+        ?? fieldRecord.Subfields
+        ?? fieldRecord.subfields
+        ?? fieldRecord.SubFields
+        ?? fieldRecord.subFields;
+
+    if (Array.isArray(rawSubInputs)) {
+        return Object.fromEntries(
+            rawSubInputs
+                .map((item) => {
+                    const subKey = item && typeof item === 'object' && !Array.isArray(item)
+                        ? trimModuleString((item as Record<string, unknown>).key, 80)
+                        : '';
+                    return subKey ? [subKey, item] : null;
+                })
+                .filter((entry): entry is [string, unknown] => Boolean(entry)),
+        );
+    }
+
+    return rawSubInputs && typeof rawSubInputs === 'object'
+        ? rawSubInputs as Record<string, unknown>
+        : {};
+}
+
 function defaultConfigValue(type: ModuleConfigFieldType, options: string[], rawDefault: unknown) {
     if (rawDefault !== undefined && rawDefault !== null && rawDefault !== '') {
         if (type === 'bool') return rawDefault === true || String(rawDefault).toLowerCase() === 'true';
@@ -966,6 +1080,14 @@ function defaultConfigValue(type: ModuleConfigFieldType, options: string[], rawD
         if (type === 'string') {
             return trimModuleString(rawDefault, 1000);
         }
+        if (type === 'group') {
+            return rawDefault && typeof rawDefault === 'object' && !Array.isArray(rawDefault) ? rawDefault as Record<string, unknown> : {};
+        }
+        if (type === 'player' || type === 'server') {
+            return rawDefault && typeof rawDefault === 'object' && !Array.isArray(rawDefault)
+                ? rawDefault as Record<string, unknown>
+                : trimModuleString(rawDefault, 500);
+        }
         const selected = String(rawDefault);
         return options.includes(selected) ? selected : (options[0] || '');
     }
@@ -975,7 +1097,77 @@ function defaultConfigValue(type: ModuleConfigFieldType, options: string[], rawD
     if (type === 'color') return '#38bdf8';
     if (type === 'integer') return 0;
     if (type === 'string') return '';
+    if (type === 'group') return {};
+    if (type === 'player' || type === 'server') return '';
     return options[0] || '';
+}
+
+function normalizeModuleConfigField(key: string, rawField: unknown, inheritedLive = false, depth = 0): ModuleConfigField | null {
+    if (!key || !rawField || typeof rawField !== 'object' || Array.isArray(rawField) || depth > 4) {
+        return null;
+    }
+
+    const fieldRecord = rawField as Record<string, unknown>;
+    const rawSubInputs = readSubInputRecord(fieldRecord);
+    const explicitType = normalizeConfigType(fieldRecord.Type ?? fieldRecord.type);
+    const type = explicitType || (Object.keys(rawSubInputs).length > 0 ? 'group' : null);
+    if (!type || !VALID_CONFIG_TYPES.has(type)) return null;
+
+    const options = normalizeConfigOptions(fieldRecord.Options ?? fieldRecord.options);
+    const label = trimModuleString(fieldRecord.Label ?? fieldRecord.label ?? key.replace(/_/g, ' '), 120);
+    const shortDescription = trimModuleString(
+        fieldRecord.Short_Description ?? fieldRecord.short_description ?? fieldRecord.description ?? '',
+        300,
+    );
+    const live = inheritedLive || normalizeConfigLiveFlag(fieldRecord.LIVE ?? fieldRecord.Live ?? fieldRecord.live);
+    const optionSource = normalizeConfigOptionSource(
+        fieldRecord.OptionSource
+        ?? fieldRecord.optionSource
+        ?? fieldRecord.OptionsSource
+        ?? fieldRecord.optionsSource
+        ?? fieldRecord.Source
+        ?? fieldRecord.source
+        ?? fieldRecord.From
+        ?? fieldRecord.from,
+        type,
+    );
+    const subFields = Object.entries(rawSubInputs)
+        .map(([subKey, rawSubField]) => normalizeModuleConfigField(trimModuleString(subKey, 80), rawSubField, live, depth + 1))
+        .filter((field): field is ModuleConfigField => Boolean(field));
+
+    return {
+        key,
+        label: label || key,
+        shortDescription,
+        type,
+        options,
+        defaultValue: defaultConfigValue(type, options, fieldRecord.Default ?? fieldRecord.defaultValue ?? fieldRecord.Value),
+        live,
+        liveButtonText: normalizeLiveButtonText(
+            fieldRecord.ButtonText
+            ?? fieldRecord.buttonText
+            ?? fieldRecord.LiveButtonText
+            ?? fieldRecord.liveButtonText
+            ?? fieldRecord.SendText
+            ?? fieldRecord.sendText,
+        ),
+        subFields,
+        optionSource,
+        referenceKey: trimModuleString(
+            fieldRecord.Reference
+            ?? fieldRecord.reference
+            ?? fieldRecord.ReferenceKey
+            ?? fieldRecord.referenceKey
+            ?? fieldRecord.SourceField
+            ?? fieldRecord.sourceField
+            ?? fieldRecord.DependsOn
+            ?? fieldRecord.dependsOn
+            ?? fieldRecord.ServerField
+            ?? fieldRecord.serverField,
+            80,
+        ),
+        searchable: normalizeConfigSearchable(fieldRecord.Searchable ?? fieldRecord.searchable, type, optionSource),
+    };
 }
 
 export function parseModuleConfigSchema(sourceCode: string): ModuleConfigSchema {
@@ -999,35 +1191,10 @@ export function parseModuleConfigSchema(sourceCode: string): ModuleConfigSchema 
         const rawField = parseSimpleLuaValue(match[4]);
         if (!key || !rawField || typeof rawField !== 'object' || Array.isArray(rawField)) continue;
 
-        const fieldRecord = rawField as Record<string, unknown>;
-        const type = normalizeConfigType(fieldRecord.Type ?? fieldRecord.type);
-        if (!type || !VALID_CONFIG_TYPES.has(type)) continue;
-
-        const options = normalizeConfigOptions(fieldRecord.Options ?? fieldRecord.options);
-        const label = trimModuleString(fieldRecord.Label ?? fieldRecord.label ?? key.replace(/_/g, ' '), 120);
-        const shortDescription = trimModuleString(
-            fieldRecord.Short_Description ?? fieldRecord.short_description ?? fieldRecord.description ?? '',
-            300,
-        );
-        const live = normalizeConfigLiveFlag(fieldRecord.LIVE ?? fieldRecord.Live ?? fieldRecord.live);
-
-        schema[key] = {
-            key,
-            label: label || key,
-            shortDescription,
-            type,
-            options,
-            defaultValue: defaultConfigValue(type, options, fieldRecord.Default ?? fieldRecord.defaultValue ?? fieldRecord.Value),
-            live,
-            liveButtonText: normalizeLiveButtonText(
-                fieldRecord.ButtonText
-                ?? fieldRecord.buttonText
-                ?? fieldRecord.LiveButtonText
-                ?? fieldRecord.liveButtonText
-                ?? fieldRecord.SendText
-                ?? fieldRecord.sendText,
-            ),
-        };
+        const field = normalizeModuleConfigField(key, rawField);
+        if (field) {
+            schema[key] = field;
+        }
     }
 
     return schema;
@@ -1068,36 +1235,7 @@ export function parseModuleConfigSettings(value: unknown, schema: ModuleConfigSc
 
         const rawValue = rawSettings[key];
 
-        if (field.type === 'bool') {
-            settings[key] = rawValue === undefined ? field.defaultValue : rawValue === true || String(rawValue).toLowerCase() === 'true';
-            continue;
-        }
-
-        if (field.type === 'checkboxes') {
-            const values = Array.isArray(rawValue) ? rawValue.map((item) => String(item)) : [];
-            settings[key] = values.filter((item) => field.options.includes(item));
-            continue;
-        }
-
-        if (field.type === 'color') {
-            const color = String(rawValue || field.defaultValue || '').trim();
-            settings[key] = /^#[0-9a-f]{6}$/i.test(color) ? color : field.defaultValue;
-            continue;
-        }
-
-        if (field.type === 'integer') {
-            const integer = Number(rawValue ?? field.defaultValue);
-            settings[key] = Number.isFinite(integer) ? Math.trunc(integer) : field.defaultValue;
-            continue;
-        }
-
-        if (field.type === 'string') {
-            settings[key] = trimModuleString(rawValue ?? field.defaultValue ?? '', 1000);
-            continue;
-        }
-
-        const selected = String(rawValue || '');
-        settings[key] = field.options.includes(selected) ? selected : field.defaultValue;
+        settings[key] = parseConfigFieldValue(rawValue, field);
     }
 
     for (const [key, rawValue] of Object.entries(rawSettings)) {
@@ -1113,31 +1251,7 @@ export function parseModuleConfigSettings(value: unknown, schema: ModuleConfigSc
 }
 
 export function parseModuleLiveConfigValue(rawValue: unknown, field: ModuleConfigField) {
-    if (field.type === 'bool') {
-        return rawValue === true || String(rawValue).toLowerCase() === 'true';
-    }
-
-    if (field.type === 'checkboxes') {
-        const values = Array.isArray(rawValue) ? rawValue.map((item) => String(item)) : [];
-        return values.filter((item) => field.options.includes(item));
-    }
-
-    if (field.type === 'color') {
-        const color = String(rawValue || field.defaultValue || '').trim();
-        return /^#[0-9a-f]{6}$/i.test(color) ? color : field.defaultValue;
-    }
-
-    if (field.type === 'integer') {
-        const integer = Number(rawValue ?? field.defaultValue);
-        return Number.isFinite(integer) ? Math.trunc(integer) : field.defaultValue;
-    }
-
-    if (field.type === 'string') {
-        return trimModuleString(rawValue ?? field.defaultValue ?? '', 1000);
-    }
-
-    const selected = String(rawValue || '');
-    return field.options.includes(selected) ? selected : field.defaultValue;
+    return parseConfigFieldValue(rawValue, field);
 }
 
 export function sanitizeAddonModuleInput(body: Record<string, unknown>, partial = false): SanitizedAddonModuleResult {
@@ -1273,6 +1387,88 @@ export function parseModuleSettings(value: unknown) {
     return value as Record<string, unknown>;
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeDynamicOptionValue(rawValue: unknown, type: 'player' | 'server') {
+    if (isPlainRecord(rawValue)) {
+        if (type === 'server') {
+            const jobId = trimModuleString(rawValue.jobId ?? rawValue.job_id ?? rawValue.id ?? rawValue.value, 120);
+            return {
+                ...rawValue,
+                jobId,
+                value: trimModuleString(rawValue.value ?? jobId, 120),
+                label: trimModuleString(rawValue.label ?? rawValue.name ?? jobId, 160),
+            };
+        }
+
+        const username = trimModuleString(rawValue.username ?? rawValue.name ?? rawValue.label ?? rawValue.value, 120);
+        const userId = trimModuleString(rawValue.userId ?? rawValue.user_id ?? rawValue.id, 40);
+        return {
+            ...rawValue,
+            username,
+            displayName: trimModuleString(rawValue.displayName ?? rawValue.display_name ?? username, 120),
+            userId: userId || null,
+            value: trimModuleString(rawValue.value ?? username ?? userId, 160),
+            label: trimModuleString(rawValue.label ?? username ?? userId, 160),
+        };
+    }
+
+    return trimModuleString(rawValue, 500);
+}
+
+function parseConfigFieldValue(rawValue: unknown, field: ModuleConfigField): unknown {
+    const rawRecord = isPlainRecord(rawValue) ? rawValue : {};
+
+    if (field.subFields.length > 0) {
+        const nested: Record<string, unknown> = {};
+        for (const subField of field.subFields) {
+            nested[subField.key] = parseConfigFieldValue(rawRecord[subField.key], subField);
+        }
+
+        if (field.type !== 'group') {
+            nested.value = parseConfigFieldValue(rawRecord.value ?? rawValue, { ...field, subFields: [] });
+        }
+
+        return nested;
+    }
+
+    if (field.type === 'bool') {
+        return rawValue === undefined ? field.defaultValue : rawValue === true || String(rawValue).toLowerCase() === 'true';
+    }
+
+    if (field.type === 'checkboxes') {
+        const values = Array.isArray(rawValue) ? rawValue.map((item) => String(item)) : [];
+        return values.filter((item) => field.options.includes(item));
+    }
+
+    if (field.type === 'color') {
+        const color = String(rawValue || field.defaultValue || '').trim();
+        return /^#[0-9a-f]{6}$/i.test(color) ? color : field.defaultValue;
+    }
+
+    if (field.type === 'integer') {
+        const integer = Number(rawValue ?? field.defaultValue);
+        return Number.isFinite(integer) ? Math.trunc(integer) : field.defaultValue;
+    }
+
+    if (field.type === 'string') {
+        return trimModuleString(rawValue ?? field.defaultValue ?? '', 1000);
+    }
+
+    if (field.type === 'group') {
+        return {};
+    }
+
+    if (field.type === 'player' || field.type === 'server') {
+        return normalizeDynamicOptionValue(rawValue ?? field.defaultValue, field.type);
+    }
+
+    const selected = String(rawValue || '');
+    return field.options.includes(selected) ? selected : field.defaultValue;
+}
+
 export function parseStoredModuleConfigSchema(value: unknown): ModuleConfigSchema {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
         return {};
@@ -1280,31 +1476,10 @@ export function parseStoredModuleConfigSchema(value: unknown): ModuleConfigSchem
 
     const schema: ModuleConfigSchema = {};
     for (const [key, rawField] of Object.entries(value as Record<string, unknown>)) {
-        if (!rawField || typeof rawField !== 'object' || Array.isArray(rawField)) continue;
-        const fieldRecord = rawField as Record<string, unknown>;
-        const type = VALID_CONFIG_TYPES.has(fieldRecord.type as ModuleConfigFieldType)
-            ? fieldRecord.type as ModuleConfigFieldType
-            : normalizeConfigType(fieldRecord.Type);
-        if (!type) continue;
-
-        const options = normalizeConfigOptions(fieldRecord.options ?? fieldRecord.Options);
-        schema[key] = {
-            key,
-            label: trimModuleString(fieldRecord.label ?? fieldRecord.Label ?? key.replace(/_/g, ' '), 120) || key,
-            shortDescription: trimModuleString(fieldRecord.shortDescription ?? fieldRecord.Short_Description ?? '', 300),
-            type,
-            options,
-            defaultValue: defaultConfigValue(type, options, fieldRecord.defaultValue),
-            live: normalizeConfigLiveFlag(fieldRecord.live ?? fieldRecord.LIVE ?? fieldRecord.Live),
-            liveButtonText: normalizeLiveButtonText(
-                fieldRecord.liveButtonText
-                ?? fieldRecord.ButtonText
-                ?? fieldRecord.buttonText
-                ?? fieldRecord.LiveButtonText
-                ?? fieldRecord.SendText
-                ?? fieldRecord.sendText,
-            ),
-        };
+        const field = normalizeModuleConfigField(trimModuleString(key, 80), rawField);
+        if (field) {
+            schema[key] = field;
+        }
     }
 
     return schema;

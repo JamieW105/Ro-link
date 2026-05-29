@@ -8,7 +8,7 @@ import { LuauCodeBlock, LuauCodeEditor } from '@/components/dashboard/LuauSyntax
 import { runModuleReviewChecks } from '@/lib/moduleReviewChecks';
 
 type ModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
-type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string';
+type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
 
 interface ModuleConfigField {
     key: string;
@@ -16,7 +16,7 @@ interface ModuleConfigField {
     shortDescription: string;
     type: ModuleConfigFieldType;
     options: string[];
-    defaultValue: boolean | string | string[] | number;
+    defaultValue: boolean | string | string[] | number | Record<string, unknown>;
 }
 
 interface AddonModule {
@@ -72,6 +72,10 @@ function formatDefaultValue(value: ModuleConfigField['defaultValue']) {
         return String(value);
     }
 
+    if (value && typeof value === 'object') {
+        return JSON.stringify(value);
+    }
+
     return value || 'None';
 }
 
@@ -82,6 +86,9 @@ function fieldDescription(field: ModuleConfigField) {
     if (field.type === 'checkboxes') return 'Choose any available options.';
     if (field.type === 'integer') return 'Whole-number value saved for this module.';
     if (field.type === 'string') return 'Free-form text value saved for this module.';
+    if (field.type === 'group') return 'Grouped inputs sent together for a module action.';
+    if (field.type === 'player') return 'Searchable Roblox player selector.';
+    if (field.type === 'server') return 'Searchable live server selector.';
     return 'Pick a hex color value.';
 }
 
