@@ -82,6 +82,7 @@ type ConfirmAction = {
 } | null;
 
 type PanelModal = 'announce' | 'command' | null;
+type AnnouncementTargetType = '' | 'global' | 'user';
 
 type ParsedCommandBar = {
     command: AdminPanelCommandDefinition | null;
@@ -473,6 +474,8 @@ export default function LivePanelPage() {
     const [panelModal, setPanelModal] = useState<PanelModal>(null);
     const [commandBarValue, setCommandBarValue] = useState('');
     const [announcement, setAnnouncement] = useState('');
+    const [announcementTargetType, setAnnouncementTargetType] = useState<AnnouncementTargetType>('');
+    const [announcementUser, setAnnouncementUser] = useState('');
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [noteText, setNoteText] = useState('');
     const [warningText, setWarningText] = useState('');
@@ -782,6 +785,18 @@ export default function LivePanelPage() {
     const panelProfile = panelUser ? profileCache[getUserKey(panelUser)] : null;
     const popoverUser = profileModal?.user || null;
     const popoverProfile = popoverUser ? profileCache[getUserKey(popoverUser)] : null;
+    const announcementUserQuery = announcementUser.trim().toLowerCase().replace(/^@/, '');
+    const announcementUserSuggestions = announcementTargetType === 'user'
+        ? allKnownUsers
+            .filter((user) => user.presence === 'live')
+            .filter((user) => (
+                !announcementUserQuery
+                || user.username.toLowerCase().includes(announcementUserQuery)
+                || user.displayName.toLowerCase().includes(announcementUserQuery)
+                || normalizeIdentity(user.userId).includes(announcementUserQuery)
+            ))
+            .slice(0, 5)
+        : [];
 
     function resolveUserFromText(value: string): LivePanelUser {
         const username = extractUsername(value);
@@ -924,20 +939,59 @@ export default function LivePanelPage() {
     }
 
     async function submitAnnouncement() {
+        if (!canUseDashboardCommand(perms, 'BROADCAST')) {
+            setNotice({ type: 'error', text: 'You do not have permission to send announcements.' });
+            return;
+        }
+
         const message = announcement.trim();
         if (!message) {
             setNotice({ type: 'error', text: 'Enter an announcement before sending.' });
             return;
         }
 
+        if (!announcementTargetType) {
+            setNotice({ type: 'error', text: 'Choose Global or User before sending the announcement.' });
+            return;
+        }
+
+        const args: Record<string, unknown> = { message };
+        let successMessage = 'Announcement queued for all live servers.';
+
+        if (announcementTargetType === 'global') {
+            args.target_scope = 'GLOBAL';
+            args.target_label = 'global';
+        } else {
+            const target = announcementUser.trim();
+            if (!target) {
+                setNotice({ type: 'error', text: 'Choose or type a user before sending the announcement.' });
+                return;
+            }
+
+            const targetUser = resolveUserFromText(target);
+            if (targetUser.presence !== 'live') {
+                setNotice({ type: 'error', text: 'User announcements require the target to be in a live server.' });
+                return;
+            }
+
+            args.username = targetUser.username;
+            args.target_label = targetUser.username;
+            if (targetUser.serverId) {
+                args.job_id = targetUser.serverId;
+            }
+            successMessage = `Announcement queued for ${targetUser.username}.`;
+        }
+
         const sent = await sendCommand(
             'BROADCAST',
-            { target_scope: 'GLOBAL', target_label: 'global', message },
-            'Announcement queued for all live servers.',
+            args,
+            successMessage,
         );
 
         if (sent) {
             setAnnouncement('');
+            setAnnouncementTargetType('');
+            setAnnouncementUser('');
             setPanelModal(null);
         }
     }
@@ -1070,7 +1124,9 @@ export default function LivePanelPage() {
         { command: 'KICK', label: 'Kick', icon: <KickIcon />, tone: 'text-amber-300 hover:border-amber-400/50 hover:bg-amber-500/10' },
         { command: 'BAN', label: 'Ban', icon: <BanIcon />, tone: 'text-red-300 hover:border-red-400/50 hover:bg-red-500/10' },
         { command: 'SOFTBAN', label: 'Temp Ban', icon: <TempBanIcon />, tone: 'text-rose-300 hover:border-rose-400/50 hover:bg-rose-500/10' },
-    ];
+    ].filter((action) => canUseDashboardCommand(perms, action.command));
+    const canRunCommands = availableCommands.length > 0;
+    const canAnnounce = canUseDashboardCommand(perms, 'BROADCAST');
 
     if (loading) {
         return (
@@ -1149,23 +1205,36 @@ export default function LivePanelPage() {
                                 Live
                             </span>
                         </div>
-                        <div className="mt-4 grid grid-cols-2 gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setPanelModal('command')}
-                                className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white transition-all hover:border-sky-400/50 hover:bg-sky-500/15"
-                            >
-                                <CommandIcon />
-                                Run Command
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setPanelModal('announce')}
-                                className="flex items-center justify-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-wider text-sky-100 transition-all hover:border-sky-300/60 hover:bg-sky-500/20"
-                            >
-                                <AnnounceIcon />
-                                Announce
-                            </button>
+                        <div className={`mt-4 grid gap-3 ${canRunCommands && canAnnounce ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                            {canRunCommands && (
+                                <button
+                                    type="button"
+                                    onClick={() => setPanelModal('command')}
+                                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white transition-all hover:border-sky-400/50 hover:bg-sky-500/15"
+                                >
+                                    <CommandIcon />
+                                    Run Command
+                                </button>
+                            )}
+                            {canAnnounce && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setAnnouncementTargetType('');
+                                        setAnnouncementUser('');
+                                        setPanelModal('announce');
+                                    }}
+                                    className="flex items-center justify-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-wider text-sky-100 transition-all hover:border-sky-300/60 hover:bg-sky-500/20"
+                                >
+                                    <AnnounceIcon />
+                                    Announce
+                                </button>
+                            )}
+                            {!canRunCommands && !canAnnounce && (
+                                <div className="rounded-xl border border-slate-800 bg-black/20 px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-slate-500">
+                                    No live commands available
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -1504,26 +1573,28 @@ export default function LivePanelPage() {
                                 </div>
                             </div>
 
-                            <div>
-                                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Quick Actions</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {quickActions.map((action) => {
-                                        const disabled = !canUseDashboardCommand(perms, action.command) || popoverUser.presence !== 'live' || actionLoading === action.command;
-                                        return (
-                                            <button
-                                                key={action.command}
-                                                type="button"
-                                                disabled={disabled}
-                                                onClick={() => requestPlayerCommand(action.command, popoverUser)}
-                                                className={`group relative flex h-11 w-11 items-center justify-center rounded-xl border border-slate-800 bg-slate-950 transition-all disabled:cursor-not-allowed disabled:opacity-35 ${action.tone}`}
-                                            >
-                                                {action.icon}
-                                                <ActionTooltip label={action.label} />
-                                            </button>
-                                        );
-                                    })}
+                            {quickActions.length > 0 && (
+                                <div>
+                                    <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Quick Actions</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {quickActions.map((action) => {
+                                            const disabled = popoverUser.presence !== 'live' || actionLoading === action.command;
+                                            return (
+                                                <button
+                                                    key={action.command}
+                                                    type="button"
+                                                    disabled={disabled}
+                                                    onClick={() => requestPlayerCommand(action.command, popoverUser)}
+                                                    className={`group relative flex h-11 w-11 items-center justify-center rounded-xl border border-slate-800 bg-slate-950 transition-all disabled:cursor-not-allowed disabled:opacity-35 ${action.tone}`}
+                                                >
+                                                    {action.icon}
+                                                    <ActionTooltip label={action.label} />
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <div>
                                 <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Last 4 Logs Involving Them</p>
@@ -1599,7 +1670,7 @@ export default function LivePanelPage() {
                     <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-800 bg-[#020617] shadow-2xl">
                         <div className="flex items-start justify-between gap-4 border-b border-slate-800 bg-slate-900/60 px-6 py-5">
                             <div>
-                                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">{panelModal === 'announce' ? 'Global Announcement' : 'Command Runner'}</p>
+                                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">{panelModal === 'announce' ? 'Announcement' : 'Command Runner'}</p>
                                 <h3 className="mt-1 text-xl font-black text-white">{panelModal === 'announce' ? 'Announce to Live Servers' : 'Run Live Command'}</h3>
                             </div>
                             <button
@@ -1613,11 +1684,63 @@ export default function LivePanelPage() {
                         <div className="space-y-4 px-6 py-6">
                             {panelModal === 'announce' ? (
                                 <>
+                                    <div className="space-y-3">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Target</p>
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setAnnouncementTargetType('global');
+                                                    setAnnouncementUser('');
+                                                }}
+                                                className={`rounded-xl border px-4 py-3 text-left transition-all ${announcementTargetType === 'global' ? 'border-sky-400/60 bg-sky-500/10 text-white' : 'border-slate-800 bg-slate-950/60 text-slate-300 hover:border-slate-700'}`}
+                                            >
+                                                <span className="block text-sm font-black">Global</span>
+                                                <span className="mt-1 block text-xs font-medium text-slate-500">Everybody playing the game, every server.</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setAnnouncementTargetType('user')}
+                                                className={`rounded-xl border px-4 py-3 text-left transition-all ${announcementTargetType === 'user' ? 'border-sky-400/60 bg-sky-500/10 text-white' : 'border-slate-800 bg-slate-950/60 text-slate-300 hover:border-slate-700'}`}
+                                            >
+                                                <span className="block text-sm font-black">User</span>
+                                                <span className="mt-1 block text-xs font-medium text-slate-500">One live Roblox player.</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {announcementTargetType === 'user' && (
+                                        <div className="space-y-3">
+                                            <input
+                                                value={announcementUser}
+                                                onChange={(event) => setAnnouncementUser(event.target.value)}
+                                                placeholder="Search or type a live Roblox username"
+                                                className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm font-bold text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60"
+                                            />
+                                            {announcementUserSuggestions.length > 0 && (
+                                                <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/70 p-2">
+                                                    {announcementUserSuggestions.map((user) => (
+                                                        <button
+                                                            key={getUserKey(user)}
+                                                            type="button"
+                                                            onClick={() => setAnnouncementUser(user.username)}
+                                                            className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-sky-500/10"
+                                                        >
+                                                            <span className="min-w-0">
+                                                                <span className="block truncate text-sm font-black text-white">{user.displayName || user.username}</span>
+                                                                <span className="mt-0.5 block truncate text-xs font-medium text-slate-500">@{user.username}</span>
+                                                            </span>
+                                                            <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">{formatServerId(user.serverId || '')}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                     <textarea
                                         value={announcement}
                                         onChange={(event) => setAnnouncement(event.target.value)}
                                         rows={5}
-                                        placeholder="Message to send to every live server"
+                                        placeholder="Message to send"
                                         className="w-full resize-none rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60"
                                     />
                                     <button

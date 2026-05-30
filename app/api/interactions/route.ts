@@ -4382,15 +4382,44 @@ function RoLink:Execute(cmd)
     elseif cmd.command == "BROADCAST" and isAdmin() then
         local message = tostring(cmd.args.message or r)
         if message ~= "" then
-            local hint = Instance.new("Hint")
-            hint.Name = "RoLinkBroadcast"
-            hint.Text = message
-            hint.Parent = workspace
-            task.delay(10, function()
-                if hint and hint.Parent then
-                    hint:Destroy()
-                end
-            end)
+            local isTargetedBroadcast = u and u ~= ""
+            local playerGui = p and p:FindFirstChildOfClass("PlayerGui")
+            if isTargetedBroadcast and playerGui then
+                local gui = Instance.new("ScreenGui")
+                gui.Name = "RoLinkBroadcast"
+                gui.ResetOnSpawn = false
+                gui.DisplayOrder = 100000
+                local label = Instance.new("TextLabel")
+                label.Name = "Message"
+                label.AnchorPoint = Vector2.new(0.5, 0)
+                label.Position = UDim2.new(0.5, 0, 0.08, 0)
+                label.Size = UDim2.new(0.86, 0, 0, 54)
+                label.BackgroundColor3 = Color3.fromRGB(15, 23, 42)
+                label.BackgroundTransparency = 0.12
+                label.BorderSizePixel = 0
+                label.Font = Enum.Font.GothamBold
+                label.Text = message
+                label.TextColor3 = Color3.fromRGB(255, 255, 255)
+                label.TextScaled = true
+                label.TextWrapped = true
+                label.Parent = gui
+                gui.Parent = playerGui
+                task.delay(10, function()
+                    if gui and gui.Parent then
+                        gui:Destroy()
+                    end
+                end)
+            elseif not isTargetedBroadcast then
+                local hint = Instance.new("Hint")
+                hint.Name = "RoLinkBroadcast"
+                hint.Text = message
+                hint.Parent = workspace
+                task.delay(10, function()
+                    if hint and hint.Parent then
+                        hint:Destroy()
+                    end
+                end)
+            end
         end
     elseif cmd.command == "GRAVITY" and isAdmin() then
         local amount = tonumber(cmd.args.amount)

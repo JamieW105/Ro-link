@@ -108,6 +108,14 @@ function compareGuildsByBotStatus(a: Guild, b: Guild) {
     return a.hasBot ? -1 : 1;
 }
 
+function canOpenDashboardAction(permissions?: GuildDashboardPermissions) {
+    return Boolean(permissions?.is_admin || permissions?.can_access_dashboard);
+}
+
+function canOpenLivePanelAction(permissions?: GuildDashboardPermissions) {
+    return canOpenDashboardAction(permissions) && Boolean(permissions?.is_admin || permissions?.can_access_live_panel);
+}
+
 export default function Dashboard() {
     const { data: session, status } = useSession();
     const [guilds, setGuilds] = useState<Guild[]>([]);
@@ -310,12 +318,12 @@ export default function Dashboard() {
                                     {guild.hasBot ? (
                                         <div className="flex flex-col gap-2">
                                             <div className="flex items-center gap-2">
-                                                {(guildPermissions[guild.id]?.is_admin || guildPermissions[guild.id]?.can_access_dashboard) && (
+                                                {canOpenDashboardAction(guildPermissions[guild.id]) && (
                                                     <ServerIconLink href={`/dashboard/${guild.id}`} label="Open Console">
                                                         <SettingsIcon />
                                                     </ServerIconLink>
                                                 )}
-                                                {(guildPermissions[guild.id]?.is_admin || guildPermissions[guild.id]?.can_access_live_panel) && (
+                                                {canOpenLivePanelAction(guildPermissions[guild.id]) && (
                                                     <ServerIconLink href={`/dashboard/${guild.id}/live-panel`} label="Live Panel" tone="live">
                                                         <LivePanelIcon />
                                                     </ServerIconLink>

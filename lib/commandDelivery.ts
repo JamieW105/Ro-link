@@ -13,6 +13,7 @@ const LIVE_SERVER_FRESHNESS_MS = 2 * 60 * 1000;
 
 const GLOBAL_COMMAND_LOOKUP = new Set<string>(GLOBAL_COMMAND_IDS);
 const PLAYER_TARGET_COMMAND_LOOKUP = new Set<string>([
+    'BROADCAST',
     'KICK',
     'BAN',
     'UNBAN',
