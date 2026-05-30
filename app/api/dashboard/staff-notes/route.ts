@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { createStaffNote, fetchStaffNotes } from '@/lib/staffNotes';
-import { canLookup, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
+import { canUseLivePanelUserTools, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { logAction } from '@/lib/logger';
 
@@ -46,7 +46,7 @@ function attachDeletePermission<T extends StaffNoteApiRow>(notes: T[], userId: s
 
 export async function GET(req: NextRequest) {
     const serverId = trimString(req.nextUrl.searchParams.get('serverId'));
-    const access = await requireDashboardAccess(serverId, canLookup);
+    const access = await requireDashboardAccess(serverId, canUseLivePanelUserTools);
     if ('error' in access) {
         return access.error;
     }
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null) as Record<string, unknown> | null;
     const serverId = trimString(body?.serverId);
-    const access = await requireDashboardAccess(serverId, canLookup);
+    const access = await requireDashboardAccess(serverId, canUseLivePanelUserTools);
     if ('error' in access) {
         return access.error;
     }
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
     const serverId = trimString(req.nextUrl.searchParams.get('serverId'));
     const noteId = trimString(req.nextUrl.searchParams.get('noteId'));
-    const access = await requireDashboardAccess(serverId, canLookup);
+    const access = await requireDashboardAccess(serverId, canUseLivePanelUserTools);
     if ('error' in access) {
         return access.error;
     }

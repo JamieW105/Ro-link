@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { canManageSettings, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
+import { canAccessDashboardOrLivePanel, canManageSettings, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { findBlockedServer, getBlockedServerMessage } from '@/lib/blockedServers';
 
@@ -49,7 +49,7 @@ function createApiKey() {
 
 export async function GET(req: NextRequest) {
     const serverId = trimString(req.nextUrl.searchParams.get('serverId'));
-    const access = await requireDashboardAccess(serverId);
+    const access = await requireDashboardAccess(serverId, canAccessDashboardOrLivePanel);
     if ('error' in access) {
         return access.error;
     }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession, signIn, signOut } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from 'next/link';
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
 
@@ -22,6 +22,47 @@ const MarketplaceIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="m12 2 7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4Z" /><path d="M9 11h6" /><path d="M9 15h4" /></svg>
 );
 
+const LivePanelIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" /><path d="M8 21h8" /><path d="M12 16v5" /><path d="m10 8 4 2-4 2Z" /></svg>
+);
+
+function ActionTooltip({ label }: { label: string }) {
+    return (
+        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-200 opacity-0 shadow-xl transition-all group-hover:translate-y-0 group-hover:opacity-100">
+            {label}
+        </span>
+    );
+}
+
+function ServerIconLink({
+    href,
+    label,
+    children,
+    tone = 'default',
+}: {
+    href: string;
+    label: string;
+    children: ReactNode;
+    tone?: 'default' | 'live' | 'market';
+}) {
+    const toneClass = tone === 'live'
+        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:border-emerald-300/70 hover:bg-emerald-500/20'
+        : tone === 'market'
+            ? 'border-sky-500/30 bg-sky-500/10 text-sky-200 hover:border-sky-300/70 hover:bg-sky-500/20'
+            : 'border-slate-700 bg-slate-800 text-slate-200 hover:border-sky-400/60 hover:bg-sky-500/15 hover:text-white';
+
+    return (
+        <Link
+            href={href}
+            aria-label={label}
+            className={`group relative flex h-10 w-10 items-center justify-center rounded-lg border transition-all ${toneClass}`}
+        >
+            {children}
+            <ActionTooltip label={label} />
+        </Link>
+    );
+}
+
 interface Guild {
     id: string;
     name: string;
@@ -30,6 +71,12 @@ interface Guild {
     permissions: number | string;
     hasBot?: boolean;
     isRoleAccess?: boolean;
+}
+
+interface GuildDashboardPermissions {
+    can_access_dashboard: boolean;
+    can_access_live_panel: boolean;
+    is_admin: boolean;
 }
 
 type SessionUserWithId = {
@@ -53,29 +100,89 @@ function canOpenMarketplaceFromServerList(guild: Guild) {
     }
 }
 
+function compareGuildsByBotStatus(a: Guild, b: Guild) {
+    if (a.hasBot === b.hasBot) {
+        return 0;
+    }
+
+    return a.hasBot ? -1 : 1;
+}
+
 export default function Dashboard() {
     const { data: session, status } = useSession();
     const [guilds, setGuilds] = useState<Guild[]>([]);
+    const [guildPermissions, setGuildPermissions] = useState<Record<string, GuildDashboardPermissions>>({});
     const [loading, setLoading] = useState(false);
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
+    const sortedGuilds = useMemo(() => [...guilds].sort(compareGuildsByBotStatus), [guilds]);
 
     useEffect(() => {
-        if (session?.accessToken) {
+        let cancelled = false;
+
+        async function loadGuilds() {
+            if (!session?.accessToken) return;
+
             setLoading(true);
-            fetch('/api/guilds')
-                .then(res => res.json())
-                .then(data => {
-                    if (Array.isArray(data)) {
-                        setGuilds(data);
-                    }
+            try {
+                const response = await fetch('/api/guilds');
+                const data = await response.json();
+                if (!cancelled && Array.isArray(data)) {
+                    setGuilds(data);
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                if (!cancelled) {
                     setLoading(false);
-                })
-                .catch(err => {
-                    console.error(err);
-                    setLoading(false);
-                });
+                }
+            }
         }
-    }, [session]);
+
+        loadGuilds();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [session?.accessToken]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadGuildPermissions() {
+            const botGuilds = guilds.filter((guild) => guild.hasBot);
+            if (!session?.accessToken || botGuilds.length === 0) {
+                if (!cancelled) {
+                    setGuildPermissions({});
+                }
+                return;
+            }
+
+            const entries = await Promise.all(
+                botGuilds.map(async (guild) => {
+                    try {
+                        const response = await fetch(`/api/user/permissions?serverId=${encodeURIComponent(guild.id)}`, {
+                            cache: 'no-store',
+                        });
+                        if (!response.ok) return null;
+                        const permissions = await response.json() as GuildDashboardPermissions;
+                        return [guild.id, permissions] as const;
+                    } catch {
+                        return null;
+                    }
+                }),
+            );
+
+            if (!cancelled) {
+                setGuildPermissions(Object.fromEntries(entries.filter((entry): entry is readonly [string, GuildDashboardPermissions] => Boolean(entry))));
+            }
+        }
+
+        loadGuildPermissions();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [guilds, session?.accessToken]);
 
     if (status === "loading") {
         return (
@@ -173,7 +280,7 @@ export default function Dashboard() {
                     </div>
                 ) : (
                     <div className="motion-list grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
-                        {guilds.map(guild => (
+                        {sortedGuilds.map(guild => (
                             <div key={guild.id} className="interactive-lift subtle-glow group relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40 p-5 transition-all hover:border-sky-500/30 sm:p-6">
                                 <div className="mb-5 flex flex-col items-start gap-4 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
                                     <div className="relative">
@@ -202,21 +309,23 @@ export default function Dashboard() {
                                 <div className="mt-auto">
                                     {guild.hasBot ? (
                                         <div className="flex flex-col gap-2">
-                                            <Link
-                                                href={`/dashboard/${guild.id}`}
-                                                className="w-full py-2.5 bg-slate-800 hover:bg-sky-600 text-white border border-slate-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 group/btn shadow-sm"
-                                            >
-                                                <SettingsIcon />
-                                                Open Console
-                                            </Link>
-                                            {canOpenMarketplaceFromServerList(guild) && (
-                                                <Link
-                                                    href="/dashboard/marketplace"
-                                                    className="w-full py-2.5 bg-sky-600/10 hover:bg-sky-600/20 text-sky-200 border border-sky-500/30 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
-                                                >
-                                                    Open Marketplace
-                                                </Link>
-                                            )}
+                                            <div className="flex items-center gap-2">
+                                                {(guildPermissions[guild.id]?.is_admin || guildPermissions[guild.id]?.can_access_dashboard) && (
+                                                    <ServerIconLink href={`/dashboard/${guild.id}`} label="Open Console">
+                                                        <SettingsIcon />
+                                                    </ServerIconLink>
+                                                )}
+                                                {(guildPermissions[guild.id]?.is_admin || guildPermissions[guild.id]?.can_access_live_panel) && (
+                                                    <ServerIconLink href={`/dashboard/${guild.id}/live-panel`} label="Live Panel" tone="live">
+                                                        <LivePanelIcon />
+                                                    </ServerIconLink>
+                                                )}
+                                                {canOpenMarketplaceFromServerList(guild) && (
+                                                    <ServerIconLink href="/dashboard/marketplace" label="Open Marketplace" tone="market">
+                                                        <MarketplaceIcon />
+                                                    </ServerIconLink>
+                                                )}
+                                            </div>
                                         </div>
                                     ) : (
                                         <a

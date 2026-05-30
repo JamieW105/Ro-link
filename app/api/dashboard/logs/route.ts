@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import {
     canManageReports,
+    canAccessDashboardOrLivePanel,
     requireDashboardAccess,
     trimString,
 } from '@/lib/serverDashboardAccess';
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
 
     const access = await requireDashboardAccess(
         serverId,
-        globalTargets ? canManageReports : undefined,
+        globalTargets ? canManageReports : canAccessDashboardOrLivePanel,
     );
     if ('error' in access) {
         return access.error;

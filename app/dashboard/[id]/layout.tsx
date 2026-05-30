@@ -22,6 +22,7 @@ interface VisibleGuild {
 
 interface DashboardPermissions {
     can_access_dashboard: boolean;
+    can_access_live_panel: boolean;
     can_kick: boolean;
     can_ban: boolean;
     can_timeout: boolean;
@@ -61,6 +62,15 @@ const HomeIcon = () => (
 const ServersIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" />
+    </svg>
+);
+
+const LivePanelIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" />
+        <path d="M8 21h8" />
+        <path d="M12 16v5" />
+        <path d="m10 8 4 2-4 2Z" />
     </svg>
 );
 
@@ -207,8 +217,22 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 const permsRes = await fetch(`/api/user/permissions?serverId=${id}`);
                 const perms = await permsRes.json() as DashboardPermissions | null;
 
-                if (!perms || !perms.can_access_dashboard) {
-                    console.log("[Guard] No dashboard access for this server.");
+                if (!perms) {
+                    console.log("[Guard] No permissions returned for this server.");
+                    setAccessDenied(true);
+                    return;
+                }
+
+                const livePanelRoute = pathname.includes('/live-panel');
+                const profileRoute = pathname.includes('/players/');
+                const routeAllowed = livePanelRoute
+                    ? perms.is_admin || perms.can_access_live_panel
+                    : profileRoute
+                        ? perms.is_admin || perms.can_access_dashboard || perms.can_access_live_panel
+                        : perms.is_admin || perms.can_access_dashboard;
+
+                if (!routeAllowed) {
+                    console.log("[Guard] No route access for this server.");
                     setAccessDenied(true);
                     return;
                 }
@@ -223,7 +247,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         }
 
         checkAccess();
-    }, [session, id, router]);
+    }, [session, id, router, pathname]);
 
     useEffect(() => {
         if (!id) return;
@@ -435,6 +459,16 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
     if (loading || !userPermissions) return null;
 
+    if (pathname.includes('/live-panel')) {
+        return (
+            <div className="h-screen min-h-screen overflow-hidden bg-[#020617] text-slate-200 font-sans">
+                <PermissionsProvider permissions={userPermissions}>
+                    {children}
+                </PermissionsProvider>
+            </div>
+        );
+    }
+
     const networkState = apiLatencyState === 'error'
         ? { label: 'Unavailable', className: 'text-red-400' }
         : apiLatencyMs !== null && apiLatencyMs > 600
@@ -451,6 +485,8 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             ? `${apiLatencyMs}ms`
             : '...';
     const canManageDashboardSettings = userPermissions.is_admin || userPermissions.can_manage_settings;
+    const canUseStandardDashboard = userPermissions.is_admin || userPermissions.can_access_dashboard;
+    const canUseLivePanel = userPermissions.is_admin || userPermissions.can_access_live_panel;
     const dashboardHomeHref = isCustomDashboardHost ? `/custom-dashboard/${id}` : '/dashboard';
     const hasConfiguredCustomDashboard = Boolean(customDashboardInfo?.subdomain || customDashboardInfo?.hostname);
     const isCustomDashboardStyled = Boolean(customDashboardPreview || hasConfiguredCustomDashboard || isCustomDashboardHost);
@@ -510,12 +546,14 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     }
 
     const utilityItems = [
-        { label: "Home", icon: <HomeIcon />, href: `/dashboard/${id}` },
-        { label: "Live Servers", icon: <ServersIcon />, href: `/dashboard/${id}/servers` },
+        { label: "Home", icon: <HomeIcon />, href: `/dashboard/${id}`, hide: !canUseStandardDashboard },
+        { label: "Live Servers", icon: <ServersIcon />, href: `/dashboard/${id}/servers`, hide: !canUseStandardDashboard },
+        { label: "Live Panel", icon: <LivePanelIcon />, href: `/dashboard/${id}/live-panel`, hide: !canUseLivePanel },
         {
             label: "Verification",
             icon: <VerificationIcon />,
-            href: `/dashboard/${id}/verification`
+            href: `/dashboard/${id}/verification`,
+            hide: !canUseStandardDashboard
         },
         {
             label: "Modules",

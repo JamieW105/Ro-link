@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
+import { canAccessDashboardOrLivePanel, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function GET(req: NextRequest) {
@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
     const activeOnly = req.nextUrl.searchParams.get('activeOnly') !== 'false';
     const cleanupStale = req.nextUrl.searchParams.get('cleanupStale') === 'true';
 
-    const access = await requireDashboardAccess(serverId);
+    const access = await requireDashboardAccess(serverId, canAccessDashboardOrLivePanel);
     if ('error' in access) {
         return access.error;
     }

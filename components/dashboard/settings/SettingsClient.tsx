@@ -60,6 +60,7 @@ interface DashboardRole {
     discord_role_id: string;
     role_name: string;
     can_access_dashboard: boolean;
+    can_access_live_panel: boolean;
     can_kick: boolean;
     can_ban: boolean;
     can_timeout: boolean;
@@ -72,6 +73,7 @@ interface DashboardRole {
 
 type DashboardRoleBooleanField =
     | 'can_access_dashboard'
+    | 'can_access_live_panel'
     | 'can_manage_settings'
     | 'can_manage_reports'
     | 'can_lookup'
@@ -82,6 +84,7 @@ type DashboardRoleBooleanField =
 
 const ROLE_PERMISSION_OPTIONS: Array<{ key: DashboardRoleBooleanField; label: string }> = [
     { key: 'can_access_dashboard', label: 'Dashboard Access' },
+    { key: 'can_access_live_panel', label: 'Live Panel' },
     { key: 'can_manage_settings', label: 'Manage Settings' },
     { key: 'can_manage_reports', label: 'Manage Reports' },
     { key: 'can_lookup', label: 'Lookup Users' },
@@ -612,6 +615,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     roleName: role.name,
                     permissions: {
                         access_dashboard: false,
+                        live_panel: false,
                         kick: false,
                         ban: false,
                         timeout: false,
@@ -657,6 +661,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     roleName: targetRole.role_name,
                     permissions: {
                         access_dashboard: targetRole.can_access_dashboard,
+                        live_panel: targetRole.can_access_live_panel,
                         kick: targetRole.can_kick,
                         ban: targetRole.can_ban,
                         timeout: targetRole.can_timeout,
@@ -820,7 +825,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     ];
     const infoItems = view === 'roles'
         ? [
-            { title: "Dashboard Access", text: "A role must have dashboard access before its other dashboard permissions are useful." },
+            { title: "Dashboard Access", text: "A role must have dashboard access before its other dashboard permissions are useful. Live Panel can be granted separately for focused live moderation." },
             { title: "Panel Commands", text: "The Roblox admin panel uses the same command allowlist configured on each Discord role." },
         ]
         : view === 'logging'

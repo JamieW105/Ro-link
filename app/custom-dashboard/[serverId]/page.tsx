@@ -23,6 +23,7 @@ interface DashboardInfo {
 
 interface DashboardPermissions {
     can_access_dashboard: boolean;
+    can_access_live_panel: boolean;
     is_admin: boolean;
 }
 

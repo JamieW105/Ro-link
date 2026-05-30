@@ -5,6 +5,7 @@ import React, { createContext, useContext, ReactNode } from 'react';
 
 interface Permissions {
     can_access_dashboard: boolean;
+    can_access_live_panel: boolean;
     can_kick: boolean;
     can_ban: boolean;
     can_timeout: boolean;

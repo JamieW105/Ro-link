@@ -179,7 +179,7 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
         const { data: accessRoles } = await supabase
             .from('dashboard_roles')
             .select('server_id, discord_role_id')
-            .eq('can_access_dashboard', true)
+            .or('can_access_dashboard.eq.true,can_access_live_panel.eq.true')
             .in('server_id', potentialRoleAccessGuilds.map((guild) => guild.id));
 
         if (Array.isArray(accessRoles) && accessRoles.length > 0) {

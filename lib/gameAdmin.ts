@@ -7,6 +7,7 @@ import { supabase } from './supabase';
 
 export interface DashboardPermissions {
     can_access_dashboard: boolean;
+    can_access_live_panel: boolean;
     can_kick: boolean;
     can_ban: boolean;
     can_timeout: boolean;
@@ -49,6 +50,7 @@ interface DiscordRoleRecord {
 
 interface DashboardRoleRecord {
     can_access_dashboard?: boolean | null;
+    can_access_live_panel?: boolean | null;
     can_kick?: boolean | null;
     can_ban?: boolean | null;
     can_timeout?: boolean | null;
@@ -87,6 +89,7 @@ const rest = process.env.DISCORD_TOKEN
 export function emptyDashboardPermissions(): DashboardPermissions {
     return {
         can_access_dashboard: false,
+        can_access_live_panel: false,
         can_kick: false,
         can_ban: false,
         can_timeout: false,
@@ -102,6 +105,7 @@ export function emptyDashboardPermissions(): DashboardPermissions {
 function hasPanelAccess(perms: DashboardPermissions) {
     return perms.is_admin
         || perms.can_access_dashboard
+        || perms.can_access_live_panel
         || perms.can_kick
         || perms.can_ban
         || perms.can_timeout
@@ -154,6 +158,7 @@ export function aggregateDashboardPermissions(isAdmin: boolean, dashboardRoles: 
     if (isAdmin) {
         return {
             can_access_dashboard: true,
+            can_access_live_panel: true,
             can_kick: true,
             can_ban: true,
             can_timeout: true,
@@ -170,6 +175,7 @@ export function aggregateDashboardPermissions(isAdmin: boolean, dashboardRoles: 
 
     for (const role of dashboardRoles) {
         if (role.can_access_dashboard) finalPerms.can_access_dashboard = true;
+        if (role.can_access_live_panel) finalPerms.can_access_live_panel = true;
         if (role.can_kick) finalPerms.can_kick = true;
         if (role.can_ban) finalPerms.can_ban = true;
         if (role.can_timeout) finalPerms.can_timeout = true;

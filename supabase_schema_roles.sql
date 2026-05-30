@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS public.dashboard_roles (
     
     -- Permissions
     can_access_dashboard BOOLEAN DEFAULT FALSE,
+    can_access_live_panel BOOLEAN DEFAULT FALSE,
     can_kick BOOLEAN DEFAULT FALSE,
     can_ban BOOLEAN DEFAULT FALSE,
     can_timeout BOOLEAN DEFAULT FALSE,
@@ -26,3 +27,6 @@ CREATE TABLE IF NOT EXISTS public.dashboard_roles (
 
 -- Index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_dashboard_roles_server ON public.dashboard_roles(server_id);
+
+ALTER TABLE public.dashboard_roles
+    ADD COLUMN IF NOT EXISTS can_access_live_panel BOOLEAN DEFAULT FALSE;

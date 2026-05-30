@@ -64,3 +64,15 @@ export function canManageReports(permissions: DashboardPermissions) {
 export function canLookup(permissions: DashboardPermissions) {
     return permissions.is_admin || permissions.can_lookup;
 }
+
+export function canAccessLivePanel(permissions: DashboardPermissions) {
+    return permissions.is_admin || permissions.can_access_live_panel;
+}
+
+export function canAccessDashboardOrLivePanel(permissions: DashboardPermissions) {
+    return permissions.is_admin || permissions.can_access_dashboard || permissions.can_access_live_panel;
+}
+
+export function canUseLivePanelUserTools(permissions: DashboardPermissions) {
+    return permissions.is_admin || permissions.can_access_live_panel || permissions.can_lookup;
+}

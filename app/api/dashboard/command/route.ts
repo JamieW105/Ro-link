@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
         const discordUserId = trimString((session.user as { id?: string }).id);
         const permissions = await resolveDashboardUserPermissions(serverId, discordUserId);
-        if (!permissions.is_admin && !permissions.can_access_dashboard) {
+        if (!permissions.is_admin && !permissions.can_access_dashboard && !permissions.can_access_live_panel) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 

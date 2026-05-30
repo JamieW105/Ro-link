@@ -53,6 +53,10 @@ function trimString(value: unknown) {
 }
 
 function buildAvatarFallback(userId: number) {
+    if (!userId) {
+        return '';
+    }
+
     return `https://www.roblox.com/headshot-thumbnail/image?userId=${encodeURIComponent(String(userId))}&width=180&height=180&format=png`;
 }
 
@@ -96,15 +100,39 @@ export default function DashboardPlayerPage() {
         setError(null);
 
         try {
-            const profileRes = await fetch(`/api/proxy?username=${encodeURIComponent(decodedUsername)}&serverId=${encodeURIComponent(guildId)}`);
-            const profilePayload = await profileRes.json().catch(() => ({}));
-            if (!profileRes.ok) {
-                throw new Error(trimString(profilePayload.error) || 'Failed to load Roblox profile.');
+            let resolvedProfile: RobloxPlayerProfile;
+            let profileLoadWarning = '';
+
+            try {
+                const profileRes = await fetch(`/api/proxy?username=${encodeURIComponent(decodedUsername)}&serverId=${encodeURIComponent(guildId)}`);
+                const profilePayload = await profileRes.json().catch(() => ({}));
+                if (!profileRes.ok) {
+                    throw new Error(trimString(profilePayload.error) || 'Failed to load Roblox profile.');
+                }
+
+                resolvedProfile = profilePayload as RobloxPlayerProfile;
+            } catch (profileError) {
+                const numericUserId = Number(decodedUsername);
+                const fallbackId = Number.isFinite(numericUserId) && numericUserId > 0 ? numericUserId : 0;
+                profileLoadWarning = profileError instanceof Error ? profileError.message : 'Roblox profile details are unavailable.';
+                resolvedProfile = {
+                    id: fallbackId,
+                    username: decodedUsername,
+                    displayName: decodedUsername,
+                    description: profileLoadWarning,
+                    created: '',
+                    avatarUrl: fallbackId ? buildAvatarFallback(fallbackId) : '',
+                };
             }
 
-            const resolvedProfile = profilePayload as RobloxPlayerProfile;
             resolvedProfile.avatarUrl = trimString(resolvedProfile.avatarUrl) || buildAvatarFallback(resolvedProfile.id);
             setPlayer(resolvedProfile);
+            if (profileLoadWarning) {
+                setNotice({
+                    type: 'error',
+                    text: `Roblox profile details could not be loaded: ${profileLoadWarning}. Commands are still available when your permissions allow them.`,
+                });
+            }
 
             const [serverConfigRes, liveServersRes, logsRes] = await Promise.all([
                 fetch(`/api/dashboard/server-config?serverId=${encodeURIComponent(guildId)}`, { cache: 'no-store' }),
@@ -241,14 +269,16 @@ export default function DashboardPlayerPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                    <a
-                        href={`https://www.roblox.com/users/${player.id}/profile`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-300 transition-all hover:border-sky-500/30 hover:text-white"
-                    >
-                        Open Profile
-                    </a>
+                    {player.id > 0 && (
+                        <a
+                            href={`https://www.roblox.com/users/${player.id}/profile`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-300 transition-all hover:border-sky-500/30 hover:text-white"
+                        >
+                            Open Profile
+                        </a>
+                    )}
                     {presence.inGame && presence.jobId && linkedPlaceId ? (
                         <a
                             href={`roblox://placeId=${linkedPlaceId}&gameInstanceId=${presence.jobId}`}
@@ -275,11 +305,17 @@ export default function DashboardPlayerPage() {
                         <div className={`h-28 bg-gradient-to-r ${player.isBanned ? 'from-red-700 to-rose-900' : presence.inGame ? 'from-emerald-600 to-teal-700' : 'from-sky-600 to-indigo-700'}`}></div>
                         <div className="px-6 pb-6 -mt-14">
                             <div className="inline-flex rounded-3xl border border-slate-800 bg-[#020617] p-2">
-                                <img
-                                    src={player.avatarUrl}
-                                    alt={player.username}
-                                    className="h-24 w-24 rounded-2xl border border-slate-800 bg-slate-900 object-cover"
-                                />
+                                {player.avatarUrl ? (
+                                    <img
+                                        src={player.avatarUrl}
+                                        alt={player.username}
+                                        className="h-24 w-24 rounded-2xl border border-slate-800 bg-slate-900 object-cover"
+                                    />
+                                ) : (
+                                    <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-3xl font-black text-slate-500">
+                                        {player.username.slice(0, 1).toUpperCase()}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="mt-4 space-y-4">
