@@ -13,6 +13,23 @@ function parseLimit(value: string | null, fallback: number, max: number) {
     return Math.min(Math.floor(parsed), max);
 }
 
+function sortAndLimitLogs(logs: Record<string, unknown>[], limit: number) {
+    const deduped = new Map<string, Record<string, unknown>>();
+
+    for (const log of logs) {
+        const id = trimString(log.id) || JSON.stringify(log);
+        deduped.set(id, log);
+    }
+
+    return Array.from(deduped.values())
+        .sort((left, right) => {
+            const leftTime = new Date(trimString(left.timestamp)).getTime();
+            const rightTime = new Date(trimString(right.timestamp)).getTime();
+            return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
+        })
+        .slice(0, limit);
+}
+
 export async function GET(req: NextRequest) {
     const serverId = trimString(req.nextUrl.searchParams.get('serverId'));
     const target = trimString(req.nextUrl.searchParams.get('target'));
@@ -27,21 +44,15 @@ export async function GET(req: NextRequest) {
     const client = getSupabaseAdmin();
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
-    let logsQuery = client
+    const createLogsQuery = () => client
         .from('logs')
         .select('*')
         .eq('server_id', serverId)
         .order('timestamp', { ascending: false })
         .limit(logLimit);
 
-    if (target) {
-        const linkedTargets = await expandLinkedLogTargets(client, [target]);
-        if (linkedTargets.some((value) => value !== target)) {
-            logsQuery = logsQuery.in('target', linkedTargets);
-        } else {
-            logsQuery = logsQuery.ilike('target', `%${target}%`);
-        }
-    }
+    const linkedTargets = target ? await expandLinkedLogTargets(client, [target]) : [];
+    const hasLinkedTargets = linkedTargets.some((value) => value !== target);
 
     const [serverResult, liveServersResult, logsResult] = await Promise.all([
         client
@@ -55,7 +66,16 @@ export async function GET(req: NextRequest) {
             .eq('server_id', serverId)
             .gte('updated_at', fiveMinutesAgo)
             .order('updated_at', { ascending: false }),
-        logsQuery,
+        target
+            ? Promise.all([
+                hasLinkedTargets
+                    ? createLogsQuery().in('target', linkedTargets)
+                    : createLogsQuery().ilike('target', `%${target}%`),
+                hasLinkedTargets
+                    ? createLogsQuery().in('moderator', linkedTargets)
+                    : createLogsQuery().ilike('moderator', `%${target}%`),
+            ])
+            : createLogsQuery(),
     ]);
 
     if (serverResult.error) {
@@ -66,7 +86,12 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: liveServersResult.error.message }, { status: 500 });
     }
 
-    if (logsResult.error) {
+    if (Array.isArray(logsResult)) {
+        const [targetLogsResult, moderatorLogsResult] = logsResult;
+        if (targetLogsResult.error || moderatorLogsResult.error) {
+            return NextResponse.json({ error: targetLogsResult.error?.message || moderatorLogsResult.error?.message }, { status: 500 });
+        }
+    } else if (logsResult.error) {
         return NextResponse.json({ error: logsResult.error.message }, { status: 500 });
     }
 
@@ -82,7 +107,10 @@ export async function GET(req: NextRequest) {
         }
     }
 
-    const logs = await enrichLogRecordsWithLinkedUsers(client, logsResult.data || []);
+    const rawLogs = Array.isArray(logsResult)
+        ? sortAndLimitLogs([...(logsResult[0].data || []), ...(logsResult[1].data || [])], logLimit)
+        : logsResult.data || [];
+    const logs = await enrichLogRecordsWithLinkedUsers(client, rawLogs);
 
     return NextResponse.json({
         server: {

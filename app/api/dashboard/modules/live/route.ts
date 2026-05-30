@@ -237,7 +237,7 @@ export async function POST(req: Request) {
             serverId,
             'MODULE_LIVE',
             `${moduleResult.slug || moduleResult.id}.${field.key}`,
-            moderator,
+            auth.userId || moderator,
             `Live module action: ${field.label}`,
         );
 
