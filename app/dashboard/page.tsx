@@ -28,7 +28,7 @@ const LivePanelIcon = () => (
 
 function ActionTooltip({ label }: { label: string }) {
     return (
-        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-200 opacity-0 shadow-xl transition-all group-hover:translate-y-0 group-hover:opacity-100">
+        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-200 opacity-0 shadow-xl transition-all group-hover/server-action:translate-y-0 group-hover/server-action:opacity-100">
             {label}
         </span>
     );
@@ -55,7 +55,7 @@ function ServerIconLink({
         <Link
             href={href}
             aria-label={label}
-            className={`group relative flex h-10 w-10 items-center justify-center rounded-lg border transition-all ${toneClass}`}
+            className={`group/server-action relative flex h-10 w-10 items-center justify-center rounded-lg border transition-all ${toneClass}`}
         >
             {children}
             <ActionTooltip label={label} />

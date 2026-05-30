@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { usePermissions } from "@/context/PermissionsContext";
 import {
@@ -88,95 +88,123 @@ export default function DashboardPlayerPage() {
         JUMP_POWER: "50",
     });
 
-    async function loadPlayerPage(showLoader = true) {
-        if (!guildId || !decodedUsername) {
-            return;
-        }
-
-        if (showLoader) {
-            setLoading(true);
-        }
-
-        setError(null);
+    const resolveRobloxProfile = useCallback(async (): Promise<{ profile: RobloxPlayerProfile; warning: string }> => {
+        let profileLoadWarning = '';
 
         try {
-            let resolvedProfile: RobloxPlayerProfile;
-            let profileLoadWarning = '';
+            const profileRes = await fetch(`/api/proxy?username=${encodeURIComponent(decodedUsername)}&serverId=${encodeURIComponent(guildId)}`);
+            const profilePayload = await profileRes.json().catch(() => ({}));
+            if (!profileRes.ok) {
+                throw new Error(trimString(profilePayload.error) || 'Failed to load Roblox profile.');
+            }
 
-            try {
-                const profileRes = await fetch(`/api/proxy?username=${encodeURIComponent(decodedUsername)}&serverId=${encodeURIComponent(guildId)}`);
-                const profilePayload = await profileRes.json().catch(() => ({}));
-                if (!profileRes.ok) {
-                    throw new Error(trimString(profilePayload.error) || 'Failed to load Roblox profile.');
-                }
+            const resolvedProfile = profilePayload as RobloxPlayerProfile;
+            resolvedProfile.avatarUrl = trimString(resolvedProfile.avatarUrl) || buildAvatarFallback(resolvedProfile.id);
+            return { profile: resolvedProfile, warning: '' };
+        } catch (profileError) {
+            const numericUserId = Number(decodedUsername);
+            const fallbackId = Number.isFinite(numericUserId) && numericUserId > 0 ? numericUserId : 0;
+            profileLoadWarning = profileError instanceof Error ? profileError.message : 'Roblox profile details are unavailable.';
 
-                resolvedProfile = profilePayload as RobloxPlayerProfile;
-            } catch (profileError) {
-                const numericUserId = Number(decodedUsername);
-                const fallbackId = Number.isFinite(numericUserId) && numericUserId > 0 ? numericUserId : 0;
-                profileLoadWarning = profileError instanceof Error ? profileError.message : 'Roblox profile details are unavailable.';
-                resolvedProfile = {
+            return {
+                warning: profileLoadWarning,
+                profile: {
                     id: fallbackId,
                     username: decodedUsername,
                     displayName: decodedUsername,
                     description: profileLoadWarning,
                     created: '',
                     avatarUrl: fallbackId ? buildAvatarFallback(fallbackId) : '',
-                };
-            }
-
-            resolvedProfile.avatarUrl = trimString(resolvedProfile.avatarUrl) || buildAvatarFallback(resolvedProfile.id);
-            setPlayer(resolvedProfile);
-            if (profileLoadWarning) {
-                setNotice({
-                    type: 'error',
-                    text: `Roblox profile details could not be loaded: ${profileLoadWarning}. Commands are still available when your permissions allow them.`,
-                });
-            }
-
-            const [serverConfigRes, liveServersRes, logsRes] = await Promise.all([
-                fetch(`/api/dashboard/server-config?serverId=${encodeURIComponent(guildId)}`, { cache: 'no-store' }),
-                fetch(`/api/dashboard/live-servers?serverId=${encodeURIComponent(guildId)}`, { cache: 'no-store' }),
-                fetch(`/api/dashboard/logs?serverId=${encodeURIComponent(guildId)}&target=${encodeURIComponent(resolvedProfile.username)}&limit=20`, { cache: 'no-store' }),
-            ]);
-
-            const serverConfig = serverConfigRes.ok ? await serverConfigRes.json() as ServerPlaceConfig | null : null;
-            if (serverConfig?.place_id) {
-                setLinkedPlaceId(serverConfig.place_id);
-            } else {
-                setLinkedPlaceId(null);
-            }
-
-            const liveServersData = liveServersRes.ok ? await liveServersRes.json() : [];
-            const liveServers = Array.isArray(liveServersData) ? liveServersData as LiveServerRecord[] : [];
-            const matchingServer = liveServers.find((server) =>
-                findLivePlayer(server.players, resolvedProfile.username)
-                || findLivePlayer(server.players, String(resolvedProfile.id)),
-            );
-
-            setPresence({
-                inGame: Boolean(matchingServer),
-                jobId: matchingServer?.id || null,
-            });
-
-            setLogs(normalizeDashboardLogs(logsRes.ok ? await logsRes.json() : []));
-        } catch (loadError) {
-            setError(String(loadError instanceof Error ? loadError.message : loadError));
-        } finally {
-            if (showLoader) {
-                setLoading(false);
-            }
+                },
+            };
         }
-    }
+    }, [decodedUsername, guildId]);
+
+    const loadDashboardData = useCallback(async (resolvedProfile: RobloxPlayerProfile) => {
+        const [serverConfigRes, liveServersRes, logsRes] = await Promise.all([
+            fetch(`/api/dashboard/server-config?serverId=${encodeURIComponent(guildId)}`, { cache: 'no-store' }),
+            fetch(`/api/dashboard/live-servers?serverId=${encodeURIComponent(guildId)}`, { cache: 'no-store' }),
+            fetch(`/api/dashboard/logs?serverId=${encodeURIComponent(guildId)}&target=${encodeURIComponent(resolvedProfile.username)}&limit=20`, { cache: 'no-store' }),
+        ]);
+
+        const serverConfig = serverConfigRes.ok ? await serverConfigRes.json() as ServerPlaceConfig | null : null;
+        if (serverConfig?.place_id) {
+            setLinkedPlaceId(serverConfig.place_id);
+        } else {
+            setLinkedPlaceId(null);
+        }
+
+        const liveServersData = liveServersRes.ok ? await liveServersRes.json() : [];
+        const liveServers = Array.isArray(liveServersData) ? liveServersData as LiveServerRecord[] : [];
+        const matchingServer = liveServers.find((server) =>
+            findLivePlayer(server.players, resolvedProfile.username)
+            || findLivePlayer(server.players, String(resolvedProfile.id)),
+        );
+
+        setPresence({
+            inGame: Boolean(matchingServer),
+            jobId: matchingServer?.id || null,
+        });
+
+        setLogs(normalizeDashboardLogs(logsRes.ok ? await logsRes.json() : []));
+    }, [guildId]);
 
     useEffect(() => {
-        loadPlayerPage();
-        const interval = setInterval(() => {
-            loadPlayerPage(false);
-        }, 15000);
+        let cancelled = false;
+        let interval: ReturnType<typeof setInterval> | null = null;
 
-        return () => clearInterval(interval);
-    }, [guildId, decodedUsername]);
+        async function loadInitialPlayerPage() {
+            if (!guildId || !decodedUsername) {
+                return;
+            }
+
+            setLoading(true);
+            setError(null);
+
+            try {
+                const { profile: resolvedProfile, warning: profileLoadWarning } = await resolveRobloxProfile();
+                if (cancelled) {
+                    return;
+                }
+
+                setPlayer(resolvedProfile);
+                if (profileLoadWarning) {
+                    setNotice({
+                        type: 'error',
+                        text: `Roblox profile details could not be loaded: ${profileLoadWarning}. Commands are still available when your permissions allow them.`,
+                    });
+                }
+
+                await loadDashboardData(resolvedProfile);
+                if (cancelled) {
+                    return;
+                }
+
+                interval = setInterval(() => {
+                    loadDashboardData(resolvedProfile).catch((refreshError) => {
+                        console.error('[Player Page] Failed to refresh dashboard data:', refreshError);
+                    });
+                }, 15000);
+            } catch (loadError) {
+                if (!cancelled) {
+                    setError(String(loadError instanceof Error ? loadError.message : loadError));
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        }
+
+        loadInitialPlayerPage();
+
+        return () => {
+            cancelled = true;
+            if (interval) {
+                clearInterval(interval);
+            }
+        };
+    }, [guildId, decodedUsername, loadDashboardData, resolveRobloxProfile]);
 
     async function sendPlayerCommand(commandId: string, extraArgs: Record<string, unknown> = {}, confirmMessage?: string) {
         if (!guildId || !player) {
@@ -226,7 +254,7 @@ export default function DashboardPlayerPage() {
                 text: trimString(payload.warning) || `${commandId} queued for ${player.username}.`,
             });
 
-            await loadPlayerPage(false);
+            await loadDashboardData(player);
         } catch (commandError) {
             setNotice({ type: 'error', text: `Failed to send command: ${String(commandError)}` });
         } finally {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { enrichLogRecordsWithLinkedUsers, expandLinkedLogTargets } from '@/lib/logIdentity';
 import { canManageReports, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -47,20 +48,30 @@ export async function GET(
     if (profile?.roblox_username) {
         targets.push(profile.roblox_username);
     }
+    if (profile?.roblox_id) {
+        targets.push(profile.roblox_id);
+    }
+    if (profile?.discord_id) {
+        targets.push(profile.discord_id);
+    }
+
+    const linkedTargets = await expandLinkedLogTargets(client, targets);
 
     const { data: logs, error: logsError } = await client
         .from('logs')
         .select('*')
-        .in('target', [...new Set(targets.filter(Boolean))])
+        .in('target', linkedTargets)
         .order('timestamp', { ascending: false });
 
     if (logsError) {
         return NextResponse.json({ error: logsError.message }, { status: 500 });
     }
 
+    const enrichedLogs = await enrichLogRecordsWithLinkedUsers(client, logs || []);
+
     return NextResponse.json({
         report,
         profile: profile || null,
-        logs: logs || [],
+        logs: enrichedLogs,
     });
 }

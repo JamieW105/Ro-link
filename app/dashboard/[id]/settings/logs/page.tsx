@@ -43,7 +43,9 @@ export default function LogsPage() {
         .filter(log =>
             (log.target?.toLowerCase() || "").includes(search.toLowerCase()) ||
             (log.action?.toLowerCase() || "").includes(search.toLowerCase()) ||
-            (log.moderator?.toLowerCase() || "").includes(search.toLowerCase())
+            (log.moderator?.toLowerCase() || "").includes(search.toLowerCase()) ||
+            log.targetIdentities.some((identity) => identity.toLowerCase().includes(search.toLowerCase())) ||
+            log.moderatorIdentities.some((identity) => identity.toLowerCase().includes(search.toLowerCase()))
         )
         .sort((a, b) => {
             const timeA = new Date(a.timestamp).getTime();

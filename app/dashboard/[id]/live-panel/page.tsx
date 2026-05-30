@@ -16,6 +16,7 @@ import {
 } from '@/lib/adminPanelCommands';
 import { normalizeDashboardLogs, type NormalizedDashboardLog } from '@/lib/logRecords';
 import { normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
+import { buildRobloxAvatarUrl } from '@/lib/robloxAvatars';
 
 interface LiveServerRecord {
     id: string;
@@ -185,11 +186,7 @@ function formatServerId(serverId: string) {
 }
 
 function buildAvatarFallback(userId: string | null) {
-    if (userId) {
-        return `https://www.roblox.com/headshot-thumbnail/image?userId=${encodeURIComponent(userId)}&width=180&height=180&format=png`;
-    }
-
-    return null;
+    return buildRobloxAvatarUrl(userId);
 }
 
 function buildJoinUrl(placeId: string | null, jobId: string) {
@@ -271,7 +268,12 @@ function logMentionsUser(log: NormalizedDashboardLog, user: LivePanelUser) {
         normalizeIdentity(user.userId),
     ].filter(Boolean);
 
-    const haystack = `${log.target} ${log.moderator}`.toLowerCase();
+    const haystack = [
+        log.target,
+        log.moderator,
+        ...log.targetIdentities,
+        ...log.moderatorIdentities,
+    ].join(' ').toLowerCase();
     return candidates.some((candidate) => haystack.includes(candidate));
 }
 
@@ -612,6 +614,8 @@ export default function LivePanelPage() {
             for (const [value, reason] of [
                 [log.target, `Recently moderated: ${log.action}`],
                 [log.moderator, `Recent staff mention: ${log.action}`],
+                ...log.targetIdentities.map((identity) => [identity, `Recently moderated: ${log.action}`] as [string, string]),
+                ...log.moderatorIdentities.map((identity) => [identity, `Recent staff mention: ${log.action}`] as [string, string]),
             ] as Array<[string, string]>) {
                 if (!isLikelyUserText(value)) continue;
                 const username = extractUsername(value);
@@ -653,6 +657,8 @@ export default function LivePanelPage() {
             log.action.toLowerCase().includes(query)
             || log.target.toLowerCase().includes(query)
             || log.moderator.toLowerCase().includes(query)
+            || log.targetIdentities.some((identity) => identity.toLowerCase().includes(query))
+            || log.moderatorIdentities.some((identity) => identity.toLowerCase().includes(query))
         ));
     }, [logSearch, logs]);
 
@@ -1248,6 +1254,16 @@ export default function LivePanelPage() {
 
                 <section className="flex min-h-0 flex-col overflow-hidden bg-slate-950/10">
                     <div className="shrink-0 border-b border-slate-800 bg-slate-950/30 p-5">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                            <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-300">
+                                Profile / Create Log
+                            </h2>
+                            {selectedProfileUser && (
+                                <span className="truncate rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-sky-200">
+                                    Editing @{selectedProfileUser.username}
+                                </span>
+                            )}
+                        </div>
                         <div className="relative">
                             <input
                                 value={profileSearch}
@@ -1298,11 +1314,14 @@ export default function LivePanelPage() {
                             )}
                         </div>
 
+                        <h2 className="mb-2 mt-4 text-[11px] font-black uppercase tracking-[0.2em] text-slate-300">
+                            Live Logs
+                        </h2>
                         <input
                             value={logSearch}
                             onChange={(event) => setLogSearch(event.target.value)}
                             placeholder="Search logs by server, user, action, or moderator"
-                            className="mt-3 w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm font-medium text-white outline-none transition-all placeholder:text-slate-600 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
+                            className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm font-medium text-white outline-none transition-all placeholder:text-slate-600 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
                         />
                     </div>
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { enrichLogRecordsWithLinkedUsers, expandLinkedLogTargets } from '@/lib/logIdentity';
 import { canAccessLivePanel, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -34,7 +35,12 @@ export async function GET(req: NextRequest) {
         .limit(logLimit);
 
     if (target) {
-        logsQuery = logsQuery.ilike('target', `%${target}%`);
+        const linkedTargets = await expandLinkedLogTargets(client, [target]);
+        if (linkedTargets.some((value) => value !== target)) {
+            logsQuery = logsQuery.in('target', linkedTargets);
+        } else {
+            logsQuery = logsQuery.ilike('target', `%${target}%`);
+        }
     }
 
     const [serverResult, liveServersResult, logsResult] = await Promise.all([
@@ -76,12 +82,14 @@ export async function GET(req: NextRequest) {
         }
     }
 
+    const logs = await enrichLogRecordsWithLinkedUsers(client, logsResult.data || []);
+
     return NextResponse.json({
         server: {
             id: serverId,
             placeId: trimString(serverResult.data?.place_id) || null,
         },
         liveServers: liveServersResult.data || [],
-        logs: logsResult.data || [],
+        logs,
     });
 }

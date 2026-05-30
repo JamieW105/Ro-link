@@ -5,13 +5,19 @@ export interface NormalizedDashboardLog {
     moderator: string;
     timestamp: string;
     server_id: string | null;
+    targetIdentities: string[];
+    moderatorIdentities: string[];
 }
 
 interface RawLogRecord {
     id?: unknown;
     action?: unknown;
     target?: unknown;
+    target_display?: unknown;
+    target_identities?: unknown;
     moderator?: unknown;
+    moderator_display?: unknown;
+    moderator_identities?: unknown;
     timestamp?: unknown;
     server_id?: unknown;
 }
@@ -68,6 +74,19 @@ export function stringifyLogValue(value: unknown, fallback = 'Unknown'): string 
     return fallback;
 }
 
+function normalizeIdentityList(value: unknown, fallback: string) {
+    const values = Array.isArray(value) ? value : [];
+    const identities = values
+        .map((entry) => trimString(entry))
+        .filter(Boolean);
+
+    if (fallback) {
+        identities.unshift(fallback);
+    }
+
+    return Array.from(new Set(identities));
+}
+
 export function normalizeDashboardLog(rawLog: unknown): NormalizedDashboardLog | null {
     if (!rawLog || typeof rawLog !== 'object') {
         return null;
@@ -75,8 +94,10 @@ export function normalizeDashboardLog(rawLog: unknown): NormalizedDashboardLog |
 
     const log = rawLog as RawLogRecord;
     const action = stringifyLogValue(log.action, 'UNKNOWN');
-    const target = stringifyLogValue(log.target, 'Unknown Target');
-    const moderator = stringifyLogValue(log.moderator, 'System');
+    const rawTarget = stringifyLogValue(log.target, 'Unknown Target');
+    const rawModerator = stringifyLogValue(log.moderator, 'System');
+    const target = stringifyLogValue(log.target_display, rawTarget);
+    const moderator = stringifyLogValue(log.moderator_display, rawModerator);
     const timestamp = trimString(log.timestamp) || new Date(0).toISOString();
     const serverId = trimString(log.server_id) || null;
     const id = trimString(log.id) || `${timestamp}-${action}-${target}-${moderator}`;
@@ -88,6 +109,8 @@ export function normalizeDashboardLog(rawLog: unknown): NormalizedDashboardLog |
         moderator,
         timestamp,
         server_id: serverId,
+        targetIdentities: normalizeIdentityList(log.target_identities, rawTarget),
+        moderatorIdentities: normalizeIdentityList(log.moderator_identities, rawModerator),
     };
 }
 

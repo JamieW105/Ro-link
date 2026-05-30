@@ -6,6 +6,7 @@ import {
     requireDashboardAccess,
     trimString,
 } from '@/lib/serverDashboardAccess';
+import { enrichLogRecordsWithLinkedUsers, expandLinkedLogTargets } from '@/lib/logIdentity';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 function parseLimit(value: string | null, fallback: number, max: number) {
@@ -48,9 +49,15 @@ export async function GET(req: NextRequest) {
     }
 
     if (targets.length > 0) {
-        query = query.in('target', targets);
+        const targetFilters = await expandLinkedLogTargets(client, targets);
+        query = query.in('target', targetFilters);
     } else if (target) {
-        query = query.ilike('target', target);
+        const targetFilters = await expandLinkedLogTargets(client, [target]);
+        if (targetFilters.some((value) => value !== target)) {
+            query = query.in('target', targetFilters);
+        } else {
+            query = query.ilike('target', target);
+        }
     }
 
     const { data, error } = await query;
@@ -58,5 +65,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data || []);
+    const logs = await enrichLogRecordsWithLinkedUsers(client, data || []);
+    return NextResponse.json(logs);
 }
