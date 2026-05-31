@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const staffTag = access.userId;
+        const staffTag = access.userId ? `<@${access.userId}>` : 'Dashboard User';
         const note = await createStaffNote(getSupabaseAdmin(), {
             serverId,
             target: {
@@ -167,7 +167,7 @@ export async function DELETE(req: NextRequest) {
             serverId,
             'STAFF_NOTE_DELETE',
             staffNote.target_roblox_username || staffNote.target_roblox_id || staffNote.target_discord_id || 'Unknown User',
-            access.userId,
+            access.userId ? `<@${access.userId}>` : 'Dashboard User',
             'Staff note deleted',
         );
 

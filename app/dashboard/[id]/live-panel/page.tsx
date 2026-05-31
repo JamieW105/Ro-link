@@ -50,6 +50,61 @@ interface RobloxPlayerProfile {
     isBanned?: boolean;
 }
 
+interface DashboardUserProfile {
+    linked?: boolean;
+    verifiedUser?: {
+        discordId?: string | null;
+        robloxId?: string | null;
+        robloxUsername?: string | null;
+    } | null;
+    discordUser?: {
+        id?: string | null;
+        username?: string | null;
+        globalName?: string | null;
+        discriminator?: string | null;
+        avatarUrl?: string | null;
+    } | null;
+    discordMember?: {
+        nick?: string | null;
+        joinedAt?: string | null;
+        highestRole?: {
+            id?: string;
+            name?: string;
+            color?: string | null;
+        } | null;
+        roles?: Array<{
+            id?: string;
+            name?: string;
+            color?: string | null;
+        }>;
+    } | null;
+    robloxUser?: {
+        id?: string | null;
+        username?: string | null;
+        displayName?: string | null;
+    } | null;
+}
+
+interface StaffNote {
+    id: string;
+    target_discord_id?: string | null;
+    target_roblox_id?: string | null;
+    target_roblox_username?: string | null;
+    note: string;
+    created_by_discord_id?: string | null;
+    created_by_tag?: string | null;
+    created_at: string;
+    can_delete?: boolean;
+}
+
+interface ModuleLiveAction {
+    id: string;
+    moduleId: string;
+    moduleName: string;
+    fieldKey: string;
+    label: string;
+}
+
 type NoticeState = {
     type: 'success' | 'error';
     text: string;
@@ -68,11 +123,6 @@ type EnrichedLiveServer = LiveServerRecord & {
     players: LivePanelUser[];
     visiblePlayerCount: number;
 };
-
-type ProfileModal = {
-    user: LivePanelUser;
-    source: 'popover' | 'profile-panel';
-} | null;
 
 type ConfirmAction = {
     command: string;
@@ -99,6 +149,7 @@ type CommandBarSuggestion = {
 };
 
 const USERNAME_PATTERN = /@?([A-Za-z0-9_]{3,20})/;
+const DISCORD_ID_PATTERN = /^\d{17,20}$/;
 const RECENT_LEFT_TTL_MS = 10 * 60 * 1000;
 const VALUE_COMMAND_SET = new Set<string>(VALUE_INPUT_COMMAND_IDS);
 const NUMERIC_GLOBAL_COMMANDS = new Set<string>(['GRAVITY', 'BRIGHTNESS']);
@@ -163,14 +214,6 @@ const AnnounceIcon = () => (
     </svg>
 );
 
-const OpenIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M15 3h6v6" />
-        <path d="M10 14 21 3" />
-        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    </svg>
-);
-
 const CloseIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
         <path d="M18 6 6 18" />
@@ -211,6 +254,16 @@ function extractUsername(value: unknown) {
 
     const directMatch = text.match(USERNAME_PATTERN);
     return directMatch?.[1] || '';
+}
+
+function extractDiscordId(value: unknown) {
+    const text = trimString(value);
+    const mentionMatch = text.match(/^<@!?(\d{17,20})>$/);
+    if (mentionMatch?.[1]) {
+        return mentionMatch[1];
+    }
+
+    return DISCORD_ID_PATTERN.test(text) ? text : '';
 }
 
 function isLikelyUserText(value: unknown) {
@@ -276,6 +329,44 @@ function logMentionsUser(log: NormalizedDashboardLog, user: LivePanelUser) {
         ...log.moderatorIdentities,
     ].join(' ').toLowerCase();
     return candidates.some((candidate) => haystack.includes(candidate));
+}
+
+function getProfileIdentityCandidates(user: LivePanelUser, profile?: DashboardUserProfile | null) {
+    return Array.from(new Set([
+        user.username,
+        user.displayName,
+        user.userId,
+        profile?.verifiedUser?.discordId,
+        profile?.verifiedUser?.robloxId,
+        profile?.verifiedUser?.robloxUsername,
+        profile?.discordUser?.id,
+        profile?.discordUser?.username,
+        profile?.discordUser?.globalName,
+        profile?.robloxUser?.id,
+        profile?.robloxUser?.username,
+        profile?.robloxUser?.displayName,
+    ].map(normalizeIdentity).filter(Boolean)));
+}
+
+function logValueMatchesProfile(value: string, identities: string[]) {
+    const normalizedValue = normalizeIdentity(value);
+    return identities.some((identity) => normalizedValue.includes(identity));
+}
+
+function logListMatchesProfile(values: string[], identities: string[]) {
+    return values.some((value) => logValueMatchesProfile(value, identities));
+}
+
+function logBelongsInUserProfile(log: NormalizedDashboardLog, user: LivePanelUser, profile?: DashboardUserProfile | null) {
+    const identities = getProfileIdentityCandidates(user, profile);
+    if (identities.length === 0) {
+        return false;
+    }
+
+    return (
+        logValueMatchesProfile(log.target, identities)
+        || logListMatchesProfile(log.targetIdentities, identities)
+    );
 }
 
 function formatTime(value: string) {
@@ -469,7 +560,6 @@ export default function LivePanelPage() {
     const [logSearch, setLogSearch] = useState('');
     const [profileSearch, setProfileSearch] = useState('');
     const [selectedProfileUser, setSelectedProfileUser] = useState<LivePanelUser | null>(null);
-    const [profileModal, setProfileModal] = useState<ProfileModal>(null);
     const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
     const [panelModal, setPanelModal] = useState<PanelModal>(null);
     const [commandBarValue, setCommandBarValue] = useState('');
@@ -481,6 +571,26 @@ export default function LivePanelPage() {
     const [warningText, setWarningText] = useState('');
     const [profileCache, setProfileCache] = useState<Record<string, RobloxPlayerProfile>>({});
     const [profileLoadingKey, setProfileLoadingKey] = useState<string | null>(null);
+    const [profileDetailsCache, setProfileDetailsCache] = useState<Record<string, DashboardUserProfile>>({});
+    const [profileDetailsLoadingKey, setProfileDetailsLoadingKey] = useState<string | null>(null);
+    const [staffNotes, setStaffNotes] = useState<StaffNote[]>([]);
+    const [staffNotesLoading, setStaffNotesLoading] = useState(false);
+    const [profileLogs, setProfileLogs] = useState<NormalizedDashboardLog[]>([]);
+    const [profileLogsLoading, setProfileLogsLoading] = useState(false);
+    const [profileCommand, setProfileCommand] = useState('');
+    const [profileCommandValue, setProfileCommandValue] = useState('');
+    const [moduleLiveActions, setModuleLiveActions] = useState<ModuleLiveAction[]>([]);
+
+    const clearSelectedProfile = useCallback(() => {
+        setSelectedProfileUser(null);
+        setProfileSearch('');
+        setStaffNotes([]);
+        setProfileLogs([]);
+        setNoteText('');
+        setWarningText('');
+        setProfileCommand('');
+        setProfileCommandValue('');
+    }, []);
 
     const loadPanel = useCallback(async (showLoader = false) => {
         if (!guildId) return;
@@ -518,6 +628,19 @@ export default function LivePanelPage() {
     }, [loadPanel]);
 
     useEffect(() => {
+        if (!selectedProfileUser) return;
+
+        function handleKeyDown(event: KeyboardEvent) {
+            if (event.key !== 'Escape' || panelModal || confirmAction) return;
+            event.preventDefault();
+            clearSelectedProfile();
+        }
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [clearSelectedProfile, confirmAction, panelModal, selectedProfileUser]);
+
+    useEffect(() => {
         if (!guildId) return;
 
         async function loadServerName() {
@@ -534,6 +657,52 @@ export default function LivePanelPage() {
         }
 
         loadServerName();
+    }, [guildId]);
+
+    useEffect(() => {
+        if (!guildId) return;
+
+        async function loadModuleLiveActions() {
+            try {
+                const response = await fetch(`/api/dashboard/modules?serverId=${encodeURIComponent(guildId)}`, { cache: 'no-store' });
+                if (!response.ok) {
+                    setModuleLiveActions([]);
+                    return;
+                }
+
+                const payload = await response.json().catch(() => ({})) as { modules?: unknown[] };
+                const actions: ModuleLiveAction[] = [];
+                for (const moduleRow of Array.isArray(payload.modules) ? payload.modules : []) {
+                    if (!moduleRow || typeof moduleRow !== 'object') continue;
+                    const record = moduleRow as Record<string, unknown>;
+                    if (record.enabled === false) continue;
+                    const moduleId = trimString(record.id);
+                    const moduleName = trimString(record.name) || trimString(record.slug) || 'Module';
+                    const configSchema = record.configSchema;
+                    if (!moduleId || !configSchema || typeof configSchema !== 'object' || Array.isArray(configSchema)) continue;
+
+                    for (const [fieldKey, rawField] of Object.entries(configSchema as Record<string, unknown>)) {
+                        if (!rawField || typeof rawField !== 'object' || Array.isArray(rawField)) continue;
+                        const field = rawField as Record<string, unknown>;
+                        if (field.live !== true || field.type !== 'player') continue;
+                        const label = trimString(field.liveButtonText) || trimString(field.label) || fieldKey;
+                        actions.push({
+                            id: `module:${moduleId}:${fieldKey}`,
+                            moduleId,
+                            moduleName,
+                            fieldKey,
+                            label,
+                        });
+                    }
+                }
+
+                setModuleLiveActions(actions);
+            } catch {
+                setModuleLiveActions([]);
+            }
+        }
+
+        loadModuleLiveActions();
     }, [guildId]);
 
     const enrichedServers = useMemo<EnrichedLiveServer[]>(() => (
@@ -783,8 +952,24 @@ export default function LivePanelPage() {
     const totalPlayers = enrichedServers.reduce((sum, server) => sum + server.visiblePlayerCount, 0);
     const panelUser = selectedProfileUser;
     const panelProfile = panelUser ? profileCache[getUserKey(panelUser)] : null;
-    const popoverUser = profileModal?.user || null;
-    const popoverProfile = popoverUser ? profileCache[getUserKey(popoverUser)] : null;
+    const panelProfileDetails = panelUser ? profileDetailsCache[getUserKey(panelUser)] || null : null;
+    const profileLogEntries = panelUser
+        ? (profileLogs.length > 0 ? profileLogs : logs)
+            .filter((log) => logBelongsInUserProfile(log, panelUser, panelProfileDetails))
+            .slice(0, 20)
+        : [];
+    const selectedModuleLiveAction = moduleLiveActions.find((action) => action.id === profileCommand) || null;
+    const profileCommandDefinition = profileCommand ? getAdminPanelCommandDefinition(profileCommand) : null;
+    const profileCommandNeedsValue = profileCommandDefinition
+        ? VALUE_COMMAND_SET.has(profileCommandDefinition.id)
+        || profileCommandDefinition.id === 'SET_CHAR'
+        || NUMERIC_GLOBAL_COMMANDS.has(profileCommandDefinition.id)
+        || profileCommandDefinition.id === 'BROADCAST'
+        : false;
+    const profileCommandOptions = availableCommands.filter((command) => (
+        command.requiresTarget
+        && !['KICK', 'BAN', 'SOFTBAN', 'UNBAN'].includes(command.id)
+    ));
     const announcementUserQuery = announcementUser.trim().toLowerCase().replace(/^@/, '');
     const announcementUserSuggestions = announcementTargetType === 'user'
         ? allKnownUsers
@@ -835,10 +1020,100 @@ export default function LivePanelPage() {
         }
     }
 
-    function openUser(user: LivePanelUser, source: 'popover' | 'profile-panel' = 'popover') {
-        const normalizedUser = liveUserMap.get(getUserKey(user)) || liveUserMap.get(`username:${user.username.toLowerCase()}`) || user;
-        setProfileModal({ user: normalizedUser, source });
-        hydrateProfile(normalizedUser);
+    async function loadUserStaffNotes(user: LivePanelUser, profile?: DashboardUserProfile | null) {
+        setStaffNotesLoading(true);
+        try {
+            const params = new URLSearchParams({
+                serverId: guildId,
+                robloxUsername: profile?.robloxUser?.username || profile?.verifiedUser?.robloxUsername || user.username,
+            });
+            const robloxId = profile?.robloxUser?.id || profile?.verifiedUser?.robloxId || user.userId;
+            const discordId = profile?.discordUser?.id || profile?.verifiedUser?.discordId;
+            if (robloxId) params.set('robloxId', String(robloxId));
+            if (discordId) params.set('discordId', String(discordId));
+
+            const response = await fetch(`/api/dashboard/staff-notes?${params.toString()}`, { cache: 'no-store' });
+            const payload = await response.json().catch(() => ({})) as { notes?: StaffNote[] };
+            setStaffNotes(response.ok && Array.isArray(payload.notes) ? payload.notes : []);
+        } finally {
+            setStaffNotesLoading(false);
+        }
+    }
+
+    async function loadUserLogs(user: LivePanelUser, profile?: DashboardUserProfile | null) {
+        setProfileLogsLoading(true);
+        try {
+            const identities = [
+                user.username,
+                user.userId,
+                profile?.verifiedUser?.discordId,
+                profile?.verifiedUser?.robloxId,
+                profile?.verifiedUser?.robloxUsername,
+                profile?.robloxUser?.id,
+                profile?.robloxUser?.username,
+                profile?.discordUser?.id,
+            ].map(trimString).filter(Boolean);
+            const params = new URLSearchParams({
+                serverId: guildId,
+                limit: '120',
+            });
+            for (const identity of Array.from(new Set(identities))) {
+                params.append('target', identity);
+            }
+
+            const response = await fetch(`/api/dashboard/logs?${params.toString()}`, { cache: 'no-store' });
+            const payload = response.ok ? await response.json() : [];
+            setProfileLogs(normalizeDashboardLogs(payload));
+        } finally {
+            setProfileLogsLoading(false);
+        }
+    }
+
+    async function loadSelectedUserData(user: LivePanelUser) {
+        const key = getUserKey(user);
+        const cached = profileDetailsCache[key] || null;
+        setStaffNotes([]);
+        setProfileLogs([]);
+
+        if (cached) {
+            await Promise.all([
+                loadUserStaffNotes(user, cached),
+                loadUserLogs(user, cached),
+            ]);
+            return;
+        }
+
+        setProfileDetailsLoadingKey(key);
+        try {
+            const params = new URLSearchParams({
+                serverId: guildId,
+                robloxUsername: user.username,
+            });
+            if (user.userId) {
+                params.set('robloxId', user.userId);
+            }
+            const discordId = extractDiscordId(user.username) || extractDiscordId(user.displayName);
+            if (discordId) {
+                params.set('discordId', discordId);
+            }
+
+            const response = await fetch(`/api/dashboard/user-profile?${params.toString()}`, { cache: 'no-store' });
+            const payload = await response.json().catch(() => ({})) as DashboardUserProfile & { error?: string };
+            const profile = response.ok ? payload : null;
+            if (profile) {
+                setProfileDetailsCache((current) => ({
+                    ...current,
+                    [key]: profile,
+                }));
+            }
+
+            await Promise.all([
+                loadUserStaffNotes(user, profile),
+                loadUserLogs(user, profile),
+            ]);
+        } finally {
+            setProfileDetailsLoadingKey(null);
+        }
     }
 
     function selectProfileUser(user: LivePanelUser) {
@@ -847,7 +1122,10 @@ export default function LivePanelPage() {
         setProfileSearch(normalizedUser.username);
         setNoteText('');
         setWarningText('');
+        setProfileCommand('');
+        setProfileCommandValue('');
         hydrateProfile(normalizedUser);
+        loadSelectedUserData(normalizedUser);
     }
 
     async function selectTypedProfile() {
@@ -1095,8 +1373,9 @@ export default function LivePanelPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     serverId: guildId,
-                    robloxId: panelProfile?.id || panelUser.userId || undefined,
-                    robloxUsername: panelProfile?.username || panelUser.username,
+                    discordId: panelProfileDetails?.discordUser?.id || panelProfileDetails?.verifiedUser?.discordId || undefined,
+                    robloxId: panelProfileDetails?.robloxUser?.id || panelProfile?.id || panelUser.userId || undefined,
+                    robloxUsername: panelProfileDetails?.robloxUser?.username || panelProfile?.username || panelUser.username,
                     note: kind === 'warning' ? `Warning: ${value}` : value,
                 }),
             });
@@ -1110,11 +1389,95 @@ export default function LivePanelPage() {
             setNotice({ type: 'success', text: kind === 'warning' ? 'Warning saved.' : 'Staff note saved.' });
             if (kind === 'warning') setWarningText('');
             else setNoteText('');
+            if (payload.note) {
+                setStaffNotes((current) => [payload.note as StaffNote, ...current].slice(0, 10));
+            }
             await loadPanel(false);
         } catch (error) {
             setNotice({ type: 'error', text: `Failed to save note: ${String(error)}` });
         } finally {
             setActionLoading(null);
+        }
+    }
+
+    async function submitProfileCommand() {
+        if (!panelUser || (!profileCommandDefinition && !selectedModuleLiveAction)) {
+            setNotice({ type: 'error', text: 'Choose a command before running it.' });
+            return;
+        }
+
+        if (selectedModuleLiveAction) {
+            setActionLoading(selectedModuleLiveAction.id);
+            setNotice(null);
+            try {
+                const response = await fetch('/api/dashboard/modules/live', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        serverId: guildId,
+                        moduleId: selectedModuleLiveAction.moduleId,
+                        fieldKey: selectedModuleLiveAction.fieldKey,
+                        value: {
+                            username: panelProfileDetails?.robloxUser?.username || panelProfile?.username || panelUser.username,
+                            displayName: panelProfileDetails?.robloxUser?.displayName || panelProfile?.displayName || panelUser.displayName,
+                            userId: panelProfileDetails?.robloxUser?.id || panelProfile?.id || panelUser.userId,
+                            jobId: panelUser.serverId,
+                            source: 'live-panel-profile',
+                        },
+                    }),
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    setNotice({ type: 'error', text: trimString(payload.error) || 'Failed to run module action.' });
+                    return;
+                }
+
+                setNotice({ type: 'success', text: `${selectedModuleLiveAction.label} queued for ${panelUser.username}.` });
+                await loadUserLogs(panelUser, panelProfileDetails);
+            } catch (error) {
+                setNotice({ type: 'error', text: `Failed to run module action: ${String(error)}` });
+            } finally {
+                setActionLoading(null);
+            }
+            return;
+        }
+
+        if (!profileCommandDefinition) {
+            return;
+        }
+
+        const command = profileCommandDefinition;
+        const value = profileCommandValue.trim();
+        const args: Record<string, unknown> = {
+            username: panelProfileDetails?.robloxUser?.username || panelProfile?.username || panelUser.username,
+            reason: 'Live Panel profile action',
+        };
+
+        if (panelUser.serverId) {
+            args.job_id = panelUser.serverId;
+        }
+
+        if (VALUE_COMMAND_SET.has(command.id)) {
+            if (!value || !Number.isFinite(Number(value))) {
+                setNotice({ type: 'error', text: `Add a numeric value for ${command.label}.` });
+                return;
+            }
+            args.amount = value;
+        } else if (command.id === 'SET_CHAR') {
+            if (!value) {
+                setNotice({ type: 'error', text: 'Add the character username to copy.' });
+                return;
+            }
+            args.char_user = value;
+            args.reason = `Set character to ${value}`;
+        } else if (value) {
+            args.reason = value;
+        }
+
+        const sent = await sendCommand(command.id, args, `${command.label} queued for ${args.username}.`);
+        if (sent) {
+            setProfileCommandValue('');
+            await loadUserLogs(panelUser, panelProfileDetails);
         }
     }
 
@@ -1303,7 +1666,7 @@ export default function LivePanelPage() {
                                                                 key={`${server.id}-${getUserKey(player)}`}
                                                                 user={player}
                                                                 compact
-                                                                onClick={() => openUser(player)}
+                                                                onClick={() => selectProfileUser(player)}
                                                             />
                                                         ))
                                                     ) : (
@@ -1322,35 +1685,247 @@ export default function LivePanelPage() {
                 </section>
 
                 <section className="flex min-h-0 flex-col overflow-hidden bg-slate-950/10">
+                    {panelUser ? (
+                        <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-5">
+                            <div className="mb-4 flex items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">User Profile</p>
+                                    <h2 className="mt-1 text-xl font-black text-white">Live Panel Profile</h2>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={clearSelectedProfile}
+                                    className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-500 transition-colors hover:text-white"
+                                >
+                                    <CloseIcon />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                                    <div className="flex items-center gap-4">
+                                        <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-indigo-500/25 bg-indigo-500/10">
+                                            {panelProfileDetails?.discordUser?.avatarUrl ? (
+                                                <img src={panelProfileDetails.discordUser.avatarUrl} alt="" className="h-full w-full object-cover" />
+                                            ) : (
+                                                <span className="flex h-full w-full items-center justify-center text-xl font-black text-indigo-200">
+                                                    {(panelProfileDetails?.discordUser?.globalName || panelProfileDetails?.discordUser?.username || panelUser.username).slice(0, 1).toUpperCase()}
+                                                </span>
+                                            )}
+                                        </span>
+                                        <div className="min-w-0">
+                                            <h3 className="truncate text-lg font-black text-white">
+                                                {panelProfileDetails?.discordMember?.nick || panelProfileDetails?.discordUser?.globalName || panelProfileDetails?.discordUser?.username || 'Discord user not linked'}
+                                            </h3>
+                                            <p className="truncate text-sm font-semibold text-slate-400">
+                                                {panelProfileDetails?.discordUser?.username ? `@${panelProfileDetails.discordUser.username}` : 'Using Roblox identity only'}
+                                            </p>
+                                            <p className="mt-1 truncate font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                                {panelProfileDetails?.discordUser?.id || (profileDetailsLoadingKey === getUserKey(panelUser) ? 'Loading Discord info' : 'No Discord ID')}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 grid grid-cols-2 gap-3">
+                                        <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Linked</p>
+                                            <p className={`mt-1 text-sm font-black ${panelProfileDetails?.linked ? 'text-emerald-300' : 'text-slate-400'}`}>
+                                                {panelProfileDetails?.linked ? 'Verified' : 'Roblox only'}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Top Role</p>
+                                            <p className="mt-1 truncate text-sm font-black text-white" style={{ color: panelProfileDetails?.discordMember?.highestRole?.color || undefined }}>
+                                                {panelProfileDetails?.discordMember?.highestRole?.name || 'None'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                    <div className="flex items-center gap-3">
+                                        <UserAvatar user={panelUser} />
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-black text-white">{panelProfileDetails?.robloxUser?.displayName || panelProfile?.displayName || panelUser.displayName}</p>
+                                            <p className="truncate text-xs font-semibold text-slate-500">@{panelProfileDetails?.robloxUser?.username || panelProfile?.username || panelUser.username}</p>
+                                        </div>
+                                        <span className={`shrink-0 rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${panelUser.presence === 'live' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-slate-800 bg-black/20 text-slate-400'}`}>
+                                            {presenceLabel(panelUser)}
+                                        </span>
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-2 gap-3">
+                                        <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Roblox ID</p>
+                                            <p className="mt-1 truncate font-mono text-xs font-bold text-sky-300">{panelProfileDetails?.robloxUser?.id || panelProfile?.id || panelUser.userId || 'Unknown'}</p>
+                                        </div>
+                                        <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Server</p>
+                                            <p className="mt-1 truncate font-mono text-xs font-bold text-white">{panelUser.serverId ? formatServerId(panelUser.serverId) : 'Not live'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {quickActions.length > 0 && (
+                                    <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                        <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Moderation Actions</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {quickActions.map((action) => {
+                                                const disabled = (action.command === 'KICK' || action.command === 'REFRESH' || action.command === 'RESET') && panelUser.presence !== 'live';
+                                                return (
+                                                    <button
+                                                        key={action.command}
+                                                        type="button"
+                                                        disabled={disabled || actionLoading === action.command}
+                                                        onClick={() => requestPlayerCommand(action.command, panelUser)}
+                                                        className={`group relative flex h-11 w-11 items-center justify-center rounded-xl border border-slate-800 bg-slate-950 transition-all disabled:cursor-not-allowed disabled:opacity-35 ${action.tone}`}
+                                                    >
+                                                        {action.icon}
+                                                        <ActionTooltip label={action.label} />
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                    <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Misc / Module Command</p>
+                                    <div className="space-y-3">
+                                        <select
+                                            value={profileCommand}
+                                            onChange={(event) => {
+                                                setProfileCommand(event.target.value);
+                                                setProfileCommandValue('');
+                                            }}
+                                            className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm font-bold text-white outline-none focus:border-sky-500/60"
+                                        >
+                                            <option value="">Choose a command</option>
+                                            {profileCommandOptions.length > 0 && (
+                                                <optgroup label="Misc commands">
+                                                    {profileCommandOptions.map((command) => (
+                                                        <option key={command.id} value={command.id}>{command.label}</option>
+                                                    ))}
+                                                </optgroup>
+                                            )}
+                                            {moduleLiveActions.length > 0 && (
+                                                <optgroup label="Module commands">
+                                                    {moduleLiveActions.map((action) => (
+                                                        <option key={action.id} value={action.id}>{action.moduleName} - {action.label}</option>
+                                                    ))}
+                                                </optgroup>
+                                            )}
+                                        </select>
+                                        {profileCommandNeedsValue && (
+                                            <input
+                                                value={profileCommandValue}
+                                                onChange={(event) => setProfileCommandValue(event.target.value)}
+                                                placeholder={profileCommandDefinition?.id === 'SET_CHAR' ? 'Character username' : profileCommandDefinition?.id === 'BROADCAST' ? 'Message' : 'Value or note'}
+                                                className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60"
+                                            />
+                                        )}
+                                        <button
+                                            type="button"
+                                            disabled={!profileCommand || actionLoading === profileCommand}
+                                            onClick={submitProfileCommand}
+                                            className="w-full rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-all hover:bg-sky-500/20 disabled:opacity-50"
+                                        >
+                                            {profileCommand && actionLoading === profileCommand ? 'Running...' : 'Run On User'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Staff Note</h3>
+                                    <textarea
+                                        value={noteText}
+                                        onChange={(event) => setNoteText(event.target.value)}
+                                        rows={3}
+                                        placeholder={`Write a private staff note for ${panelUser.username}`}
+                                        className="mt-3 w-full resize-none rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60"
+                                    />
+                                    <div className="mt-3 flex justify-end">
+                                        <button
+                                            type="button"
+                                            disabled={actionLoading === 'note'}
+                                            onClick={() => saveUserNote('note')}
+                                            className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-sky-200 transition-all hover:bg-sky-500/20 disabled:opacity-50"
+                                        >
+                                            {actionLoading === 'note' ? 'Saving...' : 'Save Note'}
+                                        </button>
+                                    </div>
+                                    <div className="mt-4 space-y-2">
+                                        {staffNotesLoading ? (
+                                            <div className="rounded-xl border border-dashed border-slate-800 p-4 text-center text-xs font-semibold text-slate-500">Loading notes...</div>
+                                        ) : staffNotes.length > 0 ? staffNotes.map((note) => (
+                                            <div key={note.id} className="rounded-xl border border-slate-800 bg-black/20 p-3">
+                                                <p className="whitespace-pre-wrap text-xs leading-5 text-slate-300">{note.note}</p>
+                                                <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                                    By {note.created_by_tag || note.created_by_discord_id || 'Unknown'} on {new Date(note.created_at).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                        )) : (
+                                            <div className="rounded-xl border border-dashed border-slate-800 p-4 text-center text-xs font-semibold text-slate-500">No staff notes for this user.</div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                    <div className="mb-3 flex items-center justify-between gap-3">
+                                        <h3 className="text-sm font-black uppercase tracking-widest text-white">User Logs</h3>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                            {profileLogsLoading ? 'Loading' : `${profileLogEntries.length} shown`}
+                                        </span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {panelUser.presence === 'live' && (
+                                            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="text-xs font-black uppercase tracking-widest text-emerald-200">Joined</span>
+                                                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">{panelUser.serverId ? formatServerId(panelUser.serverId) : 'Live'}</span>
+                                                </div>
+                                                <p className="mt-1 text-xs font-medium text-emerald-100/70">Currently connected to a tracked live server.</p>
+                                            </div>
+                                        )}
+                                        {panelUser.presence === 'recently-left' && (
+                                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="text-xs font-black uppercase tracking-widest text-amber-200">Left</span>
+                                                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-amber-300">{panelUser.leftAt ? formatTime(new Date(panelUser.leftAt).toISOString()) : 'Recent'}</span>
+                                                </div>
+                                                <p className="mt-1 text-xs font-medium text-amber-100/70">Recently disappeared from the live server roster.</p>
+                                            </div>
+                                        )}
+                                        {profileLogEntries.map((log) => (
+                                            <div key={log.id} className="rounded-xl border border-slate-800 bg-black/20 p-3">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="text-xs font-black uppercase tracking-widest text-white">{log.action}</span>
+                                                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">{formatTime(log.timestamp)}</span>
+                                                </div>
+                                                <p className="mt-1 text-xs font-medium text-slate-400">
+                                                    Target <ClickableUserText value={log.target} onOpen={() => selectProfileUser(resolveUserFromText(log.target))} /> by <ClickableUserText value={log.moderator} onOpen={() => selectProfileUser(resolveUserFromText(log.moderator))} />
+                                                </p>
+                                            </div>
+                                        ))}
+                                        {profileLogEntries.length === 0 && (
+                                            <div className="rounded-xl border border-dashed border-slate-800 p-6 text-center text-xs font-semibold text-slate-500">
+                                                No logs targeting this user were found.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
                     <div className="shrink-0 border-b border-slate-800 bg-slate-950/30 p-5">
                         <div className="mb-2 flex items-center justify-between gap-3">
                             <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-300">
                                 Profile / Create Log
                             </h2>
-                            {selectedProfileUser && (
-                                <span className="truncate rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-sky-200">
-                                    Editing @{selectedProfileUser.username}
-                                </span>
-                            )}
                         </div>
                         <div className="relative">
                             <input
                                 value={profileSearch}
-                                onChange={(event) => {
-                                    const nextValue = event.target.value;
-                                    const normalizedNextValue = nextValue.trim().toLowerCase();
-                                    const selectedUsername = selectedProfileUser?.username.toLowerCase() || '';
-                                    const selectedDisplayName = selectedProfileUser?.displayName.toLowerCase() || '';
-
-                                    setProfileSearch(nextValue);
-
-                                    if (
-                                        !normalizedNextValue
-                                        || (selectedProfileUser && normalizedNextValue !== selectedUsername && normalizedNextValue !== selectedDisplayName)
-                                    ) {
-                                        setSelectedProfileUser(null);
-                                    }
-                                }}
+                                onChange={(event) => setProfileSearch(event.target.value)}
                                 onKeyDown={(event) => {
                                     if (event.key === 'Enter') {
                                         event.preventDefault();
@@ -1394,251 +1969,40 @@ export default function LivePanelPage() {
                         />
                     </div>
 
-                    {panelUser ? (
-                        <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-5">
-                            <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
-                                <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-5">
-                                    <div className="flex items-center gap-4">
-                                        <UserAvatarButton user={panelUser} onClick={() => openUser(panelUser, 'profile-panel')} />
-                                        <div className="min-w-0">
-                                            <h2 className="truncate text-lg font-black text-white">{panelProfile?.displayName || panelUser.displayName}</h2>
-                                            <p className="truncate text-sm font-semibold text-slate-400">@{panelProfile?.username || panelUser.username}</p>
-                                        </div>
-                                    </div>
-                                    <div className="mt-5 space-y-3 text-sm">
-                                        <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Status</p>
-                                            <p className={`mt-1 font-bold ${panelUser.presence === 'live' ? 'text-emerald-300' : panelUser.presence === 'recently-left' ? 'text-amber-300' : 'text-slate-300'}`}>
-                                                {presenceLabel(panelUser)}
-                                            </p>
-                                        </div>
-                                        <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">User ID</p>
-                                            <p className="mt-1 font-mono font-bold text-sky-300">{panelProfile?.id || panelUser.userId || 'Unknown'}</p>
-                                        </div>
-                                        <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Server</p>
-                                            <p className="mt-1 font-mono font-bold text-white">{panelUser.serverId ? formatServerId(panelUser.serverId) : 'Not live'}</p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => openUser(panelUser, 'profile-panel')}
-                                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-all hover:bg-sky-500/20"
-                                        >
-                                            <OpenIcon />
-                                            Mini Profile
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-5">
-                                    <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-5">
-                                        <h3 className="text-sm font-black uppercase tracking-widest text-white">Add Staff Note</h3>
-                                        <textarea
-                                            value={noteText}
-                                            onChange={(event) => setNoteText(event.target.value)}
-                                            rows={4}
-                                            placeholder={`Write a private staff note for ${panelUser.username}`}
-                                            className="mt-4 w-full resize-none rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60"
-                                        />
-                                        <div className="mt-3 flex justify-end">
-                                            <button
-                                                type="button"
-                                                disabled={actionLoading === 'note'}
-                                                onClick={() => saveUserNote('note')}
-                                                className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-sky-200 transition-all hover:bg-sky-500/20 disabled:opacity-50"
-                                            >
-                                                {actionLoading === 'note' ? 'Saving...' : 'Save Note'}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-5">
-                                        <h3 className="text-sm font-black uppercase tracking-widest text-amber-200">Add Warning</h3>
-                                        <textarea
-                                            value={warningText}
-                                            onChange={(event) => setWarningText(event.target.value)}
-                                            rows={3}
-                                            placeholder={`Record a warning for ${panelUser.username}`}
-                                            className="mt-4 w-full resize-none rounded-xl border border-amber-500/20 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-amber-200/35 focus:border-amber-300/60"
-                                        />
-                                        <div className="mt-3 flex justify-end">
-                                            <button
-                                                type="button"
-                                                disabled={actionLoading === 'warning'}
-                                                onClick={() => saveUserNote('warning')}
-                                                className="rounded-xl border border-amber-400/30 bg-amber-500/20 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-amber-100 transition-all hover:bg-amber-500/30 disabled:opacity-50"
-                                            >
-                                                {actionLoading === 'warning' ? 'Saving...' : 'Save Warning'}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-5">
-                                        <div className="mb-4 flex items-center justify-between gap-3">
-                                            <h3 className="text-sm font-black uppercase tracking-widest text-white">Last 4 Logs</h3>
-                                            <Link
-                                                href={`/dashboard/${guildId}/players/${encodeURIComponent(panelUser.username)}`}
-                                                className="text-[10px] font-bold uppercase tracking-widest text-sky-300 hover:text-sky-100"
-                                            >
-                                                Full View
-                                            </Link>
-                                        </div>
-                                        <div className="space-y-3">
-                                            {logs.filter((log) => logMentionsUser(log, panelUser)).slice(0, 4).map((log) => (
-                                                <div key={log.id} className="rounded-xl border border-slate-800 bg-black/20 p-3">
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <span className="text-xs font-black uppercase tracking-widest text-white">{log.action}</span>
-                                                        <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">{formatTime(log.timestamp)}</span>
-                                                    </div>
-                                                    <p className="mt-1 text-xs font-medium text-slate-400">
-                                                        Target <ClickableUserText value={log.target} onOpen={() => openUser(resolveUserFromText(log.target))} /> by <ClickableUserText value={log.moderator} onOpen={() => openUser(resolveUserFromText(log.moderator))} />
-                                                    </p>
-                                                </div>
-                                            ))}
-                                            {logs.filter((log) => logMentionsUser(log, panelUser)).length === 0 && (
-                                                <div className="rounded-xl border border-dashed border-slate-800 p-6 text-center text-xs font-semibold text-slate-500">
-                                                    No recent logs for this user in the current panel cache.
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                    <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
+                        {filteredLogs.length === 0 ? (
+                            <div className="p-16 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                No logs matched.
                             </div>
-                        </div>
-                    ) : (
-                        <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
-                            {filteredLogs.length === 0 ? (
-                                <div className="p-16 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600">
-                                    No logs matched.
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-slate-800/70">
-                                    {filteredLogs.map((log) => (
-                                        <div key={log.id} className="grid gap-3 px-5 py-3 transition-colors hover:bg-sky-500/5 md:grid-cols-[minmax(0,180px)_minmax(0,1fr)_120px] md:items-center">
-                                            <div className="min-w-0">
-                                                <span className={`inline-flex max-w-full truncate rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${log.action.includes('BAN')
-                                                    ? 'border-red-500/20 bg-red-500/10 text-red-300'
-                                                    : log.action === 'KICK'
-                                                        ? 'border-amber-500/20 bg-amber-500/10 text-amber-300'
-                                                        : 'border-sky-500/20 bg-sky-500/10 text-sky-300'
-                                                    }`}>
-                                                    {log.action}
-                                                </span>
-                                            </div>
-                                            <p className="min-w-0 text-sm font-medium text-slate-300">
-                                                <ClickableUserText value={log.moderator} onOpen={() => openUser(resolveUserFromText(log.moderator))} /> used <span className="font-bold text-sky-300">{log.action}</span> on <ClickableUserText value={log.target} onOpen={() => openUser(resolveUserFromText(log.target))} />
-                                            </p>
-                                            <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500 md:text-right">
-                                                {formatTime(log.timestamp)}
-                                            </p>
+                        ) : (
+                            <div className="divide-y divide-slate-800/70">
+                                {filteredLogs.map((log) => (
+                                    <div key={log.id} className="grid gap-3 px-5 py-3 transition-colors hover:bg-sky-500/5 md:grid-cols-[minmax(0,180px)_minmax(0,1fr)_120px] md:items-center">
+                                        <div className="min-w-0">
+                                            <span className={`inline-flex max-w-full truncate rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${log.action.includes('BAN')
+                                                ? 'border-red-500/20 bg-red-500/10 text-red-300'
+                                                : log.action === 'KICK'
+                                                    ? 'border-amber-500/20 bg-amber-500/10 text-amber-300'
+                                                    : 'border-sky-500/20 bg-sky-500/10 text-sky-300'
+                                                }`}>
+                                                {log.action}
+                                            </span>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                                        <p className="min-w-0 text-sm font-medium text-slate-300">
+                                            <ClickableUserText value={log.moderator} onOpen={() => selectProfileUser(resolveUserFromText(log.moderator))} /> used <span className="font-bold text-sky-300">{log.action}</span> on <ClickableUserText value={log.target} onOpen={() => selectProfileUser(resolveUserFromText(log.target))} />
+                                        </p>
+                                        <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500 md:text-right">
+                                            {formatTime(log.timestamp)}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                        </>
                     )}
                 </section>
             </div>
-
-            {profileModal && popoverUser && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-800 bg-[#020617] shadow-2xl shadow-black/50">
-                        <div className="flex items-start justify-between gap-4 border-b border-slate-800 bg-slate-900/60 px-5 py-5">
-                            <div className="flex min-w-0 items-center gap-4">
-                                <UserAvatar user={popoverUser} />
-                                <div className="min-w-0">
-                                    <h3 className="truncate text-xl font-black text-white">{popoverProfile?.displayName || popoverUser.displayName}</h3>
-                                    <p className="truncate text-sm font-semibold text-slate-400">@{popoverProfile?.username || popoverUser.username}</p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setProfileModal(null)}
-                                className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-500 transition-colors hover:text-white"
-                            >
-                                <CloseIcon />
-                            </button>
-                        </div>
-
-                        <div className="space-y-5 px-5 py-5">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Status</p>
-                                    <p className={`mt-1 text-sm font-black ${popoverUser.presence === 'live' ? 'text-emerald-300' : popoverUser.presence === 'recently-left' ? 'text-amber-300' : 'text-slate-300'}`}>{presenceLabel(popoverUser)}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">User ID</p>
-                                    <p className="mt-1 truncate font-mono text-sm font-black text-sky-300">{popoverProfile?.id || popoverUser.userId || 'Unknown'}</p>
-                                </div>
-                            </div>
-
-                            {quickActions.length > 0 && (
-                                <div>
-                                    <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Quick Actions</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {quickActions.map((action) => {
-                                            const disabled = popoverUser.presence !== 'live' || actionLoading === action.command;
-                                            return (
-                                                <button
-                                                    key={action.command}
-                                                    type="button"
-                                                    disabled={disabled}
-                                                    onClick={() => requestPlayerCommand(action.command, popoverUser)}
-                                                    className={`group relative flex h-11 w-11 items-center justify-center rounded-xl border border-slate-800 bg-slate-950 transition-all disabled:cursor-not-allowed disabled:opacity-35 ${action.tone}`}
-                                                >
-                                                    {action.icon}
-                                                    <ActionTooltip label={action.label} />
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div>
-                                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Last 4 Logs Involving Them</p>
-                                <div className="space-y-2">
-                                    {logs.filter((log) => logMentionsUser(log, popoverUser)).slice(0, 4).map((log) => (
-                                        <div key={log.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5">
-                                            <div className="min-w-0">
-                                                <p className="truncate text-xs font-black uppercase tracking-widest text-white">{log.action}</p>
-                                                <p className="truncate text-[11px] font-medium text-slate-500">By {log.moderator}</p>
-                                            </div>
-                                            <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">{formatTime(log.timestamp)}</span>
-                                        </div>
-                                    ))}
-                                    {logs.filter((log) => logMentionsUser(log, popoverUser)).length === 0 && (
-                                        <div className="rounded-xl border border-dashed border-slate-800 px-3 py-5 text-center text-xs font-semibold text-slate-500">
-                                            No recent logs involving this user.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        selectProfileUser(popoverUser);
-                                        setProfileModal(null);
-                                    }}
-                                    className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-all hover:border-sky-400/50 hover:text-white"
-                                >
-                                    Use In Panel
-                                </button>
-                                <Link
-                                    href={`/dashboard/${guildId}/players/${encodeURIComponent(popoverUser.username)}`}
-                                    className="flex items-center justify-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-all hover:bg-sky-500/20"
-                                >
-                                    <OpenIcon />
-                                    Open Full View
-                                </Link>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {confirmAction && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">

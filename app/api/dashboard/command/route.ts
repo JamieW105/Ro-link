@@ -140,7 +140,7 @@ export async function POST(req: Request) {
             serverId,
             command,
             logTarget || 'server',
-            discordUserId || moderator,
+            discordUserId ? `<@${discordUserId}>` : moderator,
             trimString(args.reason || args.message || 'Dashboard action'),
         );
 

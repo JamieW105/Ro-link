@@ -1,6 +1,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { stringifyLogValue } from './logRecords';
+import { resolveLinkedLogUserLabels, type LinkedLogUserLabel } from './logIdentity';
 
 const supabaseParams = {
     auth: {
@@ -10,6 +11,24 @@ const supabaseParams = {
 };
 
 import { supabase } from './supabase';
+
+function formatDiscordLogActor(rawValue: string, linkedUser?: LinkedLogUserLabel) {
+    if (!linkedUser?.mention) {
+        return rawValue;
+    }
+
+    const normalizedRawValue = rawValue.toLowerCase();
+    if (
+        !rawValue
+        || normalizedRawValue === linkedUser.mention.toLowerCase()
+        || /^<@!?\d{17,20}>$/.test(rawValue)
+        || linkedUser.identities.some((identity) => identity.toLowerCase() === normalizedRawValue)
+    ) {
+        return linkedUser.mention;
+    }
+
+    return `${linkedUser.mention} (${rawValue})`;
+}
 
 export async function logAction(server_id: string, action: string, target: unknown, moderator: unknown, reason: unknown = 'No reason provided') {
     try {
@@ -24,6 +43,9 @@ export async function logAction(server_id: string, action: string, target: unkno
 
         // Use service role client if available, otherwise fallback to standard client
         const client = (url && serviceKey) ? createClient(url, serviceKey, supabaseParams) : supabase;
+        const linkedUserLabels = await resolveLinkedLogUserLabels(client, [safeTarget, safeModerator]);
+        const discordTarget = formatDiscordLogActor(safeTarget, linkedUserLabels.get(safeTarget.toLowerCase()));
+        const discordModerator = formatDiscordLogActor(safeModerator, linkedUserLabels.get(safeModerator.toLowerCase()));
 
         // 1. Insert into Database
         const { error: dbError } = await client
@@ -88,8 +110,8 @@ export async function logAction(server_id: string, action: string, target: unkno
                     title: `Action Log: ${safeAction}`,
                     color: color,
                     fields: [
-                        { name: "Target", value: safeTarget || "N/A", inline: true },
-                        { name: "Moderator", value: safeModerator || "System", inline: true },
+                        { name: "Target", value: discordTarget || "N/A", inline: true },
+                        { name: "Moderator", value: discordModerator || "System", inline: true },
                         { name: "Server", value: serverName, inline: true },
                         { name: "Reason", value: safeReason, inline: false }
                     ],

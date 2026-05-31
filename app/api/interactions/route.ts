@@ -1339,7 +1339,7 @@ async function addStaffNoteFromCommand(input: {
         guildId,
         'STAFF_NOTE',
         note.target_roblox_username || note.target_roblox_id || note.target_discord_id || 'Unknown User',
-        userTag,
+        userId ? `<@${userId}>` : userTag,
         'Staff note added',
     );
 
@@ -1500,6 +1500,7 @@ export async function POST(req: Request) {
         const user = interactionUser || member?.user;
         const userId = user?.id ?? '';
         const userTag = user ? `${user.username}${user.discriminator !== '0' ? '#' + user.discriminator : ''}` : 'Unknown';
+        const logActor = userId ? `<@${userId}>` : userTag;
 
         // Helper to check permissions against RBAC
         async function checkPermission(permissionKey: string) {
@@ -1846,7 +1847,7 @@ export async function POST(req: Request) {
                             });
 
                             await editOriginalInteractionResponse(applicationId, interactionToken, lookupResult.response);
-                            await logAction(guild_id, 'LOOKUP', lookupResult.targetLogStr, userTag, 'Unified lookup command');
+                            await logAction(guild_id, 'LOOKUP', lookupResult.targetLogStr, logActor, 'Unified lookup command');
                         } catch (error: unknown) {
                             console.error('[LOOKUP] Deferred error:', error);
                             await editOriginalInteractionResponse(
@@ -1961,7 +1962,7 @@ export async function POST(req: Request) {
                         showStaffControls: await isServerStaff(),
                     });
 
-                    await logAction(guild_id, 'LOOKUP', lookupResult.targetLogStr, userTag, 'Unified lookup command');
+                    await logAction(guild_id, 'LOOKUP', lookupResult.targetLogStr, logActor, 'Unified lookup command');
 
                     return NextResponse.json({
                         type: 4,
@@ -2030,7 +2031,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging(name.toUpperCase(), { username: targetUser, reason: reason, moderator: userTag }, server),
-                    logAction(guild_id, name.toUpperCase(), targetUser, userTag, reason)
+                    logAction(guild_id, name.toUpperCase(), targetUser, logActor, reason)
                 ]);
 
                 if (queueRes.error) {
@@ -2050,7 +2051,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging('KICK', { username: targetUser, reason: reason, moderator: userTag }, server),
-                    logAction(guild_id, 'KICK', targetUser, userTag, reason)
+                    logAction(guild_id, 'KICK', targetUser, logActor, reason)
                 ]);
 
                 if (queueRes.error) {
@@ -2070,7 +2071,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging('UNBAN', { username: targetUser, reason: reason, moderator: userTag }, server),
-                    logAction(guild_id, 'UNBAN', targetUser, userTag, reason)
+                    logAction(guild_id, 'UNBAN', targetUser, logActor, reason)
                 ]);
 
                 if (queueRes.error) {
@@ -2092,7 +2093,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging('SOFTBAN', { username: targetUser, reason: reason, duration_seconds: safeDurationSeconds, moderator: userTag }, server),
-                    logAction(guild_id, 'SOFTBAN', targetUser, userTag, reason)
+                    logAction(guild_id, 'SOFTBAN', targetUser, logActor, reason)
                 ]);
 
                 if (queueRes.error) {
@@ -2112,7 +2113,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging('UPDATE', { reason: "Manual Update Triggered", moderator: userTag }, server),
-                    logAction(guild_id, 'UPDATE_SERVERS', 'ALL', userTag, "Manual Update Triggered")
+                    logAction(guild_id, 'UPDATE_SERVERS', 'ALL', logActor, "Manual Update Triggered")
                 ]);
 
                 if (queueRes.error) {
@@ -2208,7 +2209,7 @@ export async function POST(req: Request) {
                             }
                         }
 
-                        await logAction(guild_id, 'PROFILE_UPDATE', (memberData.user?.username || targetUserId), userTag, `Updated linked Roblox account: ${robloxData.name}`);
+                        await logAction(guild_id, 'PROFILE_UPDATE', `<@${targetUserId}>`, logActor, `Updated linked Roblox account: ${robloxData.name}`);
 
                         return NextResponse.json({
                             type: 4,
@@ -2236,7 +2237,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging('SHUTDOWN', { job_id: jobId, moderator: userTag }, server),
-                    logAction(guild_id, 'SHUTDOWN', jobId || 'ALL', userTag)
+                    logAction(guild_id, 'SHUTDOWN', jobId || 'ALL', logActor)
                 ]);
 
                 if (queueRes.error) {
@@ -2278,7 +2279,7 @@ export async function POST(req: Request) {
                             status: 'PENDING'
                         }]),
                         triggerMessaging(miscCommand, args, server),
-                        logAction(guild_id, miscCommand, targetUser, userTag, 'Misc command')
+                        logAction(guild_id, miscCommand, targetUser, logActor, 'Misc command')
                     ]);
 
                     if (queueRes.error) {
@@ -2542,7 +2543,7 @@ export async function POST(req: Request) {
                             `Dismissed from reports Discord channel by ${userTag}`,
                             'DISMISSED',
                         );
-                        await logAction(currentGuildId, 'REPORT_DISMISSED', target, userTag, 'Dismissed from reports Discord channel');
+                        await logAction(currentGuildId, 'REPORT_DISMISSED', target, logActor, 'Dismissed from reports Discord channel');
                     } catch (error) {
                         return NextResponse.json({
                             type: 4,
@@ -2593,7 +2594,7 @@ export async function POST(req: Request) {
                             `${discordAction.toUpperCase()} (Discord) executed from reports channel by ${userTag}`,
                             'RESOLVED',
                         );
-                        await logAction(currentGuildId, discordAction.toUpperCase(), target, userTag, 'Reports Discord channel action');
+                        await logAction(currentGuildId, discordAction.toUpperCase(), target, logActor, 'Reports Discord channel action');
                     } catch (error) {
                         return NextResponse.json({
                             type: 4,
@@ -2639,7 +2640,7 @@ export async function POST(req: Request) {
                             status: 'PENDING'
                         }]),
                         triggerMessaging(command, { username: target, reason: 'Reports Discord Channel Action', moderator: userTag }),
-                        logAction(currentGuildId, command, target, userTag, 'Reports Discord channel action'),
+                        logAction(currentGuildId, command, target, logActor, 'Reports Discord channel action'),
                     ]);
 
                     await updateReportFromChannel(
@@ -2735,7 +2736,7 @@ export async function POST(req: Request) {
                         status: 'PENDING',
                     }]),
                     triggerMessaging(command, args),
-                    logAction(guild_id, logActionName, target, userTag, 'Discord live server action'),
+                    logAction(guild_id, logActionName, target, logActor, 'Discord live server action'),
                 ]);
 
                 if (queueRes.error) {
@@ -2797,7 +2798,7 @@ export async function POST(req: Request) {
                     }
                 }
 
-                await logAction(currentGuildId, discAction.toUpperCase(), target, userTag, 'Reports Discord channel action');
+                await logAction(currentGuildId, discAction.toUpperCase(), target, logActor, 'Reports Discord channel action');
 
                 return NextResponse.json({
                     type: 4,
@@ -2821,7 +2822,7 @@ export async function POST(req: Request) {
                                 status: 'PENDING'
                             }]),
                             triggerMessaging(action, { username, reason: 'Discord Button Action', moderator: userTag }),
-                            logAction(currentGuildId, action, username, userTag, 'Discord Button Action')
+                            logAction(currentGuildId, action, username, logActor, 'Discord Button Action')
                         ]);
 
                         await updateReportFromChannel(
@@ -3076,7 +3077,7 @@ export async function POST(req: Request) {
                     status: 'PENDING'
                 }]),
                 triggerMessaging(action.toUpperCase(), { username, reason: 'Discord Button Action', moderator: userTag }), // Will fetch server internally
-                logAction(guild_id, action.toUpperCase(), username, userTag, 'Discord Button Action')
+                logAction(guild_id, action.toUpperCase(), username, logActor, 'Discord Button Action')
             ]);
 
             return NextResponse.json({
@@ -3117,7 +3118,7 @@ export async function POST(req: Request) {
                         guild_id,
                         'STAFF_NOTE',
                         note.target_roblox_username || note.target_roblox_id || note.target_discord_id || 'Unknown User',
-                        userTag,
+                        logActor,
                         'Staff note added',
                     );
 
@@ -3177,7 +3178,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging(command, args),
-                    logAction(guild_id, command === 'UPDATE' ? 'UPDATE_SERVERS' : command, target, userTag, reason)
+                    logAction(guild_id, command === 'UPDATE' ? 'UPDATE_SERVERS' : command, target, logActor, reason)
                 ]);
 
                 if (queueRes.error) {
@@ -3232,7 +3233,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging(action, args),
-                    logAction(guild_id, action, targetUser, userTag, action === 'SET_CHAR' ? `Set character to ${args.char_user}` : 'Misc Action')
+                    logAction(guild_id, action, targetUser, logActor, action === 'SET_CHAR' ? `Set character to ${args.char_user}` : 'Misc Action')
                 ]);
 
                 return NextResponse.json({

@@ -17,6 +17,11 @@ type LogRecord = Record<string, unknown> & {
     moderator?: unknown;
 };
 
+export type LinkedLogUserLabel = {
+    mention: string;
+    identities: string[];
+};
+
 function trimString(value: unknown) {
     return String(value ?? '').trim();
 }
@@ -25,8 +30,21 @@ function unique(values: string[]) {
     return Array.from(new Set(values.map(trimString).filter(Boolean)));
 }
 
+function extractDiscordMentionId(value: unknown) {
+    const match = trimString(value).match(/^<@!?(\d{17,20})>$/);
+    return match?.[1] || '';
+}
+
+function getIdentityCandidates(values: string[]) {
+    return unique(values.flatMap((value) => {
+        const identity = trimString(value);
+        const discordMentionId = extractDiscordMentionId(identity);
+        return discordMentionId ? [identity, discordMentionId] : [identity];
+    }));
+}
+
 async function fetchVerifiedUsersByValues(client: SupabaseClient, values: string[]) {
-    const identities = unique(values);
+    const identities = getIdentityCandidates(values);
     if (identities.length === 0) {
         return [] as VerifiedUserRecord[];
     }
@@ -63,7 +81,14 @@ function buildVerifiedUserLookup(rows: VerifiedUserRecord[]) {
     const lookup = new Map<string, VerifiedUserRecord>();
 
     for (const row of rows) {
-        for (const value of [row.discord_id, row.roblox_id, row.roblox_username]) {
+        const discordId = trimString(row.discord_id);
+        for (const value of [
+            discordId,
+            discordId ? `<@${discordId}>` : '',
+            discordId ? `<@!${discordId}>` : '',
+            row.roblox_id,
+            row.roblox_username,
+        ]) {
             const identity = trimString(value);
             if (identity) {
                 lookup.set(identity.toLowerCase(), row);
@@ -117,6 +142,10 @@ function formatDiscordUser(discordId: string, users: Map<string, DiscordUserReco
     return displayName || username || `Discord ${discordId}`;
 }
 
+function formatDiscordMention(discordId: string) {
+    return `<@${discordId}>`;
+}
+
 function getLinkedIdentities(row: VerifiedUserRecord) {
     return unique([row.discord_id || '', row.roblox_id || '', row.roblox_username || '']);
 }
@@ -161,4 +190,26 @@ export async function enrichLogRecordsWithLinkedUsers(client: SupabaseClient, lo
             moderator_identities: moderatorUser ? getLinkedIdentities(moderatorUser) : undefined,
         };
     });
+}
+
+export async function resolveLinkedLogUserLabels(client: SupabaseClient, values: string[]) {
+    const inputValues = unique(values);
+    const verifiedUsers = await fetchVerifiedUsersByValues(client, inputValues);
+    const verifiedLookup = buildVerifiedUserLookup(verifiedUsers);
+    const labels = new Map<string, LinkedLogUserLabel>();
+
+    for (const value of inputValues) {
+        const verifiedUser = verifiedLookup.get(value.toLowerCase());
+        const discordId = trimString(verifiedUser?.discord_id);
+        if (!verifiedUser || !discordId) {
+            continue;
+        }
+
+        labels.set(value.toLowerCase(), {
+            mention: formatDiscordMention(discordId),
+            identities: getLinkedIdentities(verifiedUser),
+        });
+    }
+
+    return labels;
 }
