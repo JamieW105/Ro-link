@@ -8,6 +8,8 @@ type TokenShape = {
     refreshToken?: string
     accessTokenExpires?: number
     error?: string
+    errorCode?: string
+    errorDescription?: string
     sub?: string
 }
 
@@ -27,8 +29,10 @@ async function refreshDiscordAccessToken(token: TokenShape) {
         return {
             ...token,
             accessToken: undefined,
+            refreshToken: undefined,
             accessTokenExpires: 0,
             error: "RefreshAccessTokenError",
+            errorCode: "missing_refresh_token",
         }
     }
 
@@ -49,13 +53,27 @@ async function refreshDiscordAccessToken(token: TokenShape) {
         const refreshedTokens = await response.json()
 
         if (!response.ok) {
-            throw new Error(
-                typeof refreshedTokens?.error_description === "string"
-                    ? refreshedTokens.error_description
-                    : typeof refreshedTokens?.error === "string"
-                        ? refreshedTokens.error
-                        : "Discord token refresh failed.",
-            )
+            const discordError = typeof refreshedTokens?.error === "string"
+                ? refreshedTokens.error
+                : "discord_token_refresh_failed"
+            const description = typeof refreshedTokens?.error_description === "string"
+                ? refreshedTokens.error_description
+                : "Discord token refresh failed."
+
+            console.warn("[AUTH] Discord access token refresh rejected", {
+                error: discordError,
+                userId: token.sub,
+            })
+
+            return {
+                ...token,
+                accessToken: undefined,
+                refreshToken: discordError === "invalid_grant" ? undefined : token.refreshToken,
+                accessTokenExpires: 0,
+                error: "RefreshAccessTokenError",
+                errorCode: discordError,
+                errorDescription: description,
+            }
         }
 
         return {
@@ -64,6 +82,8 @@ async function refreshDiscordAccessToken(token: TokenShape) {
             accessTokenExpires: Date.now() + Number(refreshedTokens.expires_in || 0) * 1000,
             refreshToken: refreshedTokens.refresh_token || token.refreshToken,
             error: undefined,
+            errorCode: undefined,
+            errorDescription: undefined,
         }
     } catch (error) {
         console.error("[AUTH] Failed to refresh Discord access token", {
@@ -74,8 +94,10 @@ async function refreshDiscordAccessToken(token: TokenShape) {
         return {
             ...token,
             accessToken: undefined,
+            refreshToken: undefined,
             accessTokenExpires: 0,
             error: "RefreshAccessTokenError",
+            errorCode: "refresh_request_failed",
         }
     }
 }
@@ -114,6 +136,11 @@ export const authOptions: AuthOptions = {
                     ? account.expires_at * 1000
                     : Date.now() + Number(account.expires_in || 0) * 1000
                 token.error = undefined
+                token.errorCode = undefined
+                return token
+            }
+
+            if (token.error === "RefreshAccessTokenError") {
                 return token
             }
 

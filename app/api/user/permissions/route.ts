@@ -9,7 +9,7 @@ export async function GET(req: Request) {
     const serverId = searchParams.get('serverId');
 
     const session = await getServerSession(authOptions);
-    if (!session || !session.accessToken) {
+    if (!session || !session.accessToken || session.error) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -6,11 +6,18 @@ import { Routes } from 'discord-api-types/v10';
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN!);
 
+type DiscordRole = {
+    id: string;
+    name: string;
+    color: number;
+    position: number;
+};
+
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     const session = await getServerSession(authOptions);
     const { id } = await params;
 
-    if (!session || !session.accessToken) {
+    if (!session || !session.accessToken || session.error) {
         const { searchParams } = new URL(req.url);
         if (searchParams.get('status') === 'check') {
             return NextResponse.json({ status: 'API Active', message: 'Roles endpoint operational' }, { status: 200 });
@@ -20,7 +27,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     try {
         // Fetch roles from Discord API
-        const roles = await rest.get(Routes.guildRoles(id)) as any[];
+        const roles = await rest.get(Routes.guildRoles(id)) as DiscordRole[];
 
         // Map to keep only necessary fields
         const simplifiedRoles = roles.map(role => ({
