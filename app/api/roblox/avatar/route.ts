@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const VALID_SIZES = new Set([48, 50, 60, 75, 100, 110, 150, 180, 352, 420, 720]);
+const CACHE_CONTROL = 'public, max-age=3600, stale-while-revalidate=86400';
+
+function fallbackAvatar(req: NextRequest) {
+    return NextResponse.redirect(new URL('/Media/Roblox.png', req.nextUrl), {
+        headers: {
+            'Cache-Control': CACHE_CONTROL,
+        },
+    });
+}
 
 function normalizeSize(value: string | null) {
     const parsed = Number(value);
@@ -19,7 +28,7 @@ function normalizeUserId(value: string | null) {
 export async function GET(req: NextRequest) {
     const userId = normalizeUserId(req.nextUrl.searchParams.get('userId'));
     if (!userId) {
-        return NextResponse.json({ error: 'Missing Roblox userId.' }, { status: 400 });
+        return fallbackAvatar(req);
     }
 
     const size = normalizeSize(req.nextUrl.searchParams.get('size'));
@@ -35,7 +44,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!response.ok) {
-        return NextResponse.json({ error: 'Failed to load Roblox avatar.' }, { status: response.status });
+        return fallbackAvatar(req);
     }
 
     const payload = await response.json().catch(() => ({}));
@@ -44,12 +53,22 @@ export async function GET(req: NextRequest) {
         : '';
 
     if (!imageUrl) {
-        return NextResponse.json({ error: 'Roblox avatar is not available.' }, { status: 404 });
+        return fallbackAvatar(req);
     }
 
-    return NextResponse.redirect(imageUrl, {
+    const imageResponse = await fetch(imageUrl, {
+        headers: { Accept: 'image/png,image/*' },
+        next: { revalidate: 60 * 60 },
+    });
+
+    if (!imageResponse.ok || !imageResponse.body) {
+        return fallbackAvatar(req);
+    }
+
+    return new NextResponse(imageResponse.body, {
         headers: {
-            'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+            'Cache-Control': CACHE_CONTROL,
+            'Content-Type': imageResponse.headers.get('content-type') || 'image/png',
         },
     });
 }
