@@ -2,6 +2,7 @@ import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
 import { supabase } from './supabase';
+import { getSupabaseAdmin } from './supabaseAdmin';
 
 export class DiscordAccessTokenError extends Error {
     constructor(message = 'Discord access token expired or was revoked.') {
@@ -39,6 +40,10 @@ interface BotGuildRecord {
     id: string;
     name: string;
     icon?: string | null;
+}
+
+interface InstalledServerRecord {
+    id: string;
 }
 
 interface GuildMemberRecord {
@@ -109,6 +114,23 @@ async function listBotGuilds() {
     return botGuilds;
 }
 
+async function listInstalledServerIds() {
+    const { data, error } = await getSupabaseAdmin()
+        .from('servers')
+        .select('id');
+
+    if (error) {
+        console.warn('[DASHBOARD][GUILDS] Failed to load installed server list. Continuing with Discord bot guilds only.', {
+            error: error.message,
+        });
+        return new Set<string>();
+    }
+
+    return new Set(((data || []) as InstalledServerRecord[])
+        .map((server) => server.id)
+        .filter(Boolean));
+}
+
 export async function listVisibleGuildsForDiscordSession(accessToken: string, discordUserId: string) {
     const userGuilds: DiscordGuildRecord[] = [];
 
@@ -148,7 +170,10 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
         }
     }
 
-    const botGuilds = await listBotGuilds();
+    const [botGuilds, installedServerIds] = await Promise.all([
+        listBotGuilds(),
+        listInstalledServerIds(),
+    ]);
     const userGuildIds = userGuilds.map((guild) => guild.id);
     const { data: blockedRows, error: blockedRowsError } = userGuildIds.length > 0
         ? await supabase
@@ -167,6 +192,9 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
     const allowedUserGuilds = userGuilds.filter((guild) => !blockedGuildIds.has(guild.id));
 
     const botGuildIds = new Set(botGuilds.map((guild) => guild.id));
+    for (const serverId of installedServerIds) {
+        botGuildIds.add(serverId);
+    }
 
     const adminGuilds = allowedUserGuilds.filter((guild) => hasDiscordGuildManagePermission(guild.permissions, guild.owner));
     const adminGuildIds = new Set(adminGuilds.map((guild) => guild.id));

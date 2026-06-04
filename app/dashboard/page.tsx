@@ -112,8 +112,16 @@ function canOpenDashboardAction(permissions?: GuildDashboardPermissions) {
     return Boolean(permissions?.is_admin || permissions?.can_access_dashboard);
 }
 
+function canOpenDashboardFromServerList(guild: Guild, permissions?: GuildDashboardPermissions) {
+    return canOpenDashboardAction(permissions) || canOpenMarketplaceFromServerList(guild);
+}
+
 function canOpenLivePanelAction(permissions?: GuildDashboardPermissions) {
     return canOpenDashboardAction(permissions) && Boolean(permissions?.is_admin || permissions?.can_access_live_panel);
+}
+
+function canOpenLivePanelFromServerList(guild: Guild, permissions?: GuildDashboardPermissions) {
+    return canOpenLivePanelAction(permissions) || canOpenMarketplaceFromServerList(guild);
 }
 
 export default function Dashboard() {
@@ -121,6 +129,7 @@ export default function Dashboard() {
     const [guilds, setGuilds] = useState<Guild[]>([]);
     const [guildPermissions, setGuildPermissions] = useState<Record<string, GuildDashboardPermissions>>({});
     const [loading, setLoading] = useState(false);
+    const [guildsError, setGuildsError] = useState<string | null>(null);
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
     const sortedGuilds = useMemo(() => [...guilds].sort(compareGuildsByBotStatus), [guilds]);
 
@@ -128,17 +137,28 @@ export default function Dashboard() {
         let cancelled = false;
 
         async function loadGuilds() {
-            if (!session?.accessToken) return;
+            if (status !== 'authenticated') return;
 
             setLoading(true);
+            setGuildsError(null);
             try {
-                const response = await fetch('/api/guilds');
+                const response = await fetch('/api/guilds', { cache: 'no-store' });
                 const data = await response.json();
-                if (!cancelled && Array.isArray(data)) {
+                if (!response.ok) {
+                    throw new Error(typeof data?.error === 'string' ? data.error : `Failed to load servers (${response.status})`);
+                }
+                if (!Array.isArray(data)) {
+                    throw new Error('Failed to load servers.');
+                }
+                if (!cancelled) {
                     setGuilds(data);
                 }
             } catch (err) {
                 console.error(err);
+                if (!cancelled) {
+                    setGuilds([]);
+                    setGuildsError(err instanceof Error ? err.message : 'Failed to load servers.');
+                }
             } finally {
                 if (!cancelled) {
                     setLoading(false);
@@ -151,14 +171,14 @@ export default function Dashboard() {
         return () => {
             cancelled = true;
         };
-    }, [session?.accessToken]);
+    }, [status]);
 
     useEffect(() => {
         let cancelled = false;
 
         async function loadGuildPermissions() {
             const botGuilds = guilds.filter((guild) => guild.hasBot);
-            if (!session?.accessToken || botGuilds.length === 0) {
+            if (status !== 'authenticated' || botGuilds.length === 0) {
                 if (!cancelled) {
                     setGuildPermissions({});
                 }
@@ -190,7 +210,7 @@ export default function Dashboard() {
         return () => {
             cancelled = true;
         };
-    }, [guilds, session?.accessToken]);
+    }, [guilds, status]);
 
     if (status === "loading") {
         return (
@@ -286,6 +306,22 @@ export default function Dashboard() {
                         <div className="w-10 h-10 border-2 border-sky-600 border-t-transparent rounded-full animate-spin mb-6"></div>
                         <p className="text-slate-500 text-sm font-medium animate-pulse">Loading servers...</p>
                     </div>
+                ) : guildsError ? (
+                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-8 text-center">
+                        <h2 className="text-lg font-bold text-white">Could not load servers</h2>
+                        <p className="mt-2 text-sm font-medium text-red-100/80">{guildsError}</p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="mt-6 rounded-lg bg-red-500 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-red-400"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                ) : sortedGuilds.length === 0 ? (
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-8 text-center">
+                        <h2 className="text-lg font-bold text-white">No servers available</h2>
+                        <p className="mt-2 text-sm font-medium text-slate-500">Ro-Link could not find any Discord servers you can manage.</p>
+                    </div>
                 ) : (
                     <div className="motion-list grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
                         {sortedGuilds.map(guild => (
@@ -318,12 +354,12 @@ export default function Dashboard() {
                                     {guild.hasBot ? (
                                         <div className="flex flex-col gap-2">
                                             <div className="flex items-center gap-2">
-                                                {canOpenDashboardAction(guildPermissions[guild.id]) && (
+                                                {canOpenDashboardFromServerList(guild, guildPermissions[guild.id]) && (
                                                     <ServerIconLink href={`/dashboard/${guild.id}`} label="Open Console">
                                                         <SettingsIcon />
                                                     </ServerIconLink>
                                                 )}
-                                                {canOpenLivePanelAction(guildPermissions[guild.id]) && (
+                                                {canOpenLivePanelFromServerList(guild, guildPermissions[guild.id]) && (
                                                     <ServerIconLink href={`/dashboard/${guild.id}/live-panel`} label="Live Panel" tone="live">
                                                         <LivePanelIcon />
                                                     </ServerIconLink>
