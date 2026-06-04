@@ -81,6 +81,7 @@ export default function DashboardPlayerPage() {
     const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [setCharValue, setSetCharValue] = useState("");
+    const [teamValue, setTeamValue] = useState("");
     const [valueInputs, setValueInputs] = useState<Record<string, string>>({
         DAMAGE: "25",
         MAX_HEALTH: "100",
@@ -267,10 +268,11 @@ export default function DashboardPlayerPage() {
     const availableModerationCommands = moderationCommands.filter((command) => canUseDashboardCommand(perms, command.id));
     const availableTargetCommands = TARGETED_PLAYER_COMMANDS.filter((command) => canUseDashboardCommand(perms, command.id));
     const quickTargetCommands = availableTargetCommands.filter((command) =>
-        command.id !== 'SET_CHAR' && !valueCommandSet.has(command.id),
+        command.id !== 'SET_CHAR' && command.id !== 'TEAM' && !valueCommandSet.has(command.id),
     );
     const valueCommands = availableTargetCommands.filter((command) => valueCommandSet.has(command.id));
     const setCharCommand = availableTargetCommands.find((command) => command.id === 'SET_CHAR') || null;
+    const teamCommand = availableTargetCommands.find((command) => command.id === 'TEAM') || null;
 
     if (error || !player) {
         return (
@@ -480,7 +482,7 @@ export default function DashboardPlayerPage() {
                             </div>
                         )}
 
-                        {(setCharCommand || valueCommands.length > 0) && (
+                        {(setCharCommand || teamCommand || valueCommands.length > 0) && (
                             <div className="mt-6 grid gap-4 xl:grid-cols-2">
                                 {setCharCommand && (
                                     <div className="rounded-2xl border border-slate-800 bg-black/20 p-4">
@@ -501,6 +503,30 @@ export default function DashboardPlayerPage() {
                                                 className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
                                             >
                                                 {actionLoading === 'SET_CHAR' ? 'Sending...' : 'Apply'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {teamCommand && (
+                                    <div className="rounded-2xl border border-slate-800 bg-black/20 p-4">
+                                        <p className="text-xs font-black uppercase tracking-widest text-white">{teamCommand.label}</p>
+                                        <p className="mt-2 text-[11px] font-medium text-slate-500">{teamCommand.description}</p>
+                                        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                                            <input
+                                                type="text"
+                                                value={teamValue}
+                                                onChange={(event) => setTeamValue(event.target.value)}
+                                                placeholder="Roblox team name"
+                                                className="flex-1 rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600"
+                                            />
+                                            <button
+                                                type="button"
+                                                disabled={actionLoading === 'TEAM' || !presence.inGame || !trimString(teamValue)}
+                                                onClick={() => sendPlayerCommand('TEAM', { team_name: trimString(teamValue) })}
+                                                className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                                            >
+                                                {actionLoading === 'TEAM' ? 'Sending...' : 'Apply'}
                                             </button>
                                         </div>
                                     </div>

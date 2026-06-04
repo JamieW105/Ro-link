@@ -153,6 +153,7 @@ const DISCORD_ID_PATTERN = /^\d{17,20}$/;
 const RECENT_LEFT_TTL_MS = 10 * 60 * 1000;
 const VALUE_COMMAND_SET = new Set<string>(VALUE_INPUT_COMMAND_IDS);
 const NUMERIC_GLOBAL_COMMANDS = new Set<string>(['GRAVITY', 'BRIGHTNESS']);
+const TARGET_VALUE_COMMANDS = new Set<string>(['SET_CHAR', 'TEAM']);
 
 const RefreshIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -931,7 +932,17 @@ export default function LivePanelPage() {
                     title: user.displayName || user.username,
                     detail: userReason(user),
                     meta: `@${user.username}`,
-                    value: `${command.label} ${user.username}${VALUE_COMMAND_SET.has(command.id) || command.id === 'SET_CHAR' ? ' ' : ''}`,
+                    value: `${command.label} ${user.username}${VALUE_COMMAND_SET.has(command.id) || TARGET_VALUE_COMMANDS.has(command.id) ? ' ' : ''}`,
+                });
+            });
+        } else if (command.id === 'VIEW') {
+            userMatches(commandBarParsed.remainder).forEach((user) => {
+                items.push({
+                    kind: 'user',
+                    title: user.displayName || user.username,
+                    detail: `${userReason(user)}. Leave blank to reset your own camera.`,
+                    meta: `@${user.username}`,
+                    value: `${command.label} ${user.username}`,
                 });
             });
         } else if (NUMERIC_GLOBAL_COMMANDS.has(command.id)) {
@@ -962,7 +973,7 @@ export default function LivePanelPage() {
     const profileCommandDefinition = profileCommand ? getAdminPanelCommandDefinition(profileCommand) : null;
     const profileCommandNeedsValue = profileCommandDefinition
         ? VALUE_COMMAND_SET.has(profileCommandDefinition.id)
-        || profileCommandDefinition.id === 'SET_CHAR'
+        || TARGET_VALUE_COMMANDS.has(profileCommandDefinition.id)
         || NUMERIC_GLOBAL_COMMANDS.has(profileCommandDefinition.id)
         || profileCommandDefinition.id === 'BROADCAST'
         : false;
@@ -1321,26 +1332,53 @@ export default function LivePanelPage() {
                 }
                 args.char_user = extra;
                 args.reason = `Set character to ${extra}`;
+            } else if (commandDefinition.id === 'TEAM') {
+                if (!extra) {
+                    setNotice({ type: 'error', text: 'Add the Roblox team name after the target user.' });
+                    return;
+                }
+                args.team_name = extra;
+                args.reason = `Set team to ${extra}`;
             }
         } else {
             const remainder = parsed.remainder.trim();
-            args.target_scope = 'GLOBAL';
-            args.target_label = 'global';
 
-            if (NUMERIC_GLOBAL_COMMANDS.has(commandDefinition.id)) {
+            if (commandDefinition.id === 'VIEW') {
+                if (remainder) {
+                    const targetParts = splitTargetAndExtra(remainder);
+                    const knownTarget = resolveUserFromText(targetParts.target);
+                    successTarget = knownTarget.username || targetParts.target;
+                    args.username = successTarget;
+                    args.reason = targetParts.extra || 'Live Panel command bar';
+                    if (knownTarget?.serverId) {
+                        args.job_id = knownTarget.serverId;
+                    }
+                } else {
+                    args.reason = 'Live Panel command bar';
+                }
+            } else if (NUMERIC_GLOBAL_COMMANDS.has(commandDefinition.id)) {
+                args.target_scope = 'GLOBAL';
+                args.target_label = 'global';
                 if (!remainder || !Number.isFinite(Number(remainder))) {
                     setNotice({ type: 'error', text: `Add a numeric value after ${commandDefinition.label}.` });
                     return;
                 }
                 args.amount = remainder;
             } else if (commandDefinition.id === 'BROADCAST') {
+                args.target_scope = 'GLOBAL';
+                args.target_label = 'global';
                 if (!remainder) {
                     setNotice({ type: 'error', text: 'Add a broadcast message after the command.' });
                     return;
                 }
                 args.message = remainder;
             } else if (remainder) {
+                args.target_scope = 'GLOBAL';
+                args.target_label = 'global';
                 args.reason = remainder;
+            } else {
+                args.target_scope = 'GLOBAL';
+                args.target_label = 'global';
             }
         }
 
@@ -1470,6 +1508,13 @@ export default function LivePanelPage() {
             }
             args.char_user = value;
             args.reason = `Set character to ${value}`;
+        } else if (command.id === 'TEAM') {
+            if (!value) {
+                setNotice({ type: 'error', text: 'Add the Roblox team name.' });
+                return;
+            }
+            args.team_name = value;
+            args.reason = `Set team to ${value}`;
         } else if (value) {
             args.reason = value;
         }
@@ -1818,7 +1863,13 @@ export default function LivePanelPage() {
                                             <input
                                                 value={profileCommandValue}
                                                 onChange={(event) => setProfileCommandValue(event.target.value)}
-                                                placeholder={profileCommandDefinition?.id === 'SET_CHAR' ? 'Character username' : profileCommandDefinition?.id === 'BROADCAST' ? 'Message' : 'Value or note'}
+                                                placeholder={profileCommandDefinition?.id === 'SET_CHAR'
+                                                    ? 'Character username'
+                                                    : profileCommandDefinition?.id === 'TEAM'
+                                                        ? 'Roblox team name'
+                                                        : profileCommandDefinition?.id === 'BROADCAST'
+                                                            ? 'Message'
+                                                            : 'Value or note'}
                                                 className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60"
                                             />
                                         )}

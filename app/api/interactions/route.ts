@@ -186,11 +186,12 @@ type DiscordInteractionPayload = {
 };
 
 type MiscCommandArgs = {
-    username: string;
+    username?: string;
     moderator: string;
     char_user?: string;
     amount?: number;
     moderator_roblox_username?: string;
+    team_name?: string;
 };
 
 type InteractionResponseData = {
@@ -236,6 +237,8 @@ const MISC_SUBCOMMAND_TO_COMMAND: Record<string, string> = {
     kill: 'KILL',
     reset: 'RESET',
     refresh: 'REFRESH',
+    view: 'VIEW',
+    team: 'TEAM',
     freeze: 'FREEZE',
     unfreeze: 'UNFREEZE',
     'bring-to-spawn': 'BRING_TO_SPAWN',
@@ -247,6 +250,21 @@ const VALUE_INPUT_MISC_COMMANDS = new Set(['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED',
 const MODERATION_MENU_ACTIONS = ['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'UPDATE', 'SHUTDOWN'] as const;
 const MODERATION_LOG_ACTIONS = new Set(['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'DISCORD_BAN', 'DISCORD_KICK', 'TIMEOUT', 'MUTE']);
 const SUPER_ADMIN_DISCORD_ID = '953414442060746854';
+
+async function getLinkedRobloxUsername(discordId: string) {
+    const normalizedDiscordId = String(discordId ?? '').trim();
+    if (!normalizedDiscordId) {
+        return '';
+    }
+
+    const { data } = await supabase
+        .from('verified_users')
+        .select('roblox_username')
+        .eq('discord_id', normalizedDiscordId)
+        .maybeSingle<{ roblox_username?: string | null }>();
+
+    return String(data?.roblox_username ?? '').trim();
+}
 
 function buildModerationPanelResponse(): InteractionResponseData {
     return {
@@ -452,7 +470,8 @@ function buildMiscPanelResponse(): InteractionResponseData {
                 { name: 'Movement', value: "`FLY` `NOCLIP`", inline: true },
                 { name: 'Visibility', value: "`INVIS` `GHOST`", inline: true },
                 { name: 'Vitality', value: "`HEAL` `KILL` `RESET`", inline: true },
-                { name: 'Identity', value: "`SET_CHAR` `REFRESH`", inline: true }
+                { name: 'Identity', value: "`SET_CHAR` `REFRESH` `VIEW`", inline: true },
+                { name: 'Teams', value: "`TEAM`", inline: true }
             ],
             footer: { text: 'Ro-Link Systems - Admin Tools' },
             timestamp: new Date().toISOString()
@@ -478,6 +497,8 @@ function buildMiscPanelResponse(): InteractionResponseData {
                     { label: 'Kill', value: 'KILL', description: 'Instant kill' },
                     { label: 'Reset', value: 'RESET', description: 'Reset character' },
                     { label: 'Refresh', value: 'REFRESH', description: 'Refresh character' },
+                    { label: 'View', value: 'VIEW', description: 'View or reset your camera' },
+                    { label: 'Team', value: 'TEAM', description: 'Move to a team' },
                     { label: 'Freeze', value: 'FREEZE', description: 'Anchor in place' },
                     { label: 'Unfreeze', value: 'UNFREEZE', description: 'Remove freeze' },
                     { label: 'Bring To Spawn', value: 'BRING_TO_SPAWN', description: 'Move to spawn' },
@@ -2254,9 +2275,27 @@ export async function POST(req: Request) {
                 if (miscCommand) {
                     const amountValue = getCommandOptionValue(options, 'amount');
                     const amount = amountValue === undefined ? undefined : Number(amountValue);
-                    const args: MiscCommandArgs = { username: targetUser, moderator: userTag };
+                    let resolvedTargetUser = targetUser;
+                    const args: MiscCommandArgs = { username: resolvedTargetUser, moderator: userTag };
                     if (miscCommand === 'SET_CHAR') {
                         args.char_user = String(getCommandOptionValue(options, 'char_user') ?? '').trim();
+                    }
+                    if (miscCommand === 'TEAM') {
+                        args.team_name = String(getCommandOptionValue(options, 'team_name') ?? '').trim();
+                    }
+                    if (miscCommand === 'VIEW') {
+                        const linkedRobloxUsername = await getLinkedRobloxUsername(userId);
+                        if (!linkedRobloxUsername) {
+                            return NextResponse.json({
+                                type: 4,
+                                data: { content: 'Link your Discord account to Roblox before using View.', flags: 64 }
+                            });
+                        }
+                        args.moderator_roblox_username = linkedRobloxUsername;
+                        if (!resolvedTargetUser) {
+                            resolvedTargetUser = linkedRobloxUsername;
+                            args.username = linkedRobloxUsername;
+                        }
                     }
                     if (miscCommand === 'TELEPORT_TO_ME') {
                         args.moderator_roblox_username = String(getCommandOptionValue(options, 'moderator_username') ?? '').trim();
@@ -2279,7 +2318,7 @@ export async function POST(req: Request) {
                             status: 'PENDING'
                         }]),
                         triggerMessaging(miscCommand, args, server),
-                        logAction(guild_id, miscCommand, targetUser, logActor, 'Misc command')
+                        logAction(guild_id, miscCommand, resolvedTargetUser || 'self', logActor, 'Misc command')
                     ]);
 
                     if (queueRes.error) {
@@ -2291,7 +2330,7 @@ export async function POST(req: Request) {
 
                     return NextResponse.json({
                         type: 4,
-                        data: { content: `Queued **${miscCommand}** for \`${targetUser}\`.`, flags: 64 }
+                        data: { content: `Queued **${miscCommand}** for \`${resolvedTargetUser || 'self'}\`.`, flags: 64 }
                     });
                 }
 
@@ -2306,7 +2345,8 @@ export async function POST(req: Request) {
                                 { name: 'Movement', value: "`FLY` `NOCLIP`", inline: true },
                                 { name: 'Visibility', value: "`INVIS` `GHOST`", inline: true },
                                 { name: 'Vitality', value: "`HEAL` `KILL` `RESET`", inline: true },
-                                { name: 'Identity', value: "`SET_CHAR` `REFRESH`", inline: true }
+                                { name: 'Identity', value: "`SET_CHAR` `REFRESH` `VIEW`", inline: true },
+                                { name: 'Teams', value: "`TEAM`", inline: true }
                             ],
                             footer: { text: 'Ro-Link Systems • Admin Tools' },
                             timestamp: new Date().toISOString()
@@ -2332,6 +2372,8 @@ export async function POST(req: Request) {
                                     { label: 'Kill', value: 'KILL', description: 'Instant kill' },
                                     { label: 'Reset', value: 'RESET', description: 'Reset character' },
                                     { label: 'Refresh', value: 'REFRESH', description: 'Refresh character' },
+                                    { label: 'View', value: 'VIEW', description: 'View or reset your camera' },
+                                    { label: 'Team', value: 'TEAM', description: 'Move to a team' },
                                     { label: 'Freeze', value: 'FREEZE', description: 'Anchor in place' },
                                     { label: 'Unfreeze', value: 'UNFREEZE', description: 'Remove freeze' },
                                     { label: 'Bring To Spawn', value: 'BRING_TO_SPAWN', description: 'Move to spawn' },
@@ -2938,8 +2980,8 @@ export async function POST(req: Request) {
                         custom_id: 'target_user',
                         label: "Target Username",
                         style: 1,
-                        placeholder: 'Enter the Roblox username',
-                        required: true
+                        placeholder: action === 'VIEW' ? 'Leave blank to reset your camera' : 'Enter the Roblox username',
+                        required: action !== 'VIEW'
                     }]
                 }];
 
@@ -2966,6 +3008,20 @@ export async function POST(req: Request) {
                             label: 'Amount',
                             style: 1,
                             placeholder: 'Enter a number',
+                            required: true
+                        }]
+                    });
+                }
+
+                if (action === 'TEAM') {
+                    components.push({
+                        type: 1,
+                        components: [{
+                            type: 4,
+                            custom_id: 'team_name',
+                            label: 'Roblox Team Name',
+                            style: 1,
+                            placeholder: 'Exact team name',
                             required: true
                         }]
                     });
@@ -3197,7 +3253,7 @@ export async function POST(req: Request) {
             if (custom_id.startsWith('misc_modal_')) {
                 const action = custom_id.replace('misc_modal_', '');
 
-                const targetUser = getModalField(modalComponents, 'target_user');
+                let targetUser = getModalField(modalComponents, 'target_user');
                 const args: MiscCommandArgs = { username: targetUser, moderator: userTag };
 
                 let msgContent = `✅ Queuing **${action}** for **${targetUser}**...`;
@@ -3220,6 +3276,36 @@ export async function POST(req: Request) {
                     msgContent = `Queuing **${action}** (${amount}) for **${targetUser}**...`;
                 }
 
+                if (action === 'TEAM') {
+                    const teamName = getModalField(modalComponents, 'team_name').trim();
+                    if (!teamName) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: 'Please provide a Roblox team name.', flags: 64 }
+                        });
+                    }
+                    args.team_name = teamName;
+                    msgContent = `Queuing **Team** (${teamName}) for **${targetUser}**...`;
+                }
+
+                if (action === 'VIEW') {
+                    const linkedRobloxUsername = await getLinkedRobloxUsername(userId);
+                    if (!linkedRobloxUsername) {
+                        return NextResponse.json({
+                            type: 4,
+                            data: { content: 'Link your Discord account to Roblox before using View.', flags: 64 }
+                        });
+                    }
+                    args.moderator_roblox_username = linkedRobloxUsername;
+                    if (!targetUser) {
+                        targetUser = linkedRobloxUsername;
+                        args.username = linkedRobloxUsername;
+                    }
+                    msgContent = targetUser === linkedRobloxUsername
+                        ? 'Queuing **View** camera reset...'
+                        : `Queuing **View** for **${targetUser}**...`;
+                }
+
                 if (action === 'TELEPORT_TO_ME') {
                     args.moderator_roblox_username = getModalField(modalComponents, 'moderator_username');
                     msgContent = `Queuing **Teleport To Me** for **${targetUser}**...`;
@@ -3233,7 +3319,7 @@ export async function POST(req: Request) {
                         status: 'PENDING'
                     }]),
                     triggerMessaging(action, args),
-                    logAction(guild_id, action, targetUser, logActor, action === 'SET_CHAR' ? `Set character to ${args.char_user}` : 'Misc Action')
+                    logAction(guild_id, action, targetUser || 'self', logActor, action === 'SET_CHAR' ? `Set character to ${args.char_user}` : 'Misc Action')
                 ]);
 
                 return NextResponse.json({
@@ -3443,6 +3529,8 @@ local RoLink = {}
 local Http = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MS = game:GetService("MessagingService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Teams = game:GetService("Teams")
 
 local URL = "${baseUrl}"
 local KEY = "${apiKey}"
@@ -4200,6 +4288,13 @@ function RoLink:Execute(cmd)
 
 	local u, r = cmd.args.username, cmd.args.reason or "No reason"
 	local p = Players:FindFirstChild(u) 
+    if cmd.command == "VIEW" and not p then
+        local viewerPlayer = Players:FindFirstChild(cmd.args.moderator_roblox_username or "")
+        if viewerPlayer then
+            p = viewerPlayer
+            u = viewerPlayer.Name
+        end
+    end
     
     -- Permission Checks (Default to TRUE if settings not loaded or key missing)
     local function isAdmin() return not self.settings or self.settings.adminCmdsEnabled ~= false end
@@ -4379,6 +4474,25 @@ function RoLink:Execute(cmd)
                     child:Destroy()
                 end
             end
+        end
+    elseif cmd.command == "VIEW" and isMisc() then
+        local viewerPlayer = Players:FindFirstChild(cmd.args.moderator_roblox_username or "") or p
+        local viewRemote = ReplicatedStorage:FindFirstChild("RoLinkViewCamera")
+        if viewerPlayer and viewRemote and viewRemote:IsA("RemoteEvent") then
+            viewRemote:FireClient(viewerPlayer, p and p.UserId or viewerPlayer.UserId)
+        end
+    elseif cmd.command == "TEAM" and isMisc() then
+        local teamName = tostring(cmd.args.team_name or cmd.args.teamName or cmd.args.team or "")
+        local targetTeam = nil
+        for _, team in ipairs(Teams:GetTeams()) do
+            if string.lower(team.Name) == string.lower(teamName) then
+                targetTeam = team
+                break
+            end
+        end
+        if p and targetTeam then
+            p.Team = targetTeam
+            p.Neutral = false
         end
     elseif cmd.command == "BROADCAST" and isAdmin() then
         local message = tostring(cmd.args.message or r)

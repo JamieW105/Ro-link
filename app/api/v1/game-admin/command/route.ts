@@ -38,6 +38,16 @@ export async function POST(req: Request) {
         if (moderatorRobloxUsername) {
             baseArgs.moderator_roblox_username = moderatorRobloxUsername;
         }
+        if (command === 'VIEW' && !trimString(baseArgs.username) && moderatorRobloxUsername) {
+            baseArgs.target_label = moderatorRobloxUsername;
+        }
+        if (command === 'TEAM') {
+            const teamName = trimString(args.team_name || args.teamName || args.team);
+            if (!teamName) {
+                return NextResponse.json({ error: 'Team name is required.' }, { status: 400 });
+            }
+            baseArgs.team_name = teamName;
+        }
 
         const deliveryTargets = await resolveDeliveryTargets(server.id, command, baseArgs, {
             preferredJobId: trimString(body?.sourceJobId || args.source_job_id),

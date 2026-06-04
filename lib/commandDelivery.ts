@@ -29,6 +29,8 @@ const PLAYER_TARGET_COMMAND_LOOKUP = new Set<string>([
     'MAX_HEALTH',
     'RESET',
     'REFRESH',
+    'VIEW',
+    'TEAM',
     'WALK_SPEED',
     'JUMP_POWER',
     'FREEZE',
@@ -199,6 +201,22 @@ export async function resolveDeliveryTargets(
             jobId: targetJobId,
             scope: 'SERVER',
         }] satisfies DeliveryTarget[];
+    }
+
+    if (command === 'VIEW') {
+        const viewerIdentity = trimString(args.moderator_roblox_username);
+        if (viewerIdentity) {
+            const targetJobId = await resolvePlayerJobId(serverId, viewerIdentity, options?.preferredJobId);
+            if (!targetJobId) {
+                return [] satisfies DeliveryTarget[];
+            }
+
+            return [{
+                deliveryId: crypto.randomUUID(),
+                jobId: targetJobId,
+                scope: 'SERVER',
+            }] satisfies DeliveryTarget[];
+        }
     }
 
     return [{

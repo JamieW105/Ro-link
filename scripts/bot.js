@@ -47,6 +47,8 @@ const MISC_SUBCOMMAND_TO_COMMAND = {
     kill: 'KILL',
     reset: 'RESET',
     refresh: 'REFRESH',
+    view: 'VIEW',
+    team: 'TEAM',
     freeze: 'FREEZE',
     unfreeze: 'UNFREEZE',
     'bring-to-spawn': 'BRING_TO_SPAWN',
@@ -56,6 +58,18 @@ const MISC_SUBCOMMAND_TO_COMMAND = {
 };
 const VALUE_INPUT_MISC_COMMANDS = new Set(['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED', 'JUMP_POWER']);
 const MODERATION_LOG_ACTIONS = new Set(['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'DISCORD_BAN', 'DISCORD_KICK', 'TIMEOUT', 'MUTE']);
+
+async function getLinkedRobloxUsername(discordId) {
+    if (!supabase || !discordId) return '';
+
+    const { data } = await supabase
+        .from('verified_users')
+        .select('roblox_username')
+        .eq('discord_id', discordId)
+        .maybeSingle();
+
+    return String(data?.roblox_username || '').trim();
+}
 
 async function findBlockedServerForGuild(guildId) {
     if (!supabase || !guildId) return null;
@@ -123,7 +137,9 @@ function buildMiscPanel() {
             { name: 'Heal', value: 'Restores player health to maximum.', inline: false },
             { name: 'Kill', value: 'Immediately kills the target player.', inline: false },
             { name: 'Reset', value: 'Resets the player character.', inline: false },
-            { name: 'Refresh', value: 'Respawn the player character.', inline: false }
+            { name: 'Refresh', value: 'Respawn the player character.', inline: false },
+            { name: 'View', value: 'View a player or reset your camera to yourself.', inline: false },
+            { name: 'Team', value: 'Move a player to a Roblox team.', inline: false }
         )
         .setFooter({ text: 'Ro-Link Utility System' });
 
@@ -146,6 +162,8 @@ function buildMiscPanel() {
                     new StringSelectMenuOptionBuilder().setLabel('Kill').setDescription('Instant kill').setValue('KILL'),
                     new StringSelectMenuOptionBuilder().setLabel('Reset').setDescription('Reset character').setValue('RESET'),
                     new StringSelectMenuOptionBuilder().setLabel('Refresh').setDescription('Refresh character').setValue('REFRESH'),
+                    new StringSelectMenuOptionBuilder().setLabel('View').setDescription('View or reset your camera').setValue('VIEW'),
+                    new StringSelectMenuOptionBuilder().setLabel('Team').setDescription('Move to a team').setValue('TEAM'),
                     new StringSelectMenuOptionBuilder().setLabel('Freeze').setDescription('Anchor in place').setValue('FREEZE'),
                     new StringSelectMenuOptionBuilder().setLabel('Unfreeze').setDescription('Remove freeze').setValue('UNFREEZE'),
                     new StringSelectMenuOptionBuilder().setLabel('Bring To Spawn').setDescription('Move to spawn').setValue('BRING_TO_SPAWN'),
@@ -1670,10 +1688,24 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
     } else if (commandName === 'misc') {
         if (miscCommand) {
-            const targetUser = interaction.options.getString('username');
+            let targetUser = interaction.options.getString('username');
             const args = { username: targetUser, moderator: user.tag };
             if (miscCommand === 'SET_CHAR') {
                 args.char_user = interaction.options.getString('char_user');
+            }
+            if (miscCommand === 'TEAM') {
+                args.team_name = interaction.options.getString('team_name');
+            }
+            if (miscCommand === 'VIEW') {
+                const linkedRobloxUsername = await getLinkedRobloxUsername(user.id);
+                if (!linkedRobloxUsername) {
+                    return interaction.reply({ content: 'Link your Discord account to Roblox before using View.', ephemeral: true });
+                }
+                args.moderator_roblox_username = linkedRobloxUsername;
+                if (!targetUser) {
+                    targetUser = linkedRobloxUsername;
+                    args.username = linkedRobloxUsername;
+                }
             }
             if (miscCommand === 'TELEPORT_TO_ME') {
                 args.moderator_roblox_username = interaction.options.getString('moderator_username');
@@ -1713,7 +1745,9 @@ client.on('interactionCreate', async interaction => {
                 { name: 'Heal', value: 'Restores player health to maximum.', inline: false },
                 { name: 'Kill', value: 'Immediately kills the target player.', inline: false },
                 { name: 'Reset', value: 'Resets the player character.', inline: false },
-                { name: 'Refresh', value: 'Respawn the player character.', inline: false }
+                { name: 'Refresh', value: 'Respawn the player character.', inline: false },
+                { name: 'View', value: 'View a player or reset your camera to yourself.', inline: false },
+                { name: 'Team', value: 'Move a player to a Roblox team.', inline: false }
             )
             .setFooter({ text: 'Ro-Link Utility System' });
 
@@ -1775,6 +1809,14 @@ client.on('interactionCreate', async interaction => {
                             .setLabel('Refresh')
                             .setDescription('Refresh character')
                             .setValue('REFRESH'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('View')
+                            .setDescription('View or reset your camera')
+                            .setValue('VIEW'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Team')
+                            .setDescription('Move to a team')
+                            .setValue('TEAM'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Freeze')
                             .setDescription('Anchor in place')
@@ -2025,9 +2067,9 @@ client.on('interactionCreate', async interaction => {
         const targetUserInput = new TextInputBuilder()
             .setCustomId('target_user')
             .setLabel("Target Username")
-            .setPlaceholder('Enter the Roblox username')
+            .setPlaceholder(action === 'VIEW' ? 'Leave blank to reset your camera' : 'Enter the Roblox username')
             .setStyle(TextInputStyle.Short)
-            .setRequired(true);
+            .setRequired(action !== 'VIEW');
 
         const rows = [new ActionRowBuilder().addComponents(targetUserInput)];
 
@@ -2049,6 +2091,16 @@ client.on('interactionCreate', async interaction => {
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
             rows.push(new ActionRowBuilder().addComponents(amountInput));
+        }
+
+        if (action === 'TEAM') {
+            const teamNameInput = new TextInputBuilder()
+                .setCustomId('team_name')
+                .setLabel('Roblox Team Name')
+                .setPlaceholder('Exact team name')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+            rows.push(new ActionRowBuilder().addComponents(teamNameInput));
         }
 
         if (action === 'TELEPORT_TO_ME') {
@@ -2169,7 +2221,14 @@ client.on('interactionCreate', async interaction => {
 
     if (interaction.customId.startsWith('misc_modal_')) {
         const action = interaction.customId.replace('misc_modal_', '');
-        const targetUser = interaction.fields.getTextInputValue('target_user');
+        const getOptionalField = (id) => {
+            try {
+                return interaction.fields.getTextInputValue(id);
+            } catch {
+                return '';
+            }
+        };
+        let targetUser = getOptionalField('target_user');
 
         let args = { username: targetUser, moderator: interaction.user.tag };
         let msgContent = `Queuing **${action}** for **${targetUser}**...`;
@@ -2189,8 +2248,32 @@ client.on('interactionCreate', async interaction => {
             msgContent = `Queuing **${action}** (${amount}) for **${targetUser}**...`;
         }
 
+        if (action === 'TEAM') {
+            const teamName = getOptionalField('team_name').trim();
+            if (!teamName) {
+                return interaction.reply({ content: 'Please provide a Roblox team name.', ephemeral: true });
+            }
+            args.team_name = teamName;
+            msgContent = `Queuing **Team** (${teamName}) for **${targetUser}**...`;
+        }
+
+        if (action === 'VIEW') {
+            const linkedRobloxUsername = await getLinkedRobloxUsername(interaction.user.id);
+            if (!linkedRobloxUsername) {
+                return interaction.reply({ content: 'Link your Discord account to Roblox before using View.', ephemeral: true });
+            }
+            args.moderator_roblox_username = linkedRobloxUsername;
+            if (!targetUser) {
+                targetUser = linkedRobloxUsername;
+                args.username = linkedRobloxUsername;
+            }
+            msgContent = targetUser === linkedRobloxUsername
+                ? 'Queuing **View** camera reset...'
+                : `Queuing **View** for **${targetUser}**...`;
+        }
+
         if (action === 'TELEPORT_TO_ME') {
-            args.moderator_roblox_username = interaction.fields.getTextInputValue('moderator_username');
+            args.moderator_roblox_username = getOptionalField('moderator_username');
             msgContent = `Queuing **Teleport To Me** for **${targetUser}**...`;
         }
 
