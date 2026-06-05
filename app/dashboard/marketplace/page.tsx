@@ -184,6 +184,10 @@ export default function DashboardMarketplacePage() {
         setInstallError(null);
     }
 
+    function handleSignOut() {
+        void signOut({ callbackUrl: '/auth/signin' });
+    }
+
     function toggleServerSelection(serverId: string) {
         const target = installTargets.find((server) => server.id === serverId);
         if (target && target.installedModuleCount >= target.moduleLimit && !selectedServerIds.includes(serverId)) {
@@ -281,7 +285,7 @@ export default function DashboardMarketplacePage() {
                         )}
                         <div className="text-right hidden sm:block">
                             <p className="text-sm font-semibold text-white leading-none mb-1">{session?.user?.name}</p>
-                            <button onClick={() => signOut()} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
+                            <button type="button" onClick={handleSignOut} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
                                 <LogOutIcon />
                                 Sign Out
                             </button>

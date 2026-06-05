@@ -133,6 +133,10 @@ export default function Dashboard() {
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
     const sortedGuilds = useMemo(() => [...guilds].sort(compareGuildsByBotStatus), [guilds]);
 
+    function handleSignOut() {
+        void signOut({ callbackUrl: '/auth/signin' });
+    }
+
     useEffect(() => {
         let cancelled = false;
 
@@ -260,7 +264,7 @@ export default function Dashboard() {
                         )}
                         <div className="text-right hidden sm:block">
                             <p className="text-sm font-semibold text-white leading-none mb-1">{session?.user?.name}</p>
-                            <button onClick={() => signOut()} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
+                            <button type="button" onClick={handleSignOut} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
                                 <LogOutIcon />
                                 Sign Out
                             </button>
@@ -268,7 +272,8 @@ export default function Dashboard() {
                         <div className="relative group">
                             <img src={session?.user?.image || ''} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm transition-transform group-hover:scale-105" />
                             <button
-                                onClick={() => signOut()}
+                                type="button"
+                                onClick={handleSignOut}
                                 className="sm:hidden absolute -bottom-1 -right-1 bg-slate-900 border border-slate-700 p-1 rounded-md text-slate-400 hover:text-red-400 shadow-xl"
                                 title="Sign Out"
                             >

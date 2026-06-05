@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 
@@ -57,13 +57,14 @@ function SignInContent() {
     const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
     const error = searchParams.get('error');
     const [isSigningIn, setIsSigningIn] = useState(false);
+    const [destination, setDestination] = useState('Ro-Link');
 
-    const destination = useMemo(() => {
+    useEffect(() => {
         try {
             const url = new URL(callbackUrl, window.location.origin);
-            return url.hostname;
+            setDestination(url.hostname);
         } catch {
-            return 'Ro-Link';
+            setDestination('Ro-Link');
         }
     }, [callbackUrl]);
 
