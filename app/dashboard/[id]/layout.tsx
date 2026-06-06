@@ -636,12 +636,14 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
     const mainPaddingClass =
         customDashboardLayout === 'floating_dock' ? 'pb-28 md:pb-28' : '';
+    const dashboardRoute = pathname.includes('/live-panel') ? 'live-panel' : 'standard';
 
     return (
         <div
-            className={`custom-dashboard-shell h-screen min-h-0 overflow-hidden bg-[#020617] text-slate-200 flex min-w-0 flex-col ${flexDirClass} font-sans`}
+            className={`custom-dashboard-shell dashboard-shell-premium h-screen min-h-0 overflow-hidden bg-[#020617] text-slate-200 flex min-w-0 flex-col ${flexDirClass} font-sans`}
             data-custom-dashboard-themed={isCustomDashboardStyled ? 'true' : undefined}
             data-dashboard-layout={customDashboardLayout}
+            data-dashboard-route={dashboardRoute}
             style={customDashboardStyle}
         >
             {/* Sidebar Overlay (Mobile Drawer trigger) */}
@@ -653,7 +655,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             )}
 
             {/* --- MOBILE DRAWER ASIDE (Always unified under classic standard style on mobile) --- */}
-            <aside className={`
+            <aside className={`dashboard-sidebar
                 fixed inset-y-0 left-0 w-[85vw] max-w-72 overflow-hidden bg-[#020617] border-r border-slate-800 z-[70] 
                 transform transition-transform duration-300 ease-in-out flex flex-col md:hidden
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -768,7 +770,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
             {/* 1. Classic Left Sidebar Layout */}
             {customDashboardLayout === 'standard' && (
-                <aside className="hidden md:flex flex-col fixed inset-y-0 left-0 w-72 overflow-hidden border-r border-slate-800 bg-[#020617]/50 backdrop-blur-md z-[40]">
+                <aside className="dashboard-sidebar hidden md:flex flex-col fixed inset-y-0 left-0 w-72 overflow-hidden border-r border-slate-800 bg-[#020617]/50 backdrop-blur-md z-[40]">
                     <div className="p-6 flex min-h-0 flex-col h-full">
                         <div className="flex items-center justify-between mb-8">
                             <Link href={dashboardHomeHref} className="flex min-w-0 items-center gap-3 pl-2 hover:opacity-80 transition-opacity cursor-pointer">
@@ -875,7 +877,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
             {/* 2. Slim Left Dock Layout */}
             {customDashboardLayout === 'compact' && (
-                <aside className="hidden md:flex flex-col fixed inset-y-0 left-0 w-20 overflow-hidden border-r border-slate-800 bg-[#020617]/50 backdrop-blur-md items-center py-6 z-[40]">
+                <aside className="dashboard-sidebar hidden md:flex flex-col fixed inset-y-0 left-0 w-20 overflow-hidden border-r border-slate-800 bg-[#020617]/50 backdrop-blur-md items-center py-6 z-[40]">
                     <Link href={dashboardHomeHref} className="mb-8 hover:opacity-80 transition-opacity">
                         <img src={customDashboardLogo} alt="" className="w-9 h-9 rounded object-cover shadow-lg shadow-sky-500/10" />
                     </Link>
@@ -924,7 +926,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
             {/* 5. Split Multi-Level Sidebar Layout */}
             {customDashboardLayout === 'split_sidebar' && (
-                <aside className="hidden md:flex flex-row fixed inset-y-0 left-0 w-[296px] overflow-hidden border-r border-slate-800 bg-[#020617]/50 backdrop-blur-md z-[40]">
+                <aside className="dashboard-sidebar hidden md:flex flex-row fixed inset-y-0 left-0 w-[296px] overflow-hidden border-r border-slate-800 bg-[#020617]/50 backdrop-blur-md z-[40]">
                     {/* Category Switcher Column (Leftmost) */}
                     <div className="w-16 flex flex-col items-center py-6 border-r border-slate-800/80 bg-slate-950/20 h-full">
                         <Link href={dashboardHomeHref} className="mb-8 hover:opacity-80 transition-opacity">
@@ -1054,8 +1056,8 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             )}
 
             {/* --- MAIN CONTENT AREA --- */}
-            <main className={`flex-1 min-w-0 ${mainMarginClass} ${mainPaddingClass} h-screen min-h-0 overflow-hidden flex flex-col`}>
-                <header className="sticky top-0 z-50 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-[#020617]/80 px-4 py-3 backdrop-blur-md md:h-16 md:flex-nowrap md:px-10 md:py-0">
+            <main className={`dashboard-main flex-1 min-w-0 ${mainMarginClass} ${mainPaddingClass} h-screen min-h-0 overflow-hidden flex flex-col`}>
+                <header className="dashboard-topbar sticky top-0 z-50 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-[#020617]/80 px-4 py-3 backdrop-blur-md md:h-16 md:flex-nowrap md:px-10 md:py-0">
                     <div className="flex min-w-0 items-center gap-3 h-full">
                         <button
                             onClick={() => setIsSidebarOpen(true)}
@@ -1210,7 +1212,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                     </div>
                 </header>
 
-                <div className="dashboard-content-frame motion-page min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-gradient-to-tr from-[#020617] via-[#020617] to-sky-950/5 p-4 md:p-10 custom-scrollbar">
+                <div className="dashboard-content-frame dashboard-premium-frame motion-page min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-gradient-to-tr from-[#020617] via-[#020617] to-sky-950/5 p-4 md:p-10 custom-scrollbar">
                     <PermissionsProvider permissions={userPermissions}>
                         {children}
                     </PermissionsProvider>
