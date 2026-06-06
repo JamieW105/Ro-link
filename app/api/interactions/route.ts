@@ -4476,17 +4476,75 @@ function RoLink:Execute(cmd)
             hrp.Anchored = false
         end
     elseif cmd.command == "RAGDOLL" and isMisc() then
-        local humanoid = p and p.Character and p.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
+        local character = p and p.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        if character and humanoid and not character:GetAttribute("RoLink_Ragdoll") then
             local durationSeconds = tonumber(cmd.args.duration_seconds or cmd.args.duration) or 4
             durationSeconds = math.clamp(durationSeconds, 0.5, 30)
+
+            local createdInstances = {}
+            local disabledMotors = {}
+            local oldPlatformStand = humanoid.PlatformStand
+            local oldAutoRotate = humanoid.AutoRotate
+            local oldRequiresNeck = humanoid.RequiresNeck
+
+            character:SetAttribute("RoLink_Ragdoll", true)
             humanoid.PlatformStand = true
+            humanoid.AutoRotate = false
+            humanoid.RequiresNeck = false
+
+            for _, descendant in ipairs(character:GetDescendants()) do
+                if descendant:IsA("Motor6D") and descendant.Part0 and descendant.Part1 then
+                    local attachment0 = Instance.new("Attachment")
+                    attachment0.Name = "RoLinkRagdollAttachment0"
+                    attachment0.CFrame = descendant.C0
+                    attachment0.Parent = descendant.Part0
+
+                    local attachment1 = Instance.new("Attachment")
+                    attachment1.Name = "RoLinkRagdollAttachment1"
+                    attachment1.CFrame = descendant.C1
+                    attachment1.Parent = descendant.Part1
+
+                    local socket = Instance.new("BallSocketConstraint")
+                    socket.Name = "RoLinkRagdollConstraint"
+                    socket.Attachment0 = attachment0
+                    socket.Attachment1 = attachment1
+                    socket.LimitsEnabled = true
+                    socket.TwistLimitsEnabled = true
+                    socket.UpperAngle = 45
+                    socket.TwistLowerAngle = -45
+                    socket.TwistUpperAngle = 45
+                    socket.Parent = descendant.Part0
+
+                    table.insert(createdInstances, socket)
+                    table.insert(createdInstances, attachment0)
+                    table.insert(createdInstances, attachment1)
+                    table.insert(disabledMotors, descendant)
+                    descendant.Enabled = false
+                end
+            end
+
             pcall(function()
                 humanoid:ChangeState(Enum.HumanoidStateType.Ragdoll)
             end)
             task.delay(durationSeconds, function()
+                for _, motor in ipairs(disabledMotors) do
+                    if motor and motor.Parent then
+                        motor.Enabled = true
+                    end
+                end
+                for _, instance in ipairs(createdInstances) do
+                    if instance and instance.Parent then
+                        instance:Destroy()
+                    end
+                end
+                if character and character.Parent then
+                    character:SetAttribute("RoLink_Ragdoll", nil)
+                end
                 if humanoid and humanoid.Parent then
-                    humanoid.PlatformStand = false
+                    humanoid.PlatformStand = oldPlatformStand
+                    humanoid.AutoRotate = oldAutoRotate
+                    humanoid.RequiresNeck = oldRequiresNeck
                     pcall(function()
                         humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
                     end)
