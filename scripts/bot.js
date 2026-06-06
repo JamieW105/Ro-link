@@ -51,6 +51,7 @@ const MISC_SUBCOMMAND_TO_COMMAND = {
     team: 'TEAM',
     freeze: 'FREEZE',
     unfreeze: 'UNFREEZE',
+    ragdoll: 'RAGDOLL',
     'bring-to-spawn': 'BRING_TO_SPAWN',
     'teleport-to-me': 'TELEPORT_TO_ME',
     'forcefield-add': 'FORCEFIELD_ADD',
@@ -136,6 +137,7 @@ function buildMiscPanel() {
             { name: 'Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: false },
             { name: 'Heal', value: 'Restores player health to maximum.', inline: false },
             { name: 'Kill', value: 'Immediately kills the target player.', inline: false },
+            { name: 'Ragdoll', value: 'Temporarily forces the target player into a ragdoll state.', inline: false },
             { name: 'Reset', value: 'Resets the player character.', inline: false },
             { name: 'Refresh', value: 'Respawn the player character.', inline: false },
             { name: 'View', value: 'View a player or reset your camera to yourself.', inline: false },
@@ -166,6 +168,7 @@ function buildMiscPanel() {
                     new StringSelectMenuOptionBuilder().setLabel('Team').setDescription('Move to a team').setValue('TEAM'),
                     new StringSelectMenuOptionBuilder().setLabel('Freeze').setDescription('Anchor in place').setValue('FREEZE'),
                     new StringSelectMenuOptionBuilder().setLabel('Unfreeze').setDescription('Remove freeze').setValue('UNFREEZE'),
+                    new StringSelectMenuOptionBuilder().setLabel('Ragdoll').setDescription('Temporarily ragdoll').setValue('RAGDOLL'),
                     new StringSelectMenuOptionBuilder().setLabel('Bring To Spawn').setDescription('Move to spawn').setValue('BRING_TO_SPAWN'),
                     new StringSelectMenuOptionBuilder().setLabel('Teleport To Me').setDescription('Move to a moderator').setValue('TELEPORT_TO_ME'),
                     new StringSelectMenuOptionBuilder().setLabel('Add ForceField').setDescription('Add a ForceField').setValue('FORCEFIELD_ADD'),
@@ -1744,6 +1747,7 @@ client.on('interactionCreate', async interaction => {
                 { name: 'Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: false },
                 { name: 'Heal', value: 'Restores player health to maximum.', inline: false },
                 { name: 'Kill', value: 'Immediately kills the target player.', inline: false },
+                { name: 'Ragdoll', value: 'Temporarily forces the target player into a ragdoll state.', inline: false },
                 { name: 'Reset', value: 'Resets the player character.', inline: false },
                 { name: 'Refresh', value: 'Respawn the player character.', inline: false },
                 { name: 'View', value: 'View a player or reset your camera to yourself.', inline: false },
@@ -1825,6 +1829,10 @@ client.on('interactionCreate', async interaction => {
                             .setLabel('Unfreeze')
                             .setDescription('Remove freeze')
                             .setValue('UNFREEZE'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Ragdoll')
+                            .setDescription('Temporarily ragdoll')
+                            .setValue('RAGDOLL'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Bring To Spawn')
                             .setDescription('Move to spawn')

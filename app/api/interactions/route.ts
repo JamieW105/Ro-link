@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { findBlockedServer, getBlockedServerMessage } from '@/lib/blockedServers';
 import { logAction } from '@/lib/logger';
+import { buildDeliveryArgs, resolveDeliveryTargets, type CommandArgs } from '@/lib/commandDelivery';
 import { findLivePlayer, normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
@@ -241,6 +242,7 @@ const MISC_SUBCOMMAND_TO_COMMAND: Record<string, string> = {
     team: 'TEAM',
     freeze: 'FREEZE',
     unfreeze: 'UNFREEZE',
+    ragdoll: 'RAGDOLL',
     'bring-to-spawn': 'BRING_TO_SPAWN',
     'teleport-to-me': 'TELEPORT_TO_ME',
     'forcefield-add': 'FORCEFIELD_ADD',
@@ -469,7 +471,7 @@ function buildMiscPanelResponse(): InteractionResponseData {
             fields: [
                 { name: 'Movement', value: "`FLY` `NOCLIP`", inline: true },
                 { name: 'Visibility', value: "`INVIS` `GHOST`", inline: true },
-                { name: 'Vitality', value: "`HEAL` `KILL` `RESET`", inline: true },
+                { name: 'Vitality', value: "`HEAL` `KILL` `RESET` `RAGDOLL`", inline: true },
                 { name: 'Identity', value: "`SET_CHAR` `REFRESH` `VIEW`", inline: true },
                 { name: 'Teams', value: "`TEAM`", inline: true }
             ],
@@ -501,6 +503,7 @@ function buildMiscPanelResponse(): InteractionResponseData {
                     { label: 'Team', value: 'TEAM', description: 'Move to a team' },
                     { label: 'Freeze', value: 'FREEZE', description: 'Anchor in place' },
                     { label: 'Unfreeze', value: 'UNFREEZE', description: 'Remove freeze' },
+                    { label: 'Ragdoll', value: 'RAGDOLL', description: 'Temporarily ragdoll' },
                     { label: 'Bring To Spawn', value: 'BRING_TO_SPAWN', description: 'Move to spawn' },
                     { label: 'Teleport To Me', value: 'TELEPORT_TO_ME', description: 'Move to a moderator' },
                     { label: 'Add ForceField', value: 'FORCEFIELD_ADD', description: 'Add a ForceField' },
@@ -1564,6 +1567,35 @@ export async function POST(req: Request) {
             await sendRobloxMessage(guild_id, command, args, serverData);
         };
 
+        const queueResolvedCommand = async (
+            command: string,
+            args: CommandArgs,
+            options?: { serverData?: unknown },
+        ) => {
+            const deliveryTargets = await resolveDeliveryTargets(guild_id, command, args);
+            if (deliveryTargets.length === 0) {
+                return { error: 'No live server currently has that target player.' };
+            }
+
+            const queueRows = deliveryTargets.map((target) => ({
+                server_id: guild_id,
+                command,
+                args: buildDeliveryArgs(args, target),
+                status: 'PENDING',
+            }));
+
+            const { error } = await supabase.from('command_queue').insert(queueRows);
+            if (error) {
+                return { error: error.message };
+            }
+
+            await Promise.all(deliveryTargets.map((target) =>
+                triggerMessaging(command, buildDeliveryArgs(args, target), options?.serverData),
+            ));
+
+            return { deliveredTargets: deliveryTargets.length };
+        };
+
         // 2. Handle PING
         if (type === 1) {
             return NextResponse.json({ type: 1 });
@@ -2310,23 +2342,16 @@ export async function POST(req: Request) {
                         args.amount = amount;
                     }
 
-                    const [queueRes] = await Promise.all([
-                        supabase.from('command_queue').insert([{
-                            server_id: guild_id,
-                            command: miscCommand,
-                            args,
-                            status: 'PENDING'
-                        }]),
-                        triggerMessaging(miscCommand, args, server),
-                        logAction(guild_id, miscCommand, resolvedTargetUser || 'self', logActor, 'Misc command')
-                    ]);
+                    const queueRes = await queueResolvedCommand(miscCommand, args, { serverData: server });
 
                     if (queueRes.error) {
                         return NextResponse.json({
                             type: 4,
-                            data: { content: `Error: Failed to queue command.`, flags: 64 }
+                            data: { content: queueRes.error || `Error: Failed to queue command.`, flags: 64 }
                         });
                     }
+
+                    await logAction(guild_id, miscCommand, resolvedTargetUser || 'self', logActor, 'Misc command');
 
                     return NextResponse.json({
                         type: 4,
@@ -2344,7 +2369,7 @@ export async function POST(req: Request) {
                             fields: [
                                 { name: 'Movement', value: "`FLY` `NOCLIP`", inline: true },
                                 { name: 'Visibility', value: "`INVIS` `GHOST`", inline: true },
-                                { name: 'Vitality', value: "`HEAL` `KILL` `RESET`", inline: true },
+                                { name: 'Vitality', value: "`HEAL` `KILL` `RESET` `RAGDOLL`", inline: true },
                                 { name: 'Identity', value: "`SET_CHAR` `REFRESH` `VIEW`", inline: true },
                                 { name: 'Teams', value: "`TEAM`", inline: true }
                             ],
@@ -2376,6 +2401,7 @@ export async function POST(req: Request) {
                                     { label: 'Team', value: 'TEAM', description: 'Move to a team' },
                                     { label: 'Freeze', value: 'FREEZE', description: 'Anchor in place' },
                                     { label: 'Unfreeze', value: 'UNFREEZE', description: 'Remove freeze' },
+                                    { label: 'Ragdoll', value: 'RAGDOLL', description: 'Temporarily ragdoll' },
                                     { label: 'Bring To Spawn', value: 'BRING_TO_SPAWN', description: 'Move to spawn' },
                                     { label: 'Teleport To Me', value: 'TELEPORT_TO_ME', description: 'Move to a moderator' },
                                     { label: 'Add ForceField', value: 'FORCEFIELD_ADD', description: 'Add a ForceField' },
@@ -3311,16 +3337,16 @@ export async function POST(req: Request) {
                     msgContent = `Queuing **Teleport To Me** for **${targetUser}**...`;
                 }
 
-                await Promise.all([
-                    supabase.from('command_queue').insert([{
-                        server_id: guild_id,
-                        command: action,
-                        args: args,
-                        status: 'PENDING'
-                    }]),
-                    triggerMessaging(action, args),
-                    logAction(guild_id, action, targetUser || 'self', logActor, action === 'SET_CHAR' ? `Set character to ${args.char_user}` : 'Misc Action')
-                ]);
+                const queueRes = await queueResolvedCommand(action, args);
+
+                if (queueRes.error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: queueRes.error || 'Failed to queue misc action.', flags: 64 }
+                    });
+                }
+
+                await logAction(guild_id, action, targetUser || 'self', logActor, action === 'SET_CHAR' ? `Set character to ${args.char_user}` : 'Misc Action');
 
                 return NextResponse.json({
                     type: 4,
@@ -4448,6 +4474,24 @@ function RoLink:Execute(cmd)
         local hrp = p and p.Character and p.Character:FindFirstChild("HumanoidRootPart")
         if hrp then
             hrp.Anchored = false
+        end
+    elseif cmd.command == "RAGDOLL" and isMisc() then
+        local humanoid = p and p.Character and p.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            local durationSeconds = tonumber(cmd.args.duration_seconds or cmd.args.duration) or 4
+            durationSeconds = math.clamp(durationSeconds, 0.5, 30)
+            humanoid.PlatformStand = true
+            pcall(function()
+                humanoid:ChangeState(Enum.HumanoidStateType.Ragdoll)
+            end)
+            task.delay(durationSeconds, function()
+                if humanoid and humanoid.Parent then
+                    humanoid.PlatformStand = false
+                    pcall(function()
+                        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                    end)
+                end
+            end)
         end
     elseif cmd.command == "BRING_TO_SPAWN" and isMisc() then
         local hrp = p and p.Character and p.Character:FindFirstChild("HumanoidRootPart")

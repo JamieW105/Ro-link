@@ -68,7 +68,7 @@ function getActionButtonClasses(commandId: string) {
         return 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20';
     }
 
-    if (commandId === 'FREEZE' || commandId === 'FORCEFIELD_REMOVE') {
+    if (commandId === 'FREEZE' || commandId === 'RAGDOLL' || commandId === 'FORCEFIELD_REMOVE') {
         return 'bg-amber-500/10 hover:bg-amber-500 text-amber-500 hover:text-white border-amber-500/20';
     }
 

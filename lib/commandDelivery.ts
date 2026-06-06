@@ -35,6 +35,7 @@ const PLAYER_TARGET_COMMAND_LOOKUP = new Set<string>([
     'JUMP_POWER',
     'FREEZE',
     'UNFREEZE',
+    'RAGDOLL',
     'BRING_TO_SPAWN',
     'TELEPORT_TO_ME',
     'FORCEFIELD_ADD',
