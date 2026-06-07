@@ -3,6 +3,11 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { hasPermission } from "@/lib/management";
 import { createStaffActionForumThread } from "@/lib/staffForumNotifications";
+import {
+    createStaffModerationAction,
+    recordStaffModerationActionLog,
+    updateStaffModerationActionForumThread,
+} from "@/lib/staffModerationActions";
 
 export async function POST(
     req: NextRequest,
@@ -28,17 +33,38 @@ export async function POST(
         });
         const guildData = await guildRes.json();
         const ownerId = guildData.owner_id;
-        const actionReferenceId = guildId;
+        const action = await createStaffModerationAction({
+            actionType: 'removed',
+            guildId,
+            guildName: guildData.name,
+            ownerId,
+            staffDiscordId: userId,
+            reason,
+        });
+        const actionReferenceId = action.id;
 
         try {
-            await createStaffActionForumThread({
+            await recordStaffModerationActionLog({
+                action,
+                logAction: 'RO_LINK_REMOVED',
+                target: guildId,
+            });
+        } catch (logErr) {
+            console.error("[Management/Servers] Failed to record staff moderation log:", logErr);
+        }
+
+        try {
+            const thread = await createStaffActionForumThread({
                 actionType: 'removed',
-                actionId: guildId,
+                actionId: action.id,
                 guildId,
                 guildName: guildData.name,
                 ownerId,
                 staffDiscordId: userId,
                 reason,
+            });
+            await updateStaffModerationActionForumThread(action.id, thread.id).catch((updateErr) => {
+                console.error("[Management/Servers] Failed to store staff forum thread:", updateErr);
             });
         } catch (threadErr) {
             console.error("[Management/Servers] Failed to create staff forum thread:", threadErr);

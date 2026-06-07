@@ -4,6 +4,11 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { hasPermission } from "@/lib/management";
 import { supabase } from "@/lib/supabase";
 import { createStaffActionForumThread } from "@/lib/staffForumNotifications";
+import {
+    createStaffModerationAction,
+    recordStaffModerationActionLog,
+    updateStaffModerationActionForumThread,
+} from "@/lib/staffModerationActions";
 
 export async function GET() {
     const session = await getServerSession(authOptions);
@@ -49,6 +54,26 @@ export async function POST(req: Request) {
         const ownerId = guildData.owner_id;
         const guildName = guildData.name;
 
+        const { data: existingBlock, error: existingBlockError } = await supabase
+            .from('blocked_servers')
+            .select('guild_id')
+            .eq('guild_id', guildId)
+            .maybeSingle();
+
+        if (existingBlockError) throw existingBlockError;
+        if (existingBlock) {
+            return NextResponse.json({ error: 'Server is already blocked from Ro-Link.' }, { status: 409 });
+        }
+
+        const action = await createStaffModerationAction({
+            actionType: 'blocked',
+            guildId,
+            guildName,
+            ownerId,
+            staffDiscordId: userId,
+            reason,
+        });
+
         // 2. Add to blocked_servers
         const { data, error } = await supabase
             .from('blocked_servers')
@@ -57,7 +82,8 @@ export async function POST(req: Request) {
                 guild_name: guildName,
                 owner_id: ownerId,
                 reason: reason,
-                blocked_by: userId
+                blocked_by: userId,
+                moderation_action_id: action.id
             })
             .select()
             .single();
@@ -65,20 +91,33 @@ export async function POST(req: Request) {
         if (error) throw error;
 
         try {
-            await createStaffActionForumThread({
+            await recordStaffModerationActionLog({
+                action,
+                logAction: 'RO_LINK_BLOCKED',
+                target: guildId,
+            });
+        } catch (logErr) {
+            console.error("[Management/Blocking] Failed to record staff moderation log:", logErr);
+        }
+
+        try {
+            const thread = await createStaffActionForumThread({
                 actionType: 'blocked',
-                actionId: data.guild_id || guildId,
+                actionId: action.id,
                 guildId,
                 guildName,
                 ownerId,
                 staffDiscordId: userId,
                 reason,
             });
+            await updateStaffModerationActionForumThread(action.id, thread.id).catch((updateErr) => {
+                console.error("[Management/Blocking] Failed to store staff forum thread:", updateErr);
+            });
         } catch (threadErr) {
             console.error("[Management/Blocking] Failed to create staff forum thread:", threadErr);
         }
 
-        const actionReferenceId = data.guild_id || guildId;
+        const actionReferenceId = action.id;
 
         // 3. DM the owner about the block
         if (ownerId && botToken) {

@@ -8,7 +8,13 @@ import { buildDeliveryArgs, resolveDeliveryTargets, type CommandArgs } from '@/l
 import { findLivePlayer, normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
-import { buildStaffBlockServerComponents, parseStaffBlockServerCustomId } from '@/lib/staffActionComponents';
+import {
+    buildStaffActionModerationComponents,
+    buildStaffBlockServerComponents,
+    parseStaffBlockServerCustomId,
+    parseStaffVoidModerationCustomId,
+} from '@/lib/staffActionComponents';
+import { voidStaffModerationAction } from '@/lib/staffModerationActions';
 import discordCommands from '@/lib/discordCommands.json';
 import {
     createStaffNote,
@@ -173,6 +179,7 @@ type InteractionMessageEmbedField = {
 type DiscordInteractionPayload = {
     id: string;
     application_id?: string | null;
+    channel_id?: string | null;
     token?: string | null;
     type: number;
     guild_id?: string | null;
@@ -328,6 +335,12 @@ function getStaffActionReason(message: DiscordInteractionPayload['message'] | un
     return reason && reason !== 'No reason provided.' ? reason : '';
 }
 
+function getStaffActionId(message: DiscordInteractionPayload['message'] | undefined) {
+    return getStaffActionEmbedField(message, 'Action ID')
+        .replace(/^`|`$/g, '')
+        .trim();
+}
+
 async function hasGlobalManagementPermission(discordId: string, permission: string) {
     const normalizedDiscordId = String(discordId ?? '').trim();
     if (!normalizedDiscordId) return false;
@@ -363,6 +376,7 @@ async function dmBlockedServerOwner(input: {
     ownerId: string;
     guildName: string;
     guildId: string;
+    actionId?: string;
     reason: string;
 }) {
     const botToken = String(process.env.DISCORD_TOKEN ?? '').trim();
@@ -394,7 +408,7 @@ async function dmBlockedServerOwner(input: {
                 description: `Your server **${input.guildName}** has been blocked from using Ro-Link.`,
                 color: 0xff4444,
                 fields: [
-                    { name: 'Reference', value: `\`${input.guildId}\`` },
+                    { name: 'Reference', value: `\`${input.actionId || input.guildId}\`` },
                     { name: 'Reason', value: input.reason },
                     { name: 'Action', value: 'The bot has left your server and Ro-Link setup data has been removed.' },
                     { name: 'Support Server', value: 'https://discord.gg/C3n4nAwYMw' },
@@ -407,12 +421,88 @@ async function dmBlockedServerOwner(input: {
     });
 }
 
+async function dmVoidedModerationOwner(input: {
+    ownerId: string;
+    guildName: string;
+    guildId: string;
+    actionId: string;
+    actionType: 'removed' | 'blocked';
+}) {
+    const botToken = String(process.env.DISCORD_TOKEN ?? '').trim();
+    if (!botToken || !input.ownerId) return;
+
+    const dmChannelRes = await fetch(`${DISCORD_API_BASE_URL}/users/@me/channels`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bot ${botToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ recipient_id: input.ownerId }),
+    }).catch(() => null);
+
+    const dmChannel = dmChannelRes?.ok
+        ? await dmChannelRes.json().catch(() => null) as { id?: string } | null
+        : null;
+    if (!dmChannel?.id) return;
+
+    const actionDescription = input.actionType === 'blocked'
+        ? 'Your server is no longer blocked from using Ro-Link.'
+        : 'The Ro-Link removal action for your server has been voided.';
+
+    await fetch(`${DISCORD_API_BASE_URL}/channels/${encodeURIComponent(dmChannel.id)}/messages`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bot ${botToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            embeds: [{
+                title: 'Ro-Link Moderation Voided',
+                description: `The moderation action for **${input.guildName || input.guildId}** has been voided.`,
+                color: 0x10b981,
+                fields: [
+                    { name: 'Reference', value: `\`${input.actionId}\`` },
+                    { name: 'Status', value: actionDescription },
+                    { name: 'Invite Link', value: '[Click here to invite Ro-Link](https://rolink.cloud/invite)' },
+                ],
+                timestamp: new Date().toISOString(),
+            }],
+        }),
+    }).catch((error) => {
+        console.error('[STAFF_ACTION] Failed to DM owner about voided moderation:', error);
+    });
+}
+
+async function closeStaffActionForumThread(threadId: string) {
+    const botToken = String(process.env.DISCORD_TOKEN ?? '').trim();
+    const normalizedThreadId = String(threadId ?? '').trim();
+    if (!botToken || !normalizedThreadId) return;
+
+    const response = await fetch(`${DISCORD_API_BASE_URL}/channels/${encodeURIComponent(normalizedThreadId)}`, {
+        method: 'PATCH',
+        headers: {
+            Authorization: `Bot ${botToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            archived: true,
+            locked: true,
+        }),
+    }).catch(() => null);
+
+    if (response && !response.ok) {
+        const body = await response.text().catch(() => '');
+        console.error(`[STAFF_ACTION] Failed to close forum thread ${normalizedThreadId} (${response.status}):`, body);
+    }
+}
+
 async function blockServerFromStaffAction(input: {
     guildId: string;
     fallbackGuildName: string;
     fallbackOwnerId: string;
     blockedBy: string;
     reason: string;
+    moderationActionId?: string;
 }) {
     const client = getSupabaseAdmin();
     const guildId = input.guildId.trim();
@@ -434,6 +524,7 @@ async function blockServerFromStaffAction(input: {
             owner_id: ownerId || null,
             reason,
             blocked_by: input.blockedBy,
+            moderation_action_id: input.moderationActionId || null,
         })
         .select('guild_id')
         .single();
@@ -456,7 +547,28 @@ async function blockServerFromStaffAction(input: {
     }
 
     if (ownerId) {
-        await dmBlockedServerOwner({ ownerId, guildName, guildId, reason });
+        await dmBlockedServerOwner({ ownerId, guildName, guildId, actionId: input.moderationActionId, reason });
+    }
+
+    if (input.moderationActionId) {
+        try {
+            const { error: logError } = await client
+                .from('logs')
+                .insert([{
+                    server_id: guildId,
+                    action: 'RO_LINK_BLOCKED',
+                    target: guildId,
+                    moderator: input.blockedBy,
+                    timestamp: new Date().toISOString(),
+                    moderation_action_id: input.moderationActionId,
+                }]);
+
+            if (logError) {
+                console.error('[STAFF_ACTION] Failed to record staff block log:', logError);
+            }
+        } catch (error) {
+            console.error('[STAFF_ACTION] Failed to record staff block log:', error);
+        }
     }
 
     return { alreadyBlocked: false, guildName, ownerId, guildId: data.guild_id };
@@ -2427,6 +2539,65 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: 'Missing component custom_id' }, { status: 400 });
             }
 
+            const staffVoidModerationAction = parseStaffVoidModerationCustomId(cid);
+            if (staffVoidModerationAction) {
+                const canVoidModeration = await hasGlobalManagementPermission(userId, 'MANAGE_SERVERS')
+                    || await hasGlobalManagementPermission(userId, 'BLOCK_SERVERS');
+
+                if (!canVoidModeration) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: 'You do not have permission to void Ro-Link moderation actions.', flags: 64 }
+                    });
+                }
+
+                try {
+                    const result = await voidStaffModerationAction(staffVoidModerationAction.actionId, userId);
+                    const action = result.action;
+
+                    if (!result.alreadyVoided && action.owner_id) {
+                        await dmVoidedModerationOwner({
+                            ownerId: action.owner_id,
+                            guildName: action.guild_name || action.guild_id,
+                            guildId: action.guild_id,
+                            actionId: action.id,
+                            actionType: action.action_type,
+                        });
+                    }
+
+                    const threadId = String(interaction.channel_id || action.forum_thread_id || '').trim();
+                    if (threadId) {
+                        after(async () => {
+                            await closeStaffActionForumThread(threadId);
+                        });
+                    }
+
+                    return NextResponse.json({
+                        type: 7,
+                        data: {
+                            components: buildStaffActionModerationComponents({
+                                actionType: action.action_type,
+                                actionId: action.id,
+                                guildId: action.guild_id,
+                                ownerId: action.owner_id,
+                                blockDisabled: true,
+                                blockLabel: 'Block Server',
+                                voidDisabled: true,
+                                voidLabel: result.alreadyVoided ? 'Moderation Already Voided' : 'Moderation Voided',
+                            }),
+                        },
+                    });
+                } catch (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: {
+                            content: `Failed to void moderation action: ${String(error instanceof Error ? error.message : error)}`,
+                            flags: 64,
+                        }
+                    });
+                }
+            }
+
             const staffBlockServerAction = parseStaffBlockServerCustomId(cid);
             if (staffBlockServerAction) {
                 if (!(await hasGlobalManagementPermission(userId, 'BLOCK_SERVERS'))) {
@@ -2440,6 +2611,7 @@ export async function POST(req: Request) {
                 const blockReason = removalReason
                     ? `Blocked after staff removal: ${truncateText(removalReason, 900)}`
                     : 'Blocked from Ro-Link after staff removal.';
+                const moderationActionId = staffBlockServerAction.actionId || getStaffActionId(interaction.message);
 
                 try {
                     const result = await blockServerFromStaffAction({
@@ -2448,16 +2620,26 @@ export async function POST(req: Request) {
                         fallbackOwnerId: staffBlockServerAction.ownerId,
                         blockedBy: userId,
                         reason: blockReason,
+                        moderationActionId,
                     });
 
                     return NextResponse.json({
                         type: 7,
                         data: {
-                            components: buildStaffBlockServerComponents(
-                                staffBlockServerAction.guildId,
-                                result.ownerId || staffBlockServerAction.ownerId,
-                                true,
-                            ),
+                            components: moderationActionId
+                                ? buildStaffActionModerationComponents({
+                                    actionType: 'removed',
+                                    actionId: moderationActionId,
+                                    guildId: staffBlockServerAction.guildId,
+                                    ownerId: result.ownerId || staffBlockServerAction.ownerId,
+                                    blockDisabled: true,
+                                    blockLabel: 'Server Blocked',
+                                })
+                                : buildStaffBlockServerComponents(
+                                    staffBlockServerAction.guildId,
+                                    result.ownerId || staffBlockServerAction.ownerId,
+                                    true,
+                                ),
                         },
                     });
                 } catch (error) {

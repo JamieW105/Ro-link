@@ -23,6 +23,45 @@ CREATE TABLE IF NOT EXISTS public.blocked_servers (
     blocked_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Staff Moderation Actions
+CREATE TABLE IF NOT EXISTS public.staff_moderation_actions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    action_type TEXT NOT NULL CHECK (action_type IN ('removed', 'blocked')),
+    guild_id TEXT NOT NULL,
+    guild_name TEXT,
+    owner_id TEXT,
+    reason TEXT,
+    created_by TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'VOIDED')),
+    voided_by TEXT,
+    voided_at TIMESTAMPTZ,
+    forum_thread_id TEXT
+);
+
+CREATE INDEX IF NOT EXISTS staff_moderation_actions_guild_idx
+ON public.staff_moderation_actions(guild_id);
+
+CREATE INDEX IF NOT EXISTS staff_moderation_actions_status_idx
+ON public.staff_moderation_actions(status);
+
+ALTER TABLE public.blocked_servers
+ADD COLUMN IF NOT EXISTS moderation_action_id UUID REFERENCES public.staff_moderation_actions(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS blocked_servers_moderation_action_id_idx
+ON public.blocked_servers(moderation_action_id);
+
+DO $$
+BEGIN
+    IF to_regclass('public.logs') IS NOT NULL THEN
+        ALTER TABLE public.logs
+        ADD COLUMN IF NOT EXISTS moderation_action_id UUID REFERENCES public.staff_moderation_actions(id) ON DELETE SET NULL;
+
+        CREATE INDEX IF NOT EXISTS logs_moderation_action_id_idx
+        ON public.logs(moderation_action_id);
+    END IF;
+END $$;
+
 -- Job Applications
 CREATE TABLE IF NOT EXISTS public.job_applications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
