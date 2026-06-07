@@ -117,7 +117,7 @@ function canOpenDashboardFromServerList(guild: Guild, permissions?: GuildDashboa
 }
 
 function canOpenLivePanelAction(permissions?: GuildDashboardPermissions) {
-    return canOpenDashboardAction(permissions) && Boolean(permissions?.is_admin || permissions?.can_access_live_panel);
+    return Boolean(permissions?.is_admin || permissions?.can_access_live_panel);
 }
 
 function canOpenLivePanelFromServerList(guild: Guild, permissions?: GuildDashboardPermissions) {
