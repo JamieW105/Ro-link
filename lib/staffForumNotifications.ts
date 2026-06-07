@@ -449,3 +449,17 @@ export async function createStaffActionForumThread(input: StaffActionNotificatio
         }),
     });
 }
+
+export async function closeStaffActionForumThread(threadId: string) {
+    const botToken = trimString(process.env.DISCORD_TOKEN);
+    const normalizedThreadId = trimString(threadId);
+    if (!botToken || !normalizedThreadId) return;
+
+    await discordApiFetch<null>(botToken, `/channels/${encodeURIComponent(normalizedThreadId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+            archived: true,
+            locked: true,
+        }),
+    });
+}

@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { hasPermission } from "@/lib/management";
 import { supabase } from "@/lib/supabase";
+import { closeStaffActionForumThread } from "@/lib/staffForumNotifications";
+import { voidStaffModerationAction, type StaffModerationActionRecord } from "@/lib/staffModerationActions";
 
 export async function DELETE(
     req: NextRequest,
@@ -24,13 +26,46 @@ export async function DELETE(
         .eq('guild_id', guildId)
         .single();
 
-    // 2. Delete from blocked_servers
-    const { error } = await supabase
-        .from('blocked_servers')
-        .delete()
-        .eq('guild_id', guildId);
+    // 2. Delete from blocked_servers and void linked moderation action when present.
+    const moderationActionId = String(blockedData?.moderation_action_id ?? '').trim();
+    let voidedAction: StaffModerationActionRecord | null = null;
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (moderationActionId) {
+        try {
+            const result = await voidStaffModerationAction(moderationActionId, userId);
+            voidedAction = result.action;
+
+            if (result.alreadyVoided) {
+                const { error } = await supabase
+                    .from('blocked_servers')
+                    .delete()
+                    .eq('guild_id', guildId);
+
+                if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+            }
+        } catch (error) {
+            console.error("Failed to void linked moderation action during unblock:", error);
+            const { error: deleteError } = await supabase
+                .from('blocked_servers')
+                .delete()
+                .eq('guild_id', guildId);
+
+            if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
+        }
+    } else {
+        const { error } = await supabase
+            .from('blocked_servers')
+            .delete()
+            .eq('guild_id', guildId);
+
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (voidedAction?.forum_thread_id) {
+        await closeStaffActionForumThread(voidedAction.forum_thread_id).catch((error) => {
+            console.error("Failed to close staff action forum thread during unblock:", error);
+        });
+    }
 
     // 3. DM the owner about the unblock
     const botToken = process.env.DISCORD_TOKEN;

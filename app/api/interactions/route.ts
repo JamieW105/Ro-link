@@ -14,7 +14,8 @@ import {
     parseStaffBlockServerCustomId,
     parseStaffVoidModerationCustomId,
 } from '@/lib/staffActionComponents';
-import { voidStaffModerationAction } from '@/lib/staffModerationActions';
+import { closeStaffActionForumThread } from '@/lib/staffForumNotifications';
+import { fetchStaffModerationAction, voidStaffModerationAction } from '@/lib/staffModerationActions';
 import discordCommands from '@/lib/discordCommands.json';
 import {
     createStaffNote,
@@ -473,29 +474,6 @@ async function dmVoidedModerationOwner(input: {
     });
 }
 
-async function closeStaffActionForumThread(threadId: string) {
-    const botToken = String(process.env.DISCORD_TOKEN ?? '').trim();
-    const normalizedThreadId = String(threadId ?? '').trim();
-    if (!botToken || !normalizedThreadId) return;
-
-    const response = await fetch(`${DISCORD_API_BASE_URL}/channels/${encodeURIComponent(normalizedThreadId)}`, {
-        method: 'PATCH',
-        headers: {
-            Authorization: `Bot ${botToken}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            archived: true,
-            locked: true,
-        }),
-    }).catch(() => null);
-
-    if (response && !response.ok) {
-        const body = await response.text().catch(() => '');
-        console.error(`[STAFF_ACTION] Failed to close forum thread ${normalizedThreadId} (${response.status}):`, body);
-    }
-}
-
 async function blockServerFromStaffAction(input: {
     guildId: string;
     fallbackGuildName: string;
@@ -506,6 +484,27 @@ async function blockServerFromStaffAction(input: {
 }) {
     const client = getSupabaseAdmin();
     const guildId = input.guildId.trim();
+    const moderationActionId = String(input.moderationActionId ?? '').trim();
+
+    if (moderationActionId) {
+        const moderationAction = await fetchStaffModerationAction(moderationActionId, client);
+        if (!moderationAction) {
+            throw new Error('This moderation action no longer exists.');
+        }
+
+        if (moderationAction.status === 'VOIDED') {
+            throw new Error('This moderation action has already been voided and cannot be used to block the server.');
+        }
+
+        if (moderationAction.action_type !== 'removed') {
+            throw new Error('Only server removal actions can be escalated into a block.');
+        }
+
+        if (moderationAction.guild_id !== guildId) {
+            throw new Error('This moderation action does not belong to that server.');
+        }
+    }
+
     const existing = await findBlockedServer(client, guildId);
     if (existing) {
         return { alreadyBlocked: true, guildName: input.fallbackGuildName || guildId, ownerId: input.fallbackOwnerId };
@@ -524,7 +523,7 @@ async function blockServerFromStaffAction(input: {
             owner_id: ownerId || null,
             reason,
             blocked_by: input.blockedBy,
-            moderation_action_id: input.moderationActionId || null,
+            moderation_action_id: moderationActionId || null,
         })
         .select('guild_id')
         .single();
@@ -547,10 +546,10 @@ async function blockServerFromStaffAction(input: {
     }
 
     if (ownerId) {
-        await dmBlockedServerOwner({ ownerId, guildName, guildId, actionId: input.moderationActionId, reason });
+        await dmBlockedServerOwner({ ownerId, guildName, guildId, actionId: moderationActionId, reason });
     }
 
-    if (input.moderationActionId) {
+    if (moderationActionId) {
         try {
             const { error: logError } = await client
                 .from('logs')
@@ -560,7 +559,7 @@ async function blockServerFromStaffAction(input: {
                     target: guildId,
                     moderator: input.blockedBy,
                     timestamp: new Date().toISOString(),
-                    moderation_action_id: input.moderationActionId,
+                    moderation_action_id: moderationActionId,
                 }]);
 
             if (logError) {
@@ -2568,7 +2567,9 @@ export async function POST(req: Request) {
                     const threadId = String(interaction.channel_id || action.forum_thread_id || '').trim();
                     if (threadId) {
                         after(async () => {
-                            await closeStaffActionForumThread(threadId);
+                            await closeStaffActionForumThread(threadId).catch((error) => {
+                                console.error('[STAFF_ACTION] Failed to close voided moderation thread:', error);
+                            });
                         });
                     }
 
