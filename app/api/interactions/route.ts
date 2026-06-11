@@ -26,7 +26,7 @@ import {
     type StaffNoteTarget,
 } from '@/lib/staffNotes';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // ... (hexToUint8 and verifyDiscordRequest functions) ...
 
@@ -132,6 +132,11 @@ type ResolvedRobloxUser = {
     name: string;
     displayName: string;
     profile?: RobloxUserProfile | null;
+};
+
+type VerifiedRobloxIdentity = {
+    roblox_id?: string | number | null;
+    roblox_username?: string | null;
 };
 
 type LiveServerRow = {
@@ -1228,13 +1233,98 @@ async function resolveRobloxUser(input: string): Promise<ResolvedRobloxUser> {
     };
 }
 
+async function findVerifiedRobloxIdentity(input: string): Promise<VerifiedRobloxIdentity | null> {
+    const searchInput = String(input ?? '').trim();
+    if (!searchInput) {
+        return null;
+    }
+
+    let query = supabase
+        .from('verified_users')
+        .select('roblox_id, roblox_username');
+
+    query = /^\d+$/.test(searchInput)
+        ? query.eq('roblox_id', searchInput)
+        : query.ilike('roblox_username', searchInput);
+
+    const { data, error } = await query.maybeSingle<VerifiedRobloxIdentity>();
+    if (error) {
+        console.warn('[LOOKUP] Verified Roblox fallback failed:', error.message);
+        return null;
+    }
+
+    return data || null;
+}
+
+function buildVerifiedRobloxFallback(identity: VerifiedRobloxIdentity, input: string): ResolvedRobloxUser | null {
+    const id = String(identity.roblox_id ?? '').trim();
+    const username = String(identity.roblox_username ?? input).trim();
+    if (!id && !username) {
+        return null;
+    }
+
+    const resolvedName = username || input;
+    return {
+        id: id || input,
+        name: resolvedName,
+        displayName: resolvedName,
+        profile: {
+            id: id || input,
+            name: resolvedName,
+            displayName: resolvedName,
+            description: 'Roblox public profile could not be loaded. Showing verified Ro-Link data.',
+            created: '',
+            isBanned: false,
+        },
+    };
+}
+
+async function findLiveRobloxIdentity(serverId: string, input: string): Promise<ResolvedRobloxUser | null> {
+    const liveServers = await fetchLiveServers(serverId);
+    const presence = findPlayerServer(liveServers, input);
+    const player = presence.player;
+    if (!player?.userId || !player.username) {
+        return null;
+    }
+
+    const resolvedName = player.username;
+    return {
+        id: player.userId,
+        name: resolvedName,
+        displayName: player.displayName || resolvedName,
+        profile: {
+            id: player.userId,
+            name: resolvedName,
+            displayName: player.displayName || resolvedName,
+            description: 'Roblox public profile could not be loaded. Showing live server data.',
+            created: '',
+            isBanned: false,
+        },
+    };
+}
+
 async function fetchRobloxLookup(username: string, serverId: string, openCloudKey?: string | null): Promise<RobloxLookupResult> {
     const searchUsername = String(username ?? '').trim();
     if (!searchUsername) {
         throw new Error('Please provide a Roblox username to lookup.');
     }
 
-    const matchedUser = await resolveRobloxUser(searchUsername);
+    let matchedUser: ResolvedRobloxUser;
+    try {
+        matchedUser = await resolveRobloxUser(searchUsername);
+    } catch (error) {
+        const verifiedIdentity = await findVerifiedRobloxIdentity(searchUsername);
+        const fallbackUser = verifiedIdentity
+            ? buildVerifiedRobloxFallback(verifiedIdentity, searchUsername)
+            : await findLiveRobloxIdentity(serverId, searchUsername);
+        if (!fallbackUser) {
+            throw error;
+        }
+
+        console.warn('[LOOKUP] Roblox public lookup failed; using local fallback:', error instanceof Error ? error.message : error);
+        matchedUser = fallbackUser;
+    }
+
     const apiKey = String(openCloudKey ?? '').trim();
     const [legacyProfile, cloudProfile, thumbnailData] = await Promise.all([
         matchedUser.profile

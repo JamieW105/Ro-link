@@ -854,6 +854,76 @@ async function resolveRobloxUser(input) {
     };
 }
 
+async function findVerifiedRobloxIdentity(input) {
+    const searchInput = String(input ?? '').trim();
+    if (!searchInput) {
+        return null;
+    }
+
+    let query = supabase
+        .from('verified_users')
+        .select('roblox_id, roblox_username');
+
+    query = /^\d+$/.test(searchInput)
+        ? query.eq('roblox_id', searchInput)
+        : query.ilike('roblox_username', searchInput);
+
+    const { data, error } = await query.maybeSingle();
+    if (error) {
+        console.warn('[LOOKUP] Verified Roblox fallback failed:', error.message);
+        return null;
+    }
+
+    return data || null;
+}
+
+function buildVerifiedRobloxFallback(identity, input) {
+    const id = String(identity?.roblox_id ?? '').trim();
+    const username = String(identity?.roblox_username ?? input).trim();
+    if (!id && !username) {
+        return null;
+    }
+
+    const resolvedName = username || input;
+    return {
+        id: id || input,
+        name: resolvedName,
+        displayName: resolvedName,
+        profile: {
+            id: id || input,
+            name: resolvedName,
+            displayName: resolvedName,
+            description: 'Roblox public profile could not be loaded. Showing verified Ro-Link data.',
+            created: '',
+            isBanned: false,
+        },
+    };
+}
+
+async function findLiveRobloxIdentity(serverId, input) {
+    const liveServers = await fetchLiveServers(serverId);
+    const presence = findPlayerServer(liveServers, input);
+    const player = presence.player;
+    if (!player?.userId || !player.username) {
+        return null;
+    }
+
+    const resolvedName = player.username;
+    return {
+        id: player.userId,
+        name: resolvedName,
+        displayName: player.displayName || resolvedName,
+        profile: {
+            id: player.userId,
+            name: resolvedName,
+            displayName: player.displayName || resolvedName,
+            description: 'Roblox public profile could not be loaded. Showing live server data.',
+            created: '',
+            isBanned: false,
+        },
+    };
+}
+
 async function fetchRobloxLookup(username, serverId) {
     const searchUsername = String(username ?? '').trim();
     if (!searchUsername) {
@@ -874,7 +944,22 @@ async function fetchRobloxLookup(username, serverId) {
         ? serverSettings.open_cloud_key.trim()
         : '';
 
-    const matchedUser = await resolveRobloxUser(searchUsername);
+    let matchedUser;
+    try {
+        matchedUser = await resolveRobloxUser(searchUsername);
+    } catch (error) {
+        const verifiedIdentity = await findVerifiedRobloxIdentity(searchUsername);
+        const fallbackUser = verifiedIdentity
+            ? buildVerifiedRobloxFallback(verifiedIdentity, searchUsername)
+            : await findLiveRobloxIdentity(serverId, searchUsername);
+        if (!fallbackUser) {
+            throw error;
+        }
+
+        console.warn('[LOOKUP] Roblox public lookup failed; using local fallback:', error?.message || error);
+        matchedUser = fallbackUser;
+    }
+
     let cloudProfile = null;
     if (apiKey) {
         try {
