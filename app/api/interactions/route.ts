@@ -4071,6 +4071,10 @@ local function moduleKeyOf(moduleInfo)
 	return tostring((moduleInfo and (moduleInfo.slug or moduleInfo.id)) or "unknown")
 end
 
+local function normalizeModuleCommandName(commandName)
+	return string.upper((tostring(commandName or "")):gsub("[%s%-]+", "_"))
+end
+
 local function resolvePlayers(target, defaultAll)
 	if target == nil then
 		return defaultAll and Players:GetPlayers() or {}
@@ -4502,15 +4506,16 @@ function RoLink:BuildModuleContext(moduleInfo)
 		},
 		RegisterCommand = function(commandName, handler)
 			if type(commandName) ~= "string" or type(handler) ~= "function" then return end
-			local key = string.upper(commandName)
+			local key = normalizeModuleCommandName(commandName)
 			self.moduleCommands[key] = {
 				handler = handler,
 				moduleKey = tostring((moduleInfo and (moduleInfo.slug or moduleInfo.id)) or "unknown"),
 				module = moduleInfo
 			}
 			self.moduleCommandModules[key] = moduleInfo
-			self.moduleCommandPanelVisible[key] = nil
+			self.moduleCommandPanelVisible[key] = true
 			self.moduleCommandDefinitions[key] = self.moduleCommandDefinitions[key] or {
+				Id = key,
 				Name = commandName,
 				Title = commandName,
 				Description = "Registered by " .. tostring((moduleInfo and (moduleInfo.name or moduleInfo.slug)) or "marketplace module"),
@@ -4523,7 +4528,7 @@ function RoLink:BuildModuleContext(moduleInfo)
 			if type(definition) ~= "table" or type(handler) ~= "function" then return end
 			local commandName = tostring(definition.Name or definition.name or definition.Command or definition.command or definition.Id or definition.id or "")
 			if commandName == "" then return end
-			local key = string.upper(commandName)
+			local key = normalizeModuleCommandName(commandName)
 			self.moduleCommands[key] = {
 				handler = handler,
 				moduleKey = tostring((moduleInfo and (moduleInfo.slug or moduleInfo.id)) or "unknown"),
@@ -4734,7 +4739,7 @@ end
 function RoLink:Execute(cmd)
 	if not cmd or not cmd.command then return end
 	cmd.args = cmd.args or {}
-	cmd.command = string.upper(tostring(cmd.command))
+	cmd.command = normalizeModuleCommandName(cmd.command)
 
 	if self.moduleCommands and self.moduleCommands[cmd.command] then
 		local binding = self.moduleCommands[cmd.command]
@@ -4961,6 +4966,7 @@ function RoLink:Execute(cmd)
             local createdInstances = {}
             local disabledMotors = {}
             local oldPartStates = {}
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
             local oldPlatformStand = humanoid.PlatformStand
             local oldAutoRotate = humanoid.AutoRotate
             local oldRequiresNeck = humanoid.RequiresNeck
@@ -5038,6 +5044,12 @@ function RoLink:Execute(cmd)
             pcall(function()
                 humanoid:ChangeState(Enum.HumanoidStateType.Physics)
             end)
+            if rootPart then
+                pcall(function()
+                    rootPart:ApplyImpulse((rootPart.CFrame.LookVector * 35 + Vector3.new(0, 8, 0)) * rootPart.AssemblyMass)
+                    rootPart.AssemblyAngularVelocity = rootPart.CFrame.RightVector * 12 + rootPart.CFrame.LookVector * 5
+                end)
+            end
             task.delay(durationSeconds, function()
                 for _, motor in ipairs(disabledMotors) do
                     if motor and motor.Parent then
