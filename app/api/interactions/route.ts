@@ -245,6 +245,13 @@ const REPORT_CUSTOM_ID_PREFIX = 'report|';
 const commandDefinitions = discordCommands as DiscordCommandDefinition[];
 const DISCORD_API_BASE_URL = 'https://discord.com/api/v10';
 const DISCORD_EPOCH = 1420070400000n;
+const ROBLOX_USER_API_ORIGINS = ['https://users.roblox.com', 'https://users.roproxy.com'];
+const ROBLOX_THUMBNAIL_API_ORIGINS = ['https://thumbnails.roblox.com', 'https://thumbnails.roproxy.com'];
+const ROBLOX_API_HEADERS = {
+    Accept: 'application/json',
+    Referer: 'https://www.roblox.com/',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36',
+};
 const MISC_SUBCOMMAND_TO_COMMAND: Record<string, string> = {
     fly: 'FLY',
     noclip: 'NOCLIP',
@@ -1094,6 +1101,63 @@ async function fetchDiscordLookup(userId: string, serverId: string): Promise<Dis
     };
 }
 
+function mergeRobloxHeaders(headers?: HeadersInit) {
+    const merged = new Headers(ROBLOX_API_HEADERS);
+    new Headers(headers).forEach((value, key) => {
+        merged.set(key, value);
+    });
+    return merged;
+}
+
+async function fetchRobloxJsonFromOrigins<T>(
+    origins: string[],
+    path: string,
+    init: RequestInit,
+    label: string,
+): Promise<T> {
+    const failures: Array<{ origin: string; status?: number; message?: string }> = [];
+
+    for (const origin of origins) {
+        try {
+            const response = await fetch(`${origin}${path}`, {
+                ...init,
+                headers: mergeRobloxHeaders(init.headers),
+                cache: 'no-store',
+            });
+
+            if (response.ok) {
+                return response.json() as Promise<T>;
+            }
+
+            failures.push({ origin, status: response.status });
+        } catch (error) {
+            failures.push({
+                origin,
+                message: error instanceof Error ? error.message : String(error),
+            });
+        }
+    }
+
+    const statuses = failures
+        .map((failure) => failure.status)
+        .filter((status): status is number => typeof status === 'number');
+
+    if (statuses.includes(404)) {
+        throw new Error('Player not found.');
+    }
+
+    if (statuses.includes(429)) {
+        throw new Error('Roblox rate limited the lookup. Try again in a moment.');
+    }
+
+    if (statuses.includes(403)) {
+        throw new Error(`${label} was blocked by Roblox (403). Try again in a moment.`);
+    }
+
+    const lastFailure = failures[failures.length - 1];
+    throw new Error(`${label} failed${lastFailure?.status ? ` (${lastFailure.status})` : ''}.`);
+}
+
 async function resolveRobloxUser(input: string): Promise<ResolvedRobloxUser> {
     const searchInput = String(input ?? '').trim();
     if (!searchInput) {
@@ -1101,22 +1165,12 @@ async function resolveRobloxUser(input: string): Promise<ResolvedRobloxUser> {
     }
 
     if (/^\d+$/.test(searchInput)) {
-        const profileRes = await fetch(`https://users.roblox.com/v1/users/${encodeURIComponent(searchInput)}`, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0',
-            },
-            cache: 'no-store',
-        });
-
-        if (profileRes.status === 404) {
-            throw new Error('Player not found.');
-        }
-
-        if (!profileRes.ok) {
-            throw new Error(`Roblox profile lookup failed (${profileRes.status}).`);
-        }
-
-        const profile = await profileRes.json() as RobloxUserProfile;
+        const profile = await fetchRobloxJsonFromOrigins<RobloxUserProfile>(
+            ROBLOX_USER_API_ORIGINS,
+            `/v1/users/${encodeURIComponent(searchInput)}`,
+            {},
+            'Roblox profile lookup',
+        );
         const resolvedId = profile?.id || searchInput;
         const resolvedName = String(profile?.name || searchInput).trim();
         return {
@@ -1127,47 +1181,35 @@ async function resolveRobloxUser(input: string): Promise<ResolvedRobloxUser> {
         };
     }
 
-    const usernameRes = await fetch('https://users.roblox.com/v1/usernames/users', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0',
+    const usernameData = await fetchRobloxJsonFromOrigins<{ data?: RobloxSearchCandidate[] }>(
+        ROBLOX_USER_API_ORIGINS,
+        '/v1/usernames/users',
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ usernames: [searchInput], excludeBannedUsers: false }),
         },
-        body: JSON.stringify({ usernames: [searchInput], excludeBannedUsers: false }),
-        cache: 'no-store',
-    });
+        'Roblox username lookup',
+    );
 
-    if (usernameRes.ok) {
-        const usernameData = await usernameRes.json() as { data?: RobloxSearchCandidate[] };
-        const matchedUser = Array.isArray(usernameData?.data) ? usernameData.data[0] : null;
-        if (matchedUser?.id) {
-            const resolvedName = String(matchedUser.name || searchInput).trim();
-            return {
-                id: matchedUser.id,
-                name: resolvedName,
-                displayName: String(matchedUser.displayName || resolvedName).trim(),
-            };
-        }
-    } else if (usernameRes.status === 429) {
-        throw new Error('Roblox rate limited the lookup. Try again in a moment.');
+    const exactUsernameMatch = Array.isArray(usernameData?.data) ? usernameData.data[0] : null;
+    if (exactUsernameMatch?.id) {
+        const resolvedName = String(exactUsernameMatch.name || searchInput).trim();
+        return {
+            id: exactUsernameMatch.id,
+            name: resolvedName,
+            displayName: String(exactUsernameMatch.displayName || resolvedName).trim(),
+        };
     }
 
-    const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(searchInput)}&limit=10`, {
-        headers: {
-            'User-Agent': 'Mozilla/5.0',
-        },
-        cache: 'no-store',
-    });
-
-    if (!searchRes.ok) {
-        if (searchRes.status === 429) {
-            throw new Error('Roblox rate limited the lookup. Try again in a moment.');
-        }
-
-        throw new Error(`Roblox search failed (${searchRes.status}).`);
-    }
-
-    const searchData = await searchRes.json() as { data?: RobloxSearchCandidate[] };
+    const searchData = await fetchRobloxJsonFromOrigins<{ data?: RobloxSearchCandidate[] }>(
+        ROBLOX_USER_API_ORIGINS,
+        `/v1/users/search?keyword=${encodeURIComponent(searchInput)}&limit=10`,
+        {},
+        'Roblox search',
+    );
     const matches = (Array.isArray(searchData?.data) ? searchData.data : []) as RobloxSearchCandidate[];
     const exactMatch = matches.find((candidate) =>
         String(candidate?.name || '').toLowerCase() === searchInput.toLowerCase()
@@ -1197,18 +1239,12 @@ async function fetchRobloxLookup(username: string, serverId: string, openCloudKe
     const [legacyProfile, cloudProfile, thumbnailData] = await Promise.all([
         matchedUser.profile
             ? Promise.resolve(matchedUser.profile)
-            : fetch(`https://users.roblox.com/v1/users/${matchedUser.id}`, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0',
-                },
-                cache: 'no-store',
-            }).then(async (response) => {
-                if (!response.ok) {
-                    throw new Error(`Roblox profile lookup failed (${response.status}).`);
-                }
-
-                return response.json() as Promise<RobloxUserProfile>;
-            }),
+            : fetchRobloxJsonFromOrigins<RobloxUserProfile>(
+                ROBLOX_USER_API_ORIGINS,
+                `/v1/users/${encodeURIComponent(String(matchedUser.id))}`,
+                {},
+                'Roblox profile lookup',
+            ),
         apiKey
             ? fetch(`https://apis.roblox.com/cloud/v2/users/${matchedUser.id}`, {
                 headers: {
@@ -1217,12 +1253,12 @@ async function fetchRobloxLookup(username: string, serverId: string, openCloudKe
                 cache: 'no-store',
             }).then((response) => response.ok ? response.json() : null).catch(() => null)
             : Promise.resolve(null),
-        fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${matchedUser.id}&size=150x150&format=Png&isCircular=false`, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0',
-            },
-            cache: 'no-store',
-        }).then((response) => response.ok ? response.json() : { data: [] }).catch(() => ({ data: [] })),
+        fetchRobloxJsonFromOrigins<{ data?: Array<{ imageUrl?: string }> }>(
+            ROBLOX_THUMBNAIL_API_ORIGINS,
+            `/v1/users/avatar-headshot?userIds=${encodeURIComponent(String(matchedUser.id))}&size=150x150&format=Png&isCircular=false`,
+            {},
+            'Roblox avatar lookup',
+        ).catch(() => ({ data: [] })),
     ]);
 
     const resolvedUsername = legacyProfile?.name || matchedUser.name || searchUsername;
