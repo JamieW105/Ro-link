@@ -4,6 +4,19 @@ export interface AdminPanelCommandDefinition {
     description: string;
     category: string;
     requiresTarget?: boolean;
+    source?: 'module';
+    moduleId?: string;
+    moduleName?: string;
+    sortOrder?: number;
+    fields?: AdminPanelCommandFieldDefinition[];
+}
+
+export interface AdminPanelCommandFieldDefinition {
+    id: string;
+    label: string;
+    type?: string;
+    required?: boolean;
+    multiline?: boolean;
 }
 
 export const ADMIN_PANEL_COMMANDS: AdminPanelCommandDefinition[] = [

@@ -11,6 +11,7 @@ import { buildDeliveryArgs, resolveDeliveryTargets, trimString, type CommandArgs
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
 import { logAction } from '@/lib/logger';
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
+import { collectModulePanelCommandsFromLiveServers } from '@/lib/modulePanelCommands';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { supabase } from '@/lib/supabase';
 
@@ -34,9 +35,6 @@ export async function POST(req: Request) {
         if (!serverId || !command) {
             return NextResponse.json({ error: 'Missing serverId or command' }, { status: 400 });
         }
-        if (!ADMIN_PANEL_COMMAND_IDS.includes(command)) {
-            return NextResponse.json({ error: 'Unknown command' }, { status: 400 });
-        }
 
         const discordUserId = trimString((session.user as { id?: string }).id);
         const permissions = await resolveDashboardUserPermissions(serverId, discordUserId);
@@ -44,8 +42,34 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        if (!canUseDashboardCommand(permissions, command)) {
+        const isBuiltInCommand = ADMIN_PANEL_COMMAND_IDS.includes(command);
+        const freshAfter = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { data: liveServers, error: liveServersError } = isBuiltInCommand
+            ? { data: null, error: null }
+            : await supabase
+                .from('live_servers')
+                .select('*')
+                .eq('server_id', serverId)
+                .gte('updated_at', freshAfter);
+
+        if (liveServersError) {
+            return NextResponse.json({ error: liveServersError.message }, { status: 500 });
+        }
+
+        const moduleCommandDefinition = isBuiltInCommand
+            ? null
+            : collectModulePanelCommandsFromLiveServers(liveServers || []).find((definition) => definition.id === command) || null;
+
+        if (!isBuiltInCommand && !moduleCommandDefinition) {
+            return NextResponse.json({ error: 'Unknown command' }, { status: 400 });
+        }
+
+        if (isBuiltInCommand && !canUseDashboardCommand(permissions, command)) {
             return NextResponse.json({ error: 'You do not have permission to use that Roblox admin command.' }, { status: 403 });
+        }
+
+        if (!isBuiltInCommand && !permissions.is_admin && !permissions.can_access_live_panel) {
+            return NextResponse.json({ error: 'You do not have permission to use module panel commands.' }, { status: 403 });
         }
 
         const [{ data: serverSettings, error: serverSettingsError }, { data: verifiedUser }] = await Promise.all([
@@ -65,7 +89,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: serverSettingsError.message }, { status: 500 });
         }
 
-        if (commandRequiresModerationHierarchy(command)) {
+        if (isBuiltInCommand && commandRequiresModerationHierarchy(command)) {
             const hierarchyCheck = await evaluateModerationRoleHierarchy({
                 serverId,
                 moderatorDiscordId: discordUserId,
@@ -105,7 +129,10 @@ export async function POST(req: Request) {
             baseArgs.team_name = teamName;
         }
 
-        const deliveryTargets = await resolveDeliveryTargets(serverId, command, baseArgs);
+        const deliveryTargets = await resolveDeliveryTargets(serverId, command, baseArgs, {
+            allowGlobal: !isBuiltInCommand,
+            playerTargetCommands: moduleCommandDefinition?.requiresTarget ? [command] : [],
+        });
         if (deliveryTargets.length === 0) {
             return NextResponse.json({ error: 'No live servers are available for that command target.' }, { status: 400 });
         }

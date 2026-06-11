@@ -180,3 +180,16 @@ SET permissions = ARRAY(
     FROM unnest(COALESCE(permissions, ARRAY[]::TEXT[]) || ARRAY['MANAGE_MODULES']) AS permission
 )
 WHERE name = 'Super Admin';
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'live_servers'
+    ) THEN
+        ALTER TABLE public.live_servers
+            ADD COLUMN IF NOT EXISTS module_panel_commands JSONB NOT NULL DEFAULT '[]'::jsonb;
+    END IF;
+END $$;

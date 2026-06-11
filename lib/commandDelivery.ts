@@ -163,7 +163,11 @@ export async function resolveDeliveryTargets(
     serverId: string,
     command: string,
     args: CommandArgs,
-    options?: { preferredJobId?: string },
+    options?: {
+        preferredJobId?: string;
+        allowGlobal?: boolean;
+        playerTargetCommands?: readonly string[];
+    },
 ) {
     const requestedJobId = trimString(args.job_id);
     if (requestedJobId) {
@@ -175,7 +179,7 @@ export async function resolveDeliveryTargets(
     }
 
     const requestedScope = trimString(args.target_scope).toUpperCase();
-    if (requestedScope === 'GLOBAL' && GLOBAL_COMMAND_LOOKUP.has(command)) {
+    if (requestedScope === 'GLOBAL' && (GLOBAL_COMMAND_LOOKUP.has(command) || options?.allowGlobal)) {
         const liveServers = await getFreshLiveServers(serverId);
         const jobIds = Array.from(new Set(
             liveServers
@@ -191,7 +195,8 @@ export async function resolveDeliveryTargets(
     }
 
     const targetIdentity = getTargetIdentity(args);
-    if (targetIdentity && PLAYER_TARGET_COMMAND_LOOKUP.has(command)) {
+    const playerTargetCommands = new Set(options?.playerTargetCommands ?? []);
+    if (targetIdentity && (PLAYER_TARGET_COMMAND_LOOKUP.has(command) || playerTargetCommands.has(command))) {
         const targetJobId = await resolvePlayerJobId(serverId, targetIdentity, options?.preferredJobId);
         if (!targetJobId) {
             return [] satisfies DeliveryTarget[];

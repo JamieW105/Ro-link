@@ -3976,6 +3976,8 @@ function RoLink:Initialize()
 	self.loadedModules = self.loadedModules or {}
 	self.moduleCommands = self.moduleCommands or {}
 	self.moduleCommandDefinitions = self.moduleCommandDefinitions or {}
+	self.moduleCommandModules = self.moduleCommandModules or {}
+	self.moduleCommandPanelVisible = self.moduleCommandPanelVisible or {}
 	self.moduleHooks = self.moduleHooks or {
 		AdminPanelOpened = {},
 		CommandBarOpened = {}
@@ -4046,7 +4048,8 @@ function RoLink:Initialize()
 								})
 							end
 							return list
-						end)()
+						end)(),
+						modulePanelCommands = self:CreateModulePanelCommandPayload()
 					})
 				})
 			end)
@@ -4407,6 +4410,47 @@ function RoLink:RefreshModuleConfig(moduleInfo)
 	return moduleInfo
 end
 
+function RoLink:CreateModulePanelCommandPayload()
+	local payload = {}
+	for commandName, definition in pairs(self.moduleCommandDefinitions or {}) do
+		if self.moduleCommandPanelVisible and self.moduleCommandPanelVisible[commandName] and type(definition) == "table" then
+			local moduleInfo = self.moduleCommandModules and self.moduleCommandModules[commandName] or nil
+			local rawFields = definition.Fields or definition.fields or {}
+			local fields = {}
+			if type(rawFields) == "table" then
+				for _, field in ipairs(rawFields) do
+					if type(field) == "table" then
+						local fieldId = tostring(field.id or field.Id or field.key or field.Key or field.name or field.Name or "")
+						if fieldId ~= "" then
+							table.insert(fields, {
+								id = fieldId,
+								label = tostring(field.label or field.Label or field.title or field.Title or fieldId),
+								type = tostring(field.type or field.Type or ""),
+								required = field.required == true or field.Required == true,
+								multiline = field.multiline == true or field.Multiline == true or field.multiLine == true or field.MultiLine == true
+							})
+						end
+					end
+				end
+			end
+
+			table.insert(payload, {
+				id = tostring(commandName),
+				name = tostring(definition.Name or definition.name or definition.Command or definition.command or definition.Id or definition.id or commandName),
+				label = tostring(definition.Title or definition.title or definition.Label or definition.label or definition.Name or definition.name or commandName),
+				description = tostring(definition.Description or definition.description or ""),
+				category = tostring(definition.Category or definition.category or "Module"),
+				requiresTarget = definition.TargetRequired == true or definition.targetRequired == true or definition.RequiresTarget == true or definition.requiresTarget == true,
+				sortOrder = tonumber(definition.SortOrder or definition.sortOrder),
+				moduleId = tostring(moduleInfo and (moduleInfo.id or moduleInfo.slug) or ""),
+				moduleName = tostring(moduleInfo and (moduleInfo.name or moduleInfo.slug or moduleInfo.id) or ""),
+				fields = fields
+			})
+		end
+	end
+	return payload
+end
+
 function RoLink:BuildFreshModuleValue(moduleInfo, valueName)
 	return setmetatable({}, {
 		__index = function(_, key)
@@ -4464,6 +4508,8 @@ function RoLink:BuildModuleContext(moduleInfo)
 				moduleKey = tostring((moduleInfo and (moduleInfo.slug or moduleInfo.id)) or "unknown"),
 				module = moduleInfo
 			}
+			self.moduleCommandModules[key] = moduleInfo
+			self.moduleCommandPanelVisible[key] = nil
 			self.moduleCommandDefinitions[key] = self.moduleCommandDefinitions[key] or {
 				Name = commandName,
 				Title = commandName,
@@ -4483,6 +4529,8 @@ function RoLink:BuildModuleContext(moduleInfo)
 				moduleKey = tostring((moduleInfo and (moduleInfo.slug or moduleInfo.id)) or "unknown"),
 				module = moduleInfo
 			}
+			self.moduleCommandModules[key] = moduleInfo
+			self.moduleCommandPanelVisible[key] = true
 			self.moduleCommandDefinitions[key] = definition
 		end,
 		OnAdminPanelOpened = function(handler)
@@ -4572,6 +4620,12 @@ function RoLink:LoadModules()
 				for commandName, binding in pairs(self.moduleCommands) do
 					if binding.moduleKey == moduleKey then
 						self.moduleCommands[commandName] = nil
+						if self.moduleCommandModules then
+							self.moduleCommandModules[commandName] = nil
+						end
+						if self.moduleCommandPanelVisible then
+							self.moduleCommandPanelVisible[commandName] = nil
+						end
 						if self.moduleCommandDefinitions then
 							self.moduleCommandDefinitions[commandName] = nil
 						end
@@ -4604,6 +4658,26 @@ function RoLink:LoadModules()
 									context.RegisterCommand(commandName, handler)
 								end
 							end
+							if type(exported.PanelCommands) == "table" then
+								for commandName, panelCommand in pairs(exported.PanelCommands) do
+									if type(panelCommand) == "function" then
+										context.RegisterPanelCommand({
+											Name = tostring(commandName),
+											Title = tostring(commandName),
+											Description = "Registered by " .. tostring((moduleInfo and (moduleInfo.name or moduleInfo.slug)) or "marketplace module"),
+											Category = "Marketplace",
+											TargetRequired = false,
+											Fields = {}
+										}, panelCommand)
+									elseif type(panelCommand) == "table" then
+										local handler = panelCommand.Handler or panelCommand.handler
+										if type(handler) == "function" then
+											panelCommand.Name = panelCommand.Name or panelCommand.name or tostring(commandName)
+											context.RegisterPanelCommand(panelCommand, handler)
+										end
+									end
+								end
+							end
 							if type(exported.OnAdminPanelOpened) == "function" then
 								context.OnAdminPanelOpened(exported.OnAdminPanelOpened)
 							elseif type(exported.AdminPanelOpened) == "function" then
@@ -4621,6 +4695,12 @@ function RoLink:LoadModules()
 									for commandName, binding in pairs(self.moduleCommands) do
 										if binding.moduleKey == moduleKey then
 											self.moduleCommands[commandName] = nil
+											if self.moduleCommandModules then
+												self.moduleCommandModules[commandName] = nil
+											end
+											if self.moduleCommandPanelVisible then
+												self.moduleCommandPanelVisible[commandName] = nil
+											end
 											if self.moduleCommandDefinitions then
 												self.moduleCommandDefinitions[commandName] = nil
 											end
@@ -4880,14 +4960,42 @@ function RoLink:Execute(cmd)
 
             local createdInstances = {}
             local disabledMotors = {}
+            local oldPartStates = {}
             local oldPlatformStand = humanoid.PlatformStand
             local oldAutoRotate = humanoid.AutoRotate
             local oldRequiresNeck = humanoid.RequiresNeck
+            local oldGettingUpEnabled = true
+            pcall(function()
+                oldGettingUpEnabled = humanoid:GetStateEnabled(Enum.HumanoidStateType.GettingUp)
+            end)
 
             character:SetAttribute("RoLink_Ragdoll", true)
             humanoid.PlatformStand = true
             humanoid.AutoRotate = false
             humanoid.RequiresNeck = false
+            pcall(function()
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
+            end)
+
+            for _, descendant in ipairs(character:GetDescendants()) do
+                if descendant:IsA("BasePart") then
+                    oldPartStates[descendant] = {
+                        Anchored = descendant.Anchored,
+                        CanCollide = descendant.CanCollide,
+                        Massless = descendant.Massless,
+                    }
+                    descendant.Anchored = false
+                    if descendant.Name == "HumanoidRootPart" then
+                        descendant.CanCollide = false
+                    else
+                        descendant.CanCollide = true
+                        descendant.Massless = false
+                    end
+                    pcall(function()
+                        descendant:SetNetworkOwner(nil)
+                    end)
+                end
+            end
 
             for _, descendant in ipairs(character:GetDescendants()) do
                 if descendant:IsA("Motor6D") and descendant.Part0 and descendant.Part1 then
@@ -4907,12 +5015,19 @@ function RoLink:Execute(cmd)
                     socket.Attachment1 = attachment1
                     socket.LimitsEnabled = true
                     socket.TwistLimitsEnabled = true
-                    socket.UpperAngle = 45
-                    socket.TwistLowerAngle = -45
-                    socket.TwistUpperAngle = 45
+                    socket.UpperAngle = 85
+                    socket.TwistLowerAngle = -70
+                    socket.TwistUpperAngle = 70
                     socket.Parent = descendant.Part0
 
+                    local noCollision = Instance.new("NoCollisionConstraint")
+                    noCollision.Name = "RoLinkRagdollNoCollision"
+                    noCollision.Part0 = descendant.Part0
+                    noCollision.Part1 = descendant.Part1
+                    noCollision.Parent = descendant.Part0
+
                     table.insert(createdInstances, socket)
+                    table.insert(createdInstances, noCollision)
                     table.insert(createdInstances, attachment0)
                     table.insert(createdInstances, attachment1)
                     table.insert(disabledMotors, descendant)
@@ -4921,7 +5036,7 @@ function RoLink:Execute(cmd)
             end
 
             pcall(function()
-                humanoid:ChangeState(Enum.HumanoidStateType.Ragdoll)
+                humanoid:ChangeState(Enum.HumanoidStateType.Physics)
             end)
             task.delay(durationSeconds, function()
                 for _, motor in ipairs(disabledMotors) do
@@ -4934,6 +5049,13 @@ function RoLink:Execute(cmd)
                         instance:Destroy()
                     end
                 end
+                for part, state in pairs(oldPartStates) do
+                    if part and part.Parent then
+                        part.Anchored = state.Anchored
+                        part.CanCollide = state.CanCollide
+                        part.Massless = state.Massless
+                    end
+                end
                 if character and character.Parent then
                     character:SetAttribute("RoLink_Ragdoll", nil)
                 end
@@ -4941,6 +5063,9 @@ function RoLink:Execute(cmd)
                     humanoid.PlatformStand = oldPlatformStand
                     humanoid.AutoRotate = oldAutoRotate
                     humanoid.RequiresNeck = oldRequiresNeck
+                    pcall(function()
+                        humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, oldGettingUpEnabled)
+                    end)
                     pcall(function()
                         humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
                     end)

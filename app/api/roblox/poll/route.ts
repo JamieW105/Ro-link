@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { findServerByKeyWithDiagnostics } from '@/lib/serverAuth';
+import { normalizeModulePanelCommandDefinition } from '@/lib/modulePanelCommands';
+import type { AdminPanelCommandDefinition } from '@/lib/adminPanelCommands';
 import { supabase } from '@/lib/supabase';
 import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 
@@ -18,6 +20,19 @@ function getCommandTargetJobId(command: QueuedCommand) {
     return trimString(command?.args?.job_id);
 }
 
+function normalizeModulePanelCommandPayload(value: unknown) {
+    const rawCommands = Array.isArray(value)
+        ? value
+        : value && typeof value === 'object'
+            ? Object.values(value as Record<string, unknown>)
+            : [];
+
+    return rawCommands
+        .map(normalizeModulePanelCommandDefinition)
+        .filter((command): command is AdminPanelCommandDefinition => Boolean(command))
+        .slice(0, 100);
+}
+
 export async function GET() {
     return NextResponse.json({
         status: 'API Active',
@@ -29,6 +44,7 @@ export async function POST(req: Request) {
     try {
         const body = await req.json().catch(() => ({}));
         const { jobId, playerCount, players, status } = body;
+        const modulePanelCommands = normalizeModulePanelCommandPayload(body.modulePanelCommands ?? body.module_panel_commands);
         const auth = readServerApiKeyDetails(req, body.apiKey ?? body.key ?? body.serverKey ?? body.securityKey);
         const authDebug = describeServerApiKeyDetails(auth);
         if (!auth.key) {
@@ -98,6 +114,7 @@ export async function POST(req: Request) {
                             server_id: server.id,
                             player_count: playerCount || 0,
                             players: players || [],
+                            module_panel_commands: modulePanelCommands,
                             updated_at: new Date().toISOString()
                         }, { onConflict: 'id' });
                 } catch {

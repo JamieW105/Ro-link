@@ -32,6 +32,7 @@ interface LivePanelPayload {
         placeId: string | null;
     };
     liveServers?: LiveServerRecord[];
+    modulePanelCommands?: AdminPanelCommandDefinition[];
     logs?: unknown[];
 }
 
@@ -470,6 +471,67 @@ function splitTargetAndExtra(value: string) {
     };
 }
 
+function isModulePanelCommand(command: AdminPanelCommandDefinition) {
+    return command.source === 'module';
+}
+
+function tokenizeCommandArgs(value: string) {
+    const tokens: string[] = [];
+    const pattern = /"([^"]*)"|'([^']*)'|(\S+)/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = pattern.exec(value)) !== null) {
+        tokens.push(match[1] ?? match[2] ?? match[3] ?? '');
+    }
+
+    return tokens;
+}
+
+function assignModuleCommandFields(command: AdminPanelCommandDefinition, value: string, args: Record<string, unknown>) {
+    const fields = command.fields || [];
+    const trimmed = value.trim();
+    if (fields.length === 0) {
+        if (trimmed) {
+            args.reason = trimmed;
+        }
+        return;
+    }
+
+    const fieldByKey = new Map<string, string>();
+    for (const field of fields) {
+        fieldByKey.set(normalizeAdminPanelCommand(field.id), field.id);
+        fieldByKey.set(normalizeAdminPanelCommand(field.label), field.id);
+    }
+
+    const positional: string[] = [];
+    for (const token of tokenizeCommandArgs(trimmed)) {
+        const keyValueMatch = /^([A-Za-z_][A-Za-z0-9_-]*)=(.*)$/.exec(token);
+        if (keyValueMatch) {
+            const fieldId = fieldByKey.get(normalizeAdminPanelCommand(keyValueMatch[1]));
+            if (fieldId) {
+                args[fieldId] = keyValueMatch[2];
+                continue;
+            }
+        }
+        positional.push(token);
+    }
+
+    const unsetFields = fields.filter((field) => args[field.id] === undefined);
+    unsetFields.forEach((field, index) => {
+        if (positional.length === 0) {
+            return;
+        }
+        const isLastField = index === unsetFields.length - 1;
+        args[field.id] = isLastField ? positional.splice(0).join(' ') : positional.shift();
+    });
+}
+
+function getMissingRequiredModuleFields(command: AdminPanelCommandDefinition, args: Record<string, unknown>) {
+    return (command.fields || [])
+        .filter((field) => field.required && !trimString(args[field.id]))
+        .map((field) => field.label || field.id);
+}
+
 function ActionTooltip({ label }: { label: string }) {
     return (
         <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-200 opacity-0 shadow-xl transition-all group-hover:translate-y-0 group-hover:opacity-100">
@@ -581,6 +643,7 @@ export default function LivePanelPage() {
     const [profileCommand, setProfileCommand] = useState('');
     const [profileCommandValue, setProfileCommandValue] = useState('');
     const [moduleLiveActions, setModuleLiveActions] = useState<ModuleLiveAction[]>([]);
+    const [modulePanelCommands, setModulePanelCommands] = useState<AdminPanelCommandDefinition[]>([]);
 
     const clearSelectedProfile = useCallback(() => {
         setSelectedProfileUser(null);
@@ -612,6 +675,7 @@ export default function LivePanelPage() {
 
             setPlaceId(payload.server?.placeId || null);
             setLiveServers(Array.isArray(payload.liveServers) ? payload.liveServers : []);
+            setModulePanelCommands(Array.isArray(payload.modulePanelCommands) ? payload.modulePanelCommands : []);
             setLogs(normalizeDashboardLogs(payload.logs || []));
         } catch (error) {
             setNotice({ type: 'error', text: `Failed to load the Live Panel: ${String(error)}` });
@@ -835,9 +899,15 @@ export default function LivePanelPage() {
         ));
     }, [logSearch, logs]);
 
-    const availableCommands = useMemo(() => (
-        ADMIN_PANEL_COMMANDS.filter((command) => canUseDashboardCommand(perms, command.id))
-    ), [perms]);
+    const availableCommands = useMemo(() => {
+        const builtInCommands = ADMIN_PANEL_COMMANDS.filter((command) => canUseDashboardCommand(perms, command.id));
+        const builtInIds = new Set(builtInCommands.map((command) => command.id));
+        const visibleModuleCommands = (perms.is_admin || perms.can_access_live_panel)
+            ? modulePanelCommands.filter((command) => !builtInIds.has(command.id))
+            : [];
+
+        return [...builtInCommands, ...visibleModuleCommands];
+    }, [modulePanelCommands, perms]);
 
     const suggestions = useMemo(() => {
         const query = profileSearch.trim().toLowerCase();
@@ -899,8 +969,8 @@ export default function LivePanelPage() {
                 items.push({
                     kind: 'command',
                     title: command.label,
-                    detail: `${command.description}${command.requiresTarget ? ' Needs a user target.' : ' Runs on live servers.'}`,
-                    meta: command.category,
+                    detail: `${command.description}${command.requiresTarget ? ' Needs a user target.' : isModulePanelCommand(command) ? ' Runs through its module.' : ' Runs on live servers.'}`,
+                    meta: isModulePanelCommand(command) && command.moduleName ? command.moduleName : command.category,
                     value: command.requiresTarget || command.id === 'BROADCAST' || NUMERIC_GLOBAL_COMMANDS.has(command.id)
                         ? `${command.label} `
                         : command.label,
@@ -945,6 +1015,16 @@ export default function LivePanelPage() {
                     value: `${command.label} ${user.username}`,
                 });
             });
+        } else if (isModulePanelCommand(command) && command.fields && command.fields.length > 0) {
+            command.fields.slice(0, 4).forEach((field) => {
+                items.push({
+                    kind: 'command',
+                    title: `${field.label}${field.required ? ' required' : ''}`,
+                    detail: command.moduleName ? `${command.label} field from ${command.moduleName}.` : `${command.label} field.`,
+                    meta: field.id,
+                    value: `${command.label} ${field.id}=`,
+                });
+            });
         } else if (NUMERIC_GLOBAL_COMMANDS.has(command.id)) {
             ['196.2', '0', '75'].forEach((amount) => {
                 items.push({
@@ -978,7 +1058,8 @@ export default function LivePanelPage() {
         || profileCommandDefinition.id === 'BROADCAST'
         : false;
     const profileCommandOptions = availableCommands.filter((command) => (
-        command.requiresTarget
+        !isModulePanelCommand(command)
+        && command.requiresTarget
         && !['KICK', 'BAN', 'SOFTBAN', 'UNBAN'].includes(command.id)
     ));
     const announcementUserQuery = announcementUser.trim().toLowerCase().replace(/^@/, '');
@@ -1297,7 +1378,36 @@ export default function LivePanelPage() {
         let target = '';
         let successTarget = '';
 
-        if (commandDefinition.requiresTarget) {
+        if (isModulePanelCommand(commandDefinition)) {
+            if (commandDefinition.requiresTarget) {
+                const targetParts = splitTargetAndExtra(parsed.remainder);
+                target = targetParts.target;
+
+                if (!target) {
+                    setNotice({ type: 'error', text: 'Add a user after the module command before running it.' });
+                    return;
+                }
+
+                const knownTarget = resolveUserFromText(target);
+                successTarget = knownTarget.username || target;
+                args.username = successTarget;
+                args.target_label = successTarget;
+                if (knownTarget?.serverId) {
+                    args.job_id = knownTarget.serverId;
+                }
+                assignModuleCommandFields(commandDefinition, targetParts.extra, args);
+            } else {
+                args.target_scope = 'GLOBAL';
+                args.target_label = 'global';
+                assignModuleCommandFields(commandDefinition, parsed.remainder, args);
+            }
+
+            const missingFields = getMissingRequiredModuleFields(commandDefinition, args);
+            if (missingFields.length > 0) {
+                setNotice({ type: 'error', text: `Add ${missingFields.join(', ')} before running ${commandDefinition.label}.` });
+                return;
+            }
+        } else if (commandDefinition.requiresTarget) {
             const targetParts = splitTargetAndExtra(parsed.remainder);
             target = targetParts.target;
             const extra = targetParts.extra;

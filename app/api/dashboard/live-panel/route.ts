@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { enrichLogRecordsWithLinkedUsers, expandLinkedLogTargets } from '@/lib/logIdentity';
+import { collectModulePanelCommandsFromLiveServers } from '@/lib/modulePanelCommands';
 import { canAccessLivePanel, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -118,6 +119,7 @@ export async function GET(req: NextRequest) {
             placeId: trimString(serverResult.data?.place_id) || null,
         },
         liveServers: liveServersResult.data || [],
+        modulePanelCommands: collectModulePanelCommandsFromLiveServers(liveServersResult.data || []),
         logs,
     });
 }
