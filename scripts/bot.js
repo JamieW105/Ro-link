@@ -727,6 +727,95 @@ async function fetchDiscordLookup(discordUser, guild, serverId) {
     };
 }
 
+async function resolveRobloxUser(input) {
+    const searchInput = String(input ?? '').trim();
+    if (!searchInput) {
+        throw new Error('Please provide a Roblox username to lookup.');
+    }
+
+    if (/^\d+$/.test(searchInput)) {
+        const profileRes = await fetch(`https://users.roblox.com/v1/users/${encodeURIComponent(searchInput)}`, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0',
+            },
+        });
+
+        if (profileRes.status === 404) {
+            throw new Error('Player not found.');
+        }
+
+        if (!profileRes.ok) {
+            throw new Error(`Roblox profile lookup failed (${profileRes.status}).`);
+        }
+
+        const profile = await profileRes.json();
+        const resolvedId = profile?.id || searchInput;
+        const resolvedName = String(profile?.name || searchInput).trim();
+        return {
+            id: resolvedId,
+            name: resolvedName,
+            displayName: String(profile?.displayName || resolvedName).trim(),
+            profile,
+        };
+    }
+
+    const usernameRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0',
+        },
+        body: JSON.stringify({ usernames: [searchInput], excludeBannedUsers: false }),
+    });
+
+    if (usernameRes.ok) {
+        const usernameData = await usernameRes.json();
+        const matchedUser = Array.isArray(usernameData?.data) ? usernameData.data[0] : null;
+        if (matchedUser?.id) {
+            const resolvedName = String(matchedUser.name || searchInput).trim();
+            return {
+                id: matchedUser.id,
+                name: resolvedName,
+                displayName: String(matchedUser.displayName || resolvedName).trim(),
+            };
+        }
+    } else if (usernameRes.status === 429) {
+        throw new Error('Roblox rate limited the lookup. Try again in a moment.');
+    }
+
+    const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(searchInput)}&limit=10`, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0',
+        }
+    });
+
+    if (!searchRes.ok) {
+        if (searchRes.status === 429) {
+            throw new Error('Roblox rate limited the lookup. Try again in a moment.');
+        }
+
+        throw new Error(`Roblox search failed (${searchRes.status}).`);
+    }
+
+    const searchData = await searchRes.json();
+    const matches = Array.isArray(searchData?.data) ? searchData.data : [];
+    const exactMatch = matches.find((candidate) =>
+        String(candidate?.name || '').toLowerCase() === searchInput.toLowerCase()
+    );
+    const matchedUser = exactMatch || matches[0];
+
+    if (!matchedUser?.id) {
+        throw new Error('Player not found.');
+    }
+
+    const resolvedName = String(matchedUser.name || searchInput).trim();
+    return {
+        id: matchedUser.id,
+        name: resolvedName,
+        displayName: String(matchedUser.displayName || resolvedName).trim(),
+    };
+}
+
 async function fetchRobloxLookup(username, serverId) {
     const searchUsername = String(username ?? '').trim();
     if (!searchUsername) {
@@ -747,31 +836,7 @@ async function fetchRobloxLookup(username, serverId) {
         ? serverSettings.open_cloud_key.trim()
         : '';
 
-    const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(searchUsername)}&limit=10`, {
-        headers: {
-            'User-Agent': 'Ro-Link Bot/1.0',
-        }
-    });
-
-    if (!searchRes.ok) {
-        if (searchRes.status === 429) {
-            throw new Error('Roblox rate limited the lookup. Try again in a moment.');
-        }
-
-        throw new Error(`Roblox search failed (${searchRes.status}).`);
-    }
-
-    const searchData = await searchRes.json();
-    const matches = Array.isArray(searchData?.data) ? searchData.data : [];
-    const exactMatch = matches.find((candidate) =>
-        String(candidate?.name || '').toLowerCase() === searchUsername.toLowerCase()
-    );
-    const matchedUser = exactMatch || matches[0];
-
-    if (!matchedUser?.id) {
-        throw new Error('Player not found.');
-    }
-
+    const matchedUser = await resolveRobloxUser(searchUsername);
     let cloudProfile = null;
     if (apiKey) {
         try {
@@ -789,21 +854,23 @@ async function fetchRobloxLookup(username, serverId) {
         }
     }
 
-    const legacyProfileRes = await fetch(`https://users.roblox.com/v1/users/${matchedUser.id}`, {
-        headers: {
-            'User-Agent': 'Ro-Link Bot/1.0',
-        }
-    });
-
-    if (!legacyProfileRes.ok) {
-        throw new Error(`Roblox profile lookup failed (${legacyProfileRes.status}).`);
-    }
-
     const [legacyProfile, thumbnailData] = await Promise.all([
-        legacyProfileRes.json(),
+        matchedUser.profile
+            ? Promise.resolve(matchedUser.profile)
+            : fetch(`https://users.roblox.com/v1/users/${matchedUser.id}`, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0',
+                }
+            }).then(async (response) => {
+                if (!response.ok) {
+                    throw new Error(`Roblox profile lookup failed (${response.status}).`);
+                }
+
+                return response.json();
+            }),
         fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${matchedUser.id}&size=150x150&format=Png&isCircular=false`, {
             headers: {
-                'User-Agent': 'Ro-Link Bot/1.0',
+                'User-Agent': 'Mozilla/5.0',
             }
         }).then((response) => response.ok ? response.json() : { data: [] }).catch(() => ({ data: [] })),
     ]);

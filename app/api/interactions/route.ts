@@ -121,6 +121,19 @@ type RobloxSearchCandidate = {
     displayName?: string | null;
 };
 
+type RobloxUserProfile = RobloxSearchCandidate & {
+    description?: string | null;
+    created?: string | null;
+    isBanned?: boolean | null;
+};
+
+type ResolvedRobloxUser = {
+    id: number | string;
+    name: string;
+    displayName: string;
+    profile?: RobloxUserProfile | null;
+};
+
 type LiveServerRow = {
     id?: string | null;
     players?: unknown;
@@ -1081,16 +1094,69 @@ async function fetchDiscordLookup(userId: string, serverId: string): Promise<Dis
     };
 }
 
-async function fetchRobloxLookup(username: string, serverId: string, openCloudKey?: string | null): Promise<RobloxLookupResult> {
-    const searchUsername = String(username ?? '').trim();
-    if (!searchUsername) {
+async function resolveRobloxUser(input: string): Promise<ResolvedRobloxUser> {
+    const searchInput = String(input ?? '').trim();
+    if (!searchInput) {
         throw new Error('Please provide a Roblox username to lookup.');
     }
 
-    const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(searchUsername)}&limit=10`, {
-        headers: {
-            'User-Agent': 'Ro-Link/1.0',
+    if (/^\d+$/.test(searchInput)) {
+        const profileRes = await fetch(`https://users.roblox.com/v1/users/${encodeURIComponent(searchInput)}`, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0',
+            },
+            cache: 'no-store',
+        });
+
+        if (profileRes.status === 404) {
+            throw new Error('Player not found.');
         }
+
+        if (!profileRes.ok) {
+            throw new Error(`Roblox profile lookup failed (${profileRes.status}).`);
+        }
+
+        const profile = await profileRes.json() as RobloxUserProfile;
+        const resolvedId = profile?.id || searchInput;
+        const resolvedName = String(profile?.name || searchInput).trim();
+        return {
+            id: resolvedId,
+            name: resolvedName,
+            displayName: String(profile?.displayName || resolvedName).trim(),
+            profile,
+        };
+    }
+
+    const usernameRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0',
+        },
+        body: JSON.stringify({ usernames: [searchInput], excludeBannedUsers: false }),
+        cache: 'no-store',
+    });
+
+    if (usernameRes.ok) {
+        const usernameData = await usernameRes.json() as { data?: RobloxSearchCandidate[] };
+        const matchedUser = Array.isArray(usernameData?.data) ? usernameData.data[0] : null;
+        if (matchedUser?.id) {
+            const resolvedName = String(matchedUser.name || searchInput).trim();
+            return {
+                id: matchedUser.id,
+                name: resolvedName,
+                displayName: String(matchedUser.displayName || resolvedName).trim(),
+            };
+        }
+    } else if (usernameRes.status === 429) {
+        throw new Error('Roblox rate limited the lookup. Try again in a moment.');
+    }
+
+    const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(searchInput)}&limit=10`, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0',
+        },
+        cache: 'no-store',
     });
 
     if (!searchRes.ok) {
@@ -1101,10 +1167,10 @@ async function fetchRobloxLookup(username: string, serverId: string, openCloudKe
         throw new Error(`Roblox search failed (${searchRes.status}).`);
     }
 
-    const searchData = await searchRes.json();
+    const searchData = await searchRes.json() as { data?: RobloxSearchCandidate[] };
     const matches = (Array.isArray(searchData?.data) ? searchData.data : []) as RobloxSearchCandidate[];
     const exactMatch = matches.find((candidate) =>
-        String(candidate?.name || '').toLowerCase() === searchUsername.toLowerCase()
+        String(candidate?.name || '').toLowerCase() === searchInput.toLowerCase()
     );
     const matchedUser = exactMatch || matches[0];
 
@@ -1112,32 +1178,53 @@ async function fetchRobloxLookup(username: string, serverId: string, openCloudKe
         throw new Error('Player not found.');
     }
 
+    const resolvedName = String(matchedUser.name || searchInput).trim();
+    return {
+        id: matchedUser.id,
+        name: resolvedName,
+        displayName: String(matchedUser.displayName || resolvedName).trim(),
+    };
+}
+
+async function fetchRobloxLookup(username: string, serverId: string, openCloudKey?: string | null): Promise<RobloxLookupResult> {
+    const searchUsername = String(username ?? '').trim();
+    if (!searchUsername) {
+        throw new Error('Please provide a Roblox username to lookup.');
+    }
+
+    const matchedUser = await resolveRobloxUser(searchUsername);
     const apiKey = String(openCloudKey ?? '').trim();
-    const [legacyProfileRes, cloudProfile, thumbnailData] = await Promise.all([
-        fetch(`https://users.roblox.com/v1/users/${matchedUser.id}`, {
-            headers: {
-                'User-Agent': 'Ro-Link/1.0',
-            }
-        }),
+    const [legacyProfile, cloudProfile, thumbnailData] = await Promise.all([
+        matchedUser.profile
+            ? Promise.resolve(matchedUser.profile)
+            : fetch(`https://users.roblox.com/v1/users/${matchedUser.id}`, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0',
+                },
+                cache: 'no-store',
+            }).then(async (response) => {
+                if (!response.ok) {
+                    throw new Error(`Roblox profile lookup failed (${response.status}).`);
+                }
+
+                return response.json() as Promise<RobloxUserProfile>;
+            }),
         apiKey
             ? fetch(`https://apis.roblox.com/cloud/v2/users/${matchedUser.id}`, {
                 headers: {
                     'x-api-key': apiKey,
-                }
+                },
+                cache: 'no-store',
             }).then((response) => response.ok ? response.json() : null).catch(() => null)
             : Promise.resolve(null),
         fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${matchedUser.id}&size=150x150&format=Png&isCircular=false`, {
             headers: {
-                'User-Agent': 'Ro-Link/1.0',
-            }
+                'User-Agent': 'Mozilla/5.0',
+            },
+            cache: 'no-store',
         }).then((response) => response.ok ? response.json() : { data: [] }).catch(() => ({ data: [] })),
     ]);
 
-    if (!legacyProfileRes.ok) {
-        throw new Error(`Roblox profile lookup failed (${legacyProfileRes.status}).`);
-    }
-
-    const legacyProfile = await legacyProfileRes.json();
     const resolvedUsername = legacyProfile?.name || matchedUser.name || searchUsername;
 
     const [liveServersRes, logsRes] = await Promise.all([
