@@ -12,6 +12,9 @@ interface QueuedCommand {
     } | null;
 }
 
+let supportsModulePanelCommandsColumn = true;
+let modulePanelCommandsColumnRetryAt = 0;
+
 function trimString(value: unknown) {
     return String(value ?? '').trim();
 }
@@ -48,13 +51,31 @@ async function upsertLiveServer({
     players: unknown;
     modulePanelCommands: AdminPanelCommandDefinition[];
 }) {
-    const payload = {
+    const updatedAt = new Date().toISOString();
+    const legacyPayload = {
         id: jobId,
         server_id: serverId,
         player_count: playerCount || 0,
         players: players || [],
+        updated_at: updatedAt
+    };
+
+    const now = Date.now();
+    const shouldRetryModuleCommandsColumn = modulePanelCommands.length > 0 && now >= modulePanelCommandsColumnRetryAt;
+    if (!supportsModulePanelCommandsColumn && !shouldRetryModuleCommandsColumn) {
+        const fallbackResult = await client
+            .from('live_servers')
+            .upsert(legacyPayload, { onConflict: 'id' });
+
+        if (fallbackResult.error) {
+            throw fallbackResult.error;
+        }
+        return;
+    }
+
+    const payload = {
+        ...legacyPayload,
         module_panel_commands: modulePanelCommands,
-        updated_at: new Date().toISOString()
     };
 
     const result = await client
@@ -62,23 +83,29 @@ async function upsertLiveServer({
         .upsert(payload, { onConflict: 'id' });
 
     if (!result.error) {
+        supportsModulePanelCommandsColumn = true;
+        modulePanelCommandsColumnRetryAt = 0;
         return;
     }
 
-    console.warn('[RoLinkAPI][Poll] Live server upsert with module commands failed; retrying legacy payload.', {
-        code: result.error.code,
-        message: result.error.message,
-    });
+    if (result.error.code === 'PGRST204') {
+        supportsModulePanelCommandsColumn = false;
+        modulePanelCommandsColumnRetryAt = now + 60 * 1000;
+        console.warn('[RoLinkAPI][Poll] live_servers.module_panel_commands is missing; using legacy live server payload until the Supabase schema is migrated.', {
+            code: result.error.code,
+            message: result.error.message,
+            migration: "ALTER TABLE public.live_servers ADD COLUMN IF NOT EXISTS module_panel_commands JSONB NOT NULL DEFAULT '[]'::jsonb;",
+        });
+    } else {
+        console.warn('[RoLinkAPI][Poll] Live server upsert with module commands failed; retrying legacy payload.', {
+            code: result.error.code,
+            message: result.error.message,
+        });
+    }
 
     const fallbackResult = await client
         .from('live_servers')
-        .upsert({
-            id: payload.id,
-            server_id: payload.server_id,
-            player_count: payload.player_count,
-            players: payload.players,
-            updated_at: payload.updated_at
-        }, { onConflict: 'id' });
+        .upsert(legacyPayload, { onConflict: 'id' });
 
     if (fallbackResult.error) {
         throw fallbackResult.error;

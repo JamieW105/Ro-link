@@ -4538,6 +4538,39 @@ function RoLink:BuildModuleContext(moduleInfo)
 			self.moduleCommandPanelVisible[key] = true
 			self.moduleCommandDefinitions[key] = definition
 		end,
+		RegisterCommandInPanel = function(definition, handler)
+			if type(handler) ~= "function" then return end
+			local panelDefinition = definition
+			if type(panelDefinition) == "string" then
+				panelDefinition = {
+					Id = normalizeModuleCommandName(panelDefinition),
+					Name = panelDefinition,
+					Title = panelDefinition,
+					Description = "Registered by " .. tostring((moduleInfo and (moduleInfo.name or moduleInfo.slug)) or "marketplace module"),
+					Category = "Marketplace",
+					TargetRequired = false,
+					Fields = {}
+				}
+			end
+			if type(panelDefinition) ~= "table" then return end
+			local commandName = tostring(panelDefinition.Name or panelDefinition.name or panelDefinition.Command or panelDefinition.command or panelDefinition.Id or panelDefinition.id or "")
+			if commandName == "" then return end
+			local key = normalizeModuleCommandName(commandName)
+			self.moduleCommands[key] = {
+				handler = handler,
+				moduleKey = tostring((moduleInfo and (moduleInfo.slug or moduleInfo.id)) or "unknown"),
+				module = moduleInfo
+			}
+			self.moduleCommandModules[key] = moduleInfo
+			self.moduleCommandPanelVisible[key] = true
+			self.moduleCommandDefinitions[key] = panelDefinition
+		end,
+		RegisterCommandBar = function(definition, handler)
+			return self:BuildModuleContext(moduleInfo).RegisterCommandInPanel(definition, handler)
+		end,
+		RegisterCmdsBar = function(definition, handler)
+			return self:BuildModuleContext(moduleInfo).RegisterCommandInPanel(definition, handler)
+		end,
 		OnAdminPanelOpened = function(handler)
 			self:RegisterModuleHook("AdminPanelOpened", moduleInfo, handler)
 		end,

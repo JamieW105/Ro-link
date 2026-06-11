@@ -61,7 +61,19 @@ export function normalizeModulePanelCommandDefinition(rawCommand: unknown): Admi
     }
 
     const record = rawCommand as Record<string, unknown>;
-    const id = normalizeAdminPanelCommand(readRecordValue(record, 'id', 'Id', 'name', 'Name', 'command', 'Command'));
+    const id = normalizeAdminPanelCommand(readRecordValue(
+        record,
+        'id',
+        'Id',
+        'commandId',
+        'CommandId',
+        'name',
+        'Name',
+        'commandName',
+        'CommandName',
+        'command',
+        'Command',
+    ));
     if (!id || id === '*' || BUILT_IN_COMMANDS.has(id)) {
         return null;
     }
