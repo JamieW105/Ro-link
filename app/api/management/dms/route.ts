@@ -171,8 +171,8 @@ function buildMessagePayload(body: Record<string, unknown>): ModuleDiscordMessag
     }
 
     const optOutEmbed = {
-        title: "Don't want dm's from Ro-Link?",
-        description: "Opt out of these dms from Ro-Link staff and you won't recive another dm about Ro-Link feature.\n*dm's for being blocked from using rolink, game moderation actions and more will still be sent to your dm's.*",
+        title: "Don't want Ro-Link staff DMs?",
+        description: "Opt out of Ro-Link feature DMs.\n*Block, moderation, and safety notices may still be sent.*",
         color: 0x64748b,
     };
 

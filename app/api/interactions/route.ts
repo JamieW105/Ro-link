@@ -286,6 +286,7 @@ const MODERATION_MENU_ACTIONS = ['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'UPDATE', 'S
 const MODERATION_LOG_ACTIONS = new Set(['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'DISCORD_BAN', 'DISCORD_KICK', 'TIMEOUT', 'MUTE']);
 const SUPER_ADMIN_DISCORD_ID = '953414442060746854';
 const MANAGEMENT_DM_OPT_OUT_CUSTOM_ID = 'management_dm_opt_out';
+const MANAGEMENT_DM_OPT_IN_CUSTOM_ID = 'management_dm_opt_in';
 
 async function getLinkedRobloxUsername(discordId: string) {
     const normalizedDiscordId = String(discordId ?? '').trim();
@@ -320,6 +321,34 @@ async function optOutOfManagementDms(discordId: string) {
     if (error) {
         throw new Error(error.message);
     }
+}
+
+async function optInToManagementDms(discordId: string) {
+    const normalizedDiscordId = String(discordId ?? '').trim();
+    if (!/^\d{5,32}$/.test(normalizedDiscordId)) {
+        throw new Error('A valid Discord user ID is required.');
+    }
+
+    const { error } = await getSupabaseAdmin()
+        .from('management_dm_opt_outs')
+        .delete()
+        .eq('discord_id', normalizedDiscordId);
+
+    if (error) {
+        throw new Error(error.message);
+    }
+}
+
+function buildManagementDmPreferenceComponents(optedOut: boolean) {
+    return [{
+        type: 1,
+        components: [{
+            type: 2,
+            style: optedOut ? 3 : 2,
+            label: optedOut ? 'Opt in' : 'Opt out',
+            custom_id: optedOut ? MANAGEMENT_DM_OPT_IN_CUSTOM_ID : MANAGEMENT_DM_OPT_OUT_CUSTOM_ID,
+        }],
+    }];
 }
 
 function buildModerationPanelResponse(): InteractionResponseData {
@@ -2892,10 +2921,9 @@ export async function POST(req: Request) {
                 try {
                     await optOutOfManagementDms(userId);
                     return NextResponse.json({
-                        type: 4,
+                        type: 7,
                         data: {
-                            content: "You've opted out of Ro-Link staff management dashboard DMs.",
-                            flags: 64,
+                            components: buildManagementDmPreferenceComponents(true),
                         },
                     });
                 } catch (error) {
@@ -2903,6 +2931,26 @@ export async function POST(req: Request) {
                         type: 4,
                         data: {
                             content: `Failed to opt out of Ro-Link staff management dashboard DMs: ${String(error instanceof Error ? error.message : error)}`,
+                            flags: 64,
+                        },
+                    });
+                }
+            }
+
+            if (cid === MANAGEMENT_DM_OPT_IN_CUSTOM_ID) {
+                try {
+                    await optInToManagementDms(userId);
+                    return NextResponse.json({
+                        type: 7,
+                        data: {
+                            components: buildManagementDmPreferenceComponents(false),
+                        },
+                    });
+                } catch (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: {
+                            content: `Failed to opt in to Ro-Link staff management dashboard DMs: ${String(error instanceof Error ? error.message : error)}`,
                             flags: 64,
                         },
                     });
