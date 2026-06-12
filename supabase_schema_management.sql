@@ -13,6 +13,12 @@ CREATE TABLE IF NOT EXISTS public.management_users (
     added_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Management Dashboard DM Opt-Outs
+CREATE TABLE IF NOT EXISTS public.management_dm_opt_outs (
+    discord_id TEXT PRIMARY KEY,
+    opted_out_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Blocked Servers
 CREATE TABLE IF NOT EXISTS public.blocked_servers (
     guild_id TEXT PRIMARY KEY,

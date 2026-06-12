@@ -285,6 +285,7 @@ const VALUE_INPUT_MISC_COMMANDS = new Set(['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED',
 const MODERATION_MENU_ACTIONS = ['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'UPDATE', 'SHUTDOWN'] as const;
 const MODERATION_LOG_ACTIONS = new Set(['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'DISCORD_BAN', 'DISCORD_KICK', 'TIMEOUT', 'MUTE']);
 const SUPER_ADMIN_DISCORD_ID = '953414442060746854';
+const MANAGEMENT_DM_OPT_OUT_CUSTOM_ID = 'management_dm_opt_out';
 
 async function getLinkedRobloxUsername(discordId: string) {
     const normalizedDiscordId = String(discordId ?? '').trim();
@@ -299,6 +300,26 @@ async function getLinkedRobloxUsername(discordId: string) {
         .maybeSingle<{ roblox_username?: string | null }>();
 
     return String(data?.roblox_username ?? '').trim();
+}
+
+async function optOutOfManagementDms(discordId: string) {
+    const normalizedDiscordId = String(discordId ?? '').trim();
+    if (!/^\d{5,32}$/.test(normalizedDiscordId)) {
+        throw new Error('A valid Discord user ID is required.');
+    }
+
+    const { error } = await getSupabaseAdmin()
+        .from('management_dm_opt_outs')
+        .upsert({
+            discord_id: normalizedDiscordId,
+            opted_out_at: new Date().toISOString(),
+        }, {
+            onConflict: 'discord_id',
+        });
+
+    if (error) {
+        throw new Error(error.message);
+    }
 }
 
 function buildModerationPanelResponse(): InteractionResponseData {
@@ -2863,6 +2884,27 @@ export async function POST(req: Request) {
                             content: `Failed to block server: ${String(error instanceof Error ? error.message : error)}`,
                             flags: 64,
                         }
+                    });
+                }
+            }
+
+            if (cid === MANAGEMENT_DM_OPT_OUT_CUSTOM_ID) {
+                try {
+                    await optOutOfManagementDms(userId);
+                    return NextResponse.json({
+                        type: 4,
+                        data: {
+                            content: "You've opted out of Ro-Link staff management dashboard DMs.",
+                            flags: 64,
+                        },
+                    });
+                } catch (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: {
+                            content: `Failed to opt out of Ro-Link staff management dashboard DMs: ${String(error instanceof Error ? error.message : error)}`,
+                            flags: 64,
+                        },
                     });
                 }
             }

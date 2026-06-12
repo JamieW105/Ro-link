@@ -9,6 +9,7 @@ import { createDiscordDmChannel, sendDiscordMessage, type ModuleDiscordMessagePa
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 const RO_LINK_NAME = 'Ro-Link';
+const MANAGEMENT_DM_OPT_OUT_CUSTOM_ID = 'management_dm_opt_out';
 const TARGETS = [
     'verified-linked-users',
     'server-owners-all',
@@ -31,7 +32,9 @@ type DiscordGuildRecord = {
 
 type RecipientResolution = {
     recipients: string[];
+    rawRecipients: string[];
     counts: Record<TargetAudience, number>;
+    rawCounts: Record<TargetAudience, number>;
 };
 
 function trimString(value: unknown) {
@@ -167,9 +170,27 @@ function buildMessagePayload(body: Record<string, unknown>): ModuleDiscordMessag
         throw new Error('Add plaintext or at least one embed field before sending.');
     }
 
+    const optOutEmbed = {
+        title: "Don't want dm's from Ro-Link?",
+        description: "Opt out of these dms from Ro-Link staff and you won't recive another dm about Ro-Link feature.\n*dm's for being blocked from using rolink, game moderation actions and more will still be sent to your dm's.*",
+        color: 0x64748b,
+    };
+
     return {
         ...(content ? { content } : {}),
-        ...(hasEmbed ? { embeds: [embed] } : {}),
+        embeds: [
+            ...(hasEmbed ? [embed] : []),
+            optOutEmbed,
+        ],
+        components: [{
+            type: 1,
+            components: [{
+                type: 2,
+                style: 2,
+                label: 'Opt out',
+                custom_id: MANAGEMENT_DM_OPT_OUT_CUSTOM_ID,
+            }],
+        }],
     };
 }
 
@@ -254,6 +275,29 @@ async function getVerifiedLinkedUserIds() {
     ));
 }
 
+async function getManagementDmOptOutIds(userIds: string[]) {
+    const uniqueUserIds = Array.from(new Set(userIds.map(normalizeSnowflake).filter(Boolean)));
+    if (uniqueUserIds.length === 0) {
+        return new Set<string>();
+    }
+
+    const client = getSupabaseAdmin();
+    const { data, error } = await client
+        .from('management_dm_opt_outs')
+        .select('discord_id')
+        .in('discord_id', uniqueUserIds);
+
+    if (error) {
+        throw new Error(error.message);
+    }
+
+    return new Set(
+        (data || [])
+            .map((row: { discord_id?: unknown }) => normalizeSnowflake(row.discord_id))
+            .filter((discordId: string): discordId is string => Boolean(discordId)),
+    );
+}
+
 async function resolveOwnerTargets() {
     const [{ rest, guilds }, setupServerIds] = await Promise.all([
         listCurrentBotGuilds(),
@@ -306,23 +350,46 @@ async function resolveRecipients(target: TargetAudience): Promise<RecipientResol
         resolveOwnerTargets(),
     ]);
 
-    const counts = {
+    const rawCounts = {
         'verified-linked-users': verifiedUsers.length,
         'server-owners-all': owners.all.length,
         'server-owners-setup': owners.setup.length,
         'server-owners-without-setup': owners.withoutSetup.length,
     } satisfies Record<TargetAudience, number>;
 
-    const recipientsByTarget = {
+    const rawRecipientsByTarget = {
         'verified-linked-users': verifiedUsers,
         'server-owners-all': owners.all,
         'server-owners-setup': owners.setup,
         'server-owners-without-setup': owners.withoutSetup,
     } satisfies Record<TargetAudience, string[]>;
 
+    const allRawRecipients = Array.from(new Set([
+        ...verifiedUsers,
+        ...owners.all,
+        ...owners.setup,
+        ...owners.withoutSetup,
+    ]));
+    const optOutIds = await getManagementDmOptOutIds(allRawRecipients);
+    const recipientsByTarget = {
+        'verified-linked-users': rawRecipientsByTarget['verified-linked-users'].filter((recipient) => !optOutIds.has(recipient)),
+        'server-owners-all': rawRecipientsByTarget['server-owners-all'].filter((recipient) => !optOutIds.has(recipient)),
+        'server-owners-setup': rawRecipientsByTarget['server-owners-setup'].filter((recipient) => !optOutIds.has(recipient)),
+        'server-owners-without-setup': rawRecipientsByTarget['server-owners-without-setup'].filter((recipient) => !optOutIds.has(recipient)),
+    } satisfies Record<TargetAudience, string[]>;
+    const counts = {
+        'verified-linked-users': recipientsByTarget['verified-linked-users'].length,
+        'server-owners-all': recipientsByTarget['server-owners-all'].length,
+        'server-owners-setup': recipientsByTarget['server-owners-setup'].length,
+        'server-owners-without-setup': recipientsByTarget['server-owners-without-setup'].length,
+    } satisfies Record<TargetAudience, number>;
+    const rawRecipients = rawRecipientsByTarget[target];
+
     return {
         recipients: recipientsByTarget[target],
+        rawRecipients,
         counts,
+        rawCounts,
     };
 }
 
@@ -366,14 +433,16 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { recipients, counts } = await resolveRecipients(target);
+        const { recipients, rawRecipients, counts, rawCounts } = await resolveRecipients(target);
         const results = {
             target,
             attempted: recipients.length,
+            skippedOptedOut: rawRecipients.length - recipients.length,
             sent: 0,
             failed: 0,
             failures: [] as Array<{ userId: string; error: string }>,
             counts,
+            rawCounts,
         };
 
         for (const userId of recipients) {

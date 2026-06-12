@@ -49,9 +49,16 @@ type DiscordEmbedPayload = {
     footer?: { text: string; icon_url?: string };
 };
 
+type DiscordMessageComponentPayload = {
+    type: number;
+    components?: Array<Record<string, unknown>>;
+    [key: string]: unknown;
+};
+
 export type ModuleDiscordMessagePayload = {
     content?: string;
     embeds?: DiscordEmbedPayload[];
+    components?: DiscordMessageComponentPayload[];
 };
 
 export type SendableDiscordChannel = {

@@ -35,10 +35,12 @@ type EmbedField = {
 
 type SendResult = {
     attempted: number;
+    skippedOptedOut?: number;
     sent: number;
     failed: number;
     failures?: Array<{ userId: string; error: string }>;
     counts?: Record<TargetValue, number>;
+    rawCounts?: Record<TargetValue, number>;
 };
 
 const DEFAULT_COLOR = '#38bdf8';
@@ -475,6 +477,11 @@ export default function ManagementDmsPage() {
                                     <p className="text-[10px] uppercase tracking-wider text-slate-500">Failed</p>
                                 </div>
                             </div>
+                            {Number(result.skippedOptedOut || 0) > 0 && (
+                                <p className="mt-3 rounded-lg bg-slate-950 px-3 py-2 text-xs text-slate-400">
+                                    Skipped {result.skippedOptedOut} opted-out recipient{result.skippedOptedOut === 1 ? '' : 's'}.
+                                </p>
+                            )}
                             {result.failures && result.failures.length > 0 && (
                                 <div className="mt-4 space-y-2">
                                     {result.failures.map((failure) => (
