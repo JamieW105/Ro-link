@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect, type CSSProperties } from "react";
 import { hasAnyAdminPanelCommand, MISC_ACTION_COMMAND_IDS } from "@/lib/adminPanelCommands";
@@ -32,6 +32,21 @@ interface DashboardPermissions {
     can_manage_settings: boolean;
     allowed_misc_cmds: string[];
     is_admin: boolean;
+}
+
+function canAccessDashboardRoute(perms: DashboardPermissions, pathname: string) {
+    const livePanelRoute = pathname.includes('/live-panel');
+    const profileRoute = pathname.includes('/players/');
+
+    if (livePanelRoute) {
+        return perms.is_admin || perms.can_access_live_panel;
+    }
+
+    if (profileRoute) {
+        return perms.is_admin || perms.can_access_dashboard || perms.can_access_live_panel;
+    }
+
+    return perms.is_admin || perms.can_access_dashboard;
 }
 
 interface CustomDashboardInfo {
@@ -178,7 +193,6 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const { id } = useParams();
     const pathname = usePathname();
     const { data: session, status } = useSession();
-    const router = useRouter();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [userPermissions, setUserPermissions] = useState<DashboardPermissions | null>(null);
     const [loading, setLoading] = useState(true);
@@ -198,6 +212,8 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     useEffect(() => {
         if (!session || !id) return;
 
+        let cancelled = false;
+
         async function checkAccess() {
             setLoading(true);
             setAccessDenied(false);
@@ -205,11 +221,14 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 // 1. Fetch User Guilds to ensure they are even in the server
                 const guildsRes = await fetch('/api/guilds');
                 const guilds = await guildsRes.json() as VisibleGuild[];
-                const g = guilds.find((guild) => guild.id === id);
+                const g = guilds.find((guild) => guild.id === String(id));
 
                 if (!g || !g.hasBot) {
                     console.log("[Guard] Access denied or bot not present.");
-                    setAccessDenied(true);
+                    if (!cancelled) {
+                        setAccessDenied(true);
+                        setUserPermissions(null);
+                    }
                     return;
                 }
 
@@ -219,35 +238,35 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
                 if (!perms) {
                     console.log("[Guard] No permissions returned for this server.");
-                    setAccessDenied(true);
+                    if (!cancelled) {
+                        setAccessDenied(true);
+                        setUserPermissions(null);
+                    }
                     return;
                 }
 
-                const livePanelRoute = pathname.includes('/live-panel');
-                const profileRoute = pathname.includes('/players/');
-                const routeAllowed = livePanelRoute
-                    ? perms.is_admin || perms.can_access_live_panel
-                    : profileRoute
-                        ? perms.is_admin || perms.can_access_dashboard || perms.can_access_live_panel
-                        : perms.is_admin || perms.can_access_dashboard;
-
-                if (!routeAllowed) {
-                    console.log("[Guard] No route access for this server.");
-                    setAccessDenied(true);
-                    return;
+                if (!cancelled) {
+                    setUserPermissions(perms);
                 }
-
-                setUserPermissions(perms);
             } catch (err) {
                 console.error("[Guard] Error checking access:", err);
-                setAccessDenied(true);
+                if (!cancelled) {
+                    setAccessDenied(true);
+                    setUserPermissions(null);
+                }
             } finally {
-                setLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                }
             }
         }
 
         checkAccess();
-    }, [session, id, router, pathname]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [session, id]);
 
     useEffect(() => {
         if (!id) return;
@@ -443,7 +462,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         );
     }
 
-    if (accessDenied) {
+    if (accessDenied || (userPermissions && !canAccessDashboardRoute(userPermissions, pathname))) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-[#020617] p-6 text-white">
                 <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/70 p-8 text-center shadow-2xl shadow-black/30">
