@@ -93,7 +93,8 @@ export default function PostsPage() {
                                     <AutoLinkText
                                         as="p"
                                         text={post.description}
-                                        className="mt-3 flex-1 whitespace-pre-line text-sm leading-relaxed text-slate-400"
+                                        preserveLineBreaks
+                                        className="mt-3 flex-1 text-sm leading-relaxed text-slate-400"
                                     />
 
                                     <div className="mt-6 flex flex-wrap gap-2">
