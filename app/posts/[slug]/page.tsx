@@ -36,7 +36,7 @@ function SectionList({
                 {items.map((item, index) => (
                     <li key={`${title}-${index}`} className="flex gap-3 text-sm leading-relaxed text-slate-300">
                         <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
-                        <AutoLinkText text={item} />
+                        <AutoLinkText text={item} className="min-w-0 whitespace-pre-line" />
                     </li>
                 ))}
             </ul>
@@ -128,7 +128,7 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
                     <AutoLinkText
                         as="p"
                         text={post.description}
-                        className="mt-5 text-base leading-relaxed text-slate-400 sm:text-lg"
+                        className="mt-5 whitespace-pre-line text-base leading-relaxed text-slate-400 sm:text-lg"
                     />
                 </header>
 
@@ -144,14 +144,14 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
                                             <AutoLinkText
                                                 as="p"
                                                 text={feature.description}
-                                                className="mt-3 text-sm leading-relaxed text-slate-400"
+                                                className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-400"
                                             />
                                         )}
                                         <ul className="mt-5 space-y-3">
                                             {feature.subFeatures.map((subFeature, subFeatureIndex) => (
                                                 <li key={`${feature.title}-${subFeatureIndex}`} className="flex gap-3 text-sm leading-relaxed text-slate-300">
                                                     <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
-                                                    <AutoLinkText text={subFeature} />
+                                                    <AutoLinkText text={subFeature} className="min-w-0 whitespace-pre-line" />
                                                 </li>
                                             ))}
                                         </ul>
