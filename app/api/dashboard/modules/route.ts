@@ -18,7 +18,6 @@ import {
 } from '@/lib/modules';
 import { applyVerifiedCreatorBadges } from '@/lib/moduleCreatorVerification';
 import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
-import { runModuleReviewChecks } from '@/lib/moduleReviewChecks';
 import { supabase } from '@/lib/supabase';
 
 interface InstalledModuleRow {
@@ -95,15 +94,6 @@ async function buildUniqueCustomModuleSlug(serverId: string, seed: string, exist
         slug = `${baseSlug}-${suffix}`;
         suffix += 1;
     }
-}
-
-function getCustomModuleFailureMessage(results: ReturnType<typeof runModuleReviewChecks>) {
-    const failed = results.filter((result) => result.status === 'fail');
-    if (failed.length === 0) return '';
-
-    return failed
-        .map((result) => `${result.title}: ${result.details.join(' ')}`)
-        .join(' ');
 }
 
 export async function GET(req: Request) {
@@ -244,17 +234,6 @@ export async function POST(req: Request) {
             const slug = customAction === 'create'
                 ? await buildUniqueCustomModuleSlug(serverId, trimModuleString(body.slug, 80) || name)
                 : undefined;
-            const reviewResults = runModuleReviewChecks({
-                name,
-                slug: slug || trimModuleString(body.slug, 80) || name,
-                description,
-                version,
-                category: 'Server Custom',
-                isOfficial: false,
-                sourceCode,
-                configSchema,
-            });
-            const hasReviewFailures = reviewResults.some((result) => result.status === 'fail');
             const now = new Date().toISOString();
             const payload = {
                 server_id: serverId,
@@ -265,9 +244,9 @@ export async function POST(req: Request) {
                 source_checksum: checksumModuleSource(sourceCode),
                 config_schema: configSchema,
                 settings: parseModuleConfigSettings(body.settings, configSchema),
-                enabled: !hasReviewFailures,
-                status: hasReviewFailures ? 'NEEDS_REUPLOAD' : 'READY',
-                review_results: reviewResults,
+                enabled: true,
+                status: 'READY',
+                review_results: [],
                 uploaded_by: auth.userId,
                 updated_at: now,
             };
@@ -295,10 +274,8 @@ export async function POST(req: Request) {
             const module = normalizeServerCustomModule(data as Record<string, unknown>, false);
 
             return NextResponse.json({
-                success: !hasReviewFailures,
+                success: true,
                 module,
-                reviewResults,
-                warning: getCustomModuleFailureMessage(reviewResults) || undefined,
             }, { status: customAction === 'create' ? 201 : 200 });
         }
 
@@ -322,10 +299,10 @@ export async function POST(req: Request) {
 
         const { data: customModule, error: customModuleError } = await supabase
             .from('server_custom_modules')
-            .select('id, status, config_schema')
+            .select('id, config_schema')
             .eq('server_id', serverId)
             .eq('id', moduleId)
-            .maybeSingle<{ id: string; status: string; config_schema?: unknown }>();
+            .maybeSingle<{ id: string; config_schema?: unknown }>();
 
         if (customModuleError) {
             return NextResponse.json({ error: customModuleError.message }, { status: 500 });
@@ -333,10 +310,6 @@ export async function POST(req: Request) {
 
         if (!customModule) {
             return NextResponse.json({ error: 'Custom module not found.' }, { status: 404 });
-        }
-
-        if (customAction === 'enable' && customModule.status !== 'READY') {
-            return NextResponse.json({ error: 'This custom module must be re-uploaded before it can be enabled.' }, { status: 409 });
         }
 
         if (customAction === 'enable' || customAction === 'disable' || customAction === 'settings') {

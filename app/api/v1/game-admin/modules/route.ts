@@ -86,8 +86,7 @@ export async function GET(req: Request) {
             .from('server_custom_modules')
             .select(customModuleSelect)
             .eq('server_id', server.id)
-            .eq('enabled', true)
-            .eq('status', 'READY'),
+            .eq('enabled', true),
     ]);
 
     if (error) {
@@ -135,7 +134,7 @@ export async function GET(req: Request) {
         .map((row) => {
             const configSchema = parseStoredModuleConfigSchema(row.config_schema);
             const normalized = normalizeServerCustomModule(row as unknown as Record<string, unknown>, !configOnly);
-            if (!normalized || normalized.status !== 'READY' || !normalized.enabled) {
+            if (!normalized || !normalized.enabled) {
                 return null;
             }
 

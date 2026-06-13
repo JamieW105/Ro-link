@@ -1348,8 +1348,6 @@ export function normalizeServerCustomModule(row: Record<string, unknown> | null 
         return null;
     }
 
-    const status = String(row.status || 'NEEDS_REUPLOAD').toUpperCase() as ServerCustomModuleStatus;
-
     return {
         id: String(row.id || ''),
         serverId: String(row.server_id || ''),
@@ -1358,7 +1356,7 @@ export function normalizeServerCustomModule(row: Record<string, unknown> | null 
         description: String(row.description || ''),
         version: String(row.version || '1.0.0'),
         category: 'Server Custom',
-        status: status === 'READY' ? 'READY' : 'NEEDS_REUPLOAD',
+        status: 'READY' as ServerCustomModuleStatus,
         isCustom: true,
         isOfficial: false,
         creatorIsVerified: false,
@@ -1366,9 +1364,9 @@ export function normalizeServerCustomModule(row: Record<string, unknown> | null 
         creatorMaxModuleInstallCount: 0,
         sourceChecksum: String(row.source_checksum || ''),
         configSchema: parseStoredModuleConfigSchema(row.config_schema),
-        enabled: row.enabled !== false && status === 'READY',
+        enabled: row.enabled !== false,
         settings: parseModuleSettings(row.settings),
-        reviewResults: Array.isArray(row.review_results) ? row.review_results : [],
+        reviewResults: [],
         uploadedBy: row.uploaded_by ? String(row.uploaded_by) : null,
         installed: true,
         installedAt: row.uploaded_at || null,

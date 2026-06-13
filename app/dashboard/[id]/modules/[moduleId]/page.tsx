@@ -723,7 +723,7 @@ export default function DashboardModuleConfigPage() {
             )}
             {module.isCustom && module.status === 'NEEDS_REUPLOAD' && (
                 <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
-                    This custom module is disabled until it is re-uploaded and passes the automatic checks.
+                    This custom module is disabled until it is re-uploaded.
                 </div>
             )}
 
