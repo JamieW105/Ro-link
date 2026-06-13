@@ -132,7 +132,10 @@ export async function POST(req: Request) {
         const msgResult = await sendRobloxMessage(server.id, commandName, { ...safeArgs, moderator: modName }, server);
 
         // 5. Log Action (via Unified Logger)
-        await logAction(server.id, commandName, trimString(safeArgs.username) || 'N/A', modName);
+        const moderatorLogValue = trimString(moderatorDiscordId)
+            ? `<@${trimString(moderatorDiscordId)}>`
+            : modName;
+        await logAction(server.id, commandName, trimString(safeArgs.username) || 'N/A', moderatorLogValue);
 
         return NextResponse.json({
             success: true,

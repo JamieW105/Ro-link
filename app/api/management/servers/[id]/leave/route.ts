@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { hasPermission } from "@/lib/management";
+import { createStaffActionForumThread } from "@/lib/staffForumNotifications";
+import {
+    createStaffModerationAction,
+    recordStaffModerationActionLog,
+    updateStaffModerationActionForumThread,
+} from "@/lib/staffModerationActions";
 
 export async function POST(
     req: NextRequest,
@@ -11,7 +17,7 @@ export async function POST(
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const userId = (session.user as any).id;
+    const userId = String((session.user as { id?: string }).id ?? '');
     if (!(await hasPermission(userId, 'MANAGE_SERVERS'))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -27,6 +33,42 @@ export async function POST(
         });
         const guildData = await guildRes.json();
         const ownerId = guildData.owner_id;
+        const action = await createStaffModerationAction({
+            actionType: 'removed',
+            guildId,
+            guildName: guildData.name,
+            ownerId,
+            staffDiscordId: userId,
+            reason,
+        });
+        const actionReferenceId = action.id;
+
+        try {
+            await recordStaffModerationActionLog({
+                action,
+                logAction: 'RO_LINK_REMOVED',
+                target: guildId,
+            });
+        } catch (logErr) {
+            console.error("[Management/Servers] Failed to record staff moderation log:", logErr);
+        }
+
+        try {
+            const thread = await createStaffActionForumThread({
+                actionType: 'removed',
+                actionId: action.id,
+                guildId,
+                guildName: guildData.name,
+                ownerId,
+                staffDiscordId: userId,
+                reason,
+            });
+            await updateStaffModerationActionForumThread(action.id, thread.id).catch((updateErr) => {
+                console.error("[Management/Servers] Failed to store staff forum thread:", updateErr);
+            });
+        } catch (threadErr) {
+            console.error("[Management/Servers] Failed to create staff forum thread:", threadErr);
+        }
 
         if (ownerId) {
             // Create DM channel
@@ -54,8 +96,9 @@ export async function POST(
                             description: `Ro-Link has been removed from your server **${guildData.name}** by management.`,
                             color: 0xff4444,
                             fields: [
+                                { name: 'Reference', value: `\`${actionReferenceId}\`` },
                                 { name: 'Reason', value: reason || 'No reason provided.' },
-                                { name: 'Support', value: 'If you believe this was an error, please contact support.' }
+                                { name: 'Support', value: 'If you believe this was an error, please contact support: https://discord.gg/C3n4nAwYMw' }
                             ],
                             timestamp: new Date().toISOString()
                         }]

@@ -2,7 +2,6 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 
 const ShieldIcon = () => (
@@ -20,6 +19,13 @@ const RoleIcon = () => (
 const InfoIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
 );
+
+interface VerificationConfig {
+    verification_enabled?: boolean | null;
+    on_join_role?: string | null;
+    verified_role?: string | null;
+    block_unverified?: boolean | null;
+}
 
 export default function VerificationPage() {
     const { id } = useParams();
@@ -52,13 +58,12 @@ export default function VerificationPage() {
             }
 
             // 2. Fetch Server Settings
-            const { data, error: dbError } = await supabase
-                .from('servers')
-                .select('verification_enabled, on_join_role, verified_role, block_unverified')
-                .eq('id', id)
-                .single();
+            const configRes = await fetch(`/api/dashboard/server-config?serverId=${encodeURIComponent(String(id))}`, {
+                cache: 'no-store',
+            });
+            const data = configRes.ok ? await configRes.json() as VerificationConfig | null : null;
 
-            if (data && !dbError) {
+            if (data) {
                 setEnabled(data.verification_enabled || false);
                 setOnJoinRole(data.on_join_role || "");
                 setVerifiedRole(data.verified_role || "");
@@ -86,18 +91,23 @@ export default function VerificationPage() {
         setError(null);
         setSuccess(false);
 
-        const { error: dbError } = await supabase
-            .from('servers')
-            .update({
+        const response = await fetch('/api/dashboard/server-config', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                serverId: id,
+                updates: {
                 verification_enabled: enabled,
                 on_join_role: onJoinRole,
                 verified_role: verifiedRole,
                 block_unverified: blockUnverified
-            })
-            .eq('id', id);
+                },
+            }),
+        });
+        const payload = await response.json().catch(() => ({}));
 
-        if (dbError) {
-            setError(dbError.message);
+        if (!response.ok) {
+            setError(String(payload.error || 'Failed to save verification settings.'));
         } else {
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
@@ -148,11 +158,11 @@ export default function VerificationPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-12 gap-8">
+            <div className="grid grid-cols-12 gap-6 xl:gap-8">
                 {/* Main Settings Column */}
                 <div className="col-span-12 lg:col-span-8 space-y-8">
                     {/* Primary Config Section */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-10 backdrop-blur-sm relative overflow-hidden">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-8 opacity-[0.02] text-white">
                             <ShieldIcon />
                         </div>
@@ -245,7 +255,7 @@ export default function VerificationPage() {
                     </div>
 
                     {/* Status Box */}
-                    <div className="p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
+                    <div className="p-5 sm:p-6 md:p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
                         <div className="flex items-center gap-5">
                             <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/10">
                                 <InfoIcon />
@@ -267,7 +277,7 @@ export default function VerificationPage() {
 
                 {/* Info Column */}
                 <div className="col-span-12 lg:col-span-4 space-y-8">
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-8">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8">
                         <h4 className="text-xs font-bold text-white uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
                             <span className="w-6 h-px bg-sky-600"></span>
                             Documentation
@@ -290,7 +300,7 @@ export default function VerificationPage() {
                         </div>
                     </div>
 
-                    <div className="bg-sky-600/5 border border-sky-500/10 rounded-[2rem] p-8 relative overflow-hidden group hover:border-sky-500/30 transition-all">
+                    <div className="bg-sky-600/5 border border-sky-500/10 rounded-[2rem] p-5 sm:p-6 md:p-8 relative overflow-hidden group hover:border-sky-500/30 transition-all">
                         <div className="absolute -bottom-6 -right-6 opacity-[0.03] text-sky-400 group-hover:rotate-12 transition-transform duration-700">
                             <ShieldIcon />
                         </div>

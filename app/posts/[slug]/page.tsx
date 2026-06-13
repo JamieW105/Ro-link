@@ -36,7 +36,7 @@ function SectionList({
                 {items.map((item, index) => (
                     <li key={`${title}-${index}`} className="flex gap-3 text-sm leading-relaxed text-slate-300">
                         <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
-                        <AutoLinkText text={item} />
+                        <AutoLinkText text={item} preserveLineBreaks className="min-w-0" />
                     </li>
                 ))}
             </ul>
@@ -104,9 +104,14 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
                     </Link>
 
                     <div className="mt-10 flex flex-wrap gap-2">
-                        {post.version && (
+                        {post.rolink_version && (
                             <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
-                                {post.version}
+                                Ro-Link {post.rolink_version}
+                            </span>
+                        )}
+                        {post.plugin_version && (
+                            <span className="rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-violet-300">
+                                Plugin {post.plugin_version}
                             </span>
                         )}
                         <span className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-300">
@@ -123,6 +128,7 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
                     <AutoLinkText
                         as="p"
                         text={post.description}
+                        preserveLineBreaks
                         className="mt-5 text-base leading-relaxed text-slate-400 sm:text-lg"
                     />
                 </header>
@@ -139,6 +145,7 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
                                             <AutoLinkText
                                                 as="p"
                                                 text={feature.description}
+                                                preserveLineBreaks
                                                 className="mt-3 text-sm leading-relaxed text-slate-400"
                                             />
                                         )}
@@ -146,7 +153,7 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
                                             {feature.subFeatures.map((subFeature, subFeatureIndex) => (
                                                 <li key={`${feature.title}-${subFeatureIndex}`} className="flex gap-3 text-sm leading-relaxed text-slate-300">
                                                     <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
-                                                    <AutoLinkText text={subFeature} />
+                                                    <AutoLinkText text={subFeature} preserveLineBreaks className="min-w-0" />
                                                 </li>
                                             ))}
                                         </ul>

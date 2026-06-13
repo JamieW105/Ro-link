@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
-import { supabase } from "@/lib/supabase";
+import { buildRobloxAvatarUrl } from "@/lib/robloxAvatars";
 
 const RobloxIcon = () => (
     <img src="/Media/Roblox.png" alt="Roblox" className="w-6 h-6 object-contain" />
@@ -14,35 +14,50 @@ const DiscordIcon = () => (
     </svg>
 );
 
+type LinkedAccount = {
+    roblox_id: string;
+    roblox_username: string;
+};
+
 export default function VerifyPage() {
     const { data: session, status } = useSession();
     const [loading, setLoading] = useState(false);
-    const [linkedAccount, setLinkedAccount] = useState<any>(null);
+    const [linkedAccount, setLinkedAccount] = useState<LinkedAccount | null>(null);
     const [fetchingLinked, setFetchingLinked] = useState(true);
+    const [failedAvatarUserId, setFailedAvatarUserId] = useState<string | null>(null);
 
     useEffect(() => {
+        let cancelled = false;
+
+        async function loadLinkedAccount() {
+            const response = await fetch('/api/verify/linked-account', { cache: 'no-store' });
+            if (cancelled) return;
+
+            if (response.ok) {
+                const data: LinkedAccount | null = await response.json();
+                if (!cancelled && data) {
+                    setLinkedAccount(data);
+                }
+            }
+
+            if (!cancelled) {
+                setFetchingLinked(false);
+            }
+        }
+
         if (session && session.user) {
-            checkLinkedAccount();
+            loadLinkedAccount();
         } else if (status !== 'loading') {
-            setFetchingLinked(false);
+            queueMicrotask(() => {
+                if (!cancelled) {
+                    setFetchingLinked(false);
+                }
+            });
         }
+        return () => {
+            cancelled = true;
+        };
     }, [session, status]);
-
-    async function checkLinkedAccount() {
-        const userId = (session?.user as any)?.id;
-        if (!userId) return;
-
-        const { data, error } = await supabase
-            .from('verified_users')
-            .select('*')
-            .eq('discord_id', userId)
-            .maybeSingle();
-
-        if (data) {
-            setLinkedAccount(data);
-        }
-        setFetchingLinked(false);
-    }
 
     const handleRobloxLink = () => {
         setLoading(true);
@@ -79,6 +94,12 @@ export default function VerifyPage() {
         );
     }
 
+    const linkedRobloxUserId = linkedAccount?.roblox_id ? String(linkedAccount.roblox_id) : '';
+    const avatarFailed = failedAvatarUserId === linkedRobloxUserId;
+    const linkedRobloxAvatarUrl = linkedRobloxUserId
+        ? buildRobloxAvatarUrl(linkedRobloxUserId, 420)
+        : null;
+
     return (
         <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6 text-center font-sans">
             <div className="max-w-xl w-full bg-slate-900/50 border border-slate-800 rounded-[2rem] p-10 shadow-3xl backdrop-blur-2xl relative overflow-hidden">
@@ -106,9 +127,10 @@ export default function VerifyPage() {
                                 <div className="flex items-center gap-5">
                                     <div className="w-20 h-20 rounded-2xl bg-slate-800 overflow-hidden border-2 border-slate-700 shadow-xl group-hover:border-sky-500/50 transition-all">
                                         <img
-                                            src={`https://www.roblox.com/headshot-thumbnail/image?userId=${linkedAccount.roblox_id}&width=420&height=420&format=png`}
+                                            src={!avatarFailed && linkedRobloxAvatarUrl ? linkedRobloxAvatarUrl : "/Media/Roblox.png"}
                                             alt={linkedAccount.roblox_username}
-                                            className="w-full h-full object-cover"
+                                            onError={() => setFailedAvatarUserId(linkedRobloxUserId)}
+                                            className={`w-full h-full ${avatarFailed ? 'object-contain p-4' : 'object-cover'}`}
                                         />
                                     </div>
                                     <div className="text-left">

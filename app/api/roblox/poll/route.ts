@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { findServerByKeyWithDiagnostics } from '@/lib/serverAuth';
-import { supabase } from '@/lib/supabase';
+import { normalizeModulePanelCommandDefinition } from '@/lib/modulePanelCommands';
+import type { AdminPanelCommandDefinition } from '@/lib/adminPanelCommands';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 
 interface QueuedCommand {
@@ -10,12 +12,104 @@ interface QueuedCommand {
     } | null;
 }
 
+let supportsModulePanelCommandsColumn = true;
+let modulePanelCommandsColumnRetryAt = 0;
+
 function trimString(value: unknown) {
     return String(value ?? '').trim();
 }
 
 function getCommandTargetJobId(command: QueuedCommand) {
     return trimString(command?.args?.job_id);
+}
+
+function normalizeModulePanelCommandPayload(value: unknown) {
+    const rawCommands = Array.isArray(value)
+        ? value
+        : value && typeof value === 'object'
+            ? Object.values(value as Record<string, unknown>)
+            : [];
+
+    return rawCommands
+        .map(normalizeModulePanelCommandDefinition)
+        .filter((command): command is AdminPanelCommandDefinition => Boolean(command))
+        .slice(0, 100);
+}
+
+async function upsertLiveServer({
+    client,
+    jobId,
+    serverId,
+    playerCount,
+    players,
+    modulePanelCommands,
+}: {
+    client: ReturnType<typeof getSupabaseAdmin>;
+    jobId: string;
+    serverId: string;
+    playerCount: unknown;
+    players: unknown;
+    modulePanelCommands: AdminPanelCommandDefinition[];
+}) {
+    const updatedAt = new Date().toISOString();
+    const legacyPayload = {
+        id: jobId,
+        server_id: serverId,
+        player_count: playerCount || 0,
+        players: players || [],
+        updated_at: updatedAt
+    };
+
+    const now = Date.now();
+    const shouldRetryModuleCommandsColumn = modulePanelCommands.length > 0 && now >= modulePanelCommandsColumnRetryAt;
+    if (!supportsModulePanelCommandsColumn && !shouldRetryModuleCommandsColumn) {
+        const fallbackResult = await client
+            .from('live_servers')
+            .upsert(legacyPayload, { onConflict: 'id' });
+
+        if (fallbackResult.error) {
+            throw fallbackResult.error;
+        }
+        return;
+    }
+
+    const payload = {
+        ...legacyPayload,
+        module_panel_commands: modulePanelCommands,
+    };
+
+    const result = await client
+        .from('live_servers')
+        .upsert(payload, { onConflict: 'id' });
+
+    if (!result.error) {
+        supportsModulePanelCommandsColumn = true;
+        modulePanelCommandsColumnRetryAt = 0;
+        return;
+    }
+
+    if (result.error.code === 'PGRST204') {
+        supportsModulePanelCommandsColumn = false;
+        modulePanelCommandsColumnRetryAt = now + 60 * 1000;
+        console.warn('[RoLinkAPI][Poll] live_servers.module_panel_commands is missing; using legacy live server payload until the Supabase schema is migrated.', {
+            code: result.error.code,
+            message: result.error.message,
+            migration: "ALTER TABLE public.live_servers ADD COLUMN IF NOT EXISTS module_panel_commands JSONB NOT NULL DEFAULT '[]'::jsonb;",
+        });
+    } else {
+        console.warn('[RoLinkAPI][Poll] Live server upsert with module commands failed; retrying legacy payload.', {
+            code: result.error.code,
+            message: result.error.message,
+        });
+    }
+
+    const fallbackResult = await client
+        .from('live_servers')
+        .upsert(legacyPayload, { onConflict: 'id' });
+
+    if (fallbackResult.error) {
+        throw fallbackResult.error;
+    }
 }
 
 export async function GET() {
@@ -29,6 +123,7 @@ export async function POST(req: Request) {
     try {
         const body = await req.json().catch(() => ({}));
         const { jobId, playerCount, players, status } = body;
+        const modulePanelCommands = normalizeModulePanelCommandPayload(body.modulePanelCommands ?? body.module_panel_commands);
         const auth = readServerApiKeyDetails(req, body.apiKey ?? body.key ?? body.serverKey ?? body.securityKey);
         const authDebug = describeServerApiKeyDetails(auth);
         if (!auth.key) {
@@ -78,51 +173,45 @@ export async function POST(req: Request) {
             });
         }
 
+        const db = getSupabaseAdmin();
+
         // 2. Handle Shutdown (Explicit via status or implicit via 0 players)
         if (jobId) {
             if (status === 'SHUTDOWN' || playerCount === 0) {
                 // Immediate removal
-                await supabase
+                const { error: deleteError } = await db
                     .from('live_servers')
                     .delete()
                     .eq('id', jobId);
 
+                if (deleteError) throw deleteError;
+
                 console.log(`[POLL] Server ${jobId} removed (Status: ${status || '0 Players'}).`);
             } else {
                 // Normal update
-                try {
-                    await supabase
-                        .from('live_servers')
-                        .upsert({
-                            id: jobId,
-                            server_id: server.id,
-                            player_count: playerCount || 0,
-                            players: players || [],
-                            updated_at: new Date().toISOString()
-                        }, { onConflict: 'id' });
-                } catch {
-                    await supabase
-                        .from('live_servers')
-                        .upsert({
-                            id: jobId,
-                            server_id: server.id,
-                            player_count: playerCount || 0,
-                            updated_at: new Date().toISOString()
-                        }, { onConflict: 'id' });
-                }
+                await upsertLiveServer({
+                    client: db,
+                    jobId,
+                    serverId: server.id,
+                    playerCount,
+                    players,
+                    modulePanelCommands,
+                });
             }
 
             // Periodic Cleanup: Remove any servers that haven't polled in 2 minutes
             const staleTime = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-            await supabase
+            const { error: cleanupError } = await db
                 .from('live_servers')
                 .delete()
                 .eq('server_id', server.id)
                 .lt('updated_at', staleTime);
+
+            if (cleanupError) throw cleanupError;
         }
 
         // 3. Fetch Pending Commands
-        const { data: commands, error: commandError } = await supabase
+        const { data: commands, error: commandError } = await db
             .from('command_queue')
             .select('*')
             .eq('server_id', server.id)
@@ -139,10 +228,12 @@ export async function POST(req: Request) {
 
         if (relevantCommands.length > 0) {
             const ids = relevantCommands.map((command) => command.id);
-            await supabase
+            const { error: updateError } = await db
                 .from('command_queue')
                 .update({ status: 'PROCESSED' })
                 .in('id', ids);
+
+            if (updateError) throw updateError;
         }
 
         return NextResponse.json({

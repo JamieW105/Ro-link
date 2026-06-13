@@ -1,8 +1,19 @@
 'use client';
 
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 
-type ModuleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+type ModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
+type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
+
+interface ModuleConfigField {
+    key: string;
+    label: string;
+    shortDescription: string;
+    type: ModuleConfigFieldType;
+    options: string[];
+    defaultValue: boolean | string | string[] | number | Record<string, unknown>;
+}
 
 interface AddonModule {
     id: string;
@@ -12,41 +23,115 @@ interface AddonModule {
     version: string;
     category: string;
     status: ModuleStatus;
+    isOfficial: boolean;
     sourceCode: string;
     sourceChecksum: string;
+    configSchema?: Record<string, ModuleConfigField>;
+    authorDiscordId: string | null;
+    submittedAt: string | null;
+    reviewedAt: string | null;
+    moderationNote: string;
     updatedAt: string | null;
     publishedAt: string | null;
 }
 
-interface ModuleForm {
-    name: string;
-    slug: string;
-    description: string;
-    version: string;
-    category: string;
-    status: ModuleStatus;
-    sourceCode: string;
+interface CreatorBlock {
+    discord_id: string;
+    reason: string;
+    active: boolean;
 }
 
-const emptyForm: ModuleForm = {
-    name: '',
-    slug: '',
-    description: '',
-    version: '1.0.0',
-    category: 'General',
-    status: 'DRAFT',
-    sourceCode: '',
-};
+interface PendingModuleCardProps {
+    addon: AddonModule;
+    saving: boolean;
+    activeBlockIds: Set<string>;
+    onBlockCreator: (addon: AddonModule) => void;
+}
 
 function formatDate(value: string | null) {
     if (!value) return 'Never';
     return new Date(value).toLocaleString();
 }
 
+function configSummary(addon: AddonModule) {
+    return Object.values(addon.configSchema || {});
+}
+
+function PendingModuleCard({ addon, saving, activeBlockIds, onBlockCreator }: PendingModuleCardProps) {
+    const configs = configSummary(addon);
+
+    return (
+        <article className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-md border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-300">
+                            Awaiting moderation
+                        </span>
+                        {addon.authorDiscordId && (
+                            <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${activeBlockIds.has(addon.authorDiscordId) ? 'border-red-400/20 bg-red-400/10 text-red-300' : 'border-slate-700 bg-slate-900 text-slate-400'}`}>
+                                Creator {addon.authorDiscordId}
+                            </span>
+                        )}
+                        {addon.isOfficial && (
+                            <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+                                Offical
+                            </span>
+                        )}
+                    </div>
+                    <h3 className="mt-3 text-base font-bold text-white">{addon.name}</h3>
+                    <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-400">{addon.description || 'No description provided.'}</p>
+                    <div className="mt-3 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                        <span>{addon.slug}</span>
+                        <span>{addon.category}</span>
+                        <span>Submitted {formatDate(addon.submittedAt)}</span>
+                        <span>{addon.sourceChecksum.slice(0, 12)}</span>
+                    </div>
+                    <div className="mt-4 rounded-lg border border-slate-800 bg-black/20 p-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                Available configs
+                            </span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                {configs.length} {configs.length === 1 ? 'field' : 'fields'}
+                            </span>
+                        </div>
+                        {configs.length > 0 ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                {configs.map((field) => (
+                                    <span key={field.key} className="rounded-md border border-slate-800 bg-slate-950 px-2 py-1 text-[10px] font-semibold text-slate-400">
+                                        {field.label} <span className="text-slate-600">({field.type})</span>
+                                    </span>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="mt-2 text-xs text-slate-600">This submission does not declare configurable fields.</p>
+                        )}
+                    </div>
+                </div>
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                    <Link
+                        href={`/management/modules/${addon.id}`}
+                        className="rounded-lg border border-sky-500/30 px-3 py-2 text-xs font-bold text-sky-300 transition-colors hover:bg-sky-500/10"
+                    >
+                        Review Module
+                    </Link>
+                    <button
+                        onClick={() => onBlockCreator(addon)}
+                        disabled={saving || !addon.authorDiscordId || activeBlockIds.has(addon.authorDiscordId)}
+                        className="rounded-lg border border-red-500/30 px-3 py-2 text-xs font-bold text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+                    >
+                        {addon.authorDiscordId && activeBlockIds.has(addon.authorDiscordId) ? 'Blocked' : 'Block Creator'}
+                    </button>
+                </div>
+            </div>
+        </article>
+    );
+}
+
 export default function ManagementModulesPage() {
     const [modules, setModules] = useState<AddonModule[]>([]);
-    const [form, setForm] = useState<ModuleForm>(emptyForm);
-    const [editingId, setEditingId] = useState<string | null>(null);
+    const [creatorBlocks, setCreatorBlocks] = useState<CreatorBlock[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -64,6 +149,16 @@ export default function ManagementModulesPage() {
         ));
     }, [modules, search]);
 
+    const pendingModules = useMemo(
+        () => modules.filter((addon) => addon.status === 'PENDING_REVIEW'),
+        [modules],
+    );
+
+    const activeBlockIds = useMemo(
+        () => new Set(creatorBlocks.filter((block) => block.active).map((block) => block.discord_id)),
+        [creatorBlocks],
+    );
+
     async function loadModules() {
         setLoading(true);
         setError(null);
@@ -75,6 +170,11 @@ export default function ManagementModulesPage() {
                 throw new Error(String(payload.error || 'Failed to load modules.'));
             }
             setModules(Array.isArray(payload) ? payload : []);
+            const blocksResponse = await fetch('/api/management/module-creator-blocks', { cache: 'no-store' });
+            const blocksPayload = await blocksResponse.json().catch(() => ([]));
+            if (blocksResponse.ok) {
+                setCreatorBlocks(Array.isArray(blocksPayload) ? blocksPayload : []);
+            }
         } catch (loadError) {
             setError(loadError instanceof Error ? loadError.message : 'Failed to load modules.');
         } finally {
@@ -85,82 +185,6 @@ export default function ManagementModulesPage() {
     useEffect(() => {
         loadModules();
     }, []);
-
-    function updateForm<K extends keyof ModuleForm>(key: K, value: ModuleForm[K]) {
-        setForm((current) => ({
-            ...current,
-            [key]: value,
-        }));
-    }
-
-    function selectModule(addon: AddonModule) {
-        setEditingId(addon.id);
-        setForm({
-            name: addon.name,
-            slug: addon.slug,
-            description: addon.description,
-            version: addon.version,
-            category: addon.category,
-            status: addon.status,
-            sourceCode: addon.sourceCode,
-        });
-        setSuccess(null);
-        setError(null);
-    }
-
-    function resetForm() {
-        setEditingId(null);
-        setForm(emptyForm);
-        setError(null);
-        setSuccess(null);
-    }
-
-    async function handleFileUpload(event: ChangeEvent<HTMLInputElement>) {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const text = await file.text();
-        setForm((current) => ({
-            ...current,
-            name: current.name || file.name.replace(/\.(lua|luau|txt)$/i, ''),
-            sourceCode: text,
-        }));
-    }
-
-    async function saveModule() {
-        setSaving(true);
-        setError(null);
-        setSuccess(null);
-
-        try {
-            const response = await fetch(editingId ? `/api/management/modules/${editingId}` : '/api/management/modules', {
-                method: editingId ? 'PATCH' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(form),
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(String(payload.error || 'Failed to save module.'));
-            }
-
-            setSuccess(editingId ? 'Module updated.' : 'Module created.');
-            setEditingId(payload.id || editingId);
-            setForm({
-                name: payload.name || form.name,
-                slug: payload.slug || form.slug,
-                description: payload.description || '',
-                version: payload.version || '1.0.0',
-                category: payload.category || 'General',
-                status: payload.status || 'DRAFT',
-                sourceCode: payload.sourceCode || form.sourceCode,
-            });
-            await loadModules();
-        } catch (saveError) {
-            setError(saveError instanceof Error ? saveError.message : 'Failed to save module.');
-        } finally {
-            setSaving(false);
-        }
-    }
 
     async function deleteModule(addon: AddonModule) {
         if (!confirm(`Delete ${addon.name}? Installed copies will be removed from servers.`)) return;
@@ -176,9 +200,6 @@ export default function ManagementModulesPage() {
                 throw new Error(String(payload.error || 'Failed to delete module.'));
             }
 
-            if (editingId === addon.id) {
-                resetForm();
-            }
             setSuccess('Module deleted.');
             await loadModules();
         } catch (deleteError) {
@@ -188,20 +209,71 @@ export default function ManagementModulesPage() {
         }
     }
 
+    async function copySource(addon: AddonModule) {
+        await navigator.clipboard.writeText(addon.sourceCode || '');
+        setSuccess(`Copied ${addon.name} source code.`);
+    }
+
+    async function blockCreator(addon: AddonModule) {
+        if (!addon.authorDiscordId) {
+            setError('This module does not have a creator Discord ID.');
+            return;
+        }
+
+        const reason = prompt('Reason for blocking this creator from submitting modules?') || 'Repeated module terms violations.';
+        setSaving(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const response = await fetch('/api/management/module-creator-blocks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ discordId: addon.authorDiscordId, reason, active: true }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(String(payload.error || 'Failed to block creator.'));
+            }
+
+            setSuccess('Creator blocked from future module submissions.');
+            await loadModules();
+        } catch (blockError) {
+            setError(blockError instanceof Error ? blockError.message : 'Failed to block creator.');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    function statusClassName(status: ModuleStatus) {
+        if (status === 'PUBLISHED') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
+        if (status === 'PENDING_REVIEW') return 'border-amber-400/20 bg-amber-400/10 text-amber-300';
+        if (status === 'REJECTED') return 'border-red-400/20 bg-red-400/10 text-red-300';
+        return 'border-slate-700 bg-slate-950 text-slate-500';
+    }
+
     return (
-        <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_440px]">
+        <div className="space-y-6">
             <section className="space-y-6">
                 <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div>
                         <h1 className="text-3xl font-extrabold tracking-tight text-white">Module Marketplace</h1>
                         <p className="mt-1 text-sm text-slate-400">Create and publish add-ons stored by Ro-Link for Roblox runtimes.</p>
                     </div>
-                    <input
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Search modules..."
-                        className="w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500 md:w-72"
-                    />
+                    <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
+                        <input
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Search modules..."
+                            className="w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500 md:w-72"
+                        />
+                        <Link
+                            href="/dashboard/marketplace/create"
+                            className="rounded-xl bg-sky-600 px-5 py-3 text-center text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500"
+                        >
+                            Create Module
+                        </Link>
+                    </div>
                 </header>
 
                 {error && (
@@ -212,6 +284,29 @@ export default function ManagementModulesPage() {
                 {success && (
                     <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-5 py-4 text-sm font-medium text-emerald-300">
                         {success}
+                    </div>
+                )}
+
+                {pendingModules.length > 0 && (
+                    <div className="rounded-2xl border border-amber-400/20 bg-amber-400/5 p-5">
+                        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                            <div>
+                                <h2 className="text-lg font-bold text-white">Awaiting Moderation</h2>
+                                <p className="mt-1 text-xs text-slate-400">Open a submitted module to inspect source, review creator history, then accept or deny it.</p>
+                            </div>
+                            <div className="text-2xl font-black text-amber-300">{pendingModules.length}</div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3">
+                            {pendingModules.map((addon) => (
+                                <PendingModuleCard
+                                    key={addon.id}
+                                    addon={addon}
+                                    saving={saving}
+                                    activeBlockIds={activeBlockIds}
+                                    onBlockCreator={blockCreator}
+                                />
+                            ))}
+                        </div>
                     </div>
                 )}
 
@@ -240,11 +335,13 @@ export default function ManagementModulesPage() {
                                                 <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                                     <span>{addon.slug}</span>
                                                     <span>{addon.category}</span>
+                                                    {addon.isOfficial && <span>Offical</span>}
+                                                    <span>{Object.keys(addon.configSchema || {}).length} config fields</span>
                                                     <span>{addon.sourceChecksum.slice(0, 12)}</span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${addon.status === 'PUBLISHED' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : addon.status === 'ARCHIVED' ? 'border-slate-700 bg-slate-950 text-slate-500' : 'border-amber-400/20 bg-amber-400/10 text-amber-300'}`}>
+                                                <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(addon.status)}`}>
                                                     {addon.status}
                                                 </span>
                                             </td>
@@ -253,11 +350,17 @@ export default function ManagementModulesPage() {
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button
-                                                        onClick={() => selectModule(addon)}
+                                                        onClick={() => copySource(addon)}
                                                         className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-bold text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
                                                     >
-                                                        Edit
+                                                        Copy
                                                     </button>
+                                                    <Link
+                                                        href={`/management/modules/${addon.id}`}
+                                                        className="rounded-lg border border-sky-500/30 px-3 py-2 text-xs font-bold text-sky-300 transition-colors hover:bg-sky-500/10"
+                                                    >
+                                                        Open
+                                                    </Link>
                                                     <button
                                                         onClick={() => deleteModule(addon)}
                                                         disabled={saving}
@@ -282,114 +385,6 @@ export default function ManagementModulesPage() {
                     </div>
                 )}
             </section>
-
-            <aside className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
-                <div className="mb-6 flex items-center justify-between gap-4">
-                    <div>
-                        <h2 className="text-lg font-bold text-white">{editingId ? 'Edit Module' : 'Create Module'}</h2>
-                        <p className="mt-1 text-xs text-slate-500">{editingId ? 'Changes affect future Roblox module fetches.' : 'Upload Luau source or paste it below.'}</p>
-                    </div>
-                    {editingId && (
-                        <button
-                            onClick={resetForm}
-                            className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-bold text-slate-300 transition-colors hover:text-white"
-                        >
-                            New
-                        </button>
-                    )}
-                </div>
-
-                <div className="space-y-4">
-                    <div>
-                        <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Name</label>
-                        <input
-                            value={form.name}
-                            onChange={(event) => updateForm('name', event.target.value)}
-                            className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Slug</label>
-                            <input
-                                value={form.slug}
-                                onChange={(event) => updateForm('slug', event.target.value)}
-                                placeholder="auto"
-                                className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
-                            />
-                        </div>
-                        <div>
-                            <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Version</label>
-                            <input
-                                value={form.version}
-                                onChange={(event) => updateForm('version', event.target.value)}
-                                className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Category</label>
-                            <input
-                                value={form.category}
-                                onChange={(event) => updateForm('category', event.target.value)}
-                                className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
-                            />
-                        </div>
-                        <div>
-                            <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Status</label>
-                            <select
-                                value={form.status}
-                                onChange={(event) => updateForm('status', event.target.value as ModuleStatus)}
-                                className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
-                            >
-                                <option value="DRAFT">Draft</option>
-                                <option value="PUBLISHED">Published</option>
-                                <option value="ARCHIVED">Archived</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Description</label>
-                        <textarea
-                            value={form.description}
-                            onChange={(event) => updateForm('description', event.target.value)}
-                            className="h-24 w-full resize-none rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-white outline-none transition-colors focus:border-sky-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Upload Source</label>
-                        <input
-                            type="file"
-                            accept=".lua,.luau,.txt"
-                            onChange={handleFileUpload}
-                            className="w-full rounded-xl border border-dashed border-slate-700 bg-slate-950/60 px-4 py-3 text-xs text-slate-400 file:mr-4 file:rounded-lg file:border-0 file:bg-sky-600 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white hover:border-sky-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Source Code</label>
-                        <textarea
-                            value={form.sourceCode}
-                            onChange={(event) => updateForm('sourceCode', event.target.value)}
-                            className="h-[360px] w-full resize-none rounded-xl border border-slate-800 bg-black/50 p-4 font-mono text-xs leading-relaxed text-slate-100 outline-none transition-colors focus:border-sky-500"
-                            spellCheck={false}
-                        />
-                    </div>
-
-                    <button
-                        onClick={saveModule}
-                        disabled={saving}
-                        className="w-full rounded-xl bg-sky-600 px-5 py-4 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
-                    >
-                        {saving ? 'Saving' : editingId ? 'Save Module' : 'Create Module'}
-                    </button>
-                </div>
-            </aside>
         </div>
     );
 }

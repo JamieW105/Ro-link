@@ -2,11 +2,22 @@ import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
 import { supabase } from './supabase';
+import { getSupabaseAdmin } from './supabaseAdmin';
 
 export class DiscordAccessTokenError extends Error {
     constructor(message = 'Discord access token expired or was revoked.') {
         super(message);
         this.name = 'DiscordAccessTokenError';
+    }
+}
+
+export class DiscordRateLimitError extends Error {
+    retryAfter: number | null;
+
+    constructor(message = 'Discord rate limited the guild list request.', retryAfter: number | null = null) {
+        super(message);
+        this.name = 'DiscordRateLimitError';
+        this.retryAfter = retryAfter;
     }
 }
 
@@ -29,6 +40,10 @@ interface BotGuildRecord {
     id: string;
     name: string;
     icon?: string | null;
+}
+
+interface InstalledServerRecord {
+    id: string;
 }
 
 interface GuildMemberRecord {
@@ -63,8 +78,62 @@ export function hasDiscordGuildManagePermission(permissionBits?: string | null, 
     }
 }
 
+async function listBotGuilds() {
+    const botGuilds: BotGuildRecord[] = [];
+    let botAfter = '0';
+    const discordRest = rest;
+
+    if (!discordRest) {
+        console.warn('[DASHBOARD][GUILDS] Missing DISCORD_TOKEN while loading bot guilds. Returning an empty bot guild list.');
+        return botGuilds;
+    }
+
+    try {
+        while (true) {
+            const data = await discordRest.get(Routes.userGuilds(), {
+                query: new URLSearchParams({ after: botAfter, limit: '100' }),
+            }) as BotGuildRecord[];
+
+            if (!Array.isArray(data) || data.length === 0) {
+                break;
+            }
+
+            botGuilds.push(...data);
+            botAfter = data[data.length - 1].id;
+
+            if (data.length < 100) {
+                break;
+            }
+        }
+    } catch (error) {
+        console.warn('[DASHBOARD][GUILDS] Failed to load bot guilds. Returning an empty bot guild list.', {
+            error: error instanceof Error ? error.message : error,
+        });
+    }
+
+    return botGuilds;
+}
+
+async function listInstalledServerIds() {
+    const { data, error } = await getSupabaseAdmin()
+        .from('servers')
+        .select('id');
+
+    if (error) {
+        console.warn('[DASHBOARD][GUILDS] Failed to load installed server list. Continuing with Discord bot guilds only.', {
+            error: error.message,
+        });
+        return new Set<string>();
+    }
+
+    return new Set(((data || []) as InstalledServerRecord[])
+        .map((server) => server.id)
+        .filter(Boolean));
+}
+
 export async function listVisibleGuildsForDiscordSession(accessToken: string, discordUserId: string) {
     const userGuilds: DiscordGuildRecord[] = [];
+
     let after = '0';
 
     while (true) {
@@ -76,6 +145,11 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
         if (!res.ok) {
             if (res.status === 401) {
                 throw new DiscordAccessTokenError();
+            }
+            if (res.status === 429) {
+                const retryAfterHeader = res.headers.get('retry-after');
+                const retryAfter = retryAfterHeader ? Number(retryAfterHeader) : null;
+                throw new DiscordRateLimitError(`Failed to fetch user guilds (${res.status})`, Number.isFinite(retryAfter) ? retryAfter : null);
             }
             if (userGuilds.length === 0) {
                 throw new Error(`Failed to fetch user guilds (${res.status})`);
@@ -96,52 +170,44 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
         }
     }
 
-    const botGuilds: BotGuildRecord[] = [];
-    let botAfter = '0';
+    const [botGuilds, installedServerIds] = await Promise.all([
+        listBotGuilds(),
+        listInstalledServerIds(),
+    ]);
+    const userGuildIds = userGuilds.map((guild) => guild.id);
+    const { data: blockedRows, error: blockedRowsError } = userGuildIds.length > 0
+        ? await supabase
+            .from('blocked_servers')
+            .select('guild_id')
+            .in('guild_id', userGuildIds)
+        : { data: [], error: null };
 
-    const discordRest = rest;
-
-    if (!discordRest) {
-        console.warn('[DASHBOARD][GUILDS] Missing DISCORD_TOKEN while loading bot guilds. Returning user guilds without bot matches.');
-    } else {
-        try {
-            while (true) {
-                const data = await discordRest.get(Routes.userGuilds(), {
-                    query: new URLSearchParams({ after: botAfter, limit: '100' }),
-                }) as BotGuildRecord[];
-
-                if (!Array.isArray(data) || data.length === 0) {
-                    break;
-                }
-
-                botGuilds.push(...data);
-                botAfter = data[data.length - 1].id;
-
-                if (data.length < 100) {
-                    break;
-                }
-            }
-        } catch (error) {
-            console.warn('[DASHBOARD][GUILDS] Failed to load bot guilds. Returning user guilds without bot matches.', {
-                error: error instanceof Error ? error.message : error,
-            });
-        }
+    if (blockedRowsError) {
+        console.warn('[DASHBOARD][GUILDS] Failed to load blocked guild list. Continuing without filtering.', {
+            error: blockedRowsError.message,
+        });
     }
 
-    const botGuildIds = new Set(botGuilds.map((guild) => guild.id));
-    const isSuperUser = discordUserId === '953414442060746854';
+    const blockedGuildIds = new Set((blockedRows || []).map((row) => row.guild_id));
+    const allowedUserGuilds = userGuilds.filter((guild) => !blockedGuildIds.has(guild.id));
 
-    const adminGuilds = userGuilds.filter((guild) => hasDiscordGuildManagePermission(guild.permissions, guild.owner));
+    const botGuildIds = new Set(botGuilds.map((guild) => guild.id));
+    for (const serverId of installedServerIds) {
+        botGuildIds.add(serverId);
+    }
+
+    const adminGuilds = allowedUserGuilds.filter((guild) => hasDiscordGuildManagePermission(guild.permissions, guild.owner));
     const adminGuildIds = new Set(adminGuilds.map((guild) => guild.id));
-    const potentialRoleAccessGuilds = userGuilds.filter((guild) => botGuildIds.has(guild.id) && !adminGuildIds.has(guild.id));
+    const potentialRoleAccessGuilds = allowedUserGuilds.filter((guild) => botGuildIds.has(guild.id) && !adminGuildIds.has(guild.id));
 
     let roleAccessGuilds: VisibleDashboardGuild[] = [];
+    const discordRest = rest;
 
     if (discordRest && potentialRoleAccessGuilds.length > 0) {
         const { data: accessRoles } = await supabase
             .from('dashboard_roles')
             .select('server_id, discord_role_id')
-            .eq('can_access_dashboard', true)
+            .or('can_access_dashboard.eq.true,can_access_live_panel.eq.true')
             .in('server_id', potentialRoleAccessGuilds.map((guild) => guild.id));
 
         if (Array.isArray(accessRoles) && accessRoles.length > 0) {
@@ -186,26 +252,6 @@ export async function listVisibleGuildsForDiscordSession(accessToken: string, di
                 }
             }
         }
-    }
-
-    if (isSuperUser) {
-        const botOnlyGuilds = botGuilds
-            .filter((guild) => !adminGuildIds.has(guild.id))
-            .map((guild) => ({
-                id: guild.id,
-                name: guild.name,
-                icon: guild.icon,
-                permissions: '0',
-                owner: false,
-                hasBot: true,
-            } satisfies VisibleDashboardGuild));
-
-        const managedGuilds = adminGuilds.map((guild) => ({
-            ...guild,
-            hasBot: botGuildIds.has(guild.id),
-        } satisfies VisibleDashboardGuild));
-
-        return [...managedGuilds, ...botOnlyGuilds];
     }
 
     const managedGuilds = adminGuilds.map((guild) => ({

@@ -1,14 +1,22 @@
 'use client';
 
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
     ADMIN_PANEL_COMMAND_GROUPS,
     ADMIN_PANEL_COMMAND_IDS,
     hasAdminPanelCommandAccess,
     normalizeAdminPanelCommandList,
 } from "@/lib/adminPanelCommands";
-import { supabase } from "@/lib/supabase";
+import {
+    CUSTOM_DASHBOARD_LAYOUTS,
+    CUSTOM_DASHBOARD_THEMES,
+    DEFAULT_CUSTOM_DASHBOARD_LAYOUT,
+    DEFAULT_CUSTOM_DASHBOARD_THEME,
+    type CustomDashboardLayout,
+    type CustomDashboardMetadata,
+    type CustomDashboardTheme,
+} from "@/lib/customDashboardSettings";
 import { useSession } from "next-auth/react";
 
 // Icons
@@ -52,6 +60,7 @@ interface DashboardRole {
     discord_role_id: string;
     role_name: string;
     can_access_dashboard: boolean;
+    can_access_live_panel: boolean;
     can_kick: boolean;
     can_ban: boolean;
     can_timeout: boolean;
@@ -64,6 +73,7 @@ interface DashboardRole {
 
 type DashboardRoleBooleanField =
     | 'can_access_dashboard'
+    | 'can_access_live_panel'
     | 'can_manage_settings'
     | 'can_manage_reports'
     | 'can_lookup'
@@ -74,6 +84,7 @@ type DashboardRoleBooleanField =
 
 const ROLE_PERMISSION_OPTIONS: Array<{ key: DashboardRoleBooleanField; label: string }> = [
     { key: 'can_access_dashboard', label: 'Dashboard Access' },
+    { key: 'can_access_live_panel', label: 'Live Panel' },
     { key: 'can_manage_settings', label: 'Manage Settings' },
     { key: 'can_manage_reports', label: 'Manage Reports' },
     { key: 'can_lookup', label: 'Lookup Users' },
@@ -89,7 +100,38 @@ interface DiscordChannel {
     type: number;
 }
 
-type SettingsView = 'overview' | 'roles' | 'commands' | 'logging' | 'reports';
+interface ServerSettingsConfig {
+    admin_cmds_enabled?: boolean | null;
+    misc_cmds_enabled?: boolean | null;
+    logging_channel_id?: string | null;
+    reports_enabled?: boolean | null;
+    reports_channel_id?: string | null;
+}
+
+interface CustomDashboardSettings {
+    id?: string | null;
+    server_id: string;
+    subdomain: string;
+    hostname: string;
+    hostnames: string[];
+    layout: CustomDashboardLayout;
+    theme: CustomDashboardTheme;
+    metadata: CustomDashboardMetadata;
+}
+
+type SettingsView = 'overview' | 'roles' | 'commands' | 'logging' | 'reports' | 'dashboard';
+
+interface SavedSettingsSnapshot {
+    adminCmds: boolean;
+    miscCmds: boolean;
+    loggingChannelId: string;
+    reportsEnabled: boolean;
+    reportsChannelId: string;
+    customDashboardSubdomain: string;
+    customDashboardLayout: CustomDashboardLayout;
+    customDashboardTheme: CustomDashboardTheme;
+    customDashboardMetadata: CustomDashboardMetadata;
+}
 
 interface SettingsClientProps {
     view?: SettingsView;
@@ -116,7 +158,72 @@ const PAGE_COPY: Record<SettingsView, { title: string; description: string }> = 
         title: 'Report System',
         description: 'Configure player reports and where report notifications are delivered.',
     },
+    dashboard: {
+        title: 'Custom Dashboard',
+        description: 'Control the custom dashboard URL, layout, theme, and public sign-in metadata.',
+    },
 };
+
+const EMPTY_CUSTOM_DASHBOARD_METADATA: CustomDashboardMetadata = {
+    title: "",
+    description: "",
+    logoUrl: "",
+    supportUrl: "",
+};
+
+const DEFAULT_SAVED_SETTINGS: SavedSettingsSnapshot = {
+    adminCmds: true,
+    miscCmds: true,
+    loggingChannelId: "",
+    reportsEnabled: false,
+    reportsChannelId: "",
+    customDashboardSubdomain: "",
+    customDashboardLayout: DEFAULT_CUSTOM_DASHBOARD_LAYOUT,
+    customDashboardTheme: DEFAULT_CUSTOM_DASHBOARD_THEME,
+    customDashboardMetadata: EMPTY_CUSTOM_DASHBOARD_METADATA,
+};
+
+function normalizeDashboardMetadata(metadata?: Partial<CustomDashboardMetadata> | null): CustomDashboardMetadata {
+    return {
+        title: metadata?.title || "",
+        description: metadata?.description || "",
+        logoUrl: metadata?.logoUrl || "",
+        supportUrl: metadata?.supportUrl || "",
+    };
+}
+
+function getComparableSettingsForView(settings: SavedSettingsSnapshot, view: SettingsView) {
+    if (view === 'commands') {
+        return {
+            adminCmds: settings.adminCmds,
+            miscCmds: settings.miscCmds,
+        };
+    }
+
+    if (view === 'logging') {
+        return {
+            loggingChannelId: settings.loggingChannelId,
+        };
+    }
+
+    if (view === 'reports') {
+        return {
+            reportsEnabled: settings.reportsEnabled,
+            reportsChannelId: settings.reportsChannelId,
+        };
+    }
+
+    if (view === 'dashboard') {
+        return {
+            customDashboardSubdomain: settings.customDashboardSubdomain.trim(),
+            customDashboardLayout: settings.customDashboardLayout,
+            customDashboardTheme: settings.customDashboardTheme,
+            customDashboardMetadata: settings.customDashboardMetadata,
+        };
+    }
+
+    return {};
+}
 
 export default function SettingsClient({ view = 'overview' }: SettingsClientProps) {
     const { id } = useParams();
@@ -127,6 +234,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [savedSettings, setSavedSettings] = useState<SavedSettingsSnapshot | null>(null);
     const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
     const [removeBotOption, setRemoveBotOption] = useState(true);
     const [deleteDataOption, setDeleteDataOption] = useState(false);
@@ -139,6 +247,18 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     const [loggingChannelId, setLoggingChannelId] = useState("");
     const [reportsEnabled, setReportsEnabled] = useState(false);
     const [reportsChannelId, setReportsChannelId] = useState("");
+    const [customDashboardSubdomain, setCustomDashboardSubdomain] = useState("");
+    const [customDashboardLayout, setCustomDashboardLayout] = useState<CustomDashboardLayout>(DEFAULT_CUSTOM_DASHBOARD_LAYOUT);
+    const [customDashboardTheme, setCustomDashboardTheme] = useState<CustomDashboardTheme>(DEFAULT_CUSTOM_DASHBOARD_THEME);
+    const [customDashboardMetadata, setCustomDashboardMetadata] = useState<CustomDashboardMetadata>({
+        title: "",
+        description: "",
+        logoUrl: "",
+        supportUrl: "",
+    });
+    const [customDashboardHostnames, setCustomDashboardHostnames] = useState<string[]>([]);
+    const [currentHostname, setCurrentHostname] = useState("");
+    const [hasCustomDashboardSetup, setHasCustomDashboardSetup] = useState(false);
 
     // Role Management
     const [discordRoles, setDiscordRoles] = useState<DiscordRole[]>([]);
@@ -215,10 +335,38 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
         ));
     }
 
+    function updateCustomDashboardMetadata(field: keyof CustomDashboardMetadata, value: string) {
+        setCustomDashboardMetadata((current) => ({
+            ...current,
+            [field]: value,
+        }));
+    }
+
+    useEffect(() => {
+        setCurrentHostname(window.location.hostname.toLowerCase());
+    }, []);
+
+    useEffect(() => {
+        if (view !== 'dashboard' || !hasCustomDashboardSetup) return;
+
+        window.dispatchEvent(new CustomEvent('rolink:custom-dashboard-preview', {
+            detail: {
+                layout: customDashboardLayout,
+                theme: customDashboardTheme,
+                metadata: customDashboardMetadata,
+            },
+        }));
+
+        return () => {
+            window.dispatchEvent(new CustomEvent('rolink:custom-dashboard-preview', { detail: null }));
+        };
+    }, [customDashboardLayout, customDashboardMetadata, customDashboardTheme, hasCustomDashboardSetup, view]);
+
     useEffect(() => {
         async function fetchData() {
             if (!id || !session) return;
             const sessionUserId = String((session.user as { id?: string }).id || "");
+            let nextSavedSettings: SavedSettingsSnapshot = { ...DEFAULT_SAVED_SETTINGS };
 
             // 1. Check Permissions
             const guildRes = await fetch('/api/guilds');
@@ -231,18 +379,31 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
             }
 
             // 2. Fetch Server Settings
-            const { data, error: dbError } = await supabase
-                .from('servers')
-                .select('admin_cmds_enabled, misc_cmds_enabled, logging_channel_id, reports_enabled, reports_channel_id')
-                .eq('id', id)
-                .single();
+            const settingsRes = await fetch(`/api/dashboard/server-config?serverId=${encodeURIComponent(String(id))}`, {
+                cache: 'no-store',
+            });
+            const data = settingsRes.ok ? await settingsRes.json() as ServerSettingsConfig | null : null;
 
-            if (data && !dbError) {
-                setAdminCmds(data.admin_cmds_enabled !== false);
-                setMiscCmds(data.misc_cmds_enabled !== false);
-                setLoggingChannelId(data.logging_channel_id || "");
-                setReportsEnabled(data.reports_enabled || false);
-                setReportsChannelId(data.reports_channel_id || "");
+            if (data) {
+                const nextAdminCmds = data.admin_cmds_enabled !== false;
+                const nextMiscCmds = data.misc_cmds_enabled !== false;
+                const nextLoggingChannelId = data.logging_channel_id || "";
+                const nextReportsEnabled = data.reports_enabled || false;
+                const nextReportsChannelId = data.reports_channel_id || "";
+
+                setAdminCmds(nextAdminCmds);
+                setMiscCmds(nextMiscCmds);
+                setLoggingChannelId(nextLoggingChannelId);
+                setReportsEnabled(nextReportsEnabled);
+                setReportsChannelId(nextReportsChannelId);
+                nextSavedSettings = {
+                    ...nextSavedSettings,
+                    adminCmds: nextAdminCmds,
+                    miscCmds: nextMiscCmds,
+                    loggingChannelId: nextLoggingChannelId,
+                    reportsEnabled: nextReportsEnabled,
+                    reportsChannelId: nextReportsChannelId,
+                };
             }
 
             // 3. Fetch Discord Roles & Channels
@@ -269,10 +430,51 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                 console.error("Failed to fetch configured roles", e);
             }
 
+            if (view === 'overview' || view === 'dashboard') {
+                try {
+                    const dashboardRes = await fetch(`/api/dashboard/custom-dashboard?serverId=${encodeURIComponent(String(id))}`, {
+                        cache: 'no-store',
+                    });
+
+                    if (dashboardRes.ok) {
+                        const dashboardSettings = await dashboardRes.json() as CustomDashboardSettings;
+                        const nextDashboardMetadata = normalizeDashboardMetadata(dashboardSettings.metadata);
+
+                        setHasCustomDashboardSetup(Boolean(dashboardSettings.id));
+                        setCustomDashboardSubdomain(dashboardSettings.subdomain || "");
+                        setCustomDashboardLayout(dashboardSettings.layout || DEFAULT_CUSTOM_DASHBOARD_LAYOUT);
+                        setCustomDashboardTheme(dashboardSettings.theme || DEFAULT_CUSTOM_DASHBOARD_THEME);
+                        setCustomDashboardMetadata(nextDashboardMetadata);
+                        setCustomDashboardHostnames(dashboardSettings.hostnames || []);
+                        nextSavedSettings = {
+                            ...nextSavedSettings,
+                            customDashboardSubdomain: dashboardSettings.subdomain || "",
+                            customDashboardLayout: dashboardSettings.layout || DEFAULT_CUSTOM_DASHBOARD_LAYOUT,
+                            customDashboardTheme: dashboardSettings.theme || DEFAULT_CUSTOM_DASHBOARD_THEME,
+                            customDashboardMetadata: nextDashboardMetadata,
+                        };
+                    } else {
+                        setHasCustomDashboardSetup(false);
+                        if (view === 'dashboard') {
+                            router.replace(`/dashboard/${id}/settings`);
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch custom dashboard settings", e);
+                    setHasCustomDashboardSetup(false);
+                    if (view === 'dashboard') {
+                        router.replace(`/dashboard/${id}/settings`);
+                        return;
+                    }
+                }
+            }
+
+            setSavedSettings(nextSavedSettings);
             setLoading(false);
         }
         fetchData();
-    }, [id, session, router]);
+    }, [id, session, router, view]);
 
     async function handleSave() {
         setSaving(true);
@@ -291,26 +493,98 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
             return;
         }
 
-        // Save General Settings
-        const { error: dbError } = await supabase
-            .from('servers')
-            .update({
+        if (view === 'dashboard') {
+            const response = await fetch('/api/dashboard/custom-dashboard', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverId: id,
+                    subdomain: customDashboardSubdomain,
+                    layout: customDashboardLayout,
+                    theme: customDashboardTheme,
+                    metadata: customDashboardMetadata,
+                }),
+            });
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                setError(String(payload.error || 'Failed to save custom dashboard settings.'));
+            } else {
+                const dashboardSettings = payload as CustomDashboardSettings;
+                const nextDashboardMetadata = normalizeDashboardMetadata(dashboardSettings.metadata);
+                const nextDashboardLayout = dashboardSettings.layout || DEFAULT_CUSTOM_DASHBOARD_LAYOUT;
+                const nextDashboardTheme = dashboardSettings.theme || DEFAULT_CUSTOM_DASHBOARD_THEME;
+
+                setCustomDashboardSubdomain(dashboardSettings.subdomain || "");
+                setCustomDashboardLayout(nextDashboardLayout);
+                setCustomDashboardTheme(nextDashboardTheme);
+                setCustomDashboardMetadata(nextDashboardMetadata);
+                setCustomDashboardHostnames(dashboardSettings.hostnames || []);
+                setSavedSettings((current) => ({
+                    ...(current || DEFAULT_SAVED_SETTINGS),
+                    customDashboardSubdomain: dashboardSettings.subdomain || "",
+                    customDashboardLayout: nextDashboardLayout,
+                    customDashboardTheme: nextDashboardTheme,
+                    customDashboardMetadata: nextDashboardMetadata,
+                }));
+                window.dispatchEvent(new CustomEvent('rolink:custom-dashboard-saved', {
+                    detail: {
+                        ...dashboardSettings,
+                        layout: nextDashboardLayout,
+                        theme: nextDashboardTheme,
+                        metadata: nextDashboardMetadata,
+                    },
+                }));
+                setSuccess(true);
+                setTimeout(() => setSuccess(false), 3000);
+            }
+
+            setSaving(false);
+            return;
+        }
+
+        const response = await fetch('/api/dashboard/server-config', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                serverId: id,
+                updates: {
                 admin_cmds_enabled: adminCmds,
                 misc_cmds_enabled: miscCmds,
                 logging_channel_id: loggingChannelId || null,
                 reports_enabled: reportsEnabled,
                 reports_channel_id: reportsChannelId || null
-            })
-            .eq('id', id);
+                },
+            }),
+        });
+        const payload = await response.json().catch(() => ({}));
 
         // Save Roles Logic (In this simplified view, we save roles as they are modified, but general settings on Save)
         // Actually, let's keep role editing separate to avoid complex state management
         // Roles are saved immediately when modified in the UI below, or we could batch them.
         // For simplicity, let's just save general settings here.
 
-        if (dbError) {
-            setError(dbError.message);
+        if (!response.ok) {
+            setError(String(payload.error || 'Failed to save settings.'));
         } else {
+            const savedServerSettings = payload as ServerSettingsConfig;
+            const nextServerSettings = {
+                adminCmds: savedServerSettings.admin_cmds_enabled !== false,
+                miscCmds: savedServerSettings.misc_cmds_enabled !== false,
+                loggingChannelId: savedServerSettings.logging_channel_id || "",
+                reportsEnabled: savedServerSettings.reports_enabled || false,
+                reportsChannelId: savedServerSettings.reports_channel_id || "",
+            };
+
+            setAdminCmds(nextServerSettings.adminCmds);
+            setMiscCmds(nextServerSettings.miscCmds);
+            setLoggingChannelId(nextServerSettings.loggingChannelId);
+            setReportsEnabled(nextServerSettings.reportsEnabled);
+            setReportsChannelId(nextServerSettings.reportsChannelId);
+            setSavedSettings((current) => ({
+                ...(current || DEFAULT_SAVED_SETTINGS),
+                ...nextServerSettings,
+            }));
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
         }
@@ -341,6 +615,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     roleName: role.name,
                     permissions: {
                         access_dashboard: false,
+                        live_panel: false,
                         kick: false,
                         ban: false,
                         timeout: false,
@@ -386,6 +661,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     roleName: targetRole.role_name,
                     permissions: {
                         access_dashboard: targetRole.can_access_dashboard,
+                        live_panel: targetRole.can_access_live_panel,
                         kick: targetRole.can_kick,
                         ban: targetRole.can_ban,
                         timeout: targetRole.can_timeout,
@@ -464,6 +740,38 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
         }
     }
 
+    const showsSaveButton = view === 'commands' || view === 'logging' || view === 'reports' || view === 'dashboard';
+    const currentSettingsSnapshot = useMemo<SavedSettingsSnapshot>(() => ({
+        adminCmds,
+        miscCmds,
+        loggingChannelId,
+        reportsEnabled,
+        reportsChannelId,
+        customDashboardSubdomain,
+        customDashboardLayout,
+        customDashboardTheme,
+        customDashboardMetadata,
+    }), [
+        adminCmds,
+        customDashboardLayout,
+        customDashboardMetadata,
+        customDashboardSubdomain,
+        customDashboardTheme,
+        loggingChannelId,
+        miscCmds,
+        reportsChannelId,
+        reportsEnabled,
+    ]);
+    const hasUnsavedSettings = showsSaveButton
+        && Boolean(savedSettings)
+        && JSON.stringify(getComparableSettingsForView(currentSettingsSnapshot, view)) !== JSON.stringify(getComparableSettingsForView(savedSettings || DEFAULT_SAVED_SETTINGS, view));
+
+    useEffect(() => {
+        if (hasUnsavedSettings && success) {
+            setSuccess(false);
+        }
+    }, [hasUnsavedSettings, success]);
+
     if (loading) return (
         <div className="flex items-center justify-center min-h-[400px]">
             <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
@@ -471,7 +779,6 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     );
 
     const pageCopy = PAGE_COPY[view];
-    const showsSaveButton = view === 'commands' || view === 'logging' || view === 'reports';
     const settingsTiles = [
         {
             title: 'Game Connection',
@@ -503,6 +810,12 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
             href: `/dashboard/${id}/settings/reports`,
             tone: 'red',
         },
+        ...(hasCustomDashboardSetup ? [{
+            title: 'Custom Dashboard',
+            description: 'Edit the custom URL, sign-in metadata, layout, and color scheme.',
+            href: `/dashboard/${id}/settings/dashboard`,
+            tone: 'amber',
+        }] : []),
         {
             title: 'Activity Logs',
             description: 'Review recent dashboard and moderation activity for this server.',
@@ -512,7 +825,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     ];
     const infoItems = view === 'roles'
         ? [
-            { title: "Dashboard Access", text: "A role must have dashboard access before its other dashboard permissions are useful." },
+            { title: "Dashboard Access", text: "A role must have dashboard access before its other dashboard permissions are useful. Live Panel can be granted separately for focused live moderation." },
             { title: "Panel Commands", text: "The Roblox admin panel uses the same command allowlist configured on each Discord role." },
         ]
         : view === 'logging'
@@ -525,13 +838,35 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     { title: "Dashboard Reports", text: "Reports remain visible in the dashboard even when no Discord channel is selected." },
                     { title: "Notifications", text: "Choose a reports channel when staff should receive new report notifications in Discord." },
                 ]
-                : [
-                    { title: "Admin Commands", text: "Essential moderation tools. Disabling this prevents any kick/ban actions from Discord." },
-                    { title: "Misc Commands", text: "Fun and utility commands. Can be disabled if they interfere with gameplay." },
-                ];
+                : view === 'dashboard'
+                    ? [
+                        { title: "Custom URL", text: "The subdomain controls the wildcard dashboard address staff can use to sign in." },
+                        { title: "Branding", text: "Metadata appears before sign-in and the theme carries into the custom-host dashboard shell." },
+                    ]
+                    : [
+                        { title: "Admin Commands", text: "Essential moderation tools. Disabling this prevents any kick/ban actions from Discord." },
+                        { title: "Misc Commands", text: "Fun and utility commands. Can be disabled if they interfere with gameplay." },
+                    ];
+    const currentDashboardHostname = (() => {
+        const subdomain = customDashboardSubdomain.trim().toLowerCase();
+        if (!subdomain) return "";
+
+        const hostnames = customDashboardHostnames.length > 0 ? customDashboardHostnames : [`${subdomain}.rolink.cloud`];
+        const exactRootMatch = hostnames.find((hostname) => {
+            const rootDomain = hostname.toLowerCase().replace(/^[^.]+\./, '');
+            return currentHostname === rootDomain;
+        });
+        const matchingHostname = exactRootMatch || hostnames.find((hostname) => {
+            const rootDomain = hostname.toLowerCase().replace(/^[^.]+\./, '');
+            return currentHostname.endsWith(`.${rootDomain}`)
+                || rootDomain.endsWith(`.${currentHostname}`);
+        }) || hostnames[0];
+
+        return matchingHostname.replace(/^[^.]+/, subdomain);
+    })();
 
     return (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full pb-20">
+        <div className={`animate-in fade-in slide-in-from-bottom-4 duration-700 w-full ${showsSaveButton ? 'pb-32' : 'pb-20'}`}>
             {/* Page Header */}
             <div className="mb-10 pb-8 border-b border-slate-800/60">
                 <div className="flex items-center justify-between">
@@ -545,26 +880,10 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         </div>
                     </div>
 
-                    {showsSaveButton && (
-                        <button
-                            onClick={handleSave}
-                            disabled={saving}
-                            className="hidden md:flex bg-sky-600 hover:bg-sky-500 text-white font-bold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-sky-900/20 text-xs disabled:opacity-50 items-center justify-center gap-3 active:scale-95 border border-sky-400/20"
-                        >
-                            {saving ? (
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            ) : (
-                                <>
-                                    <SaveIcon />
-                                    SAVE CHANGES
-                                </>
-                            )}
-                        </button>
-                    )}
                 </div>
             </div>
 
-            <div className="grid grid-cols-12 gap-8">
+            <div className="grid grid-cols-12 gap-6 xl:gap-8">
                 {/* Main Settings Column */}
                 <div className={`col-span-12 space-y-12 ${view === 'overview' ? '' : 'lg:col-span-8'}`}>
 
@@ -579,6 +898,8 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                             ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 group-hover:border-indigo-500/40'
                                             : tile.tone === 'red'
                                                 ? 'bg-red-500/10 text-red-400 border-red-500/20 group-hover:border-red-500/40'
+                                                : tile.tone === 'amber'
+                                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 group-hover:border-amber-500/40'
                                                 : tile.tone === 'sky'
                                                     ? 'bg-sky-500/10 text-sky-400 border-sky-500/20 group-hover:border-sky-500/40'
                                                     : 'bg-slate-500/10 text-slate-400 border-slate-500/20 group-hover:border-slate-500/40';
@@ -608,7 +929,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* --- ROLE PERMISSIONS SECTION (NEW) --- */}
                     {view === 'roles' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden transition-all duration-300">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden transition-all duration-300">
                         <div className="flex items-start justify-between mb-8 cursor-pointer" onClick={() => setIsRolesCollapsed(!isRolesCollapsed)}>
                             <div className="flex items-start gap-6">
                                 <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500 border border-purple-500/10">
@@ -701,7 +1022,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                             {!roleCardCollapsed && (
                                                 <>
                                                     {/* Permissions Grid */}
-                                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-3 xl:gap-4">
                                                         {ROLE_PERMISSION_OPTIONS.map((perm) => (
                                                             <label key={perm.key} className="flex items-center gap-3 cursor-pointer group select-none">
                                                                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
@@ -764,7 +1085,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                                             </div>
                                                                         </div>
 
-                                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
                                                                             {group.commands.map((command) => {
                                                                                 const enabled = hasAllCommands || hasAdminPanelCommandAccess(roleCommands, command.id);
 
@@ -824,9 +1145,160 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     )}
 
 
+                    {/* Custom Dashboard Config Section */}
+                    {view === 'dashboard' && (
+                    <div className="space-y-6">
+                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
+                            <div className="flex items-start gap-6 mb-8">
+                                <div className="p-3 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/10">
+                                    <SettingsIcon />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Custom Dashboard</h3>
+                                    <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Set the custom dashboard address and control how the branded sign-in and dashboard shell appear.</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-6">
+                                <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
+                                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Dashboard Subdomain</label>
+                                    <div className="flex rounded-xl border border-slate-800 bg-black/30 focus-within:border-amber-500">
+                                        <input
+                                            value={customDashboardSubdomain}
+                                            onChange={(e) => setCustomDashboardSubdomain(e.target.value)}
+                                            placeholder="my-community"
+                                            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-white outline-none"
+                                        />
+                                        <span className="hidden items-center border-l border-slate-800 px-4 font-mono text-xs text-slate-500 sm:flex">subdomain</span>
+                                    </div>
+                                    {currentDashboardHostname && (
+                                        <div className="mt-4">
+                                            <a
+                                                href={`https://${currentDashboardHostname}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 font-mono text-[11px] text-amber-200 hover:border-amber-400/50"
+                                            >
+                                                {currentDashboardHostname}
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-6">
+                                    <div className="space-y-6">
+                                        <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
+                                            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Dashboard Title</label>
+                                            <input
+                                                value={customDashboardMetadata.title}
+                                                onChange={(e) => updateCustomDashboardMetadata('title', e.target.value)}
+                                                placeholder="Community Staff Dashboard"
+                                                maxLength={80}
+                                                className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                            />
+                                        </div>
+
+                                        <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
+                                            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Description</label>
+                                            <textarea
+                                                value={customDashboardMetadata.description}
+                                                onChange={(e) => updateCustomDashboardMetadata('description', e.target.value)}
+                                                placeholder="Sign in with Discord to access this community dashboard."
+                                                maxLength={180}
+                                                className="h-28 w-full resize-none rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
+                                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Logo URL</label>
+                                                <input
+                                                    value={customDashboardMetadata.logoUrl}
+                                                    onChange={(e) => updateCustomDashboardMetadata('logoUrl', e.target.value)}
+                                                    placeholder="https://..."
+                                                    className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                                />
+                                            </div>
+
+                                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
+                                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Support URL</label>
+                                                <input
+                                                    value={customDashboardMetadata.supportUrl}
+                                                    onChange={(e) => updateCustomDashboardMetadata('supportUrl', e.target.value)}
+                                                    placeholder="https://discord.gg/..."
+                                                    className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm">
+                            <div className="mb-6">
+                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Layout</h3>
+                                <p className="text-sm text-slate-500 leading-relaxed">Choose how dense the custom-host dashboard shell should feel.</p>
+                            </div>
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                {CUSTOM_DASHBOARD_LAYOUTS.map((layout) => (
+                                    <button
+                                        key={layout.id}
+                                        type="button"
+                                        onClick={() => setCustomDashboardLayout(layout.id)}
+                                        className={`rounded-xl border p-5 text-left transition-all ${customDashboardLayout === layout.id ? 'border-amber-500/50 bg-amber-500/10' : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'}`}
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="text-sm font-black uppercase tracking-[0.16em] text-white">{layout.name}</div>
+                                            {customDashboardLayout === layout.id && (
+                                                <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-amber-200">
+                                                    Selected
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="mt-2 text-xs leading-relaxed text-slate-500">{layout.description}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm">
+                            <div className="mb-6">
+                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Theme</h3>
+                                <p className="text-sm text-slate-500 leading-relaxed">Choose one of seven color schemes for custom dashboard branding.</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                                {CUSTOM_DASHBOARD_THEMES.map((theme) => (
+                                    <button
+                                        key={theme.id}
+                                        type="button"
+                                        onClick={() => setCustomDashboardTheme(theme.id)}
+                                        className={`rounded-xl border p-4 text-left transition-all ${customDashboardTheme === theme.id ? 'border-white/40 bg-white/10' : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'}`}
+                                    >
+                                        <span
+                                            className="mb-4 block h-9 w-full rounded-lg border"
+                                            style={{
+                                                background: theme.gradient,
+                                                borderColor: theme.border,
+                                            }}
+                                        />
+                                        <span className="flex items-center justify-between gap-2">
+                                            <span className="text-xs font-black uppercase tracking-[0.16em] text-white">{theme.name}</span>
+                                            {customDashboardTheme === theme.id && (
+                                                <span className="h-2 w-2 rounded-full" style={{ background: theme.accent }} />
+                                            )}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    )}
+
+
                     {/* Command Config Section */}
                     {view === 'commands' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
                             <div className="p-3 bg-sky-500/10 rounded-xl text-sky-500 border border-sky-500/10">
                                 <CommandIcon />
@@ -871,7 +1343,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* Logging Config Section */}
                     {view === 'logging' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
                             <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-500 border border-indigo-500/10">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -907,7 +1379,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* Report System Config */}
                     {view === 'reports' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
                             <div className="p-3 bg-red-500/10 rounded-xl text-red-500 border border-red-500/10">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
@@ -960,8 +1432,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* Status Box */}
                     {showsSaveButton && (
-                    <>
-                        <div className="p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
+                        <div className="p-5 sm:p-6 md:p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
                             <div className="flex items-center gap-5">
                                 <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/10">
                                     <InfoIcon />
@@ -979,21 +1450,11 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                             )}
                             {error && <span className="text-red-500 text-[10px] font-bold uppercase tracking-widest">{error}</span>}
                         </div>
-                        <div className="md:hidden">
-                            <button
-                                onClick={handleSave}
-                                disabled={saving}
-                                className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-sky-900/10 text-xs disabled:opacity-50 flex items-center justify-center gap-3 active:scale-95"
-                            >
-                                {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "SAVE SETTINGS"}
-                            </button>
-                        </div>
-                    </>
                     )}
 
                     {/* Remove Ro-Link */}
                     {view === 'overview' && (
-                    <div className="bg-red-950/20 border border-red-500/20 rounded-[2rem] p-10 backdrop-blur-sm">
+                    <div className="bg-red-950/20 border border-red-500/20 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm">
                         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                             <div className="flex items-start gap-5">
                                 <div className="p-3 bg-red-500/10 rounded-xl text-red-400 border border-red-500/20">
@@ -1027,7 +1488,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                 {/* Info Column */}
                 {view !== 'overview' && (
                 <div className="col-span-12 lg:col-span-4 space-y-8">
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-8">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8">
                         <h4 className="text-xs font-bold text-white uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
                             <span className="w-6 h-px bg-sky-600"></span>
                             Information
@@ -1048,6 +1509,37 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                 </div>
                 )}
             </div>
+
+            {showsSaveButton && (hasUnsavedSettings || saving) && (
+                <div className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 pointer-events-none">
+                    <div className="pointer-events-auto flex w-full max-w-3xl flex-col gap-4 rounded-2xl border border-sky-500/30 bg-slate-950/95 p-4 shadow-2xl shadow-black/40 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-500/20 bg-sky-500/10 text-sky-300">
+                                <SaveIcon />
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-white">Save your settings</p>
+                                <p className="mt-0.5 text-xs font-medium text-slate-400">You have unsaved changes on this page.</p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="flex min-h-11 items-center justify-center gap-3 rounded-xl border border-sky-400/20 bg-sky-600 px-6 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-sky-950/30 transition-all hover:bg-sky-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {saving ? (
+                                <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin"></div>
+                            ) : (
+                                <>
+                                    <SaveIcon />
+                                    Save Settings
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {view === 'overview' && isRemoveModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">

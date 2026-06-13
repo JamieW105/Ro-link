@@ -1,72 +1,65 @@
 [
   {
-    "name": "ban",
-    "description": "Permanently ban a user from the Roblox game",
-    "options": [
-      {
-        "name": "username",
-        "description": "The Roblox username to ban",
-        "type": 3,
-        "required": true
-      },
-      {
-        "name": "reason",
-        "description": "Reason for the ban",
-        "type": 3,
-        "required": false
-      }
-    ]
-  },
-  {
-    "name": "kick",
-    "description": "Kick a user from the game server",
-    "options": [
-      {
-        "name": "username",
-        "description": "The Roblox username",
-        "type": 3,
-        "required": true
-      },
-      {
-        "name": "reason",
-        "description": "Reason for the kick",
-        "type": 3,
-        "required": false
-      }
-    ]
-  },
-  {
-    "name": "unban",
-    "description": "Unban a user from the Roblox game",
-    "options": [
-      {
-        "name": "username",
-        "description": "The Roblox username to unban",
-        "type": 3,
-        "required": true
-      }
-    ]
-  },
-  {
-    "name": "lookup",
-    "description": "Lookup a Roblox user and review prior moderation history",
-    "options": [
-      {
-        "name": "username",
-        "description": "The Roblox username to lookup",
-        "type": 3,
-        "required": true
-      }
-    ]
+    "name": "moderation",
+    "description": "Open Roblox moderation commands"
   },
   {
     "name": "misc",
-    "description": "Perform miscellaneous player actions (Fly, Noclip, etc.)",
-    "options": []
+    "description": "Open miscellaneous player commands"
   },
   {
-    "name": "update-servers",
-    "description": "Send a global update signal to all Roblox servers (restarts them)"
+    "name": "lookup",
+    "description": "Lookup a user's Discord and Roblox info, and their server moderation history",
+    "options": [
+      {
+        "name": "roblox_user",
+        "description": "The Roblox username to lookup",
+        "type": 3,
+        "required": false
+      },
+      {
+        "name": "discord_user",
+        "description": "The Discord user to lookup",
+        "type": 6,
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "staff-note",
+    "description": "Add a staff-only note to a Discord or Roblox user",
+    "options": [
+      {
+        "name": "note",
+        "description": "The staff note to save",
+        "type": 3,
+        "required": true
+      },
+      {
+        "name": "roblox_user",
+        "description": "The Roblox username to attach this note to",
+        "type": 3,
+        "required": false
+      },
+      {
+        "name": "discord_user",
+        "description": "The Discord user to attach this note to",
+        "type": 6,
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "servers",
+    "description": "View and manage live Roblox servers",
+    "options": [
+      {
+        "name": "search",
+        "description": "Optional Roblox username, Roblox user ID, or server JobId",
+        "type": 3,
+        "required": false
+      }
+    ]
   },
   {
     "name": "update",
@@ -76,18 +69,6 @@
         "name": "user",
         "description": "The Discord user to refresh verification data for",
         "type": 6,
-        "required": false
-      }
-    ]
-  },
-  {
-    "name": "shutdown",
-    "description": "Immediately shut down game servers",
-    "options": [
-      {
-        "name": "job_id",
-        "description": "The specific Roblox JobId to shut down (Leave empty for ALL servers)",
-        "type": 3,
         "required": false
       }
     ]
@@ -107,30 +88,6 @@
   {
     "name": "verify",
     "description": "Link your Roblox account with Ro-Link"
-  },
-  {
-    "name": "get-discord",
-    "description": "Find a Discord user from their Roblox account",
-    "options": [
-      {
-        "name": "roblox_username",
-        "description": "The Roblox username to lookup",
-        "type": 3,
-        "required": true
-      }
-    ]
-  },
-  {
-    "name": "get-roblox",
-    "description": "Find a Roblox account from a Discord user",
-    "options": [
-      {
-        "name": "discord_user",
-        "description": "The Discord user to lookup",
-        "type": 6,
-        "required": true
-      }
-    ]
   },
   {
     "name": "report",

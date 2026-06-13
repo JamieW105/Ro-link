@@ -9,6 +9,7 @@ type AutoLinkTextProps = {
     as?: 'div' | 'p' | 'span';
     className?: string;
     linkClassName?: string;
+    preserveLineBreaks?: boolean;
     text: string;
 };
 
@@ -86,17 +87,37 @@ function renderLinkifiedText(text: string, linkClassName: string): ReactNode[] {
     return nodes.length > 0 ? nodes : [text];
 }
 
+function renderTextWithLineBreaks(text: string, linkClassName: string): ReactNode[] {
+    const lines = text.split(/\r\n|\r|\n/);
+
+    return lines.flatMap((line, index) => {
+        const nodes = renderLinkifiedText(line, linkClassName);
+
+        if (index === lines.length - 1) {
+            return nodes;
+        }
+
+        return [
+            ...nodes,
+            <br key={`line-break-${index}`} />,
+        ];
+    });
+}
+
 export default function AutoLinkText({
     as = 'span',
     className,
     linkClassName = DEFAULT_LINK_CLASS_NAME,
+    preserveLineBreaks = false,
     text,
 }: AutoLinkTextProps) {
     const Component = as;
 
     return (
         <Component className={className}>
-            {renderLinkifiedText(text, linkClassName)}
+            {preserveLineBreaks
+                ? renderTextWithLineBreaks(text, linkClassName)
+                : renderLinkifiedText(text, linkClassName)}
         </Component>
     );
 }

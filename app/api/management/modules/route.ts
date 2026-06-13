@@ -9,6 +9,7 @@ import {
     sanitizeAddonModuleInput,
     slugifyModuleName,
 } from '@/lib/modules';
+import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
 
 async function requireModuleManager() {
@@ -63,7 +64,13 @@ export async function GET() {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json((data || []).map((row) => normalizeAddonModule(row, true)).filter(Boolean));
+    const staffDiscordIds = await getRoLinkStaffDiscordIds();
+
+    return NextResponse.json(
+        applyOfficialModuleLabels((data || []) as Record<string, unknown>[], staffDiscordIds)
+            .map((row) => normalizeAddonModule(row, true))
+            .filter(Boolean),
+    );
 }
 
 export async function POST(req: Request) {
@@ -91,7 +98,12 @@ export async function POST(req: Request) {
             status: input.status || 'DRAFT',
             source_code: input.sourceCode,
             source_checksum: checksumModuleSource(input.sourceCode || ''),
+            config_schema: input.configSchema || {},
             author_discord_id: auth.userId,
+            submitted_at: input.status === 'PENDING_REVIEW' ? now : null,
+            reviewed_at: input.status === 'PUBLISHED' || input.status === 'REJECTED' ? now : null,
+            reviewed_by_discord_id: input.status === 'PUBLISHED' || input.status === 'REJECTED' ? auth.userId : null,
+            moderation_note: '',
             published_at: input.status === 'PUBLISHED' ? now : null,
             updated_at: now,
         })
@@ -102,5 +114,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(normalizeAddonModule(data, true));
+    const staffDiscordIds = await getRoLinkStaffDiscordIds();
+    const [labeledModule] = applyOfficialModuleLabels([data as Record<string, unknown>], staffDiscordIds);
+
+    return NextResponse.json(normalizeAddonModule(labeledModule, true));
 }

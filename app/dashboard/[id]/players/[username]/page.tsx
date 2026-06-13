@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { usePermissions } from "@/context/PermissionsContext";
 import {
@@ -13,7 +13,6 @@ import {
 } from "@/lib/adminPanelCommands";
 import { findLivePlayer } from "@/lib/livePlayers";
 import { normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
-import { supabase } from "@/lib/supabase";
 
 interface RobloxPlayerProfile {
     id: number;
@@ -28,6 +27,10 @@ interface RobloxPlayerProfile {
 interface LiveServerRecord {
     id: string;
     players?: unknown;
+}
+
+interface ServerPlaceConfig {
+    place_id?: string | null;
 }
 
 type PresenceState = {
@@ -50,6 +53,10 @@ function trimString(value: unknown) {
 }
 
 function buildAvatarFallback(userId: number) {
+    if (!userId) {
+        return '';
+    }
+
     return `https://www.roblox.com/headshot-thumbnail/image?userId=${encodeURIComponent(String(userId))}&width=180&height=180&format=png`;
 }
 
@@ -74,6 +81,7 @@ export default function DashboardPlayerPage() {
     const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [setCharValue, setSetCharValue] = useState("");
+    const [teamValue, setTeamValue] = useState("");
     const [valueInputs, setValueInputs] = useState<Record<string, string>>({
         DAMAGE: "25",
         MAX_HEALTH: "100",
@@ -81,16 +89,8 @@ export default function DashboardPlayerPage() {
         JUMP_POWER: "50",
     });
 
-    async function loadPlayerPage(showLoader = true) {
-        if (!guildId || !decodedUsername) {
-            return;
-        }
-
-        if (showLoader) {
-            setLoading(true);
-        }
-
-        setError(null);
+    const resolveRobloxProfile = useCallback(async (): Promise<{ profile: RobloxPlayerProfile; warning: string }> => {
+        let profileLoadWarning = '';
 
         try {
             const profileRes = await fetch(`/api/proxy?username=${encodeURIComponent(decodedUsername)}&serverId=${encodeURIComponent(guildId)}`);
@@ -101,62 +101,111 @@ export default function DashboardPlayerPage() {
 
             const resolvedProfile = profilePayload as RobloxPlayerProfile;
             resolvedProfile.avatarUrl = trimString(resolvedProfile.avatarUrl) || buildAvatarFallback(resolvedProfile.id);
-            setPlayer(resolvedProfile);
+            return { profile: resolvedProfile, warning: '' };
+        } catch (profileError) {
+            const numericUserId = Number(decodedUsername);
+            const fallbackId = Number.isFinite(numericUserId) && numericUserId > 0 ? numericUserId : 0;
+            profileLoadWarning = profileError instanceof Error ? profileError.message : 'Roblox profile details are unavailable.';
 
-            const [serverConfigRes, liveServersRes, logsRes] = await Promise.all([
-                supabase
-                    .from('servers')
-                    .select('place_id')
-                    .eq('id', guildId)
-                    .single(),
-                supabase
-                    .from('live_servers')
-                    .select('id, players')
-                    .eq('server_id', guildId),
-                supabase
-                    .from('logs')
-                    .select('id, action, moderator, timestamp')
-                    .eq('server_id', guildId)
-                    .ilike('target', resolvedProfile.username)
-                    .order('timestamp', { ascending: false })
-                    .limit(20),
-            ]);
-
-            if (serverConfigRes.data?.place_id) {
-                setLinkedPlaceId(serverConfigRes.data.place_id);
-            } else {
-                setLinkedPlaceId(null);
-            }
-
-            const liveServers = Array.isArray(liveServersRes.data) ? liveServersRes.data as LiveServerRecord[] : [];
-            const matchingServer = liveServers.find((server) =>
-                findLivePlayer(server.players, resolvedProfile.username)
-                || findLivePlayer(server.players, String(resolvedProfile.id)),
-            );
-
-            setPresence({
-                inGame: Boolean(matchingServer),
-                jobId: matchingServer?.id || null,
-            });
-
-            setLogs(normalizeDashboardLogs(logsRes.data));
-        } catch (loadError) {
-            setError(String(loadError instanceof Error ? loadError.message : loadError));
-        } finally {
-            if (showLoader) {
-                setLoading(false);
-            }
+            return {
+                warning: profileLoadWarning,
+                profile: {
+                    id: fallbackId,
+                    username: decodedUsername,
+                    displayName: decodedUsername,
+                    description: profileLoadWarning,
+                    created: '',
+                    avatarUrl: fallbackId ? buildAvatarFallback(fallbackId) : '',
+                },
+            };
         }
-    }
+    }, [decodedUsername, guildId]);
+
+    const loadDashboardData = useCallback(async (resolvedProfile: RobloxPlayerProfile) => {
+        const [serverConfigRes, liveServersRes, logsRes] = await Promise.all([
+            fetch(`/api/dashboard/server-config?serverId=${encodeURIComponent(guildId)}`, { cache: 'no-store' }),
+            fetch(`/api/dashboard/live-servers?serverId=${encodeURIComponent(guildId)}`, { cache: 'no-store' }),
+            fetch(`/api/dashboard/logs?serverId=${encodeURIComponent(guildId)}&target=${encodeURIComponent(resolvedProfile.username)}&limit=20`, { cache: 'no-store' }),
+        ]);
+
+        const serverConfig = serverConfigRes.ok ? await serverConfigRes.json() as ServerPlaceConfig | null : null;
+        if (serverConfig?.place_id) {
+            setLinkedPlaceId(serverConfig.place_id);
+        } else {
+            setLinkedPlaceId(null);
+        }
+
+        const liveServersData = liveServersRes.ok ? await liveServersRes.json() : [];
+        const liveServers = Array.isArray(liveServersData) ? liveServersData as LiveServerRecord[] : [];
+        const matchingServer = liveServers.find((server) =>
+            findLivePlayer(server.players, resolvedProfile.username)
+            || findLivePlayer(server.players, String(resolvedProfile.id)),
+        );
+
+        setPresence({
+            inGame: Boolean(matchingServer),
+            jobId: matchingServer?.id || null,
+        });
+
+        setLogs(normalizeDashboardLogs(logsRes.ok ? await logsRes.json() : []));
+    }, [guildId]);
 
     useEffect(() => {
-        loadPlayerPage();
-        const interval = setInterval(() => {
-            loadPlayerPage(false);
-        }, 15000);
+        let cancelled = false;
+        let interval: ReturnType<typeof setInterval> | null = null;
 
-        return () => clearInterval(interval);
-    }, [guildId, decodedUsername]);
+        async function loadInitialPlayerPage() {
+            if (!guildId || !decodedUsername) {
+                return;
+            }
+
+            setLoading(true);
+            setError(null);
+
+            try {
+                const { profile: resolvedProfile, warning: profileLoadWarning } = await resolveRobloxProfile();
+                if (cancelled) {
+                    return;
+                }
+
+                setPlayer(resolvedProfile);
+                if (profileLoadWarning) {
+                    setNotice({
+                        type: 'error',
+                        text: `Roblox profile details could not be loaded: ${profileLoadWarning}. Commands are still available when your permissions allow them.`,
+                    });
+                }
+
+                await loadDashboardData(resolvedProfile);
+                if (cancelled) {
+                    return;
+                }
+
+                interval = setInterval(() => {
+                    loadDashboardData(resolvedProfile).catch((refreshError) => {
+                        console.error('[Player Page] Failed to refresh dashboard data:', refreshError);
+                    });
+                }, 15000);
+            } catch (loadError) {
+                if (!cancelled) {
+                    setError(String(loadError instanceof Error ? loadError.message : loadError));
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        }
+
+        loadInitialPlayerPage();
+
+        return () => {
+            cancelled = true;
+            if (interval) {
+                clearInterval(interval);
+            }
+        };
+    }, [guildId, decodedUsername, loadDashboardData, resolveRobloxProfile]);
 
     async function sendPlayerCommand(commandId: string, extraArgs: Record<string, unknown> = {}, confirmMessage?: string) {
         if (!guildId || !player) {
@@ -206,7 +255,7 @@ export default function DashboardPlayerPage() {
                 text: trimString(payload.warning) || `${commandId} queued for ${player.username}.`,
             });
 
-            await loadPlayerPage(false);
+            await loadDashboardData(player);
         } catch (commandError) {
             setNotice({ type: 'error', text: `Failed to send command: ${String(commandError)}` });
         } finally {
@@ -219,10 +268,11 @@ export default function DashboardPlayerPage() {
     const availableModerationCommands = moderationCommands.filter((command) => canUseDashboardCommand(perms, command.id));
     const availableTargetCommands = TARGETED_PLAYER_COMMANDS.filter((command) => canUseDashboardCommand(perms, command.id));
     const quickTargetCommands = availableTargetCommands.filter((command) =>
-        command.id !== 'SET_CHAR' && !valueCommandSet.has(command.id),
+        command.id !== 'SET_CHAR' && command.id !== 'TEAM' && !valueCommandSet.has(command.id),
     );
     const valueCommands = availableTargetCommands.filter((command) => valueCommandSet.has(command.id));
     const setCharCommand = availableTargetCommands.find((command) => command.id === 'SET_CHAR') || null;
+    const teamCommand = availableTargetCommands.find((command) => command.id === 'TEAM') || null;
 
     if (error || !player) {
         return (
@@ -249,14 +299,16 @@ export default function DashboardPlayerPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                    <a
-                        href={`https://www.roblox.com/users/${player.id}/profile`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-300 transition-all hover:border-sky-500/30 hover:text-white"
-                    >
-                        Open Profile
-                    </a>
+                    {player.id > 0 && (
+                        <a
+                            href={`https://www.roblox.com/users/${player.id}/profile`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-300 transition-all hover:border-sky-500/30 hover:text-white"
+                        >
+                            Open Profile
+                        </a>
+                    )}
                     {presence.inGame && presence.jobId && linkedPlaceId ? (
                         <a
                             href={`roblox://placeId=${linkedPlaceId}&gameInstanceId=${presence.jobId}`}
@@ -283,11 +335,17 @@ export default function DashboardPlayerPage() {
                         <div className={`h-28 bg-gradient-to-r ${player.isBanned ? 'from-red-700 to-rose-900' : presence.inGame ? 'from-emerald-600 to-teal-700' : 'from-sky-600 to-indigo-700'}`}></div>
                         <div className="px-6 pb-6 -mt-14">
                             <div className="inline-flex rounded-3xl border border-slate-800 bg-[#020617] p-2">
-                                <img
-                                    src={player.avatarUrl}
-                                    alt={player.username}
-                                    className="h-24 w-24 rounded-2xl border border-slate-800 bg-slate-900 object-cover"
-                                />
+                                {player.avatarUrl ? (
+                                    <img
+                                        src={player.avatarUrl}
+                                        alt={player.username}
+                                        className="h-24 w-24 rounded-2xl border border-slate-800 bg-slate-900 object-cover"
+                                    />
+                                ) : (
+                                    <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-3xl font-black text-slate-500">
+                                        {player.username.slice(0, 1).toUpperCase()}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="mt-4 space-y-4">
@@ -424,7 +482,7 @@ export default function DashboardPlayerPage() {
                             </div>
                         )}
 
-                        {(setCharCommand || valueCommands.length > 0) && (
+                        {(setCharCommand || teamCommand || valueCommands.length > 0) && (
                             <div className="mt-6 grid gap-4 xl:grid-cols-2">
                                 {setCharCommand && (
                                     <div className="rounded-2xl border border-slate-800 bg-black/20 p-4">
@@ -445,6 +503,30 @@ export default function DashboardPlayerPage() {
                                                 className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
                                             >
                                                 {actionLoading === 'SET_CHAR' ? 'Sending...' : 'Apply'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {teamCommand && (
+                                    <div className="rounded-2xl border border-slate-800 bg-black/20 p-4">
+                                        <p className="text-xs font-black uppercase tracking-widest text-white">{teamCommand.label}</p>
+                                        <p className="mt-2 text-[11px] font-medium text-slate-500">{teamCommand.description}</p>
+                                        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                                            <input
+                                                type="text"
+                                                value={teamValue}
+                                                onChange={(event) => setTeamValue(event.target.value)}
+                                                placeholder="Roblox team name"
+                                                className="flex-1 rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600"
+                                            />
+                                            <button
+                                                type="button"
+                                                disabled={actionLoading === 'TEAM' || !presence.inGame || !trimString(teamValue)}
+                                                onClick={() => sendPlayerCommand('TEAM', { team_name: trimString(teamValue) })}
+                                                className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                                            >
+                                                {actionLoading === 'TEAM' ? 'Sending...' : 'Apply'}
                                             </button>
                                         </div>
                                     </div>

@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
-import { supabase } from "@/lib/supabase";
-
 const INSTALLER_PLUGIN_URL = "https://create.roblox.com/store/asset/87859041511603/RoLink-installer";
 
 const SearchIcon = () => (
@@ -60,6 +58,13 @@ type DashboardGuild = {
     permissions?: string;
 };
 
+type ServerSetupConfig = {
+    api_key?: string | null;
+    place_id?: string | null;
+    universe_id?: string | null;
+    open_cloud_key?: string | null;
+};
+
 type SessionUserWithId = {
     id?: string;
 };
@@ -95,14 +100,13 @@ export default function DashboardSetupPage() {
 
             setIsReadOnly(false);
 
-            const { data, error: serverError } = await supabase
-                .from("servers")
-                .select("*")
-                .eq("id", id)
-                .single();
+            const configRes = await fetch(`/api/dashboard/server-config?serverId=${encodeURIComponent(String(id))}`, {
+                cache: 'no-store',
+            });
+            const data = configRes.ok ? await configRes.json() as ServerSetupConfig | null : null;
 
-            if (data && !serverError) {
-                setApiKey(data.api_key);
+            if (data) {
+                setApiKey(data.api_key || "");
                 setPlaceId(data.place_id || "");
                 setUniverseId(data.universe_id || "");
                 setOpenCloudKey(data.open_cloud_key || "");
@@ -120,25 +124,26 @@ export default function DashboardSetupPage() {
         setLoading(true);
         setError(null);
 
-        const resolvedApiKey = apiKey.trim() || `rl_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+        const response = await fetch('/api/dashboard/server-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                serverId: id,
+                placeId,
+                universeId,
+                openCloudKey,
+                apiKey,
+            }),
+        });
+        const payload = await response.json().catch(() => ({}));
 
-        const { error: dbError } = await supabase
-            .from("servers")
-            .upsert({
-                id,
-                place_id: placeId,
-                universe_id: universeId,
-                open_cloud_key: openCloudKey,
-                api_key: resolvedApiKey
-            });
-
-        if (dbError) {
-            setError(dbError.message);
+        if (!response.ok) {
+            setError(String(payload.error || 'Failed to save setup.'));
             setLoading(false);
             return;
         }
 
-        setApiKey(resolvedApiKey);
+        setApiKey(String(payload.api_key || ""));
         setStep(2);
         setLoading(false);
     }
@@ -163,7 +168,7 @@ export default function DashboardSetupPage() {
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className={`w-full transition-all duration-700 ${step === 1 ? "max-w-md mx-auto mt-20" : "max-w-7xl"}`}>
                 {step === 1 ? (
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-10 shadow-3xl">
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 shadow-3xl">
                         <div className="w-12 h-12 bg-sky-600/10 rounded-lg flex items-center justify-center text-sky-500 mb-8 border border-sky-500/10">
                             <SearchIcon />
                         </div>
@@ -224,8 +229,8 @@ export default function DashboardSetupPage() {
                         </form>
                     </div>
                 ) : (
-                    <div className="bg-slate-900 border border-slate-800 rounded-[1.5rem] p-10 shadow-3xl border-l-sky-600 border-l-4">
-                        <div className="flex flex-col lg:flex-row gap-12">
+                    <div className="bg-slate-900 border border-slate-800 rounded-[1.5rem] p-5 sm:p-6 md:p-8 xl:p-10 shadow-3xl border-l-sky-600 border-l-4">
+                        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-12">
                             <div className="flex-1">
                                 <div className="flex items-center gap-4 mb-10">
                                     <div className="w-12 h-12 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-500 border border-emerald-500/10">

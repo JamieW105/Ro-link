@@ -1,6 +1,5 @@
 'use client';
 
-import { supabase } from "@/lib/supabase";
 import { hasAdminPanelCommandAccess } from "@/lib/adminPanelCommands";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -60,8 +59,8 @@ export default function ReportDetailsPage() {
                 console.error("Failed to fetch guild names:", error);
             }
 
-            // 1. Fetch Report Details
-            const reportResponse = await fetch(`/api/reports/${encodeURIComponent(String(reportId))}?serverId=${encodeURIComponent(String(id))}`, {
+            // 1. Fetch report details, linked profile, and moderation history.
+            const reportResponse = await fetch(`/api/reports/${encodeURIComponent(String(reportId))}/context?serverId=${encodeURIComponent(String(id))}`, {
                 cache: 'no-store',
             });
 
@@ -71,39 +70,12 @@ export default function ReportDetailsPage() {
                 return;
             }
 
-            const reportData = await reportResponse.json();
+            const contextData = await reportResponse.json();
+            const reportData = contextData.report;
             setReport(reportData);
             setReason(`Re: Report #${reportData.id.slice(0, 8)} - ${reportData.reason}`);
-
-            // 2. Fetch Linked Profiles (Verified Users)
-            // Try to find by Roblox Username OR Discord ID
-            const isDiscordId = /^\d{17,20}$/.test(reportData.reported_roblox_username);
-
-            let profileQuery = supabase.from('verified_users').select('*');
-            if (isDiscordId) {
-                profileQuery = profileQuery.eq('discord_id', reportData.reported_roblox_username);
-            } else {
-                profileQuery = profileQuery.ilike('roblox_username', reportData.reported_roblox_username);
-            }
-
-            const { data: profileData } = await profileQuery.maybeSingle();
-            setProfiles(profileData);
-
-            // 3. Fetch Global Moderation Logs
-            // Search logs for the reported target OR the linked Roblox username if found.
-            // Do not join against servers here; some deployments do not expose a usable logs->servers relationship.
-            const searchTargets = [reportData.reported_roblox_username];
-            if (profileData?.roblox_username) searchTargets.push(profileData.roblox_username);
-
-            const { data: logsData } = await supabase
-                .from('logs')
-                .select('*')
-                .in('target', searchTargets)
-                .order('timestamp', { ascending: false });
-
-            if (logsData) {
-                setLogs(normalizeDashboardLogs(logsData));
-            }
+            setProfiles(contextData.profile || null);
+            setLogs(normalizeDashboardLogs(contextData.logs));
 
             setLoading(false);
         }
@@ -261,7 +233,7 @@ export default function ReportDetailsPage() {
     }
 
     return (
-        <div className="space-y-8 max-w-5xl animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="space-y-6 md:space-y-8 max-w-5xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             {/* Header / Nav */}
             <div>
                 <Link href={`/dashboard/${id}/reports`} className="inline-flex items-center gap-2 text-slate-500 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest mb-4">
@@ -283,11 +255,11 @@ export default function ReportDetailsPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 xl:gap-8">
                 {/* Main Content: Info & Evidence */}
                 <div className="lg:col-span-2 space-y-6">
                     {/* Report Information */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8 backdrop-blur-md">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 sm:p-6 md:p-8 backdrop-blur-md">
                         <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-3">
                             <div className="p-2 bg-red-600/10 rounded-lg text-red-500 border border-red-500/10">
                                 <ShieldIcon />
@@ -307,7 +279,7 @@ export default function ReportDetailsPage() {
                                 </div>
                             </div>
 
-                            <div className="bg-slate-800/30 p-6 rounded-xl border border-slate-700/50">
+                            <div className="bg-slate-800/30 p-4 sm:p-6 rounded-xl border border-slate-700/50">
                                 <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Detailed Reason / Evidence</label>
                                 <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{report.reason}</p>
                             </div>
@@ -326,7 +298,7 @@ export default function ReportDetailsPage() {
                     </div>
 
                     {/* Global History */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8 backdrop-blur-md">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 sm:p-6 md:p-8 backdrop-blur-md">
                         <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-3">
                             <div className="p-2 bg-amber-600/10 rounded-lg text-amber-500 border border-amber-500/10">
                                 <ShieldIcon />
@@ -369,7 +341,7 @@ export default function ReportDetailsPage() {
                     {/* User Profile Card */}
                     <div className="bg-[#020617] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
                         <div className="h-20 bg-gradient-to-r from-red-900 to-slate-900"></div>
-                        <div className="px-6 pb-6 -mt-10">
+                        <div className="px-4 sm:px-6 pb-4 sm:pb-6 -mt-10">
                             <div className="relative inline-block">
                                 <img
                                     src={profiles?.roblox_id
@@ -436,7 +408,7 @@ export default function ReportDetailsPage() {
                     </div>
 
                     {/* Action Panel */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-md">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 sm:p-6 backdrop-blur-md">
                         <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
                             <ShieldIcon /> Take Action
                         </h3>

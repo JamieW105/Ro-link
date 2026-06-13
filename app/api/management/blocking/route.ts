@@ -3,12 +3,18 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { hasPermission } from "@/lib/management";
 import { supabase } from "@/lib/supabase";
+import { createStaffActionForumThread } from "@/lib/staffForumNotifications";
+import {
+    createStaffModerationAction,
+    recordStaffModerationActionLog,
+    updateStaffModerationActionForumThread,
+} from "@/lib/staffModerationActions";
 
 export async function GET() {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const userId = (session.user as any).id;
+    const userId = String((session.user as { id?: string }).id ?? '');
     if (!(await hasPermission(userId, 'BLOCK_SERVERS'))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -26,7 +32,7 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const userId = (session.user as any).id;
+    const userId = String((session.user as { id?: string }).id ?? '');
     if (!(await hasPermission(userId, 'BLOCK_SERVERS'))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -48,6 +54,26 @@ export async function POST(req: Request) {
         const ownerId = guildData.owner_id;
         const guildName = guildData.name;
 
+        const { data: existingBlock, error: existingBlockError } = await supabase
+            .from('blocked_servers')
+            .select('guild_id')
+            .eq('guild_id', guildId)
+            .maybeSingle();
+
+        if (existingBlockError) throw existingBlockError;
+        if (existingBlock) {
+            return NextResponse.json({ error: 'Server is already blocked from Ro-Link.' }, { status: 409 });
+        }
+
+        const action = await createStaffModerationAction({
+            actionType: 'blocked',
+            guildId,
+            guildName,
+            ownerId,
+            staffDiscordId: userId,
+            reason,
+        });
+
         // 2. Add to blocked_servers
         const { data, error } = await supabase
             .from('blocked_servers')
@@ -56,12 +82,42 @@ export async function POST(req: Request) {
                 guild_name: guildName,
                 owner_id: ownerId,
                 reason: reason,
-                blocked_by: userId
+                blocked_by: userId,
+                moderation_action_id: action.id
             })
             .select()
             .single();
 
         if (error) throw error;
+
+        try {
+            await recordStaffModerationActionLog({
+                action,
+                logAction: 'RO_LINK_BLOCKED',
+                target: guildId,
+            });
+        } catch (logErr) {
+            console.error("[Management/Blocking] Failed to record staff moderation log:", logErr);
+        }
+
+        try {
+            const thread = await createStaffActionForumThread({
+                actionType: 'blocked',
+                actionId: action.id,
+                guildId,
+                guildName,
+                ownerId,
+                staffDiscordId: userId,
+                reason,
+            });
+            await updateStaffModerationActionForumThread(action.id, thread.id).catch((updateErr) => {
+                console.error("[Management/Blocking] Failed to store staff forum thread:", updateErr);
+            });
+        } catch (threadErr) {
+            console.error("[Management/Blocking] Failed to create staff forum thread:", threadErr);
+        }
+
+        const actionReferenceId = action.id;
 
         // 3. DM the owner about the block
         if (ownerId && botToken) {
@@ -83,8 +139,10 @@ export async function POST(req: Request) {
                                 description: `Your server **${guildName}** has been blocked from using Ro-Link.`,
                                 color: 0xff4444,
                                 fields: [
+                                    { name: 'Reference', value: `\`${actionReferenceId}\`` },
                                     { name: 'Reason', value: reason || 'Violation of terms.' },
-                                    { name: 'Action', value: 'The bot has left your server and all data has been wiped.' }
+                                    { name: 'Action', value: 'The bot has left your server and all data has been wiped.' },
+                                    { name: 'Support Server', value: 'https://discord.gg/C3n4nAwYMw' }
                                 ],
                                 timestamp: new Date().toISOString()
                             }]

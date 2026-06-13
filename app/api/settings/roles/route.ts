@@ -53,14 +53,15 @@ export async function POST(req: Request) {
             server_id: serverId,
             discord_role_id: discordRoleId,
             role_name: roleName,
-            can_access_dashboard: permissions.access_dashboard,
-            can_kick: permissions.kick,
-            can_ban: permissions.ban,
-            can_timeout: permissions.timeout,
-            can_mute: permissions.mute,
-            can_lookup: permissions.lookup,
-            can_manage_settings: permissions.manage_settings,
-            can_manage_reports: permissions.manage_reports,
+            can_access_dashboard: permissions.access_dashboard === true,
+            can_access_live_panel: permissions.live_panel === true,
+            can_kick: permissions.kick === true,
+            can_ban: permissions.ban === true,
+            can_timeout: permissions.timeout === true,
+            can_mute: permissions.mute === true,
+            can_lookup: permissions.lookup === true,
+            can_manage_settings: permissions.manage_settings === true,
+            can_manage_reports: permissions.manage_reports === true,
             allowed_misc_cmds: normalizedPanelCommands
         }, { onConflict: 'server_id, discord_role_id' }) // Constraint name might be needed or handled automatically if standard UNIQUE INDEX exists
         .select()

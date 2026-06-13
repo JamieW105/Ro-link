@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, type ReactNode, type SVGProps } from 'react';
+import { isValidElement, useEffect, useMemo, useRef, useState, type ReactNode, type SVGProps } from 'react';
 
 type IconComponent = (props: SVGProps<SVGSVGElement>) => ReactNode;
 type DocCategory = 'Platform' | 'Operations' | 'Configuration' | 'Developer';
@@ -26,6 +26,32 @@ type DocPage = {
     stats: StatItem[];
     toc: TocItem[];
     content: ReactNode;
+};
+
+type SearchableElementProps = {
+    children?: ReactNode;
+    title?: ReactNode;
+    description?: ReactNode;
+    eyebrow?: ReactNode;
+    label?: ReactNode;
+    value?: ReactNode;
+    items?: ReactNode[];
+    headers?: ReactNode[];
+    rows?: ReactNode[][];
+};
+
+type DocSearchEntry = {
+    key: string;
+    pageId: string;
+    sectionId: string | null;
+    title: string;
+    subtitle: string;
+    body: string;
+    tokens: string;
+};
+
+type DocSearchResult = DocSearchEntry & {
+    score: number;
 };
 
 const INSTALLER_PLUGIN_URL = 'https://create.roblox.com/store/asset/87859041511603/RoLink-installer';
@@ -232,19 +258,19 @@ function CodeBlock({ children, label }: { children: ReactNode; label: string }) 
     }
 
     return (
-        <div className="overflow-hidden rounded-[18px] border border-white/10 bg-[#111827]">
+        <div className="min-w-0 overflow-hidden rounded-[18px] border border-white/10 bg-[#111827]">
             <div className="flex items-center justify-between border-b border-white/8 bg-white/[0.02] px-4 py-3">
-                <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{label}</span>
+                <span className="min-w-0 truncate pr-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{label}</span>
                 <button
                     type="button"
                     onClick={copyToClipboard}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-slate-400 transition-colors hover:text-white"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-slate-400 transition-colors hover:text-white"
                 >
                     {copied ? <Icons.Check className="h-3.5 w-3.5 text-emerald-400" /> : <Icons.Copy className="h-3.5 w-3.5" />}
                     {copied ? 'Copied' : 'Copy'}
                 </button>
             </div>
-            <pre id={codeId} className="overflow-x-auto p-4 text-sm leading-7 text-slate-300">
+            <pre id={codeId} className="custom-scrollbar w-full max-w-full overflow-x-auto p-4 text-sm leading-7 text-slate-300">
                 <code>{children}</code>
             </pre>
         </div>
@@ -292,6 +318,44 @@ function DataTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
                 </tbody>
             </table>
         </div>
+    );
+}
+
+function InfoGrid({
+    items,
+    columns = 'md:grid-cols-3',
+}: {
+    items: Array<{ title: string; description: string; meta?: string }>;
+    columns?: string;
+}) {
+    return (
+        <div className={cn('grid gap-4', columns)}>
+            {items.map((item) => (
+                <div key={item.title} className="rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+                    {item.meta && <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-sky-400/85">{item.meta}</p>}
+                    <h3 className="mt-2 text-base font-semibold text-white first:mt-0">{item.title}</h3>
+                    <p className="mt-2 text-sm leading-7 text-slate-400">{item.description}</p>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function StepList({ steps }: { steps: Array<{ title: string; description: string }> }) {
+    return (
+        <ol className="space-y-3">
+            {steps.map((step, index) => (
+                <li key={step.title} className="flex gap-4 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sky-500/25 bg-sky-500/10 text-sm font-bold text-sky-300">
+                        {index + 1}
+                    </span>
+                    <div>
+                        <h3 className="text-sm font-semibold text-white">{step.title}</h3>
+                        <p className="mt-1 text-sm leading-7 text-slate-400">{step.description}</p>
+                    </div>
+                </li>
+            ))}
+        </ol>
     );
 }
 
@@ -367,6 +431,89 @@ function NavButton({
     );
 }
 
+function normalizeSearchText(value: string) {
+    return value.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function collectSearchText(node: ReactNode): string {
+    if (node === null || node === undefined || typeof node === 'boolean') return '';
+    if (typeof node === 'string' || typeof node === 'number') return String(node);
+    if (Array.isArray(node)) return node.map(collectSearchText).filter(Boolean).join(' ');
+
+    if (isValidElement<SearchableElementProps>(node)) {
+        const props = node.props;
+        const values: ReactNode[] = [props.eyebrow, props.title, props.description, props.label, props.value, props.children];
+
+        if (Array.isArray(props.items)) values.push(...props.items);
+        if (Array.isArray(props.headers)) values.push(...props.headers);
+        if (Array.isArray(props.rows)) values.push(...props.rows.flat());
+
+        return values.map(collectSearchText).filter(Boolean).join(' ');
+    }
+
+    return '';
+}
+
+function buildSearchEntries(pages: DocPage[]): DocSearchEntry[] {
+    return pages.flatMap((page) => {
+        const pageBody = [
+            page.eyebrow,
+            page.summary,
+            page.category,
+            ...page.stats.flatMap((stat) => [stat.label, stat.value]),
+            ...page.toc.map((item) => item.title),
+            collectSearchText(page.content),
+        ].join(' ');
+
+        const pageEntry: DocSearchEntry = {
+            key: page.id,
+            pageId: page.id,
+            sectionId: null,
+            title: page.title,
+            subtitle: page.category,
+            body: pageBody,
+            tokens: normalizeSearchText(`${page.title} ${pageBody}`),
+        };
+
+        const sectionEntries = page.toc.map((section) => {
+            const body = `${page.title} ${page.summary} ${page.category} ${section.title} ${pageBody}`;
+
+            return {
+                key: `${page.id}/${section.id}`,
+                pageId: page.id,
+                sectionId: section.id,
+                title: section.title,
+                subtitle: page.title,
+                body,
+                tokens: normalizeSearchText(body),
+            };
+        });
+
+        return [pageEntry, ...sectionEntries];
+    });
+}
+
+function scoreSearchEntry(entry: DocSearchEntry, query: string, queryParts: string[]) {
+    const title = normalizeSearchText(entry.title);
+    const subtitle = normalizeSearchText(entry.subtitle);
+    let score = 0;
+
+    if (title === query) score += 120;
+    if (title.startsWith(query)) score += 80;
+    if (title.includes(query)) score += 50;
+    if (subtitle.includes(query)) score += 25;
+    if (entry.tokens.includes(query)) score += 15;
+
+    for (const part of queryParts) {
+        if (title.includes(part)) score += 16;
+        else if (subtitle.includes(part)) score += 8;
+        else if (entry.tokens.includes(part)) score += 4;
+    }
+
+    if (!entry.sectionId) score += 5;
+    return score;
+}
+
 const commandGroups = [
     {
         title: 'Moderation',
@@ -394,6 +541,30 @@ const commandGroups = [
             { name: 'Custom misc actions', args: '{ username: string, ... }', description: 'Your dashboard may expose additional game-specific actions if your integration supports them.' },
         ],
     },
+] as const;
+
+const moduleDeveloperFunctions = [
+    ['Module', 'table', 'Published marketplace module metadata for the currently running module.'],
+    ['Config', 'table', 'Parsed CONFIG schema declared at the top of the uploaded module source.'],
+    ['Settings', 'table', 'Per-server settings configured from the dashboard module install page.'],
+    ['Services', 'table', 'Whitelisted Roblox services such as Players, HttpService, ReplicatedStorage, RunService, Workspace, Lighting, MessagingService, and ServerScriptService.'],
+    ['RegisterCommand(commandName, handler)', 'function', 'Adds a custom command handler. Handlers receive command payload, context, and args.'],
+    ['RegisterPanelCommand(definition, handler)', 'function', 'Registers a module command and exposes it in the in-game Cmds panel with title, description, target, and field metadata.'],
+    ['OnAdminPanelOpened(handler)', 'function', 'Runs when an authorized user opens the in-game admin panel. Handler receives player, payload, and context.'],
+    ['OnCommandBarOpened(handler)', 'function', 'Runs when an authorized user opens the in-game command bar. Handler receives player, payload, and context.'],
+    ['SendBotMessage(target, user, channelId, content)', 'function', 'Sends a Discord bot message through Ro-Link after validating the server, channel, or member target.'],
+    ['GetDiscordChannels()', 'function', 'Returns sendable Discord channels for the current server.'],
+    ['GetUserData(user)', 'function', 'Returns Roblox user data, server role rank, and linked Discord user/member data when the user is linked.'],
+    ['GetReports(options)', 'function', 'Reads reports for the current server. options can include status, limit, target, or reporter.'],
+    ['GetReport(reportId)', 'function', 'Reads one report from the current server.'],
+    ['CreateReport(body)', 'function', 'Creates a pending report for the current server.'],
+    ['UpdateReport(reportId, updates)', 'function', 'Edits report status, notes, target, reason, or moderator fields for the current server.'],
+    ['CreateUI(target, functionOrTree, props)', 'function', 'Creates Roblox UI for one player, all players, or a target list. Installed modules should pass a function or UI tree table.'],
+    ['_G.RoLinkModuleUI.Bind(guiObject, handler, options)', 'function', 'Binds client UI input from CreateUI instances back to server-side module code.'],
+    ['FindPlayer(target)', 'function', 'Finds one live Roblox player by Player instance, username, or UserId.'],
+    ['GetPlayers()', 'function', 'Returns the current live Players list.'],
+    ['Notify(target, message, success)', 'function', 'Shows admin-panel feedback where the Studio package exposes the feedback remote.'],
+    ['Log(...)', 'function', 'Prints a namespaced marketplace module log line.'],
 ] as const;
 
 const docsPages: DocPage[] = [
@@ -1003,6 +1174,597 @@ const docsPages: DocPage[] = [
         ),
     },
     {
+        id: 'module-developer-api',
+        category: 'Developer',
+        eyebrow: 'Module Runtime',
+        title: 'Module Developer API',
+        summary: 'Use this page to understand what a Ro-Link module file looks like, how dashboard settings reach Roblox, and which context helpers are available for commands, reports, Discord messages, user data, and player UI.',
+        icon: Icons.Terminal,
+        stats: [
+            { label: 'Runtime object', value: 'context' },
+            { label: 'Upload surface', value: 'Management portal' },
+            { label: 'Loaded by', value: 'Roblox admin panel' },
+        ],
+        toc: [
+            { id: 'module-api-overview', title: 'How modules work' },
+            { id: 'module-api-config', title: 'Configuration' },
+            { id: 'module-api-live-inputs', title: 'Live input dropdowns' },
+            { id: 'module-api-functions', title: 'Context functions' },
+            { id: 'module-api-command-panel', title: 'Cmds panel commands' },
+            { id: 'module-api-reports', title: 'Reports data' },
+            { id: 'module-api-discord', title: 'Discord messages' },
+            { id: 'module-api-user-data', title: 'Linked users' },
+            { id: 'module-api-lifecycle', title: 'Lifecycle hooks' },
+            { id: 'module-api-ui', title: 'CreateUI' },
+            { id: 'module-api-example', title: 'Full example' },
+        ],
+        content: (
+            <div className="space-y-6">
+                <SectionCard
+                    id="module-api-overview"
+                    eyebrow="Structure"
+                    title="How a marketplace module runs"
+                    description="A module is uploaded once, reviewed by staff, enabled per Discord server, then installed into Roblox by the Studio plugin. The uploaded Luau returns a table of hooks and commands. Ro-Link provides the context object at runtime."
+                >
+                    <InfoGrid
+                        items={[
+                            {
+                                meta: 'You upload',
+                                title: 'Module source',
+                                description: 'The Luau file contains an optional CONFIG table and returns Init, Commands, LiveConfig, and other handlers.',
+                            },
+                            {
+                                meta: 'Server owners set',
+                                title: 'Dashboard config',
+                                description: 'Each Discord server can save different settings for the same published module from Dashboard > Modules.',
+                            },
+                            {
+                                meta: 'Roblox receives',
+                                title: 'Runtime context',
+                                description: 'When the admin panel loads the module, Ro-Link passes context, settings, APIs, report helpers, Discord helpers, and UI helpers.',
+                            },
+                        ]}
+                    />
+
+                    <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+                        <div className="space-y-5">
+                            <StepList
+                                steps={[
+                                    {
+                                        title: 'Declare CONFIG only for dashboard fields.',
+                                        description: 'CONFIG describes the form Ro-Link should show. It is schema, not live game state.',
+                                    },
+                                    {
+                                        title: 'Return a module table.',
+                                        description: 'Put startup work in Init and command handlers in Commands or RegisterPanelCommand.',
+                                    },
+                                    {
+                                        title: 'Use context for every Ro-Link action.',
+                                        description: 'The context object is the stable bridge to Discord, reports, players, notifications, and module UI.',
+                                    },
+                                ]}
+                            />
+                            <Callout title="Keep these separate" tone="info">
+                                <InlineCode>context.Config</InlineCode> is the field schema. <InlineCode>context.Settings</InlineCode> is the saved value for the current Discord server. Use <InlineCode>settings</InlineCode> or <InlineCode>context.Settings</InlineCode> when your module needs an actual configured value.
+                            </Callout>
+                        </div>
+                        <CodeBlock label="Minimal module shape">
+                            {`CONFIG = {
+    Version = "1.0.0",
+    Debug_UI = {
+        Short_Description = "Show extra module UI.",
+        Type = "Bool",
+        Default = true,
+        Options = {}
+    },
+    Theme = {
+        Short_Description = "Dashboard-selected module theme.",
+        Type = "Dropdown",
+        Default = "Sky",
+        Options = { "Sky", "Emerald", "Amber" }
+    },
+    Welcome_Message = {
+        Short_Description = "Message shown by the module.",
+        Type = "String",
+        Default = "Welcome to the server.",
+        Options = {}
+    },
+    Announcement = {
+        Short_Description = "Message to send immediately to live servers.",
+        Type = "String",
+        Default = "",
+        LIVE = true,
+        ButtonText = "Send",
+        Options = {}
+    },
+    Max_Open_Reports = {
+        Short_Description = "Maximum open reports to show in module UI.",
+        Type = "Integer",
+        Default = 10,
+        Options = {}
+    }
+}
+
+return {
+    Init = function(context, settings)
+        context.Log("Loaded", context.Module.name, context.Settings.Debug_UI)
+    end,
+
+    Commands = {
+        hello = function(command, context, args)
+            context.Log("Hello command ran", command, args)
+        end
+    }
+}`}
+                        </CodeBlock>
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-config"
+                    eyebrow="Configuration"
+                    title="Get module config from Ro-Link"
+                    description="A module declares configurable fields with CONFIG. Ro-Link turns that schema into a per-server dashboard form, saves the selected values, then passes those saved values back into Roblox."
+                >
+                    <InfoGrid
+                        columns="md:grid-cols-2"
+                        items={[
+                            {
+                                meta: 'Schema',
+                                title: 'CONFIG lives at the top of the file',
+                                description: 'Ro-Link reads CONFIG before the module runs so it can build the dashboard form and know which fields are live actions.',
+                            },
+                            {
+                                meta: 'Values',
+                                title: 'Settings arrive at runtime',
+                                description: 'Saved values are passed to Init as settings and are also available at context.Settings while commands and hooks run.',
+                            },
+                        ]}
+                    />
+
+                    <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+                        <div className="space-y-5">
+                            <Checklist
+                                items={[
+                                    'Declare a top-level CONFIG table in the uploaded module source.',
+                                    'Use Bool, Dropdown, CheckBoxes, Color Wheel, Integer, String, Player, Server, or Group field types.',
+                                    'Set LIVE = true on a field when the dashboard should show a send button instead of saving the value.',
+                                    'Server managers open Dashboard > Modules, choose the module, select Configure, then save the module config for that Discord server.',
+                                    'Read saved values in Roblox from context.Settings or from the second settings argument passed to Init.',
+                                    'Use context.Config only for schema metadata such as field type, default value, options, and description.',
+                                ]}
+                            />
+                            <Callout title="Settings are per server" tone="info">
+                                The same published module can have different saved config values on different Discord servers. Always read the values from the runtime context instead of hard-coding dashboard choices in the module source.
+                            </Callout>
+                            <DataTable
+                                headers={['Field type', 'Dashboard control', 'Runtime value']}
+                                rows={[
+                                    ['Bool', 'Toggle', 'true or false'],
+                                    ['Dropdown', 'Single select menu', 'Selected option string'],
+                                    ['CheckBoxes', 'Multi-select list', 'Array-like table of selected values'],
+                                    ['Color Wheel', 'Color picker', 'Selected color value'],
+                                    ['Integer', 'Number input', 'Number'],
+                                    ['String', 'Text input', 'String'],
+                                    ['Player', 'Searchable Roblox/live player dropdown', 'String or selected player object'],
+                                    ['Server', 'Searchable live server dropdown', 'String or selected server object'],
+                                    ['Group', 'Nested field container', 'Object with subfield values'],
+                                ]}
+                            />
+                        </div>
+                        <CodeBlock label="Read saved module config">
+                            {`return {
+    Init = function(context, settings)
+        local debugEnabled = settings.Debug_UI
+        local theme = context.Settings.Theme
+
+        if debugEnabled then
+            context.Log("Debug UI enabled with theme", theme)
+        end
+    end,
+
+    Commands = {
+        theme = function(command, context)
+            return context.Notify(command.Player, "Theme: " .. tostring(context.Settings.Theme), true)
+        end
+    }
+}`}
+                        </CodeBlock>
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-live-inputs"
+                    eyebrow="Live Config"
+                    title="Use live player and server dropdowns"
+                    description="Live config fields can use special Player and Server inputs. These are meant for one-off dashboard actions: the value is sent to running Roblox servers, not saved into context.Settings."
+                >
+                    <InfoGrid
+                        columns="md:grid-cols-2"
+                        items={[
+                            {
+                                meta: 'Server input',
+                                title: 'Type = "Server"',
+                                description: 'Shows a searchable list of live Roblox jobs for the current Discord server. The selected value includes jobId, label, playerCount, updatedAt, and source.',
+                            },
+                            {
+                                meta: 'Player input',
+                                title: 'Type = "Player"',
+                                description: 'Shows a searchable player picker. By default it lists players currently in live servers, and it can be scoped to a selected server with ReferenceKey.',
+                            },
+                        ]}
+                    />
+
+                    <DataTable
+                        headers={['Property', 'Accepted values', 'Use']}
+                        rows={[
+                            ['Type', 'Player, User, RobloxPlayer, PlayerDropdown', 'Creates a player search dropdown.'],
+                            ['Type', 'Server, LiveServer, ServerDropdown, JobId', 'Creates a live server search dropdown.'],
+                            ['OptionSource', 'live-players, current-players, all-live-players', 'Player dropdown backed by all currently live players. This is the default for Type = Player.'],
+                            ['OptionSource', 'live-server-players, selected-server-players, job-players', 'Player dropdown backed only by the server selected in ReferenceKey.'],
+                            ['OptionSource', 'roblox-users, users', 'Player dropdown backed by Roblox user search instead of current live players.'],
+                            ['OptionSource', 'live-servers, servers, jobs', 'Server dropdown backed by currently live Roblox servers. This is the default for Type = Server.'],
+                            ['ReferenceKey', 'Any field key in the same live action', 'Lets a player dropdown read the selected server jobId from another input. Also accepted as DependsOn, ServerField, SourceField, or Reference.'],
+                        ]}
+                    />
+
+                    <div className="grid gap-6 xl:grid-cols-2">
+                        <CodeBlock label="Live action with server and player pickers">
+                            {`CONFIG = {
+    Teleport_Admin = {
+        Label = "Teleport admin to player",
+        Short_Description = "Choose a live server and one player in that server.",
+        Type = "Group",
+        LIVE = true,
+        ButtonText = "Teleport",
+        Fields = {
+            Target_Server = {
+                Label = "Live server",
+                Type = "Server",
+                OptionSource = "live-servers"
+            },
+            Target_Player = {
+                Label = "Player in server",
+                Type = "Player",
+                OptionSource = "live-server-players",
+                ReferenceKey = "Target_Server"
+            }
+        }
+    }
+}
+
+return {
+    LiveConfig = {
+        Teleport_Admin = function(command, context, value)
+            local selectedServer = value.Target_Server
+            local selectedPlayer = value.Target_Player
+
+            context.Log("Server job:", selectedServer.jobId)
+            context.Log("Player:", selectedPlayer.username, selectedPlayer.userId)
+        end
+    }
+}`}
+                        </CodeBlock>
+                        <CodeBlock label="Value received by LiveConfig">
+                            {`-- Server dropdown value
+{
+    jobId = "roblox-job-id",
+    value = "roblox-job-id",
+    label = "Server ABC12345",
+    playerCount = 8,
+    updatedAt = "2026-05-30T10:15:00.000Z",
+    source = "live-servers"
+}
+
+-- Player dropdown value
+{
+    username = "PlayerName",
+    displayName = "Display Name",
+    userId = "123456789",
+    avatarUrl = "https://...",
+    jobId = "roblox-job-id",
+    value = "PlayerName",
+    label = "PlayerName",
+    source = "live-server-players"
+}`}
+                        </CodeBlock>
+                    </div>
+
+                    <Callout title="Live actions are broadcast to live servers" tone="warn">
+                        Pressing the live button queues a <InlineCode>MODULE_LIVE</InlineCode> command for the server&apos;s live Roblox jobs. If your action should only affect the selected job, check <InlineCode>value.Target_Server.jobId</InlineCode> inside the handler and ignore commands running on other jobs.
+                    </Callout>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-functions"
+                    eyebrow="Reference"
+                    title="Context functions and fields"
+                    description="Every module receives a context table. Treat it as the module API: read settings from it, call helpers from it, and avoid reaching into Ro-Link internals directly."
+                >
+                    <DataTable
+                        headers={['Where you are', 'Arguments you get', 'Use it for']}
+                        rows={[
+                            ['Init', 'context, settings', 'Startup work, event hooks, panel commands, cached setup.'],
+                            ['Commands handler', 'command, context, args', 'Run a command from Roblox and respond with Notify, reports, or Discord messages.'],
+                            ['RegisterPanelCommand handler', 'command, commandContext, args', 'Handle a command launched from the in-game Cmds panel.'],
+                            ['LiveConfig handler', 'command, context, value', 'React to a live dashboard action without saving the value as a setting.'],
+                            ['Lifecycle hook', 'player, payload, hookContext', 'Refresh UI or audit when an admin opens the panel or command bar.'],
+                        ]}
+                    />
+                    <DataTable
+                        headers={['Name', 'Type', 'Description']}
+                        rows={moduleDeveloperFunctions.map((row) => [...row])}
+                    />
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-command-panel"
+                    eyebrow="Commands"
+                    title="Register commands in the in-game Cmds panel"
+                    description="Use RegisterPanelCommand when a marketplace module command should be discoverable from the admin command bar. RegisterCommand still works for direct command handling; RegisterPanelCommand adds the UI metadata the command bar needs."
+                >
+                    <CodeBlock label="RegisterPanelCommand">
+                        {`return {
+    Init = function(context)
+        context.RegisterPanelCommand({
+            Name = "flag_report",
+            Title = "Flag Report",
+            Description = "Add a moderator note to a report.",
+            Category = "Reports",
+            TargetRequired = false,
+            Fields = {
+                { id = "reportId", label = "Report ID", required = true },
+                { id = "note", label = "Note", required = true, multiline = true }
+            }
+        }, function(command, commandContext, args)
+            return commandContext.UpdateReport(args.reportId, {
+                moderatorNote = args.note
+            })
+        end)
+    end
+}`}
+                    </CodeBlock>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-reports"
+                    eyebrow="Reports"
+                    title="Read and edit reports for the current server"
+                    description="Report helpers call the Ro-Link game-admin API with the configured server key, so modules can only access reports that belong to the Discord server attached to the running Roblox server."
+                >
+                    <div className="grid gap-6 xl:grid-cols-2">
+                        <CodeBlock label="Read reports">
+                            {`local ok, reports = context.GetReports({
+    status = "PENDING",
+    limit = 25,
+    target = "PlayerName"
+})
+
+if ok then
+    for _, report in ipairs(reports) do
+        context.Log(report.id, report.reported_roblox_username, report.reason)
+    end
+end`}
+                        </CodeBlock>
+                        <CodeBlock label="Update a report">
+                            {`local ok, report = context.UpdateReport(reportId, {
+    status = "RESOLVED",
+    moderatorId = tostring(player.UserId),
+    moderatorNote = "Resolved by module command."
+})
+
+if ok then
+    context.Log("Updated report", report.id)
+end`}
+                        </CodeBlock>
+                        <CodeBlock label="Handle live config actions">
+                            {`CONFIG = {
+    Announcement = {
+        Short_Description = "Send an announcement to live servers.",
+        Type = "String",
+        Default = "",
+        LIVE = true,
+        ButtonText = "Send"
+    }
+}
+
+return {
+    LiveConfig = {
+        Announcement = function(command, context, value)
+            for _, player in ipairs(context.GetPlayers()) do
+                context.Notify(player, tostring(value), true)
+            end
+        end
+    }
+}`}
+                        </CodeBlock>
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-discord"
+                    eyebrow="Discord"
+                    title="Send validated bot messages"
+                    description="SendBotMessage routes through Ro-Link so the server API key is checked and channel IDs are validated against the Discord server attached to that Roblox server."
+                >
+                    <div className="grid gap-6 xl:grid-cols-2">
+                        <CodeBlock label="SendBotMessage signature">
+                            {`local ok, result = context.SendBotMessage(
+    "channel", -- "channel", "serverowner", "user", "dm", or "member"
+    nil,       -- Discord user ID or { discordId = "..." } for user/dm/member targets
+    "123456789012345678", -- channel ID for channel target
+    {
+        PlainText = "Plain text is optional when Embed exists",
+        Embed = {
+            Title = "Optional embed title",
+            Content = "Optional embed body",
+            media = "https://example.com/image.png",
+            Footer = "Footer text",
+            icon = "https://example.com/icon.png",
+            Color = 0x38bdf8
+        }
+    }
+)`}
+                        </CodeBlock>
+                        <div className="space-y-4">
+                            <DataTable
+                                headers={['Target', 'Behavior', 'Validation']}
+                                rows={[
+                                    ['channel', 'Sends to channelId.', 'Channel must belong to the current Discord server and be sendable by the bot.'],
+                                    ['serverowner', 'DMs the Discord server owner.', 'Owner is resolved from Discord for the current server.'],
+                                    ['user, dm, member', 'DMs the provided Discord user.', 'User must be a member of the current Discord server.'],
+                                ]}
+                            />
+                            <Callout title="Embed is optional" tone="info">
+                                Content can include <InlineCode>PlainText</InlineCode>, <InlineCode>Embed</InlineCode>, or both. The runtime also accepts <InlineCode>Footer</InlineCode> or the misspelled <InlineCode>Footor</InlineCode> for compatibility.
+                            </Callout>
+                        </div>
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-user-data"
+                    eyebrow="Users"
+                    title="Read linked user data"
+                    description="GetUserData resolves a Roblox player, username, UserId, or identity table through Ro-Link and returns the linked Discord user/member and server role rank when available."
+                >
+                    <CodeBlock label="GetUserData">
+                        {`local ok, data = context.GetUserData(player)
+
+if ok then
+    context.Log("Roblox user", data.user.robloxUsername, data.user.robloxId)
+
+    if data.linked and data.discordUser then
+        context.Log("Discord user", data.discordUser.username, data.discordUser.id)
+    end
+
+    if data.serverRank then
+        context.Log("Highest role", data.serverRank.highestRole and data.serverRank.highestRole.name or "none")
+        context.Log("Role position", data.serverRank.highestPosition)
+    end
+end`}
+                    </CodeBlock>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-lifecycle"
+                    eyebrow="Hooks"
+                    title="React when admins open the panel or command bar"
+                    description="Lifecycle hooks let a module run code when the in-game UI is opened, which is useful for refreshing module state, showing contextual UI, or sending audit messages."
+                >
+                    <CodeBlock label="Lifecycle hooks">
+                        {`return {
+    Init = function(context)
+        context.OnAdminPanelOpened(function(player, payload, hookContext)
+            context.Log(player.Name .. " opened the admin panel")
+        end)
+
+        context.OnCommandBarOpened(function(player, payload, hookContext)
+            context.Notify(player, "Command bar opened", true)
+        end)
+    end
+}`}
+                    </CodeBlock>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-ui"
+                    eyebrow="UI"
+                    title="Create player UI from a module"
+                    description="CreateUI can target a Player instance, username, UserId, all/server/everyone, or a list of targets. Use the UI interaction bridge when created controls need to send button or textbox events back to module code."
+                >
+                    <div className="grid gap-6 xl:grid-cols-2">
+                        <CodeBlock label="CreateUI with interaction">
+                            {`context.CreateUI(player, function(ui)
+        local frame = ui.Create("Frame", {
+            Size = UDim2.new(0, 320, 0, 120),
+            BackgroundColor3 = Color3.fromRGB(15, 23, 42)
+        })
+
+        ui.Create("TextLabel", {
+            Size = UDim2.fromScale(1, 1),
+            BackgroundTransparency = 1,
+            Text = "Hello from a module",
+            TextColor3 = Color3.fromRGB(255, 255, 255)
+        }, frame)
+
+        local button = ui.Create("TextButton", {
+            Position = UDim2.new(0, 20, 1, -48),
+            Size = UDim2.new(0, 160, 0, 36),
+            Text = "Send ping"
+        }, frame)
+
+        _G.RoLinkModuleUI.Bind(button, function(clickingPlayer, payload)
+            context.Notify(clickingPlayer, "Clicked " .. payload.Name, true)
+        end, {
+            Module = context.Module,
+            Events = { "Activated" }
+        })
+
+        return frame
+end)`}
+                        </CodeBlock>
+                        <CodeBlock label="CreateUI from tree">
+                            {`context.CreateUI("all", {
+    ClassName = "ScreenGui",
+    Properties = { Name = "ModuleNotice", ResetOnSpawn = false },
+    Children = {
+        {
+            ClassName = "TextLabel",
+            Properties = {
+                Size = UDim2.new(0, 260, 0, 48),
+                Text = "Server module loaded"
+            }
+        }
+    }
+})`}
+                        </CodeBlock>
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-example"
+                    eyebrow="Example"
+                    title="Complete module example"
+                    description="This example registers one command, announces lifecycle activity, reads server channels, and sends a Discord message only to channels that belong to the current server."
+                >
+                    <CodeBlock label="Marketplace module example">
+                        {`return {
+    Init = function(context, settings)
+        context.OnAdminPanelOpened(function(player)
+            context.Notify(player, "Marketplace module ready", true)
+        end)
+
+        context.OnCommandBarOpened(function(player)
+            context.Log("Command bar opened by", player.Name)
+        end)
+    end,
+
+    Commands = {
+        announce = function(command, context, args)
+            local ok, channels = context.GetDiscordChannels()
+            if not ok or #channels == 0 then
+                return false, "No sendable Discord channels are available."
+            end
+
+            local channelId = args.channelId or channels[1].id
+            return context.SendBotMessage("channel", nil, channelId, {
+                PlainText = args.message or "Announcement from Roblox",
+                Embed = {
+                    Title = "Ro-Link Module",
+                    Content = "This was sent by a marketplace add-on.",
+                    Footer = "Server validated"
+                }
+            })
+        end
+    }
+}`}
+                    </CodeBlock>
+                </SectionCard>
+            </div>
+        ),
+    },
+    {
         id: 'troubleshooting',
         category: 'Developer',
         eyebrow: 'Troubleshooting',
@@ -1111,6 +1873,10 @@ export default function DocsClientPage() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [pendingSectionId, setPendingSectionId] = useState<string | null>(null);
     const [copiedPageLink, setCopiedPageLink] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const mainContentRef = useRef<HTMLElement>(null);
 
     const activePage = docsPages.find((page) => page.id === activePageId) || docsPages[0];
     const ActivePageIcon = activePage.icon;
@@ -1118,6 +1884,18 @@ export default function DocsClientPage() {
     const previousPage = activePageIndex > 0 ? docsPages[activePageIndex - 1] : null;
     const nextPage = activePageIndex >= 0 && activePageIndex < docsPages.length - 1 ? docsPages[activePageIndex + 1] : null;
     const pagerPages = [previousPage, nextPage].filter((page): page is DocPage => Boolean(page));
+    const searchEntries = useMemo(() => buildSearchEntries(docsPages), []);
+    const searchResults = useMemo(() => {
+        const query = normalizeSearchText(searchQuery);
+        if (!query) return searchEntries.slice(0, 8).map((entry) => ({ ...entry, score: 0 }));
+
+        const queryParts = query.split(' ').filter(Boolean);
+        return searchEntries
+            .map((entry) => ({ ...entry, score: scoreSearchEntry(entry, query, queryParts) }))
+            .filter((entry) => entry.score > 0)
+            .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title))
+            .slice(0, 8);
+    }, [searchEntries, searchQuery]);
 
     useEffect(() => {
         function syncFromHash() {
@@ -1139,6 +1917,29 @@ export default function DocsClientPage() {
     }, []);
 
     useEffect(() => {
+        function handleSearchShortcut(event: KeyboardEvent) {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+                event.preventDefault();
+                setSearchOpen(true);
+            }
+
+            if (event.key === 'Escape') {
+                setSearchOpen(false);
+            }
+        }
+
+        window.addEventListener('keydown', handleSearchShortcut);
+        return () => window.removeEventListener('keydown', handleSearchShortcut);
+    }, []);
+
+    useEffect(() => {
+        if (!searchOpen) return;
+
+        const timeout = window.setTimeout(() => searchInputRef.current?.focus(), 0);
+        return () => window.clearTimeout(timeout);
+    }, [searchOpen]);
+
+    useEffect(() => {
         if (!pendingSectionId) return;
 
         const timeout = window.setTimeout(() => {
@@ -1149,6 +1950,10 @@ export default function DocsClientPage() {
         return () => window.clearTimeout(timeout);
     }, [activePageId, pendingSectionId]);
 
+    function scrollMainContentToTop() {
+        mainContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     function openPage(pageId: string) {
         const targetPage = docsPages.find((page) => page.id === pageId);
         if (!targetPage) return;
@@ -1158,13 +1963,35 @@ export default function DocsClientPage() {
         setMobileMenuOpen(false);
         setPendingSectionId(null);
         window.history.replaceState(null, '', `#${pageId}`);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        scrollMainContentToTop();
     }
 
     function openSection(sectionId: string) {
         setActiveSectionId(sectionId);
         setPendingSectionId(sectionId);
         window.history.replaceState(null, '', `#${activePageId}/${sectionId}`);
+    }
+
+    function openSearchResult(result: DocSearchResult) {
+        const targetPage = docsPages.find((page) => page.id === result.pageId);
+        if (!targetPage) return;
+
+        const targetSectionId = result.sectionId || targetPage.toc[0]?.id || null;
+
+        setActivePageId(targetPage.id);
+        setActiveSectionId(targetSectionId);
+        setMobileMenuOpen(false);
+        setSearchOpen(false);
+        setSearchQuery('');
+
+        if (result.sectionId) {
+            setPendingSectionId(result.sectionId);
+            window.history.replaceState(null, '', `#${targetPage.id}/${result.sectionId}`);
+        } else {
+            setPendingSectionId(null);
+            window.history.replaceState(null, '', `#${targetPage.id}`);
+            scrollMainContentToTop();
+        }
     }
 
     function copyCurrentPageLink() {
@@ -1189,6 +2016,7 @@ export default function DocsClientPage() {
                     <div className="hidden items-center gap-4 lg:flex">
                         <button
                             type="button"
+                            onClick={() => setSearchOpen(true)}
                             className="flex min-w-[230px] items-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-4 py-2 text-left text-sm text-slate-400"
                         >
                             <Icons.Search className="h-4 w-4" />
@@ -1207,10 +2035,74 @@ export default function DocsClientPage() {
                 </div>
             </header>
 
+            {searchOpen && (
+                <div className="fixed inset-0 z-50 bg-black/65 px-4 py-20 backdrop-blur-sm" onMouseDown={() => setSearchOpen(false)}>
+                    <div
+                        className="mx-auto w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-[#181818] shadow-2xl shadow-black/40"
+                        onMouseDown={(event) => event.stopPropagation()}
+                    >
+                        <div className="flex items-center gap-3 border-b border-white/8 px-4 py-3">
+                            <Icons.Search className="h-5 w-5 shrink-0 text-slate-500" />
+                            <input
+                                ref={searchInputRef}
+                                value={searchQuery}
+                                onChange={(event) => setSearchQuery(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter' && searchResults[0]) {
+                                        event.preventDefault();
+                                        openSearchResult(searchResults[0]);
+                                    }
+                                }}
+                                placeholder="Search docs..."
+                                className="h-11 min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-slate-500"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setSearchOpen(false)}
+                                className="rounded-lg border border-white/10 px-2 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-500 transition-colors hover:text-white"
+                            >
+                                Esc
+                            </button>
+                        </div>
+
+                        <div className="max-h-[min(520px,65vh)] overflow-y-auto p-2">
+                            {searchResults.length > 0 ? (
+                                <div className="space-y-1">
+                                    {searchResults.map((result) => (
+                                        <button
+                                            key={result.key}
+                                            type="button"
+                                            onClick={() => openSearchResult(result)}
+                                            className="group flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-white/[0.04]"
+                                        >
+                                            <div className="mt-0.5 rounded-lg border border-white/10 bg-white/[0.03] p-2 text-sky-300">
+                                                <Icons.Book className="h-4 w-4" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-semibold text-white group-hover:text-sky-200">{result.title}</p>
+                                                <p className="mt-1 truncate text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                                                    {result.sectionId ? `${result.subtitle} / Section` : result.subtitle}
+                                                </p>
+                                            </div>
+                                            <Icons.ChevronRight className="mt-2 h-4 w-4 text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-sky-200" />
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="px-4 py-10 text-center">
+                                    <p className="text-sm font-semibold text-white">No results found</p>
+                                    <p className="mt-2 text-sm text-slate-500">Try a page name, setup step, API route, or command.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="pt-16">
                 <aside
                     className={cn(
-                        'custom-scrollbar fixed inset-y-16 left-0 z-30 flex w-[280px] flex-col overflow-y-auto border-r border-white/8 bg-[#181818]/98 px-5 py-8 backdrop-blur-xl transition-transform duration-300',
+                        'fixed bottom-0 left-0 top-16 z-30 flex w-[280px] flex-col overflow-hidden border-r border-white/8 bg-[#181818]/98 px-5 py-8 backdrop-blur-xl transition-transform duration-300',
                         mobileMenuOpen ? 'translate-x-0' : '-translate-x-full',
                         'lg:translate-x-0',
                     )}
@@ -1239,7 +2131,7 @@ export default function DocsClientPage() {
 
                 {mobileMenuOpen && <button type="button" aria-label="Close navigation" onClick={() => setMobileMenuOpen(false)} className="fixed inset-0 z-20 bg-black/50 lg:hidden" />}
 
-                <aside className="custom-scrollbar fixed inset-y-16 right-0 hidden w-[270px] overflow-y-auto border-l border-white/8 bg-[#181818] px-7 py-10 xl:block">
+                <aside className="fixed bottom-0 right-0 top-16 hidden w-[270px] overflow-hidden border-l border-white/8 bg-[#181818] px-7 py-10 2xl:block">
                     <nav className="space-y-1">
                         {activePage.toc.map((item) => (
                             <button
@@ -1257,8 +2149,8 @@ export default function DocsClientPage() {
                     </nav>
                 </aside>
 
-                <main className="lg:pl-[280px] xl:pr-[270px]">
-                    <div className="mx-auto max-w-[880px] px-6 py-10 sm:px-10">
+                <main ref={mainContentRef} className="custom-scrollbar h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain lg:pl-[280px] 2xl:pr-[270px]">
+                    <div className="mx-auto max-w-[1080px] px-6 py-10 sm:px-10">
                         <div className="flex flex-col gap-6 border-b border-white/8 pb-10 sm:flex-row sm:items-start sm:justify-between">
                             <div className="max-w-3xl">
                                 <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-sky-400">{activePage.category}</p>

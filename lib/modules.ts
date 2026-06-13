@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 
-export type AddonModuleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+export type AddonModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
+export type ServerCustomModuleStatus = 'READY' | 'NEEDS_REUPLOAD';
 
 export interface SanitizedAddonModuleInput {
     name?: string;
@@ -10,13 +11,37 @@ export interface SanitizedAddonModuleInput {
     category?: string;
     status?: AddonModuleStatus;
     sourceCode?: string;
+    configSchema?: ModuleConfigSchema;
 }
+
+export type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
+export type ModuleConfigOptionSource = 'static' | 'roblox-users' | 'live-players' | 'live-server-players' | 'live-servers';
+
+export interface ModuleConfigField {
+    key: string;
+    label: string;
+    shortDescription: string;
+    type: ModuleConfigFieldType;
+    options: string[];
+    defaultValue: boolean | string | string[] | number | Record<string, unknown>;
+    live: boolean;
+    liveButtonText: string;
+    subFields: ModuleConfigField[];
+    optionSource: ModuleConfigOptionSource;
+    referenceKey: string;
+    searchable: boolean;
+}
+
+export type ModuleConfigSchema = Record<string, ModuleConfigField>;
 
 export type SanitizedAddonModuleResult =
     | { input: SanitizedAddonModuleInput }
     | { errors: string[] };
 
-const VALID_MODULE_STATUSES = new Set<AddonModuleStatus>(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
+const VALID_MODULE_STATUSES = new Set<AddonModuleStatus>(['DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'ARCHIVED']);
+const VALID_CONFIG_TYPES = new Set<ModuleConfigFieldType>(['bool', 'dropdown', 'checkboxes', 'color', 'integer', 'string', 'group', 'player', 'server']);
+export const MAX_SERVER_ADDON_MODULES = 5;
+export const MAX_SERVER_CUSTOM_MODULES = 20;
 
 export function trimModuleString(value: unknown, maxLength = 5000) {
     return String(value ?? '').trim().slice(0, maxLength);
@@ -34,6 +59,1199 @@ export function slugifyModuleName(value: string) {
 
 export function checksumModuleSource(sourceCode: string) {
     return createHash('sha256').update(sourceCode, 'utf8').digest('hex');
+}
+
+export interface AddonModuleDuplicateCandidate {
+    id?: string | null;
+    name?: string | null;
+    status?: string | null;
+    source_code?: string | null;
+    source_checksum?: string | null;
+}
+
+export interface AddonModuleDuplicateMatch {
+    id: string;
+    name: string;
+    status: AddonModuleStatus | string;
+    reason: 'exact_source' | 'similar_source';
+    similarity: number;
+}
+
+export const MODULE_SOURCE_SIMILARITY_THRESHOLD = 0.92;
+
+function normalizeModuleTokensForSimilarity(sourceCode: string) {
+    return tokenizeLua(sourceCode)
+        .filter((token) => token.type !== 'whitespace')
+        .map((token) => {
+            if (token.type === 'identifier') return 'id';
+            if (token.type === 'number') return 'num';
+            if (token.type === 'string') return `str:${trimModuleString(token.decoded ?? token.value, 120).toLowerCase()}`;
+            return token.value.toLowerCase();
+        });
+}
+
+function buildModuleTokenGramSet(tokens: string[], size = 3) {
+    const grams = new Set<string>();
+    if (tokens.length < size) {
+        if (tokens.length > 0) {
+            grams.add(tokens.join(' '));
+        }
+        return grams;
+    }
+
+    for (let index = 0; index <= tokens.length - size; index += 1) {
+        grams.add(tokens.slice(index, index + size).join(' '));
+    }
+
+    return grams;
+}
+
+function calculateSetSimilarity(first: Set<string>, second: Set<string>) {
+    if (first.size === 0 || second.size === 0) return 0;
+
+    let shared = 0;
+    for (const value of first) {
+        if (second.has(value)) {
+            shared += 1;
+        }
+    }
+
+    return shared / (first.size + second.size - shared);
+}
+
+export function calculateModuleSourceSimilarity(firstSourceCode: string, secondSourceCode: string) {
+    const firstTokens = normalizeModuleTokensForSimilarity(firstSourceCode);
+    const secondTokens = normalizeModuleTokensForSimilarity(secondSourceCode);
+
+    if (firstTokens.length === 0 || secondTokens.length === 0) return 0;
+    if (firstTokens.join('\n') === secondTokens.join('\n')) return 1;
+
+    const tokenLengthRatio = Math.min(firstTokens.length, secondTokens.length) / Math.max(firstTokens.length, secondTokens.length);
+    if (tokenLengthRatio < 0.7) {
+        return 0;
+    }
+
+    return calculateSetSimilarity(
+        buildModuleTokenGramSet(firstTokens),
+        buildModuleTokenGramSet(secondTokens),
+    );
+}
+
+export function findDuplicateAddonModuleSubmission(
+    sourceCode: string,
+    candidates: AddonModuleDuplicateCandidate[],
+    threshold = MODULE_SOURCE_SIMILARITY_THRESHOLD,
+): AddonModuleDuplicateMatch | null {
+    const sourceChecksum = checksumModuleSource(sourceCode);
+    let strongestMatch: AddonModuleDuplicateMatch | null = null;
+
+    for (const candidate of candidates) {
+        const candidateId = trimModuleString(candidate.id, 80);
+        const candidateName = trimModuleString(candidate.name || 'Untitled Module', 120);
+        const candidateStatus = trimModuleString(candidate.status || 'DRAFT', 20) as AddonModuleStatus;
+
+        if (!candidateId) {
+            continue;
+        }
+
+        if (candidate.source_checksum && candidate.source_checksum === sourceChecksum) {
+            return {
+                id: candidateId,
+                name: candidateName,
+                status: candidateStatus,
+                reason: 'exact_source',
+                similarity: 1,
+            };
+        }
+
+        const candidateSourceCode = String(candidate.source_code || '');
+        if (!candidateSourceCode) {
+            continue;
+        }
+
+        const similarity = calculateModuleSourceSimilarity(sourceCode, candidateSourceCode);
+        if (
+            similarity >= threshold
+            && (!strongestMatch || similarity > strongestMatch.similarity)
+        ) {
+            strongestMatch = {
+                id: candidateId,
+                name: candidateName,
+                status: candidateStatus,
+                reason: 'similar_source',
+                similarity,
+            };
+        }
+    }
+
+    return strongestMatch;
+}
+
+type LuaTokenType = 'identifier' | 'keyword' | 'number' | 'punctuation' | 'string' | 'whitespace';
+
+interface LuaToken {
+    type: LuaTokenType;
+    value: string;
+    decoded?: string;
+}
+
+const LUA_KEYWORDS = new Set([
+    'and',
+    'break',
+    'continue',
+    'do',
+    'else',
+    'elseif',
+    'end',
+    'export',
+    'false',
+    'for',
+    'function',
+    'if',
+    'in',
+    'local',
+    'nil',
+    'not',
+    'or',
+    'repeat',
+    'return',
+    'then',
+    'true',
+    'type',
+    'typeof',
+    'until',
+    'while',
+]);
+
+const LUA_GLOBALS_AND_COMMON_FIELDS = new Set([
+    '_G',
+    'assert',
+    'bit32',
+    'BrickColor',
+    'CFrame',
+    'Color3',
+    'ColorSequence',
+    'coroutine',
+    'debug',
+    'Enum',
+    'error',
+    'game',
+    'getmetatable',
+    'Instance',
+    'ipairs',
+    'math',
+    'next',
+    'NumberRange',
+    'NumberSequence',
+    'os',
+    'pairs',
+    'pcall',
+    'plugin',
+    'print',
+    'Random',
+    'rawget',
+    'rawlen',
+    'rawset',
+    'require',
+    'script',
+    'select',
+    'self',
+    'setmetatable',
+    'shared',
+    'string',
+    'table',
+    'task',
+    'tonumber',
+    'tostring',
+    'TweenInfo',
+    'type',
+    'typeof',
+    'UDim',
+    'UDim2',
+    'unpack',
+    'utf8',
+    'Vector2',
+    'Vector3',
+    'warn',
+    'workspace',
+    'xpcall',
+]);
+
+function isIdentifierStart(char: string) {
+    return /[A-Za-z_]/.test(char);
+}
+
+function isIdentifierPart(char: string) {
+    return /[A-Za-z0-9_]/.test(char);
+}
+
+function isWhitespace(char: string) {
+    return /\s/.test(char);
+}
+
+function findLongBracketClose(sourceCode: string, startIndex: number) {
+    if (sourceCode[startIndex] !== '[') {
+        return null;
+    }
+
+    let index = startIndex + 1;
+    while (sourceCode[index] === '=') {
+        index += 1;
+    }
+
+    if (sourceCode[index] !== '[') {
+        return null;
+    }
+
+    const equals = sourceCode.slice(startIndex + 1, index);
+    const openEnd = index + 1;
+    const closeMarker = `]${equals}]`;
+    const closeIndex = sourceCode.indexOf(closeMarker, openEnd);
+
+    return {
+        openEnd,
+        closeIndex,
+        closeMarkerLength: closeMarker.length,
+    };
+}
+
+function normalizeLuaLongStringContent(content: string) {
+    if (content.startsWith('\r\n')) {
+        return content.slice(2);
+    }
+    if (content.startsWith('\n')) {
+        return content.slice(1);
+    }
+    return content;
+}
+
+function decodeLuaQuotedString(rawValue: string) {
+    let output = '';
+    for (let index = 1; index < rawValue.length - 1; index += 1) {
+        const char = rawValue[index];
+        if (char !== '\\') {
+            output += char;
+            continue;
+        }
+
+        index += 1;
+        const escaped = rawValue[index];
+        if (escaped === undefined) {
+            break;
+        }
+
+        if (escaped === '\r' && rawValue[index + 1] === '\n') {
+            index += 1;
+            continue;
+        }
+        if (escaped === '\n' || escaped === '\r') {
+            continue;
+        }
+        if (escaped === 'a') output += '\x07';
+        else if (escaped === 'b') output += '\b';
+        else if (escaped === 'f') output += '\f';
+        else if (escaped === 'n') output += '\n';
+        else if (escaped === 'r') output += '\r';
+        else if (escaped === 't') output += '\t';
+        else if (escaped === 'v') output += '\v';
+        else if (escaped === 'z') {
+            while (index + 1 < rawValue.length - 1 && isWhitespace(rawValue[index + 1])) {
+                index += 1;
+            }
+        } else if (escaped === 'x') {
+            const hex = rawValue.slice(index + 1, index + 3);
+            if (/^[0-9a-fA-F]{2}$/.test(hex)) {
+                output += String.fromCharCode(parseInt(hex, 16));
+                index += 2;
+            } else {
+                output += escaped;
+            }
+        } else if (escaped === 'u' && rawValue[index + 1] === '{') {
+            const closeIndex = rawValue.indexOf('}', index + 2);
+            const codePoint = closeIndex > index + 2 ? parseInt(rawValue.slice(index + 2, closeIndex), 16) : NaN;
+            if (Number.isFinite(codePoint)) {
+                output += String.fromCodePoint(codePoint);
+                index = closeIndex;
+            } else {
+                output += escaped;
+            }
+        } else if (/[0-9]/.test(escaped)) {
+            let digits = escaped;
+            while (digits.length < 3 && /[0-9]/.test(rawValue[index + 1] || '')) {
+                digits += rawValue[index + 1];
+                index += 1;
+            }
+            output += String.fromCharCode(Number(digits) % 256);
+        } else {
+            output += escaped;
+        }
+    }
+
+    return output;
+}
+
+function tokenizeLua(sourceCode: string): LuaToken[] {
+    const tokens: LuaToken[] = [];
+    let index = 0;
+
+    while (index < sourceCode.length) {
+        const char = sourceCode[index];
+        const next = sourceCode[index + 1];
+
+        if (isWhitespace(char)) {
+            let end = index + 1;
+            while (end < sourceCode.length && isWhitespace(sourceCode[end])) {
+                end += 1;
+            }
+            tokens.push({ type: 'whitespace', value: sourceCode.slice(index, end) });
+            index = end;
+            continue;
+        }
+
+        if (char === '-' && next === '-') {
+            const longComment = findLongBracketClose(sourceCode, index + 2);
+            if (longComment) {
+                index = longComment.closeIndex >= 0
+                    ? longComment.closeIndex + longComment.closeMarkerLength
+                    : sourceCode.length;
+            } else {
+                while (index < sourceCode.length && sourceCode[index] !== '\n') {
+                    index += 1;
+                }
+            }
+            tokens.push({ type: 'whitespace', value: '\n' });
+            continue;
+        }
+
+        if (char === '"' || char === "'") {
+            const quote = char;
+            let end = index + 1;
+            let escaped = false;
+            while (end < sourceCode.length) {
+                const current = sourceCode[end];
+                if (escaped) {
+                    escaped = false;
+                } else if (current === '\\') {
+                    escaped = true;
+                } else if (current === quote) {
+                    end += 1;
+                    break;
+                }
+                end += 1;
+            }
+            const value = sourceCode.slice(index, end);
+            tokens.push({ type: 'string', value, decoded: decodeLuaQuotedString(value) });
+            index = end;
+            continue;
+        }
+
+        if (char === '[') {
+            const longString = findLongBracketClose(sourceCode, index);
+            if (longString) {
+                const closeIndex = longString.closeIndex >= 0 ? longString.closeIndex : sourceCode.length;
+                const value = sourceCode.slice(index, closeIndex + (longString.closeIndex >= 0 ? longString.closeMarkerLength : 0));
+                const content = sourceCode.slice(longString.openEnd, closeIndex);
+                tokens.push({ type: 'string', value, decoded: normalizeLuaLongStringContent(content) });
+                index = closeIndex + (longString.closeIndex >= 0 ? longString.closeMarkerLength : 0);
+                continue;
+            }
+        }
+
+        if (/[0-9]/.test(char) || (char === '.' && /[0-9]/.test(next || ''))) {
+            let end = index + 1;
+            while (end < sourceCode.length && /[A-Za-z0-9_.]/.test(sourceCode[end])) {
+                end += 1;
+            }
+            tokens.push({ type: 'number', value: sourceCode.slice(index, end) });
+            index = end;
+            continue;
+        }
+
+        if (isIdentifierStart(char)) {
+            let end = index + 1;
+            while (end < sourceCode.length && isIdentifierPart(sourceCode[end])) {
+                end += 1;
+            }
+            const value = sourceCode.slice(index, end);
+            tokens.push({
+                type: LUA_KEYWORDS.has(value) ? 'keyword' : 'identifier',
+                value,
+            });
+            index = end;
+            continue;
+        }
+
+        tokens.push({ type: 'punctuation', value: char });
+        index += 1;
+    }
+
+    return tokens;
+}
+
+function nextSignificantTokenIndex(tokens: LuaToken[], startIndex: number) {
+    for (let index = startIndex; index < tokens.length; index += 1) {
+        if (tokens[index].type !== 'whitespace') {
+            return index;
+        }
+    }
+    return -1;
+}
+
+function previousSignificantTokenIndex(tokens: LuaToken[], startIndex: number) {
+    for (let index = startIndex; index >= 0; index -= 1) {
+        if (tokens[index].type !== 'whitespace') {
+            return index;
+        }
+    }
+    return -1;
+}
+
+function shouldRenameIdentifier(name: string) {
+    return !LUA_KEYWORDS.has(name)
+        && !LUA_GLOBALS_AND_COMMON_FIELDS.has(name)
+        && name !== 'CONFIG'
+        && !/^__rolink_/.test(name);
+}
+
+function collectLocalRenameCandidates(tokens: LuaToken[]) {
+    const candidates = new Set<string>();
+
+    for (let index = 0; index < tokens.length; index += 1) {
+        const token = tokens[index];
+        if (token.type === 'keyword' && token.value === 'local') {
+            const nextIndex = nextSignificantTokenIndex(tokens, index + 1);
+            if (nextIndex >= 0 && tokens[nextIndex].type === 'keyword' && tokens[nextIndex].value === 'function') {
+                const nameIndex = nextSignificantTokenIndex(tokens, nextIndex + 1);
+                if (nameIndex >= 0 && tokens[nameIndex].type === 'identifier' && shouldRenameIdentifier(tokens[nameIndex].value)) {
+                    candidates.add(tokens[nameIndex].value);
+                }
+                continue;
+            }
+
+            let inTypeAnnotation = false;
+            for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
+                const current = tokens[cursor];
+                if (current.type === 'whitespace' && current.value.includes('\n')) {
+                    break;
+                }
+                if (current.value === '=') {
+                    break;
+                }
+                if (current.value === ',') {
+                    inTypeAnnotation = false;
+                    continue;
+                }
+                if (current.value === ':') {
+                    inTypeAnnotation = true;
+                    continue;
+                }
+                if (!inTypeAnnotation && current.type === 'identifier' && shouldRenameIdentifier(current.value)) {
+                    candidates.add(current.value);
+                }
+            }
+        }
+
+        if (token.type === 'keyword' && token.value === 'function') {
+            const openIndex = (() => {
+                let cursor = index + 1;
+                while (cursor < tokens.length) {
+                    if (tokens[cursor].value === '(') return cursor;
+                    if (tokens[cursor].type === 'whitespace' || tokens[cursor].type === 'identifier' || tokens[cursor].value === '.' || tokens[cursor].value === ':') {
+                        cursor += 1;
+                        continue;
+                    }
+                    return -1;
+                }
+                return -1;
+            })();
+
+            if (openIndex >= 0) {
+                let depth = 1;
+                let inTypeAnnotation = false;
+                for (let cursor = openIndex + 1; cursor < tokens.length; cursor += 1) {
+                    const current = tokens[cursor];
+                    if (current.value === '(') depth += 1;
+                    if (current.value === ')') {
+                        depth -= 1;
+                        if (depth === 0) break;
+                    }
+                    if (depth !== 1) continue;
+                    if (current.value === ',') {
+                        inTypeAnnotation = false;
+                        continue;
+                    }
+                    if (current.value === ':') {
+                        inTypeAnnotation = true;
+                        continue;
+                    }
+                    if (!inTypeAnnotation && current.type === 'identifier' && shouldRenameIdentifier(current.value)) {
+                        candidates.add(current.value);
+                    }
+                }
+            }
+        }
+
+        if (token.type === 'keyword' && token.value === 'for') {
+            let inTypeAnnotation = false;
+            for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
+                const current = tokens[cursor];
+                if (current.value === '=' || (current.type === 'keyword' && current.value === 'in')) {
+                    break;
+                }
+                if (current.value === ',') {
+                    inTypeAnnotation = false;
+                    continue;
+                }
+                if (current.value === ':') {
+                    inTypeAnnotation = true;
+                    continue;
+                }
+                if (!inTypeAnnotation && current.type === 'identifier' && shouldRenameIdentifier(current.value)) {
+                    candidates.add(current.value);
+                }
+            }
+        }
+    }
+
+    return candidates;
+}
+
+function buildRenameMap(tokens: LuaToken[], sourceCode: string) {
+    const candidates = Array.from(collectLocalRenameCandidates(tokens)).sort();
+    const hash = checksumModuleSource(sourceCode).slice(0, 10);
+    const renameMap = new Map<string, string>();
+
+    candidates.forEach((candidate, index) => {
+        renameMap.set(candidate, `__rolink_${hash}_${index.toString(36)}`);
+    });
+
+    return renameMap;
+}
+
+function isTableFieldKey(tokens: LuaToken[], index: number, braceDepth: number) {
+    if (braceDepth <= 0) {
+        return false;
+    }
+    const nextIndex = nextSignificantTokenIndex(tokens, index + 1);
+    const prevIndex = previousSignificantTokenIndex(tokens, index - 1);
+    const afterNextIndex = nextIndex >= 0 ? nextSignificantTokenIndex(tokens, nextIndex + 1) : -1;
+    return nextIndex >= 0
+        && tokens[nextIndex].value === '='
+        && (afterNextIndex < 0 || tokens[afterNextIndex].value !== '=')
+        && (prevIndex < 0 || tokens[prevIndex].value !== '.');
+}
+
+function obfuscateIdentifierToken(tokens: LuaToken[], index: number, renameMap: Map<string, string>, braceDepth: number) {
+    const token = tokens[index];
+    if (token.type !== 'identifier') {
+        return token.value;
+    }
+
+    const renamed = renameMap.get(token.value);
+    if (!renamed) {
+        return token.value;
+    }
+
+    const prevIndex = previousSignificantTokenIndex(tokens, index - 1);
+    if (prevIndex >= 0 && tokens[prevIndex].value === '.') {
+        const prevPrevIndex = previousSignificantTokenIndex(tokens, prevIndex - 1);
+        if (prevPrevIndex < 0 || tokens[prevPrevIndex].value !== '.') {
+            return token.value;
+        }
+    }
+    if (prevIndex >= 0 && tokens[prevIndex].value === ':') {
+        return token.value;
+    }
+    if (isTableFieldKey(tokens, index, braceDepth)) {
+        return token.value;
+    }
+
+    return renamed;
+}
+
+function encodeLuaString(decoded: string, decodeFunctionName: string, seed: number) {
+    const bytes = Buffer.from(decoded, 'utf8');
+    const key = (seed % 173) + 53;
+    const encoded = Array.from(bytes, (byte, index) => (byte + key + (((index + 1) * 17) % 251)) % 256);
+    return `${decodeFunctionName}({${encoded.join(',')}},${key})`;
+}
+
+function encodeIntegerConstant(rawValue: string, seed: number) {
+    if (!/^\d+$/.test(rawValue)) {
+        return rawValue;
+    }
+
+    const value = Number(rawValue);
+    if (!Number.isSafeInteger(value)) {
+        return rawValue;
+    }
+
+    const mask = ((seed % 997) + 31) * 3;
+    return `(${value + mask}-${mask})`;
+}
+
+function tokenStartsLikeWord(value: string) {
+    return /^[A-Za-z0-9_]/.test(value);
+}
+
+function tokenEndsLikeWord(value: string) {
+    return /[A-Za-z0-9_]$/.test(value);
+}
+
+function needsSpaceBetween(prev: string, next: string) {
+    if (!prev || !next) {
+        return false;
+    }
+
+    if (tokenEndsLikeWord(prev) && tokenStartsLikeWord(next)) {
+        return true;
+    }
+    if (/[\])}]$/.test(prev) && tokenStartsLikeWord(next)) {
+        return true;
+    }
+    if (prev.endsWith('-') && next.startsWith('-')) {
+        return true;
+    }
+
+    return false;
+}
+
+function buildObfuscatedPrelude(decodeFunctionName: string, hash: string) {
+    const charName = `__rolink_char_${hash}`;
+    const concatName = `__rolink_concat_${hash}`;
+    const outputName = `__rolink_out_${hash}`;
+    const indexName = `__rolink_i_${hash}`;
+    const noiseName = `__rolink_noise_${hash}`;
+
+    return [
+        `local ${charName}=string.char`,
+        `local ${concatName}=table.concat`,
+        `local function ${decodeFunctionName}(__rolink_data_${hash},__rolink_key_${hash})`,
+        `local ${outputName}={}`,
+        `for ${indexName}=1,#__rolink_data_${hash} do`,
+        `${outputName}[${indexName}]=${charName}((__rolink_data_${hash}[${indexName}]-__rolink_key_${hash}-(${indexName}*17%251))%256)`,
+        'end',
+        `return ${concatName}(${outputName})`,
+        'end',
+        `local ${noiseName}=0`,
+        `if ${noiseName}==${Number.parseInt(hash.slice(0, 5), 36)} then ${noiseName}=${noiseName}+1 end`,
+    ].join('\n');
+}
+
+export function obfuscateModuleSourceForStudio(sourceCode: string) {
+    const tokens = tokenizeLua(sourceCode);
+    const renameMap = buildRenameMap(tokens, sourceCode);
+    const hash = checksumModuleSource(sourceCode).slice(0, 8);
+    const decodeFunctionName = `__rolink_decode_${hash}`;
+    const fragments: string[] = [];
+    let previous = '';
+    let braceDepth = 0;
+
+    tokens.forEach((token, index) => {
+        if (token.type === 'whitespace') {
+            return;
+        }
+
+        let value = token.value;
+        if (token.type === 'identifier') {
+            value = obfuscateIdentifierToken(tokens, index, renameMap, braceDepth);
+        } else if (token.type === 'string') {
+            value = encodeLuaString(token.decoded ?? '', decodeFunctionName, index + sourceCode.length);
+        } else if (token.type === 'number') {
+            value = encodeIntegerConstant(token.value, index + sourceCode.length);
+        }
+
+        if (needsSpaceBetween(previous, value)) {
+            fragments.push(' ');
+        }
+        fragments.push(value);
+        previous = value;
+
+        if (token.value === '{') {
+            braceDepth += 1;
+        } else if (token.value === '}') {
+            braceDepth = Math.max(0, braceDepth - 1);
+        }
+    });
+
+    return [
+        '-- Ro-Link managed module. Source is statically obfuscated before Studio insertion.',
+        buildObfuscatedPrelude(decodeFunctionName, hash),
+        fragments.join(''),
+        '',
+    ].join('\n');
+}
+
+function splitTopLevelEntries(value: string) {
+    const entries: string[] = [];
+    let current = '';
+    let depth = 0;
+    let quote: '"' | "'" | null = null;
+    let escaped = false;
+
+    for (let index = 0; index < value.length; index += 1) {
+        const char = value[index];
+
+        if (quote) {
+            current += char;
+            if (escaped) {
+                escaped = false;
+            } else if (char === '\\') {
+                escaped = true;
+            } else if (char === quote) {
+                quote = null;
+            }
+            continue;
+        }
+
+        if (char === '"' || char === "'") {
+            quote = char;
+            current += char;
+            continue;
+        }
+
+        if (char === '{') depth += 1;
+        if (char === '}') depth = Math.max(0, depth - 1);
+
+        if ((char === ',' || char === ';' || char === '\n') && depth === 0) {
+            const entry = current.trim();
+            if (entry) entries.push(entry);
+            current = '';
+            continue;
+        }
+
+        current += char;
+    }
+
+    const entry = current.trim();
+    if (entry) entries.push(entry);
+    return entries;
+}
+
+function unquoteConfigString(value: string) {
+    const trimmed = value.trim();
+    const quote = trimmed[0];
+    if ((quote === '"' || quote === "'") && trimmed[trimmed.length - 1] === quote) {
+        return trimmed
+            .slice(1, -1)
+            .replace(/\\n/g, '\n')
+            .replace(/\\r/g, '\r')
+            .replace(/\\t/g, '\t')
+            .replace(/\\"/g, '"')
+            .replace(/\\'/g, "'");
+    }
+    return trimmed;
+}
+
+function findMatchingBrace(sourceCode: string, startIndex: number) {
+    let depth = 0;
+    let quote: '"' | "'" | null = null;
+    let escaped = false;
+
+    for (let index = startIndex; index < sourceCode.length; index += 1) {
+        const char = sourceCode[index];
+
+        if (quote) {
+            if (escaped) {
+                escaped = false;
+            } else if (char === '\\') {
+                escaped = true;
+            } else if (char === quote) {
+                quote = null;
+            }
+            continue;
+        }
+
+        if (char === '"' || char === "'") {
+            quote = char;
+            continue;
+        }
+
+        if (char === '{') depth += 1;
+        if (char === '}') {
+            depth -= 1;
+            if (depth === 0) return index;
+        }
+    }
+
+    return -1;
+}
+
+function parseSimpleLuaValue(value: string): unknown {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (trimmed === 'true') return true;
+    if (trimmed === 'false') return false;
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        const inner = trimmed.slice(1, -1);
+        const objectValue: Record<string, unknown> = {};
+        const arrayValue: unknown[] = [];
+        let hasObjectKeys = false;
+
+        for (const entry of splitTopLevelEntries(inner)) {
+            const keyedMatch = entry.match(/^\s*(?:\["([^"]+)"\]|\['([^']+)'\]|([A-Za-z_][A-Za-z0-9_]*))\s*=\s*([\s\S]*)$/);
+            if (keyedMatch) {
+                hasObjectKeys = true;
+                const key = keyedMatch[1] || keyedMatch[2] || keyedMatch[3];
+                objectValue[key] = parseSimpleLuaValue(keyedMatch[4]);
+            } else {
+                arrayValue.push(parseSimpleLuaValue(entry));
+            }
+        }
+
+        return hasObjectKeys ? objectValue : arrayValue;
+    }
+
+    return unquoteConfigString(trimmed);
+}
+
+function normalizeConfigType(value: unknown): ModuleConfigFieldType | null {
+    const normalized = String(value || '')
+        .toLowerCase()
+        .replace(/[\s_-]+/g, '');
+
+    if (normalized === 'bool' || normalized === 'boolean' || normalized === 'toggle' || normalized === 'togglable') {
+        return 'bool';
+    }
+    if (normalized === 'dropdown' || normalized === 'select') {
+        return 'dropdown';
+    }
+    if (normalized === 'checkboxes' || normalized === 'checkbox' || normalized === 'multiselect') {
+        return 'checkboxes';
+    }
+    if (normalized === 'colorwheel' || normalized === 'color' || normalized === 'hexcolor') {
+        return 'color';
+    }
+    if (normalized === 'integer' || normalized === 'int' || normalized === 'wholenumber') {
+        return 'integer';
+    }
+    if (normalized === 'string' || normalized === 'str' || normalized === 'text') {
+        return 'string';
+    }
+    if (normalized === 'group' || normalized === 'object' || normalized === 'container' || normalized === 'action') {
+        return 'group';
+    }
+    if (
+        normalized === 'player'
+        || normalized === 'user'
+        || normalized === 'robloxuser'
+        || normalized === 'robloxplayer'
+        || normalized === 'playerdropdown'
+        || normalized === 'userdropdown'
+        || normalized === 'searchableplayer'
+    ) {
+        return 'player';
+    }
+    if (
+        normalized === 'server'
+        || normalized === 'liveserver'
+        || normalized === 'serverdropdown'
+        || normalized === 'searchableserver'
+        || normalized === 'job'
+        || normalized === 'jobid'
+    ) {
+        return 'server';
+    }
+
+    return null;
+}
+
+function normalizeConfigOptions(value: unknown) {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((item) => trimModuleString(item, 120))
+        .filter(Boolean)
+        .slice(0, 50);
+}
+
+function normalizeConfigLiveFlag(value: unknown) {
+    if (value === true) return true;
+    const normalized = String(value ?? '').trim().toLowerCase();
+    return normalized === 'true' || normalized === '1' || normalized === 'yes';
+}
+
+function normalizeLiveButtonText(value: unknown) {
+    return trimModuleString(value, 40) || 'Send';
+}
+
+function normalizeConfigOptionSource(value: unknown, type: ModuleConfigFieldType): ModuleConfigOptionSource {
+    const normalized = String(value || '')
+        .toLowerCase()
+        .replace(/[\s_-]+/g, '');
+
+    if (
+        normalized === 'roblox'
+        || normalized === 'robloxusers'
+        || normalized === 'robloxwide'
+        || normalized === 'globalrobloxusers'
+        || normalized === 'users'
+    ) {
+        return 'roblox-users';
+    }
+    if (
+        normalized === 'liveplayers'
+        || normalized === 'currentplayers'
+        || normalized === 'gameplayers'
+        || normalized === 'currentgame'
+        || normalized === 'everyoneplaying'
+        || normalized === 'allliveplayers'
+    ) {
+        return 'live-players';
+    }
+    if (
+        normalized === 'serverplayers'
+        || normalized === 'liveserverplayers'
+        || normalized === 'selectedserverplayers'
+        || normalized === 'jobplayers'
+    ) {
+        return 'live-server-players';
+    }
+    if (
+        normalized === 'servers'
+        || normalized === 'liveservers'
+        || normalized === 'serverlist'
+        || normalized === 'jobs'
+    ) {
+        return 'live-servers';
+    }
+
+    if (type === 'player') return 'live-players';
+    if (type === 'server') return 'live-servers';
+    return 'static';
+}
+
+function normalizeConfigSearchable(value: unknown, type: ModuleConfigFieldType, optionSource: ModuleConfigOptionSource) {
+    if (value === false) return false;
+    const normalized = String(value ?? '').trim().toLowerCase();
+    if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+    return type === 'player' || type === 'server' || optionSource !== 'static' || normalized === 'true' || normalized === '1' || normalized === 'yes';
+}
+
+function readSubInputRecord(fieldRecord: Record<string, unknown>) {
+    const rawSubInputs = fieldRecord.SubInputs
+        ?? fieldRecord.subInputs
+        ?? fieldRecord.Inputs
+        ?? fieldRecord.inputs
+        ?? fieldRecord.Fields
+        ?? fieldRecord.fields
+        ?? fieldRecord.SubConfigs
+        ?? fieldRecord.subConfigs
+        ?? fieldRecord.Subfields
+        ?? fieldRecord.subfields
+        ?? fieldRecord.SubFields
+        ?? fieldRecord.subFields;
+
+    if (Array.isArray(rawSubInputs)) {
+        return Object.fromEntries(
+            rawSubInputs
+                .map((item) => {
+                    const subKey = item && typeof item === 'object' && !Array.isArray(item)
+                        ? trimModuleString((item as Record<string, unknown>).key, 80)
+                        : '';
+                    return subKey ? [subKey, item] : null;
+                })
+                .filter((entry): entry is [string, unknown] => Boolean(entry)),
+        );
+    }
+
+    return rawSubInputs && typeof rawSubInputs === 'object'
+        ? rawSubInputs as Record<string, unknown>
+        : {};
+}
+
+function defaultConfigValue(type: ModuleConfigFieldType, options: string[], rawDefault: unknown) {
+    if (rawDefault !== undefined && rawDefault !== null && rawDefault !== '') {
+        if (type === 'bool') return rawDefault === true || String(rawDefault).toLowerCase() === 'true';
+        if (type === 'checkboxes') {
+            if (Array.isArray(rawDefault)) {
+                return rawDefault.map((item) => String(item)).filter((item) => options.includes(item));
+            }
+            return [];
+        }
+        if (type === 'color') {
+            const color = String(rawDefault).trim();
+            return /^#[0-9a-f]{6}$/i.test(color) ? color : '#38bdf8';
+        }
+        if (type === 'integer') {
+            const integer = Number(rawDefault);
+            return Number.isFinite(integer) ? Math.trunc(integer) : 0;
+        }
+        if (type === 'string') {
+            return trimModuleString(rawDefault, 1000);
+        }
+        if (type === 'group') {
+            return rawDefault && typeof rawDefault === 'object' && !Array.isArray(rawDefault) ? rawDefault as Record<string, unknown> : {};
+        }
+        if (type === 'player' || type === 'server') {
+            return rawDefault && typeof rawDefault === 'object' && !Array.isArray(rawDefault)
+                ? rawDefault as Record<string, unknown>
+                : trimModuleString(rawDefault, 500);
+        }
+        const selected = String(rawDefault);
+        return options.includes(selected) ? selected : (options[0] || '');
+    }
+
+    if (type === 'bool') return false;
+    if (type === 'checkboxes') return [];
+    if (type === 'color') return '#38bdf8';
+    if (type === 'integer') return 0;
+    if (type === 'string') return '';
+    if (type === 'group') return {};
+    if (type === 'player' || type === 'server') return '';
+    return options[0] || '';
+}
+
+function normalizeModuleConfigField(key: string, rawField: unknown, inheritedLive = false, depth = 0): ModuleConfigField | null {
+    if (!key || !rawField || typeof rawField !== 'object' || Array.isArray(rawField) || depth > 4) {
+        return null;
+    }
+
+    const fieldRecord = rawField as Record<string, unknown>;
+    const rawSubInputs = readSubInputRecord(fieldRecord);
+    const explicitType = normalizeConfigType(fieldRecord.Type ?? fieldRecord.type);
+    const type = explicitType || (Object.keys(rawSubInputs).length > 0 ? 'group' : null);
+    if (!type || !VALID_CONFIG_TYPES.has(type)) return null;
+
+    const options = normalizeConfigOptions(fieldRecord.Options ?? fieldRecord.options);
+    const label = trimModuleString(fieldRecord.Label ?? fieldRecord.label ?? key.replace(/_/g, ' '), 120);
+    const shortDescription = trimModuleString(
+        fieldRecord.Short_Description ?? fieldRecord.short_description ?? fieldRecord.description ?? '',
+        300,
+    );
+    const live = inheritedLive || normalizeConfigLiveFlag(fieldRecord.LIVE ?? fieldRecord.Live ?? fieldRecord.live);
+    const optionSource = normalizeConfigOptionSource(
+        fieldRecord.OptionSource
+        ?? fieldRecord.optionSource
+        ?? fieldRecord.OptionsSource
+        ?? fieldRecord.optionsSource
+        ?? fieldRecord.Source
+        ?? fieldRecord.source
+        ?? fieldRecord.From
+        ?? fieldRecord.from,
+        type,
+    );
+    const subFields = Object.entries(rawSubInputs)
+        .map(([subKey, rawSubField]) => normalizeModuleConfigField(trimModuleString(subKey, 80), rawSubField, live, depth + 1))
+        .filter((field): field is ModuleConfigField => Boolean(field));
+
+    return {
+        key,
+        label: label || key,
+        shortDescription,
+        type,
+        options,
+        defaultValue: defaultConfigValue(type, options, fieldRecord.Default ?? fieldRecord.defaultValue ?? fieldRecord.Value),
+        live,
+        liveButtonText: normalizeLiveButtonText(
+            fieldRecord.ButtonText
+            ?? fieldRecord.buttonText
+            ?? fieldRecord.LiveButtonText
+            ?? fieldRecord.liveButtonText
+            ?? fieldRecord.SendText
+            ?? fieldRecord.sendText,
+        ),
+        subFields,
+        optionSource,
+        referenceKey: trimModuleString(
+            fieldRecord.Reference
+            ?? fieldRecord.reference
+            ?? fieldRecord.ReferenceKey
+            ?? fieldRecord.referenceKey
+            ?? fieldRecord.SourceField
+            ?? fieldRecord.sourceField
+            ?? fieldRecord.DependsOn
+            ?? fieldRecord.dependsOn
+            ?? fieldRecord.ServerField
+            ?? fieldRecord.serverField,
+            80,
+        ),
+        searchable: normalizeConfigSearchable(fieldRecord.Searchable ?? fieldRecord.searchable, type, optionSource),
+    };
+}
+
+export function parseModuleConfigSchema(sourceCode: string): ModuleConfigSchema {
+    const configMatch = /(?:^|\n)\s*(?:local\s+)?CONFIG\s*=\s*\{/m.exec(sourceCode);
+    if (!configMatch) return {};
+
+    const openBraceIndex = sourceCode.indexOf('{', configMatch.index);
+    if (openBraceIndex < 0) return {};
+
+    const closeBraceIndex = findMatchingBrace(sourceCode, openBraceIndex);
+    if (closeBraceIndex < 0) return {};
+
+    const inner = sourceCode.slice(openBraceIndex + 1, closeBraceIndex);
+    const schema: ModuleConfigSchema = {};
+
+    for (const entry of splitTopLevelEntries(inner)) {
+        const match = entry.match(/^\s*(?:\["([^"]+)"\]|\['([^']+)'\]|([A-Za-z_][A-Za-z0-9_]*))\s*=\s*(\{[\s\S]*\})\s*$/);
+        if (!match) continue;
+
+        const key = trimModuleString(match[1] || match[2] || match[3], 80);
+        const rawField = parseSimpleLuaValue(match[4]);
+        if (!key || !rawField || typeof rawField !== 'object' || Array.isArray(rawField)) continue;
+
+        const field = normalizeModuleConfigField(key, rawField);
+        if (field) {
+            schema[key] = field;
+        }
+    }
+
+    return schema;
+}
+
+export function parseModuleConfigVersion(sourceCode: string) {
+    const configMatch = /(?:^|\n)\s*(?:local\s+)?CONFIG\s*=\s*\{/m.exec(sourceCode);
+    if (!configMatch) return '';
+
+    const openBraceIndex = sourceCode.indexOf('{', configMatch.index);
+    if (openBraceIndex < 0) return '';
+
+    const closeBraceIndex = findMatchingBrace(sourceCode, openBraceIndex);
+    if (closeBraceIndex < 0) return '';
+
+    const inner = sourceCode.slice(openBraceIndex + 1, closeBraceIndex);
+    for (const entry of splitTopLevelEntries(inner)) {
+        const match = entry.match(/^\s*(?:\["([^"]+)"\]|\['([^']+)'\]|([A-Za-z_][A-Za-z0-9_]*))\s*=\s*([\s\S]*)$/);
+        if (!match) continue;
+
+        const key = trimModuleString(match[1] || match[2] || match[3], 80).toLowerCase();
+        if (key !== 'version') continue;
+
+        return trimModuleString(parseSimpleLuaValue(match[4]), 40);
+    }
+
+    return '';
+}
+
+export function parseModuleConfigSettings(value: unknown, schema: ModuleConfigSchema) {
+    const rawSettings = parseModuleSettings(value);
+    const settings: Record<string, unknown> = {};
+
+    for (const [key, field] of Object.entries(schema || {})) {
+        if (field.live) {
+            continue;
+        }
+
+        const rawValue = rawSettings[key];
+
+        settings[key] = parseConfigFieldValue(rawValue, field);
+    }
+
+    for (const [key, rawValue] of Object.entries(rawSettings)) {
+        if (schema[key]?.live) {
+            continue;
+        }
+        if (!(key in settings)) {
+            settings[key] = rawValue;
+        }
+    }
+
+    return settings;
+}
+
+export function parseModuleLiveConfigValue(rawValue: unknown, field: ModuleConfigField) {
+    return parseConfigFieldValue(rawValue, field);
 }
 
 export function sanitizeAddonModuleInput(body: Record<string, unknown>, partial = false): SanitizedAddonModuleResult {
@@ -79,6 +1297,11 @@ export function sanitizeAddonModuleInput(body: Record<string, unknown>, partial 
             errors.push('Module source code is required.');
         } else {
             input.sourceCode = sourceCode;
+            input.configSchema = parseModuleConfigSchema(sourceCode);
+            const configVersion = parseModuleConfigVersion(sourceCode);
+            if (configVersion) {
+                input.version = configVersion;
+            }
         }
     }
 
@@ -102,11 +1325,56 @@ export function normalizeAddonModule(row: Record<string, unknown> | null | undef
         version: String(row.version || '1.0.0'),
         category: String(row.category || 'General'),
         status: String(row.status || 'DRAFT') as AddonModuleStatus,
+        isOfficial: row.is_official_module === true,
+        creatorIsVerified: row.is_verified_creator === true,
+        creatorApprovedModuleCount: Number(row.creator_approved_module_count || 0),
+        creatorMaxModuleInstallCount: Number(row.creator_max_module_install_count || 0),
         sourceChecksum: String(row.source_checksum || ''),
+        configSchema: parseStoredModuleConfigSchema(row.config_schema),
         authorDiscordId: row.author_discord_id ? String(row.author_discord_id) : null,
+        submittedAt: row.submitted_at || null,
+        reviewedAt: row.reviewed_at || null,
+        reviewedByDiscordId: row.reviewed_by_discord_id ? String(row.reviewed_by_discord_id) : null,
+        moderationNote: String(row.moderation_note || ''),
         createdAt: row.created_at || null,
         updatedAt: row.updated_at || null,
         publishedAt: row.published_at || null,
+        ...(includeSource ? { sourceCode: String(row.source_code || '') } : {}),
+    };
+}
+
+export function normalizeServerCustomModule(row: Record<string, unknown> | null | undefined, includeSource = false) {
+    if (!row) {
+        return null;
+    }
+
+    const status = String(row.status || 'NEEDS_REUPLOAD').toUpperCase() as ServerCustomModuleStatus;
+
+    return {
+        id: String(row.id || ''),
+        serverId: String(row.server_id || ''),
+        slug: String(row.slug || ''),
+        name: String(row.name || 'Untitled Module'),
+        description: String(row.description || ''),
+        version: String(row.version || '1.0.0'),
+        category: 'Server Custom',
+        status: status === 'READY' ? 'READY' : 'NEEDS_REUPLOAD',
+        isCustom: true,
+        isOfficial: false,
+        creatorIsVerified: false,
+        creatorApprovedModuleCount: 0,
+        creatorMaxModuleInstallCount: 0,
+        sourceChecksum: String(row.source_checksum || ''),
+        configSchema: parseStoredModuleConfigSchema(row.config_schema),
+        enabled: row.enabled !== false && status === 'READY',
+        settings: parseModuleSettings(row.settings),
+        reviewResults: Array.isArray(row.review_results) ? row.review_results : [],
+        uploadedBy: row.uploaded_by ? String(row.uploaded_by) : null,
+        installed: true,
+        installedAt: row.uploaded_at || null,
+        createdAt: row.uploaded_at || null,
+        updatedAt: row.updated_at || null,
+        publishedAt: null,
         ...(includeSource ? { sourceCode: String(row.source_code || '') } : {}),
     };
 }
@@ -117,4 +1385,123 @@ export function parseModuleSettings(value: unknown) {
     }
 
     return value as Record<string, unknown>;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeDynamicOptionValue(rawValue: unknown, type: 'player' | 'server') {
+    if (isPlainRecord(rawValue)) {
+        if (type === 'server') {
+            const jobId = trimModuleString(rawValue.jobId ?? rawValue.job_id ?? rawValue.id ?? rawValue.value, 120);
+            const label = trimModuleString(rawValue.label ?? rawValue.name ?? jobId, 160);
+            const playerCount = Number(rawValue.playerCount ?? rawValue.player_count ?? 0);
+            return {
+                ...rawValue,
+                jobId,
+                JobId: jobId,
+                job_id: jobId,
+                id: jobId,
+                Id: jobId,
+                value: trimModuleString(rawValue.value ?? jobId, 120),
+                label,
+                name: trimModuleString(rawValue.name ?? label, 160),
+                Name: trimModuleString(rawValue.Name ?? rawValue.name ?? label, 160),
+                playerCount,
+                PlayerCount: playerCount,
+                player_count: playerCount,
+            };
+        }
+
+        const username = trimModuleString(rawValue.username ?? rawValue.name ?? rawValue.label ?? rawValue.value, 120);
+        const userId = trimModuleString(rawValue.userId ?? rawValue.user_id ?? rawValue.id, 40);
+        const displayName = trimModuleString(rawValue.displayName ?? rawValue.display_name ?? username, 120);
+        return {
+            ...rawValue,
+            username,
+            Username: username,
+            name: trimModuleString(rawValue.name ?? username, 120),
+            Name: trimModuleString(rawValue.Name ?? rawValue.name ?? username, 120),
+            displayName,
+            DisplayName: displayName,
+            display_name: displayName,
+            userId: userId || null,
+            UserId: userId || null,
+            user_id: userId || null,
+            id: userId || username,
+            Id: userId || username,
+            value: trimModuleString(rawValue.value ?? username ?? userId, 160),
+            label: trimModuleString(rawValue.label ?? username ?? userId, 160),
+        };
+    }
+
+    return trimModuleString(rawValue, 500);
+}
+
+function parseConfigFieldValue(rawValue: unknown, field: ModuleConfigField): unknown {
+    const rawRecord = isPlainRecord(rawValue) ? rawValue : {};
+
+    if (field.subFields.length > 0) {
+        const nested: Record<string, unknown> = {};
+        for (const subField of field.subFields) {
+            nested[subField.key] = parseConfigFieldValue(rawRecord[subField.key], subField);
+        }
+
+        if (field.type !== 'group') {
+            nested.value = parseConfigFieldValue(rawRecord.value ?? rawValue, { ...field, subFields: [] });
+        }
+
+        return nested;
+    }
+
+    if (field.type === 'bool') {
+        return rawValue === undefined ? field.defaultValue : rawValue === true || String(rawValue).toLowerCase() === 'true';
+    }
+
+    if (field.type === 'checkboxes') {
+        const values = Array.isArray(rawValue) ? rawValue.map((item) => String(item)) : [];
+        return values.filter((item) => field.options.includes(item));
+    }
+
+    if (field.type === 'color') {
+        const color = String(rawValue || field.defaultValue || '').trim();
+        return /^#[0-9a-f]{6}$/i.test(color) ? color : field.defaultValue;
+    }
+
+    if (field.type === 'integer') {
+        const integer = Number(rawValue ?? field.defaultValue);
+        return Number.isFinite(integer) ? Math.trunc(integer) : field.defaultValue;
+    }
+
+    if (field.type === 'string') {
+        return trimModuleString(rawValue ?? field.defaultValue ?? '', 1000);
+    }
+
+    if (field.type === 'group') {
+        return {};
+    }
+
+    if (field.type === 'player' || field.type === 'server') {
+        return normalizeDynamicOptionValue(rawValue ?? field.defaultValue, field.type);
+    }
+
+    const selected = String(rawValue || '');
+    return field.options.includes(selected) ? selected : field.defaultValue;
+}
+
+export function parseStoredModuleConfigSchema(value: unknown): ModuleConfigSchema {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return {};
+    }
+
+    const schema: ModuleConfigSchema = {};
+    for (const [key, rawField] of Object.entries(value as Record<string, unknown>)) {
+        const field = normalizeModuleConfigField(trimModuleString(key, 80), rawField);
+        if (field) {
+            schema[key] = field;
+        }
+    }
+
+    return schema;
 }

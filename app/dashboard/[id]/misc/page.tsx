@@ -11,7 +11,6 @@ import {
     VALUE_INPUT_COMMAND_IDS,
 } from "@/lib/adminPanelCommands";
 import { normalizeLivePlayerList } from "@/lib/livePlayers";
-import { supabase } from "@/lib/supabase";
 import { usePermissions } from "@/context/PermissionsContext";
 
 interface LiveServer {
@@ -44,6 +43,10 @@ const VALUE_INPUT_CONFIG: Record<string, { prompt: string; defaultValue: string 
         prompt: 'Enter the jump power value:',
         defaultValue: '50',
     },
+    TEAM: {
+        prompt: 'Enter the Roblox team name:',
+        defaultValue: '',
+    },
 };
 
 const VALUE_COMMAND_SET = new Set<string>(VALUE_INPUT_COMMAND_IDS);
@@ -65,11 +68,11 @@ function getActionButtonClasses(commandId: string) {
         return 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20';
     }
 
-    if (commandId === 'FREEZE' || commandId === 'FORCEFIELD_REMOVE') {
+    if (commandId === 'FREEZE' || commandId === 'RAGDOLL' || commandId === 'FORCEFIELD_REMOVE') {
         return 'bg-amber-500/10 hover:bg-amber-500 text-amber-500 hover:text-white border-amber-500/20';
     }
 
-    if (VALUE_COMMAND_SET.has(commandId) || commandId === 'SET_CHAR') {
+    if (VALUE_COMMAND_SET.has(commandId) || commandId === 'SET_CHAR' || commandId === 'TEAM') {
         return 'bg-violet-500/10 hover:bg-violet-500 text-violet-400 hover:text-white border-violet-500/20';
     }
 
@@ -107,12 +110,12 @@ export default function MiscPage() {
         async function fetchPlayers() {
             if (!guildId) return;
 
-            const { data, error } = await supabase
-                .from('live_servers')
-                .select('id, players')
-                .eq('server_id', guildId);
+            const response = await fetch(`/api/dashboard/live-servers?serverId=${encodeURIComponent(String(guildId))}`, {
+                cache: 'no-store',
+            });
 
-            if (!error && data) {
+            if (response.ok) {
+                const data = await response.json();
                 const allPlayers: PlayerSummary[] = [];
                 data.forEach((server: LiveServer) => {
                     normalizeLivePlayerList(server.players).forEach((player) => {
@@ -164,6 +167,15 @@ export default function MiscPage() {
             extraArgs.amount = amount;
         }
 
+        if (action === 'TEAM') {
+            const config = VALUE_INPUT_CONFIG.TEAM;
+            const teamName = trimString(prompt(config.prompt, config.defaultValue));
+            if (!teamName) {
+                return;
+            }
+            extraArgs.team_name = teamName;
+        }
+
         setActionLoading(`${target}-${action}`);
 
         const res = await fetch('/api/dashboard/command', {
@@ -189,8 +201,8 @@ export default function MiscPage() {
 
     function renderActions(target: string) {
         const availableActions = [...MISC_ACTION_COMMAND_IDS].filter((action) => canUseDashboardCommand(perms, action));
-        const instantActions = availableActions.filter((action) => action !== 'SET_CHAR' && !VALUE_COMMAND_SET.has(action));
-        const promptedActions = availableActions.filter((action) => action === 'SET_CHAR' || VALUE_COMMAND_SET.has(action));
+        const instantActions = availableActions.filter((action) => action !== 'SET_CHAR' && action !== 'TEAM' && !VALUE_COMMAND_SET.has(action));
+        const promptedActions = availableActions.filter((action) => action === 'SET_CHAR' || action === 'TEAM' || VALUE_COMMAND_SET.has(action));
 
         return (
             <div className="space-y-3">

@@ -1,9 +1,9 @@
 'use client';
 
 import { useSession, signIn, signOut } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
 
 // SVGs
 const LogOutIcon = () => (
@@ -18,6 +18,51 @@ const SettingsIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
 );
 
+const MarketplaceIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="m12 2 7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4Z" /><path d="M9 11h6" /><path d="M9 15h4" /></svg>
+);
+
+const LivePanelIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" /><path d="M8 21h8" /><path d="M12 16v5" /><path d="m10 8 4 2-4 2Z" /></svg>
+);
+
+function ActionTooltip({ label }: { label: string }) {
+    return (
+        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-200 opacity-0 shadow-xl transition-all group-hover/server-action:translate-y-0 group-hover/server-action:opacity-100">
+            {label}
+        </span>
+    );
+}
+
+function ServerIconLink({
+    href,
+    label,
+    children,
+    tone = 'default',
+}: {
+    href: string;
+    label: string;
+    children: ReactNode;
+    tone?: 'default' | 'live' | 'market';
+}) {
+    const toneClass = tone === 'live'
+        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:border-emerald-300/70 hover:bg-emerald-500/20'
+        : tone === 'market'
+            ? 'border-sky-500/30 bg-sky-500/10 text-sky-200 hover:border-sky-300/70 hover:bg-sky-500/20'
+            : 'border-slate-700 bg-slate-800 text-slate-200 hover:border-sky-400/60 hover:bg-sky-500/15 hover:text-white';
+
+    return (
+        <Link
+            href={href}
+            aria-label={label}
+            className={`group/server-action relative flex h-10 w-10 items-center justify-center rounded-lg border transition-all ${toneClass}`}
+        >
+            {children}
+            <ActionTooltip label={label} />
+        </Link>
+    );
+}
+
 interface Guild {
     id: string;
     name: string;
@@ -28,76 +73,148 @@ interface Guild {
     isRoleAccess?: boolean;
 }
 
+interface GuildDashboardPermissions {
+    can_access_dashboard: boolean;
+    can_access_live_panel: boolean;
+    is_admin: boolean;
+}
+
+type SessionUserWithId = {
+    id?: string;
+};
+
+const ADMINISTRATOR_PERMISSION = 0x8n;
+const MANAGE_GUILD_PERMISSION = 0x20n;
+
+function canOpenMarketplaceFromServerList(guild: Guild) {
+    if (guild.owner) {
+        return true;
+    }
+
+    try {
+        const permissions = BigInt(guild.permissions || 0);
+        return (permissions & ADMINISTRATOR_PERMISSION) === ADMINISTRATOR_PERMISSION
+            || (permissions & MANAGE_GUILD_PERMISSION) === MANAGE_GUILD_PERMISSION;
+    } catch {
+        return false;
+    }
+}
+
+function compareGuildsByBotStatus(a: Guild, b: Guild) {
+    if (a.hasBot === b.hasBot) {
+        return 0;
+    }
+
+    return a.hasBot ? -1 : 1;
+}
+
+function canOpenDashboardAction(permissions?: GuildDashboardPermissions) {
+    return Boolean(permissions?.is_admin || permissions?.can_access_dashboard);
+}
+
+function canOpenDashboardFromServerList(guild: Guild, permissions?: GuildDashboardPermissions) {
+    return canOpenDashboardAction(permissions) || canOpenMarketplaceFromServerList(guild);
+}
+
+function canOpenLivePanelAction(permissions?: GuildDashboardPermissions) {
+    return Boolean(permissions?.is_admin || permissions?.can_access_live_panel);
+}
+
+function canOpenLivePanelFromServerList(guild: Guild, permissions?: GuildDashboardPermissions) {
+    return canOpenLivePanelAction(permissions) || canOpenMarketplaceFromServerList(guild);
+}
+
 export default function Dashboard() {
     const { data: session, status } = useSession();
     const [guilds, setGuilds] = useState<Guild[]>([]);
+    const [guildPermissions, setGuildPermissions] = useState<Record<string, GuildDashboardPermissions>>({});
     const [loading, setLoading] = useState(false);
+    const [guildsError, setGuildsError] = useState<string | null>(null);
+    const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
+    const sortedGuilds = useMemo(() => [...guilds].sort(compareGuildsByBotStatus), [guilds]);
 
-    // Admin Actions State
-    const [removeModal, setRemoveModal] = useState<{ id: string, name: string } | null>(null);
-    const [removeReason, setRemoveReason] = useState("");
-    const [processing, setProcessing] = useState(false);
-
-    const handleJoinServer = async (guildId: string) => {
-        try {
-            const response = await fetch(`/api/guilds/${guildId}/invite`, { method: 'POST' });
-            const data = await response.json();
-            if (data.url) {
-                window.open(data.url, '_blank');
-            } else {
-                alert('Failed to get invite: ' + (data.error || 'Unknown error'));
-            }
-        } catch (err) {
-            console.error(err);
-            alert('Error joining server');
-        }
-    };
-
-    const handleRemoveBot = async () => {
-        if (!removeModal) return;
-        if (!removeReason.trim()) return alert("Reason required");
-
-        setProcessing(true);
-        try {
-            const response = await fetch(`/api/guilds/${removeModal.id}/leave`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason: removeReason })
-            });
-
-            if (response.ok) {
-                setGuilds(prev => prev.filter(g => g.id !== removeModal.id));
-                setRemoveModal(null);
-                setRemoveReason("");
-            } else {
-                const data = await response.json();
-                alert('Failed to remove bot: ' + (data.error || 'Unknown error'));
-            }
-        } catch (err) {
-            console.error(err);
-            alert('Error removing bot');
-        } finally {
-            setProcessing(false);
-        }
-    };
+    function handleSignOut() {
+        void signOut({ callbackUrl: '/auth/signin' });
+    }
 
     useEffect(() => {
-        if (session?.accessToken) {
+        let cancelled = false;
+
+        async function loadGuilds() {
+            if (status !== 'authenticated') return;
+
             setLoading(true);
-            fetch('/api/guilds')
-                .then(res => res.json())
-                .then(data => {
-                    if (Array.isArray(data)) {
-                        setGuilds(data);
-                    }
+            setGuildsError(null);
+            try {
+                const response = await fetch('/api/guilds', { cache: 'no-store' });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(typeof data?.error === 'string' ? data.error : `Failed to load servers (${response.status})`);
+                }
+                if (!Array.isArray(data)) {
+                    throw new Error('Failed to load servers.');
+                }
+                if (!cancelled) {
+                    setGuilds(data);
+                }
+            } catch (err) {
+                console.error(err);
+                if (!cancelled) {
+                    setGuilds([]);
+                    setGuildsError(err instanceof Error ? err.message : 'Failed to load servers.');
+                }
+            } finally {
+                if (!cancelled) {
                     setLoading(false);
-                })
-                .catch(err => {
-                    console.error(err);
-                    setLoading(false);
-                });
+                }
+            }
         }
-    }, [session]);
+
+        loadGuilds();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [status]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadGuildPermissions() {
+            const botGuilds = guilds.filter((guild) => guild.hasBot);
+            if (status !== 'authenticated' || botGuilds.length === 0) {
+                if (!cancelled) {
+                    setGuildPermissions({});
+                }
+                return;
+            }
+
+            const entries = await Promise.all(
+                botGuilds.map(async (guild) => {
+                    try {
+                        const response = await fetch(`/api/user/permissions?serverId=${encodeURIComponent(guild.id)}`, {
+                            cache: 'no-store',
+                        });
+                        if (!response.ok) return null;
+                        const permissions = await response.json() as GuildDashboardPermissions;
+                        return [guild.id, permissions] as const;
+                    } catch {
+                        return null;
+                    }
+                }),
+            );
+
+            if (!cancelled) {
+                setGuildPermissions(Object.fromEntries(entries.filter((entry): entry is readonly [string, GuildDashboardPermissions] => Boolean(entry))));
+            }
+        }
+
+        loadGuildPermissions();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [guilds, status]);
 
     if (status === "loading") {
         return (
@@ -136,7 +253,7 @@ export default function Dashboard() {
                     </Link>
 
                     <div className="ml-auto flex items-center gap-2 border-l border-slate-800 pl-3 sm:gap-4 md:pl-4">
-                        {((session?.user as any)?.id === '953414442060746854') && (
+                        {(sessionUserId === '953414442060746854') && (
                             <Link
                                 href="/management"
                                 className="hidden md:flex items-center gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-sky-900/20"
@@ -147,7 +264,7 @@ export default function Dashboard() {
                         )}
                         <div className="text-right hidden sm:block">
                             <p className="text-sm font-semibold text-white leading-none mb-1">{session?.user?.name}</p>
-                            <button onClick={() => signOut()} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
+                            <button type="button" onClick={handleSignOut} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
                                 <LogOutIcon />
                                 Sign Out
                             </button>
@@ -155,7 +272,8 @@ export default function Dashboard() {
                         <div className="relative group">
                             <img src={session?.user?.image || ''} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm transition-transform group-hover:scale-105" />
                             <button
-                                onClick={() => signOut()}
+                                type="button"
+                                onClick={handleSignOut}
                                 className="sm:hidden absolute -bottom-1 -right-1 bg-slate-900 border border-slate-700 p-1 rounded-md text-slate-400 hover:text-red-400 shadow-xl"
                                 title="Sign Out"
                             >
@@ -166,10 +284,26 @@ export default function Dashboard() {
                 </div>
             </nav>
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 md:py-12">
-                <header className="mb-6 md:mb-12">
-                    <h1 className="text-xl md:text-4xl font-extrabold text-white tracking-tight mb-1">Select a Server</h1>
-                    <p className="text-slate-500 text-xs md:text-base font-medium">Choose a community to manage and monitor.</p>
+            <div className="motion-page max-w-7xl mx-auto px-4 sm:px-8 py-6 md:py-12">
+                <header className="mb-6 flex flex-col gap-4 md:mb-12 md:flex-row md:items-end md:justify-between">
+                    <div>
+                        <h1 className="text-xl md:text-4xl font-extrabold text-white tracking-tight mb-1">Select a Server</h1>
+                        <p className="text-slate-500 text-xs md:text-base font-medium">Choose a community to manage and monitor.</p>
+                    </div>
+                    <Link
+                        href="/dashboard/marketplace"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:border-sky-400/60 hover:bg-sky-500/20"
+                    >
+                        <MarketplaceIcon />
+                        Open Marketplace
+                    </Link>
+                    <Link
+                        href="/dashboard/creator/modules"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3 text-xs font-bold uppercase tracking-widest text-emerald-200 transition-colors hover:border-emerald-400/60 hover:bg-emerald-500/20"
+                    >
+                        <PlusIcon />
+                        Creator Dashboard
+                    </Link>
                 </header>
 
                 {loading ? (
@@ -177,10 +311,26 @@ export default function Dashboard() {
                         <div className="w-10 h-10 border-2 border-sky-600 border-t-transparent rounded-full animate-spin mb-6"></div>
                         <p className="text-slate-500 text-sm font-medium animate-pulse">Loading servers...</p>
                     </div>
+                ) : guildsError ? (
+                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-8 text-center">
+                        <h2 className="text-lg font-bold text-white">Could not load servers</h2>
+                        <p className="mt-2 text-sm font-medium text-red-100/80">{guildsError}</p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="mt-6 rounded-lg bg-red-500 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-red-400"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                ) : sortedGuilds.length === 0 ? (
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-8 text-center">
+                        <h2 className="text-lg font-bold text-white">No servers available</h2>
+                        <p className="mt-2 text-sm font-medium text-slate-500">Ro-Link could not find any Discord servers you can manage.</p>
+                    </div>
                 ) : (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
-                        {guilds.map(guild => (
-                            <div key={guild.id} className="group relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40 p-5 transition-all hover:border-sky-500/30 sm:p-6">
+                    <div className="motion-list grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+                        {sortedGuilds.map(guild => (
+                            <div key={guild.id} className="interactive-lift subtle-glow group relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40 p-5 transition-all hover:border-sky-500/30 sm:p-6">
                                 <div className="mb-5 flex flex-col items-start gap-4 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
                                     <div className="relative">
                                         {guild.icon ? (
@@ -207,50 +357,28 @@ export default function Dashboard() {
 
                                 <div className="mt-auto">
                                     {guild.hasBot ? (
-                                        (() => {
-                                            const userId = (session?.user as any)?.id;
-                                            const isSuperUser = userId === '953414442060746854';
-                                            // isReadOnly is ONLY for the superuser to manage bot state in servers they don't own perms in.
-                                            // Everyone else (Admins or RoleAccess users) should see the Console.
-                                            const isReadOnly = isSuperUser && (guild.permissions == 0 || guild.permissions === "0") && !guild.isRoleAccess;
-
-                                            // Debug log
-                                            if (userId === '953414442060746854') {
-                                                console.log(`Guild: ${guild.name} (${guild.id}), ReadOnly: ${isReadOnly}`);
-                                            }
-
-                                            if (isReadOnly) {
-                                                return (
-                                                    <div className="flex flex-col gap-2 w-full">
-                                                        <button
-                                                            onClick={() => handleJoinServer(guild.id)}
-                                                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2"
-                                                        >
-                                                            Join Server
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setRemoveModal({ id: guild.id, name: guild.name })}
-                                                            className="w-full py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2"
-                                                        >
-                                                            Remove Bot
-                                                        </button>
-                                                    </div>
-                                                );
-                                            }
-
-                                            return (
-                                                <Link
-                                                    href={`/dashboard/${guild.id}`}
-                                                    className="w-full py-2.5 bg-slate-800 hover:bg-sky-600 text-white border border-slate-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 group/btn shadow-sm"
-                                                >
-                                                    <SettingsIcon />
-                                                    Open Console
-                                                </Link>
-                                            );
-                                        })()
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex items-center gap-2">
+                                                {canOpenDashboardFromServerList(guild, guildPermissions[guild.id]) && (
+                                                    <ServerIconLink href={`/dashboard/${guild.id}`} label="Open Console">
+                                                        <SettingsIcon />
+                                                    </ServerIconLink>
+                                                )}
+                                                {canOpenLivePanelFromServerList(guild, guildPermissions[guild.id]) && (
+                                                    <ServerIconLink href={`/dashboard/${guild.id}/live-panel`} label="Live Panel" tone="live">
+                                                        <LivePanelIcon />
+                                                    </ServerIconLink>
+                                                )}
+                                                {canOpenMarketplaceFromServerList(guild) && (
+                                                    <ServerIconLink href="/dashboard/marketplace" label="Open Marketplace" tone="market">
+                                                        <MarketplaceIcon />
+                                                    </ServerIconLink>
+                                                )}
+                                            </div>
+                                        </div>
                                     ) : (
                                         <a
-                                            href={`https://discord.com/api/oauth2/authorize?client_id=1466340007940722750&permissions=268536470&scope=bot%20applications.commands&guild_id=${guild.id}&disable_guild_select=true`}
+                                            href={getDiscordBotInviteUrl(guild.id)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-sky-900/10 flex items-center justify-center gap-2"
@@ -262,46 +390,6 @@ export default function Dashboard() {
                                 </div>
                             </div>
                         ))}
-                    </div>
-                )}
-                {/* Remove Bot Modal */}
-                {removeModal && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                        <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl relative">
-                            <h3 className="text-xl font-bold text-white mb-2">Remove Bot</h3>
-                            <p className="text-slate-400 text-sm mb-4">
-                                Remove bot from <span className="text-white font-semibold">{removeModal.name}</span>?
-                                <br />
-                                The owner will be notified with the reason below.
-                            </p>
-
-                            <textarea
-                                value={removeReason}
-                                onChange={(e) => setRemoveReason(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-red-500 mb-4 h-24 resize-none"
-                                placeholder="Reason for removal (required)..."
-                            />
-
-                            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
-                                <button
-                                    onClick={() => {
-                                        setRemoveModal(null);
-                                        setRemoveReason("");
-                                    }}
-                                    className="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition-colors"
-                                    disabled={processing}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleRemoveBot}
-                                    disabled={processing || !removeReason.trim()}
-                                    className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition-all shadow-lg shadow-red-900/20"
-                                >
-                                    {processing ? 'Removing...' : 'Confirm Remove'}
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 )}
             </div>

@@ -67,13 +67,13 @@ export default function CareersPage() {
             </nav>
 
             {/* Hero */}
-            <header className="py-20 px-6 max-w-7xl mx-auto">
+            <header className="motion-page py-20 px-6 max-w-7xl mx-auto">
                 <div className="max-w-3xl">
                     <h1 className="text-5xl md:text-7xl font-extrabold text-white tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-500">
                         Build the future of <span className="text-sky-500">Ro-Link.</span>
                     </h1>
                     <p className="text-slate-400 text-lg md:text-xl leading-relaxed">
-                        Join our mission to bridge the gap between Discord and Roblox. We're looking for passionate individuals to help us build and moderate the ultimate management platform.
+                        Join our mission to bridge the gap between Discord and Roblox. We&apos;re looking for passionate individuals to help us build and moderate the ultimate management platform.
                     </p>
                 </div>
             </header>
@@ -116,7 +116,7 @@ export default function CareersPage() {
                     </aside>
 
                     {/* Jobs List */}
-                    <div className="flex-1 space-y-6">
+                    <div className="motion-list flex-1 space-y-6">
                         {loading ? (
                             <div className="py-20 flex flex-col items-center justify-center gap-4 text-slate-500">
                                 <div className="w-10 h-10 border-2 border-sky-600 border-t-transparent rounded-full animate-spin"></div>
@@ -131,7 +131,7 @@ export default function CareersPage() {
                                 <Link
                                     key={job.id}
                                     href={`/careers/${job.id}`}
-                                    className="block bg-slate-900/40 border border-slate-800 p-8 rounded-3xl group hover:border-sky-500/30 hover:bg-slate-900/60 transition-all relative overflow-hidden"
+                                    className="interactive-lift subtle-glow block bg-slate-900/40 border border-slate-800 p-8 rounded-3xl group hover:border-sky-500/30 hover:bg-slate-900/60 transition-all relative overflow-hidden"
                                 >
                                     <div className="absolute top-0 right-0 p-8">
                                         <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-600 group-hover:bg-sky-600 group-hover:text-white transition-all">

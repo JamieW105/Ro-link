@@ -32,6 +32,187 @@ let metadataSyncEnabled = Boolean(
     process.env.DISCORD_BEARER_TOKEN
     && process.env.DISCORD_BEARER_TOKEN !== '0'
 );
+const DISCORD_EPOCH = 1420070400000n;
+const ROBLOX_USER_API_ORIGINS = ['https://users.roblox.com', 'https://users.roproxy.com'];
+const ROBLOX_THUMBNAIL_API_ORIGINS = ['https://thumbnails.roblox.com', 'https://thumbnails.roproxy.com'];
+const ROBLOX_API_HEADERS = {
+    Accept: 'application/json',
+    Referer: 'https://www.roblox.com/',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36',
+};
+const MISC_SUBCOMMAND_TO_COMMAND = {
+    fly: 'FLY',
+    noclip: 'NOCLIP',
+    invis: 'INVIS',
+    ghost: 'GHOST',
+    'set-char': 'SET_CHAR',
+    heal: 'HEAL',
+    damage: 'DAMAGE',
+    'max-health': 'MAX_HEALTH',
+    'walk-speed': 'WALK_SPEED',
+    'jump-power': 'JUMP_POWER',
+    kill: 'KILL',
+    reset: 'RESET',
+    refresh: 'REFRESH',
+    view: 'VIEW',
+    team: 'TEAM',
+    freeze: 'FREEZE',
+    unfreeze: 'UNFREEZE',
+    ragdoll: 'RAGDOLL',
+    'bring-to-spawn': 'BRING_TO_SPAWN',
+    'teleport-to-me': 'TELEPORT_TO_ME',
+    'forcefield-add': 'FORCEFIELD_ADD',
+    'forcefield-remove': 'FORCEFIELD_REMOVE',
+};
+const VALUE_INPUT_MISC_COMMANDS = new Set(['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED', 'JUMP_POWER']);
+const MODERATION_LOG_ACTIONS = new Set(['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'DISCORD_BAN', 'DISCORD_KICK', 'TIMEOUT', 'MUTE']);
+
+async function getLinkedRobloxUsername(discordId) {
+    if (!supabase || !discordId) return '';
+
+    const { data } = await supabase
+        .from('verified_users')
+        .select('roblox_username')
+        .eq('discord_id', discordId)
+        .maybeSingle();
+
+    return String(data?.roblox_username || '').trim();
+}
+
+async function findBlockedServerForGuild(guildId) {
+    if (!supabase || !guildId) return null;
+
+    const { data, error } = await supabase
+        .from('blocked_servers')
+        .select('guild_id, reason')
+        .eq('guild_id', guildId)
+        .maybeSingle();
+
+    if (error) {
+        throw error;
+    }
+
+    return data;
+}
+
+function getBlockedServerMessage(blocked) {
+    const reason = String(blocked?.reason || '').trim();
+    return reason
+        ? `This server is blocked from using Ro-Link. Reason: ${reason}`
+        : 'This server is blocked from using Ro-Link.';
+}
+
+function buildModerationPanel() {
+    const embed = new EmbedBuilder()
+        .setTitle('Moderation Actions')
+        .setDescription('Select an action from the menu below.')
+        .setColor('#ef4444')
+        .addFields(
+            { name: 'Player Actions', value: '`BAN` `KICK` `UNBAN` `SOFTBAN`', inline: false },
+            { name: 'Server Actions', value: '`UPDATE` `SHUTDOWN`', inline: false }
+        )
+        .setFooter({ text: 'Ro-Link Moderation System' });
+
+    const row = new ActionRowBuilder()
+        .addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('moderation_menu')
+                .setPlaceholder('Choose a moderation action...')
+                .addOptions(
+                    new StringSelectMenuOptionBuilder().setLabel('Ban').setDescription('Permanently ban a Roblox user').setValue('BAN'),
+                    new StringSelectMenuOptionBuilder().setLabel('Kick').setDescription('Kick a Roblox user from the server').setValue('KICK'),
+                    new StringSelectMenuOptionBuilder().setLabel('Unban').setDescription('Lift a Roblox ban').setValue('UNBAN'),
+                    new StringSelectMenuOptionBuilder().setLabel('Softban').setDescription('Temporarily ban and remove a Roblox user').setValue('SOFTBAN'),
+                    new StringSelectMenuOptionBuilder().setLabel('Update Servers').setDescription('Restart all Roblox servers').setValue('UPDATE'),
+                    new StringSelectMenuOptionBuilder().setLabel('Shutdown').setDescription('Shut down Roblox servers').setValue('SHUTDOWN'),
+                ),
+        );
+
+    return { embed, row };
+}
+
+function buildMiscPanel() {
+    const embed = new EmbedBuilder()
+        .setTitle('Miscellaneous Player Actions')
+        .setDescription('Select an action from the menu below to apply it to a Roblox player.')
+        .setColor('#0ea5e9')
+        .addFields(
+            { name: 'Fly', value: 'Enables hover/flight for the target player.', inline: false },
+            { name: 'Noclip', value: 'Allows the player to pass through walls.', inline: false },
+            { name: 'Invis', value: 'Makes the player and their accessories fully invisible.', inline: false },
+            { name: 'Ghost', value: 'Applies a ForceField material to the player character.', inline: false },
+            { name: 'Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: false },
+            { name: 'Heal', value: 'Restores player health to maximum.', inline: false },
+            { name: 'Kill', value: 'Immediately kills the target player.', inline: false },
+            { name: 'Ragdoll', value: 'Temporarily forces the target player into a ragdoll state.', inline: false },
+            { name: 'Reset', value: 'Resets the player character.', inline: false },
+            { name: 'Refresh', value: 'Respawn the player character.', inline: false },
+            { name: 'View', value: 'View a player or reset your camera to yourself.', inline: false },
+            { name: 'Team', value: 'Move a player to a Roblox team.', inline: false }
+        )
+        .setFooter({ text: 'Ro-Link Utility System' });
+
+    const row = new ActionRowBuilder()
+        .addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('misc_menu')
+                .setPlaceholder('Choose an action...')
+                .addOptions(
+                    new StringSelectMenuOptionBuilder().setLabel('Fly').setDescription('Enable flight for the player').setValue('FLY'),
+                    new StringSelectMenuOptionBuilder().setLabel('Noclip').setDescription('Allow player to walk through walls').setValue('NOCLIP'),
+                    new StringSelectMenuOptionBuilder().setLabel('Invis').setDescription('Make the player invisible').setValue('INVIS'),
+                    new StringSelectMenuOptionBuilder().setLabel('Ghost').setDescription('Apply a ForceField material').setValue('GHOST'),
+                    new StringSelectMenuOptionBuilder().setLabel('Set Character').setDescription('Change appearance').setValue('SET_CHAR'),
+                    new StringSelectMenuOptionBuilder().setLabel('Heal').setDescription('Restore health').setValue('HEAL'),
+                    new StringSelectMenuOptionBuilder().setLabel('Damage').setDescription('Deal damage').setValue('DAMAGE'),
+                    new StringSelectMenuOptionBuilder().setLabel('Max Health').setDescription('Set maximum health').setValue('MAX_HEALTH'),
+                    new StringSelectMenuOptionBuilder().setLabel('Walk Speed').setDescription('Set walk speed').setValue('WALK_SPEED'),
+                    new StringSelectMenuOptionBuilder().setLabel('Jump Power').setDescription('Set jump power').setValue('JUMP_POWER'),
+                    new StringSelectMenuOptionBuilder().setLabel('Kill').setDescription('Instant kill').setValue('KILL'),
+                    new StringSelectMenuOptionBuilder().setLabel('Reset').setDescription('Reset character').setValue('RESET'),
+                    new StringSelectMenuOptionBuilder().setLabel('Refresh').setDescription('Refresh character').setValue('REFRESH'),
+                    new StringSelectMenuOptionBuilder().setLabel('View').setDescription('View or reset your camera').setValue('VIEW'),
+                    new StringSelectMenuOptionBuilder().setLabel('Team').setDescription('Move to a team').setValue('TEAM'),
+                    new StringSelectMenuOptionBuilder().setLabel('Freeze').setDescription('Anchor in place').setValue('FREEZE'),
+                    new StringSelectMenuOptionBuilder().setLabel('Unfreeze').setDescription('Remove freeze').setValue('UNFREEZE'),
+                    new StringSelectMenuOptionBuilder().setLabel('Ragdoll').setDescription('Temporarily ragdoll').setValue('RAGDOLL'),
+                    new StringSelectMenuOptionBuilder().setLabel('Bring To Spawn').setDescription('Move to spawn').setValue('BRING_TO_SPAWN'),
+                    new StringSelectMenuOptionBuilder().setLabel('Teleport To Me').setDescription('Move to a moderator').setValue('TELEPORT_TO_ME'),
+                    new StringSelectMenuOptionBuilder().setLabel('Add ForceField').setDescription('Add a ForceField').setValue('FORCEFIELD_ADD'),
+                    new StringSelectMenuOptionBuilder().setLabel('Remove ForceField').setDescription('Remove ForceFields').setValue('FORCEFIELD_REMOVE'),
+                ),
+        );
+
+    return { embed, row };
+}
+
+async function isServerStaffInteraction(interaction) {
+    if (!interaction?.member) return false;
+    if (
+        interaction.member.permissions.has('Administrator')
+        || interaction.member.permissions.has('BanMembers')
+        || interaction.member.permissions.has('KickMembers')
+        || interaction.member.permissions.has('ManageGuild')
+    ) {
+        return true;
+    }
+
+    const roleIds = interaction.member.roles?.cache?.map((role) => role.id) || [];
+    if (!roleIds.length) return false;
+
+    const { data: roles } = await supabase
+        .from('dashboard_roles')
+        .select('can_lookup, can_kick, can_ban, can_access_dashboard')
+        .eq('server_id', interaction.guildId)
+        .in('discord_role_id', roleIds);
+
+    return Array.isArray(roles) && roles.some((role) =>
+        role.can_lookup === true
+        || role.can_kick === true
+        || role.can_ban === true
+        || role.can_access_dashboard === true
+    );
+}
 
 async function refreshCommands() {
     try {
@@ -150,8 +331,597 @@ function formatModerationHistory(entries) {
     return entries.slice(0, 5).map((entry) => {
         const action = truncateText(entry?.action || 'UNKNOWN', 24);
         const moderator = truncateText(entry?.moderator || 'Unknown Moderator', 48);
-        return `• \`${action}\` by **${moderator}** ${formatDiscordTimestamp(entry?.timestamp, 'R')}`;
+        return `- \`${action}\` by **${moderator}** ${formatDiscordTimestamp(entry?.timestamp, 'R')}`;
     }).join('\n');
+}
+
+function normalizeStaffNoteTarget(target = {}) {
+    const discordId = String(target.discordId ?? '').trim().slice(0, 32);
+    const robloxId = String(target.robloxId ?? '').trim().slice(0, 32);
+    const robloxUsername = String(target.robloxUsername ?? '').trim().slice(0, 64);
+
+    return {
+        discordId: discordId || null,
+        robloxId: robloxId || null,
+        robloxUsername: robloxUsername || null,
+        robloxUsernameLower: robloxUsername ? robloxUsername.toLowerCase() : null,
+    };
+}
+
+function getStaffNoteTargetLabel(target) {
+    const normalized = normalizeStaffNoteTarget(target);
+    if (normalized.robloxUsername) return normalized.robloxUsername;
+    if (normalized.robloxId) return `Roblox ID ${normalized.robloxId}`;
+    if (normalized.discordId) return `Discord ID ${normalized.discordId}`;
+    return 'Unknown User';
+}
+
+function formatStaffNotes(notes) {
+    if (!Array.isArray(notes) || notes.length === 0) {
+        return 'No staff notes found for this user.';
+    }
+
+    return notes.slice(0, 5).map((note) => {
+        const author = truncateText(note.created_by_tag || note.created_by_discord_id || 'Unknown Staff', 48);
+        return `- **${author}** ${formatDiscordTimestamp(note.created_at, 'R')}: ${truncateText(note.note, 220)}`;
+    }).join('\n');
+}
+
+function encodeStaffNoteModalTarget(target) {
+    const normalized = normalizeStaffNoteTarget(target);
+    return [
+        normalized.discordId || '-',
+        normalized.robloxId || '-',
+        normalized.robloxUsername ? encodeURIComponent(normalized.robloxUsername) : '-',
+    ].join('|');
+}
+
+function decodeStaffNoteModalTarget(encoded) {
+    const [discordId = '-', robloxId = '-', robloxUsername = '-'] = String(encoded || '').split('|');
+    return {
+        discordId: discordId === '-' ? '' : discordId,
+        robloxId: robloxId === '-' ? '' : robloxId,
+        robloxUsername: robloxUsername === '-' ? '' : decodeURIComponent(robloxUsername),
+    };
+}
+
+function buildStaffNoteModalCustomId(target) {
+    return `staff_note_modal|${encodeStaffNoteModalTarget(target)}`;
+}
+
+async function fetchStaffNotes(serverId, target, limit = 5) {
+    const normalized = normalizeStaffNoteTarget(target);
+    const safeLimit = Math.max(1, Math.min(Math.floor(limit), 25));
+    if (!serverId || (!normalized.discordId && !normalized.robloxId && !normalized.robloxUsernameLower)) return [];
+
+    const baseQuery = () => supabase
+        .from('staff_notes')
+        .select('id, server_id, target_discord_id, target_roblox_id, target_roblox_username, note, created_by_discord_id, created_by_tag, created_at')
+        .eq('server_id', serverId)
+        .order('created_at', { ascending: false })
+        .limit(safeLimit);
+
+    const queries = [];
+    if (normalized.discordId) queries.push(baseQuery().eq('target_discord_id', normalized.discordId));
+    if (normalized.robloxId) queries.push(baseQuery().eq('target_roblox_id', normalized.robloxId));
+    if (normalized.robloxUsernameLower) queries.push(baseQuery().eq('target_roblox_username_lower', normalized.robloxUsernameLower));
+
+    const results = await Promise.all(queries);
+    const rows = new Map();
+    for (const { data, error } of results) {
+        if (error) throw new Error(error.message || 'Failed to load staff notes.');
+        for (const row of Array.isArray(data) ? data : []) {
+            rows.set(row.id, row);
+        }
+    }
+
+    return Array.from(rows.values())
+        .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+        .slice(0, safeLimit);
+}
+
+async function createStaffNote({ serverId, target, note, createdByDiscordId, createdByTag }) {
+    const normalized = normalizeStaffNoteTarget(target);
+    const safeNote = String(note ?? '').trim().slice(0, 1500);
+
+    if (!normalized.discordId && !normalized.robloxId && !normalized.robloxUsername) {
+        throw new Error('Choose a Discord user or Roblox user before adding a note.');
+    }
+    if (!safeNote) {
+        throw new Error('Note cannot be empty.');
+    }
+
+    const { data, error } = await supabase
+        .from('staff_notes')
+        .insert([{
+            server_id: serverId,
+            target_discord_id: normalized.discordId,
+            target_roblox_id: normalized.robloxId,
+            target_roblox_username: normalized.robloxUsername,
+            target_roblox_username_lower: normalized.robloxUsernameLower,
+            note: safeNote,
+            created_by_discord_id: String(createdByDiscordId ?? '').trim().slice(0, 32) || null,
+            created_by_tag: String(createdByTag ?? '').trim().slice(0, 128) || 'Unknown Staff',
+        }])
+        .select('id, target_discord_id, target_roblox_id, target_roblox_username, note')
+        .single();
+
+    if (error) throw new Error(error.message || 'Failed to save staff note.');
+    return data;
+}
+
+function getDiscordCreatedAt(discordId) {
+    try {
+        const timestamp = Number((BigInt(discordId) >> 22n) + DISCORD_EPOCH);
+        return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : '';
+    } catch {
+        return '';
+    }
+}
+
+function formatDiscordUserTag(discordUser) {
+    if (!discordUser?.username) {
+        return 'Unknown User';
+    }
+
+    return discordUser.discriminator && discordUser.discriminator !== '0'
+        ? `${discordUser.username}#${discordUser.discriminator}`
+        : `@${discordUser.username}`;
+}
+
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getLivePlayerScore(record) {
+    let score = 0;
+    if (String(record.username || record.name || '').trim()) score += 2;
+    if (String(record.displayName || '').trim()) score += 1;
+    if (String(record.userId || record.id || '').trim()) score += 1;
+    if (String(record.avatarUrl || record.thumbnailUrl || record.characterThumbnail || record.headshotUrl || '').trim()) score += 1;
+    return score;
+}
+
+function unwrapLivePlayerObject(value, seen = new WeakSet()) {
+    if (!isRecord(value) || seen.has(value)) {
+        return null;
+    }
+
+    seen.add(value);
+    const currentScore = getLivePlayerScore(value);
+    let bestMatch = currentScore > 0 ? value : null;
+    let bestScore = currentScore;
+
+    for (const nestedValue of Object.values(value)) {
+        if (!isRecord(nestedValue)) continue;
+        const nestedMatch = unwrapLivePlayerObject(nestedValue, seen);
+        if (!nestedMatch) continue;
+        const nestedScore = getLivePlayerScore(nestedMatch);
+        if (nestedScore > bestScore) {
+            bestMatch = nestedMatch;
+            bestScore = nestedScore;
+        }
+    }
+
+    return bestMatch;
+}
+
+function collectNestedLivePlayerEntries(value, depth = 0) {
+    if (depth > 3) {
+        return [];
+    }
+
+    if (Array.isArray(value)) {
+        return value.flatMap((entry) => collectNestedLivePlayerEntries(entry, depth + 1));
+    }
+
+    if (!isRecord(value)) {
+        return [];
+    }
+
+    if (getLivePlayerScore(value) > 0) {
+        return [value];
+    }
+
+    return Object.values(value).flatMap((entry) => collectNestedLivePlayerEntries(entry, depth + 1));
+}
+
+function toRawLivePlayerEntries(rawPlayers) {
+    if (Array.isArray(rawPlayers)) {
+        return rawPlayers;
+    }
+
+    if (!isRecord(rawPlayers)) {
+        return [];
+    }
+
+    if (getLivePlayerScore(rawPlayers) > 0) {
+        return [rawPlayers];
+    }
+
+    const nestedEntries = Object.values(rawPlayers).flatMap((entry) => collectNestedLivePlayerEntries(entry));
+    return nestedEntries.length > 0 ? nestedEntries : Object.values(rawPlayers);
+}
+
+function normalizeLivePlayer(rawPlayer) {
+    if (typeof rawPlayer === 'string') {
+        const username = rawPlayer.trim();
+        return username ? { username, displayName: username, userId: null, avatarUrl: null } : null;
+    }
+
+    const player = unwrapLivePlayerObject(rawPlayer);
+    if (!player) {
+        return null;
+    }
+
+    const username = String(player.username || player.name || '').trim();
+    if (!username) {
+        return null;
+    }
+
+    const userId = String(player.userId || player.id || '').trim() || null;
+    return {
+        username,
+        displayName: String(player.displayName || username).trim(),
+        userId,
+        avatarUrl: String(player.avatarUrl || player.thumbnailUrl || player.characterThumbnail || player.headshotUrl || '').trim() || null,
+    };
+}
+
+function normalizeLivePlayerList(rawPlayers) {
+    const players = [];
+    const seen = new Set();
+
+    for (const rawPlayer of toRawLivePlayerEntries(rawPlayers)) {
+        const player = normalizeLivePlayer(rawPlayer);
+        if (!player) continue;
+
+        const key = player.userId ? `id:${player.userId}` : `username:${player.username.toLowerCase()}`;
+        if (seen.has(key)) continue;
+
+        seen.add(key);
+        players.push(player);
+    }
+
+    return players;
+}
+
+function findLivePlayerInList(rawPlayers, identity) {
+    const normalizedIdentity = String(identity || '').trim().toLowerCase();
+    if (!normalizedIdentity) {
+        return null;
+    }
+
+    return normalizeLivePlayerList(rawPlayers).find((player) =>
+        player.username.toLowerCase() === normalizedIdentity
+        || (player.userId ? player.userId.toLowerCase() === normalizedIdentity : false)
+    ) || null;
+}
+
+function getVisiblePlayerCount(server) {
+    const players = normalizeLivePlayerList(server?.players);
+    const count = Number(server?.player_count || 0);
+    return players.length > 0 ? players.length : Number.isFinite(count) ? count : 0;
+}
+
+function formatJobId(jobId) {
+    const value = String(jobId || '').trim();
+    return value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value || 'Unknown';
+}
+
+function buildRobloxJoinUrl(placeId, jobId) {
+    const normalizedPlaceId = String(placeId || '').trim();
+    const normalizedJobId = String(jobId || '').trim();
+    if (!normalizedPlaceId || !normalizedJobId) {
+        return '';
+    }
+
+    return `https://www.roblox.com/games/start?placeId=${encodeURIComponent(normalizedPlaceId)}&gameInstanceId=${encodeURIComponent(normalizedJobId)}`;
+}
+
+async function fetchLiveServers(serverId) {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const baseQuery = () => supabase
+        .from('live_servers')
+        .select('id, players, player_count, updated_at')
+        .eq('server_id', serverId)
+        .order('updated_at', { ascending: false });
+
+    const { data, error } = await baseQuery()
+        .gte('updated_at', fiveMinutesAgo);
+
+    if (error) {
+        throw new Error('Failed to load live servers.');
+    }
+
+    if (Array.isArray(data) && data.length > 0) {
+        return data;
+    }
+
+    const { data: fallbackData, error: fallbackError } = await baseQuery()
+        .limit(25);
+
+    if (fallbackError) {
+        throw new Error('Failed to load live servers.');
+    }
+
+    return Array.isArray(fallbackData) ? fallbackData : [];
+}
+
+function findPlayerServer(liveServers, identity) {
+    for (const liveServer of liveServers) {
+        const player = findLivePlayerInList(liveServer.players, identity);
+        if (player) {
+            return { server: liveServer, player };
+        }
+    }
+
+    return { server: null, player: null };
+}
+
+async function fetchDiscordLookup(discordUser, guild, serverId) {
+    const userId = String(discordUser?.id || '').trim();
+    if (!userId) {
+        throw new Error('Please choose a Discord user to lookup.');
+    }
+
+    const [member, verifiedUserRes, logsRes] = await Promise.all([
+        guild?.members?.fetch(userId).catch(() => null),
+        supabase
+            .from('verified_users')
+            .select('*')
+            .eq('discord_id', userId)
+            .maybeSingle(),
+        supabase
+            .from('logs')
+            .select('id, action, moderator, timestamp, target')
+            .eq('server_id', serverId)
+            .order('timestamp', { ascending: false })
+            .limit(100),
+    ]);
+
+    const resolvedUser = member?.user || discordUser;
+    const matchValues = new Set(
+        [
+            userId,
+            `<@${userId}>`,
+            `<@!${userId}>`,
+            verifiedUserRes.data?.roblox_username,
+            resolvedUser?.username,
+            formatDiscordUserTag(resolvedUser),
+        ]
+            .filter(Boolean)
+            .map((value) => String(value).toLowerCase())
+    );
+
+    const moderationHistory = (Array.isArray(logsRes.data) ? logsRes.data : [])
+        .filter((entry) => {
+            const action = String(entry?.action || '').toUpperCase();
+            const target = String(entry?.target || '').toLowerCase();
+            return matchValues.has(target) && (
+                MODERATION_LOG_ACTIONS.has(action)
+                || action.includes('BAN')
+                || action.includes('KICK')
+                || action.includes('MUTE')
+                || action.includes('TIMEOUT')
+            );
+        })
+        .slice(0, 5);
+
+    let activeServer = null;
+    let activePlayer = null;
+    const robloxUsername = String(verifiedUserRes.data?.roblox_username || '').trim();
+    const robloxId = String(verifiedUserRes.data?.roblox_id || '').trim();
+    if (robloxUsername || robloxId) {
+        const liveServers = await fetchLiveServers(serverId);
+        const presence = findPlayerServer(liveServers, robloxUsername || robloxId);
+        activeServer = presence.server;
+        activePlayer = presence.player;
+        if (!activeServer && robloxUsername && robloxId) {
+            const fallbackPresence = findPlayerServer(liveServers, robloxId);
+            activeServer = fallbackPresence.server;
+            activePlayer = fallbackPresence.player;
+        }
+    }
+
+    return {
+        user: resolvedUser,
+        member,
+        verifiedUser: verifiedUserRes.data,
+        moderationHistory,
+        activeServer,
+        activePlayer,
+    };
+}
+
+function mergeRobloxHeaders(headers) {
+    return {
+        ...ROBLOX_API_HEADERS,
+        ...(headers || {}),
+    };
+}
+
+async function fetchRobloxJsonFromOrigins(origins, path, init = {}, label = 'Roblox lookup') {
+    const failures = [];
+
+    for (const origin of origins) {
+        try {
+            const response = await fetch(`${origin}${path}`, {
+                ...init,
+                headers: mergeRobloxHeaders(init.headers),
+            });
+
+            if (response.ok) {
+                return await response.json();
+            }
+
+            failures.push({ origin, status: response.status });
+        } catch (error) {
+            failures.push({
+                origin,
+                message: error?.message || String(error),
+            });
+        }
+    }
+
+    const statuses = failures
+        .map((failure) => failure.status)
+        .filter((status) => typeof status === 'number');
+
+    if (statuses.includes(404)) {
+        throw new Error('Player not found.');
+    }
+
+    if (statuses.includes(429)) {
+        throw new Error('Roblox rate limited the lookup. Try again in a moment.');
+    }
+
+    if (statuses.includes(403)) {
+        throw new Error(`${label} was blocked by Roblox (403). Try again in a moment.`);
+    }
+
+    const lastFailure = failures[failures.length - 1];
+    throw new Error(`${label} failed${lastFailure?.status ? ` (${lastFailure.status})` : ''}.`);
+}
+
+async function resolveRobloxUser(input) {
+    const searchInput = String(input ?? '').trim();
+    if (!searchInput) {
+        throw new Error('Please provide a Roblox username to lookup.');
+    }
+
+    if (/^\d+$/.test(searchInput)) {
+        const profile = await fetchRobloxJsonFromOrigins(
+            ROBLOX_USER_API_ORIGINS,
+            `/v1/users/${encodeURIComponent(searchInput)}`,
+            {},
+            'Roblox profile lookup',
+        );
+        const resolvedId = profile?.id || searchInput;
+        const resolvedName = String(profile?.name || searchInput).trim();
+        return {
+            id: resolvedId,
+            name: resolvedName,
+            displayName: String(profile?.displayName || resolvedName).trim(),
+            profile,
+        };
+    }
+
+    const usernameData = await fetchRobloxJsonFromOrigins(
+        ROBLOX_USER_API_ORIGINS,
+        '/v1/usernames/users',
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ usernames: [searchInput], excludeBannedUsers: false }),
+        },
+        'Roblox username lookup',
+    );
+
+    const exactUsernameMatch = Array.isArray(usernameData?.data) ? usernameData.data[0] : null;
+    if (exactUsernameMatch?.id) {
+        const resolvedName = String(exactUsernameMatch.name || searchInput).trim();
+        return {
+            id: exactUsernameMatch.id,
+            name: resolvedName,
+            displayName: String(exactUsernameMatch.displayName || resolvedName).trim(),
+        };
+    }
+
+    const searchData = await fetchRobloxJsonFromOrigins(
+        ROBLOX_USER_API_ORIGINS,
+        `/v1/users/search?keyword=${encodeURIComponent(searchInput)}&limit=10`,
+        {},
+        'Roblox search',
+    );
+    const matches = Array.isArray(searchData?.data) ? searchData.data : [];
+    const exactMatch = matches.find((candidate) =>
+        String(candidate?.name || '').toLowerCase() === searchInput.toLowerCase()
+    );
+    const matchedUser = exactMatch || matches[0];
+
+    if (!matchedUser?.id) {
+        throw new Error('Player not found.');
+    }
+
+    const resolvedName = String(matchedUser.name || searchInput).trim();
+    return {
+        id: matchedUser.id,
+        name: resolvedName,
+        displayName: String(matchedUser.displayName || resolvedName).trim(),
+    };
+}
+
+async function findVerifiedRobloxIdentity(input) {
+    const searchInput = String(input ?? '').trim();
+    if (!searchInput) {
+        return null;
+    }
+
+    let query = supabase
+        .from('verified_users')
+        .select('roblox_id, roblox_username');
+
+    query = /^\d+$/.test(searchInput)
+        ? query.eq('roblox_id', searchInput)
+        : query.ilike('roblox_username', searchInput);
+
+    const { data, error } = await query.maybeSingle();
+    if (error) {
+        console.warn('[LOOKUP] Verified Roblox fallback failed:', error.message);
+        return null;
+    }
+
+    return data || null;
+}
+
+function buildVerifiedRobloxFallback(identity, input) {
+    const id = String(identity?.roblox_id ?? '').trim();
+    const username = String(identity?.roblox_username ?? input).trim();
+    if (!id && !username) {
+        return null;
+    }
+
+    const resolvedName = username || input;
+    return {
+        id: id || input,
+        name: resolvedName,
+        displayName: resolvedName,
+        profile: {
+            id: id || input,
+            name: resolvedName,
+            displayName: resolvedName,
+            description: 'Roblox public profile could not be loaded. Showing verified Ro-Link data.',
+            created: '',
+            isBanned: false,
+        },
+    };
+}
+
+async function findLiveRobloxIdentity(serverId, input) {
+    const liveServers = await fetchLiveServers(serverId);
+    const presence = findPlayerServer(liveServers, input);
+    const player = presence.player;
+    if (!player?.userId || !player.username) {
+        return null;
+    }
+
+    const resolvedName = player.username;
+    return {
+        id: player.userId,
+        name: resolvedName,
+        displayName: player.displayName || resolvedName,
+        profile: {
+            id: player.userId,
+            name: resolvedName,
+            displayName: player.displayName || resolvedName,
+            description: 'Roblox public profile could not be loaded. Showing live server data.',
+            created: '',
+            isBanned: false,
+        },
+    };
 }
 
 async function fetchRobloxLookup(username, serverId) {
@@ -174,29 +944,20 @@ async function fetchRobloxLookup(username, serverId) {
         ? serverSettings.open_cloud_key.trim()
         : '';
 
-    const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(searchUsername)}&limit=10`, {
-        headers: {
-            'User-Agent': 'Ro-Link Bot/1.0',
+    let matchedUser;
+    try {
+        matchedUser = await resolveRobloxUser(searchUsername);
+    } catch (error) {
+        const verifiedIdentity = await findVerifiedRobloxIdentity(searchUsername);
+        const fallbackUser = verifiedIdentity
+            ? buildVerifiedRobloxFallback(verifiedIdentity, searchUsername)
+            : await findLiveRobloxIdentity(serverId, searchUsername);
+        if (!fallbackUser) {
+            throw error;
         }
-    });
 
-    if (!searchRes.ok) {
-        if (searchRes.status === 429) {
-            throw new Error('Roblox rate limited the lookup. Try again in a moment.');
-        }
-
-        throw new Error(`Roblox search failed (${searchRes.status}).`);
-    }
-
-    const searchData = await searchRes.json();
-    const matches = Array.isArray(searchData?.data) ? searchData.data : [];
-    const exactMatch = matches.find((candidate) =>
-        String(candidate?.name || '').toLowerCase() === searchUsername.toLowerCase()
-    );
-    const matchedUser = exactMatch || matches[0];
-
-    if (!matchedUser?.id) {
-        throw new Error('Player not found.');
+        console.warn('[LOOKUP] Roblox public lookup failed; using local fallback:', error?.message || error);
+        matchedUser = fallbackUser;
     }
 
     let cloudProfile = null;
@@ -216,23 +977,21 @@ async function fetchRobloxLookup(username, serverId) {
         }
     }
 
-    const legacyProfileRes = await fetch(`https://users.roblox.com/v1/users/${matchedUser.id}`, {
-        headers: {
-            'User-Agent': 'Ro-Link Bot/1.0',
-        }
-    });
-
-    if (!legacyProfileRes.ok) {
-        throw new Error(`Roblox profile lookup failed (${legacyProfileRes.status}).`);
-    }
-
     const [legacyProfile, thumbnailData] = await Promise.all([
-        legacyProfileRes.json(),
-        fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${matchedUser.id}&size=150x150&format=Png&isCircular=false`, {
-            headers: {
-                'User-Agent': 'Ro-Link Bot/1.0',
-            }
-        }).then((response) => response.ok ? response.json() : { data: [] }).catch(() => ({ data: [] })),
+        matchedUser.profile
+            ? Promise.resolve(matchedUser.profile)
+            : fetchRobloxJsonFromOrigins(
+                ROBLOX_USER_API_ORIGINS,
+                `/v1/users/${encodeURIComponent(String(matchedUser.id))}`,
+                {},
+                'Roblox profile lookup',
+            ),
+        fetchRobloxJsonFromOrigins(
+            ROBLOX_THUMBNAIL_API_ORIGINS,
+            `/v1/users/avatar-headshot?userIds=${encodeURIComponent(String(matchedUser.id))}&size=150x150&format=Png&isCircular=false`,
+            {},
+            'Roblox avatar lookup',
+        ).catch(() => ({ data: [] })),
     ]);
 
     const resolvedUsername = legacyProfile?.name || matchedUser.name || searchUsername;
@@ -254,8 +1013,8 @@ async function fetchRobloxLookup(username, serverId) {
     const liveServers = Array.isArray(liveServersRes.data) ? liveServersRes.data : [];
     const moderationHistory = Array.isArray(logsRes.data) ? logsRes.data : [];
     const activeServer = liveServers.find((server) =>
-        Array.isArray(server.players)
-        && server.players.some((player) => String(player || '').toLowerCase() === resolvedUsername.toLowerCase())
+        findLivePlayerInList(server.players, resolvedUsername)
+        || findLivePlayerInList(server.players, matchedUser.id)
     );
 
     return {
@@ -288,8 +1047,23 @@ client.once('clientReady', () => {
     setInterval(cleanupLiveServers, 60000); // Cleanup every minute
 });
 
-client.on('guildCreate', guild => {
+client.on('guildCreate', async guild => {
     console.log(`[GUILD] Joined new guild: ${guild.name} (${guild.id})`);
+    if (supabase) {
+        try {
+            const blocked = await findBlockedServerForGuild(guild.id);
+            if (blocked) {
+                console.warn(`[GUILD] Leaving blocked guild: ${guild.name} (${guild.id})`);
+                await guild.leave();
+                syncStats();
+                updateStatus();
+                return;
+            }
+        } catch (error) {
+            console.error(`[GUILD] Failed to check blocked status for ${guild.id}:`, error.message);
+        }
+    }
+
     syncStats();
     updateStatus();
 });
@@ -348,13 +1122,37 @@ client.on('interactionCreate', async interaction => {
 
     if (!interaction.isChatInputCommand()) return;
 
-    const { commandName, guildId, user, guild } = interaction;
+    const { commandName: rawCommandName, guildId, user, guild } = interaction;
+    let commandName = rawCommandName;
+    let miscCommand = null;
+    if (rawCommandName === 'misc') {
+        const subcommand = interaction.options.getSubcommand(false);
+        miscCommand = subcommand ? MISC_SUBCOMMAND_TO_COMMAND[subcommand] || null : null;
+    }
 
     // 1. Handle Setup separately (Owner Only)
     if (commandName === 'setup') {
         if (user.id !== guild?.ownerId) {
             return interaction.reply({
                 content: 'This command can only be run by the server owner.',
+                ephemeral: true
+            });
+        }
+
+        let blockedServer = null;
+        try {
+            blockedServer = await findBlockedServerForGuild(guildId);
+        } catch (error) {
+            console.error(`[SETUP] Failed to check blocked status for ${guildId}:`, error.message);
+            return interaction.reply({
+                content: 'Unable to verify whether this server is allowed to use Ro-Link. Try again later.',
+                ephemeral: true
+            });
+        }
+
+        if (blockedServer) {
+            return interaction.reply({
+                content: getBlockedServerMessage(blockedServer),
                 ephemeral: true
             });
         }
@@ -432,14 +1230,12 @@ client.on('interactionCreate', async interaction => {
             .addFields(
                 { name: '/setup', value: 'Initializes Ro-Link for this server (Owner Only).' },
                 { name: '/ping', value: 'Check the bot response time and connection status.' },
-                { name: '/ban', value: 'Permanently ban a user from the Roblox game.' },
-                { name: '/kick', value: 'Kick a user from the game server.' },
-                { name: '/unban', value: 'Unban a user from the Roblox game.' },
-                { name: '/lookup', value: 'Lookup a Roblox user and review their moderation history.' },
+                { name: '/moderation', value: 'Open Ban, Kick, Unban, Softban, Update, and Shutdown actions.' },
+                { name: '/lookup', value: 'Lookup Discord info, linked Roblox info, server moderation history, and staff notes.' },
+                { name: '/staff-note', value: 'Add a staff-only note to a Discord or Roblox user.' },
+                { name: '/servers', value: 'View and manage live Roblox servers.' },
                 { name: '/update', value: 'Update your linked Roblox profile and roles.' },
-                { name: '/update-servers', value: 'Send a global update signal to all Roblox servers (restarts them).' },
-                { name: '/shutdown', value: 'Immediately shut down game servers.' },
-                { name: '/misc', value: 'Access miscellaneous player actions like Fly, Kill, and Heal.' },
+                { name: '/misc', value: 'Open Fly, Kill, Heal, Freeze, and other miscellaneous actions.' },
                 { name: '/help', value: 'Show info and list of available commands.' }
             );
 
@@ -461,7 +1257,7 @@ client.on('interactionCreate', async interaction => {
     }
 
     // 4. Permission Check for Moderation Commands
-    if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('BanMembers') && !interaction.member.permissions.has('KickMembers')) {
+    if (commandName !== 'lookup' && !interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('BanMembers') && !interaction.member.permissions.has('KickMembers')) {
         return interaction.reply({
             content: 'You do not have permission to use moderation commands. (Requires Kick/Ban Members or Admin)',
             ephemeral: true
@@ -524,51 +1320,425 @@ client.on('interactionCreate', async interaction => {
             }]),
             interaction.reply(`🔓 **Unbanned** \`\${targetUser}\` from Roblox. Command sent to game servers.`)
         ]);
-    } else if (commandName === 'lookup') {
+    } else if (commandName === 'softban') {
         const targetUser = interaction.options.getString('username');
+        const reason = interaction.options.getString('reason') || 'No reason provided';
+        const durationSeconds = interaction.options.getInteger('duration_seconds') || 3600;
+
+        await Promise.all([
+            supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'SOFTBAN',
+                target: targetUser,
+                moderator: user.tag
+            }]),
+            supabase.from('command_queue').insert([{
+                server_id: guildId,
+                command: 'SOFTBAN',
+                args: { username: targetUser, reason: reason, duration_seconds: durationSeconds, moderator: user.tag },
+                status: 'PENDING'
+            }]),
+            interaction.reply(`Temporarily banned \`${targetUser}\` from Roblox for ${durationSeconds} seconds. Reason: ${reason}`)
+        ]);
+    } else if (commandName === 'lookup') {
+        let robloxUserArg = interaction.options.getString('roblox_user');
+        let discordUserArg = interaction.options.getUser('discord_user');
 
         await interaction.deferReply({ ephemeral: true });
 
         try {
-            const lookup = await fetchRobloxLookup(targetUser, guildId);
-            const profileUrl = `https://www.roblox.com/users/${lookup.id}/profile`;
-            const lookupEmbed = new EmbedBuilder()
-                .setTitle('ðŸ” Roblox User Lookup')
-                .setURL(profileUrl)
-                .setColor(lookup.isBanned ? '#ef4444' : lookup.inGame ? '#10b981' : '#0ea5e9')
-                .setThumbnail(lookup.avatarUrl || null)
-                .addFields(
-                    { name: 'Username', value: `[${lookup.username}](${profileUrl})`, inline: true },
-                    { name: 'Display Name', value: truncateText(lookup.displayName || lookup.username, 256), inline: true },
-                    { name: 'Roblox ID', value: `\`${lookup.id}\``, inline: true },
-                    { name: 'Account Created', value: lookup.created ? formatDiscordTimestamp(lookup.created, 'F') : 'Unknown', inline: true },
-                    { name: 'Status', value: lookup.isBanned ? 'Banned' : lookup.inGame ? 'In Game' : 'Offline', inline: true },
-                    { name: 'Profile Source', value: lookup.hasApiKey ? 'Public Roblox API + configured Open Cloud key' : 'Public Roblox API', inline: true },
-                    { name: 'Description', value: truncateText(lookup.description || 'No description provided.', 1024), inline: false },
-                    { name: 'Moderation History', value: formatModerationHistory(lookup.moderationHistory), inline: false }
-                )
-                .setFooter({ text: `Ro-Link Utility System • ${lookup.moderationHistory.length} prior action(s)` });
+            const showStaffControls = await isServerStaffInteraction(interaction);
 
-            if (lookup.inGame && lookup.jobId) {
-                lookupEmbed.addFields({
-                    name: 'Live Server',
-                    value: `User is active in job \`${lookup.jobId}\``,
-                    inline: false,
-                });
+            // If neither is provided, default to the command runner (interaction.user)
+            if (!robloxUserArg && !discordUserArg) {
+                discordUserArg = interaction.user;
             }
 
-            await interaction.editReply({ embeds: [lookupEmbed] });
+            let discordLookup = null;
+            let robloxLookup = null;
+            let verifiedUserForRoblox = null;
 
+            // Step 1: Query Discord if resolved/provided
+            if (discordUserArg) {
+                discordLookup = await fetchDiscordLookup(discordUserArg, guild, guildId);
+            }
+
+            // Step 2: Query Roblox if resolved/provided
+            if (robloxUserArg) {
+                robloxLookup = await fetchRobloxLookup(robloxUserArg, guildId);
+                // Since they searched by Roblox username, see if there is a linked Discord user
+                const { data: verified } = await supabase
+                    .from('verified_users')
+                    .select('*')
+                    .eq('roblox_id', robloxLookup.id)
+                    .maybeSingle();
+                if (verified) {
+                    verifiedUserForRoblox = verified;
+                    // If we don't already have discordLookup fetched, fetch it now!
+                    if (!discordLookup) {
+                        try {
+                            const linkedUser = await client.users.fetch(verified.discord_id).catch(() => null);
+                            if (linkedUser) {
+                                discordLookup = await fetchDiscordLookup(linkedUser, guild, guildId);
+                            }
+                        } catch (err) {
+                            console.warn('[LOOKUP] Failed to fetch linked Discord user:', err.message);
+                        }
+                    }
+                }
+            } else if (discordLookup && discordLookup.verifiedUser) {
+                // If they didn't search Roblox directly, but the Discord user has a linked Roblox account,
+                // fetch the full Roblox profile info!
+                try {
+                    robloxLookup = await fetchRobloxLookup(discordLookup.verifiedUser.roblox_username, guildId);
+                } catch (err) {
+                    console.warn('[LOOKUP] Failed to fetch Roblox profile for verified user:', err.message);
+                }
+            }
+
+            // If we found neither, throw an error
+            if (!discordLookup && !robloxLookup) {
+                throw new Error('Could not resolve any Discord or Roblox user to lookup.');
+            }
+
+            // Step 3: Combined Moderation History
+            // We want to gather all prior moderation actions for all matched aliases/identities.
+            const matchValues = new Set();
+            if (discordLookup && discordLookup.user) {
+                matchValues.add(discordLookup.user.id);
+                matchValues.add(`<@${discordLookup.user.id}>`);
+                matchValues.add(`<@!${discordLookup.user.id}>`);
+                matchValues.add(discordLookup.user.username.toLowerCase());
+                if (discordLookup.user.tag) matchValues.add(discordLookup.user.tag.toLowerCase());
+            }
+            if (robloxLookup) {
+                matchValues.add(robloxLookup.username.toLowerCase());
+                matchValues.add(String(robloxLookup.id).toLowerCase());
+            }
+            if (discordLookup && discordLookup.verifiedUser) {
+                matchValues.add(String(discordLookup.verifiedUser.roblox_username || '').toLowerCase());
+                matchValues.add(String(discordLookup.verifiedUser.roblox_id).toLowerCase());
+            }
+            if (verifiedUserForRoblox) {
+                matchValues.add(String(verifiedUserForRoblox.roblox_username || '').toLowerCase());
+                matchValues.add(String(verifiedUserForRoblox.roblox_id).toLowerCase());
+            }
+
+            let moderationHistory = [];
+            if (showStaffControls) {
+                const { data: logsRes, error: logsError } = await supabase
+                    .from('logs')
+                    .select('id, action, moderator, timestamp, target')
+                    .eq('server_id', guildId)
+                    .order('timestamp', { ascending: false })
+                    .limit(100);
+
+                if (!logsError && Array.isArray(logsRes)) {
+                moderationHistory = logsRes
+                    .filter((entry) => {
+                        const action = String(entry?.action || '').toUpperCase();
+                        const target = String(entry?.target || '').toLowerCase();
+                        return matchValues.has(target) && (
+                            MODERATION_LOG_ACTIONS.has(action)
+                            || action.includes('BAN')
+                            || action.includes('KICK')
+                            || action.includes('MUTE')
+                            || action.includes('TIMEOUT')
+                        );
+                    })
+                    .slice(0, 5);
+                }
+            }
+
+            const embeds = [];
+
+            // 1. Build Discord Embed
+            if (discordLookup) {
+                const createdAt = getDiscordCreatedAt(discordLookup.user.id);
+                const linkedRobloxStr = discordLookup.verifiedUser
+                    ? `[${discordLookup.verifiedUser.roblox_username}](https://www.roblox.com/users/${discordLookup.verifiedUser.roblox_id}/profile)\n\`ID: ${discordLookup.verifiedUser.roblox_id}\``
+                    : (verifiedUserForRoblox 
+                        ? `[${verifiedUserForRoblox.roblox_username}](https://www.roblox.com/users/${verifiedUserForRoblox.roblox_id}/profile)\n\`ID: ${verifiedUserForRoblox.roblox_id}\``
+                        : 'No linked Roblox account found.');
+
+                const discordEmbed = new EmbedBuilder()
+                    .setTitle(`Discord User Info: ${formatDiscordUserTag(discordLookup.user)}`)
+                    .setColor('#0ea5e9')
+                    .setThumbnail(discordLookup.user?.displayAvatarURL?.({ size: 256 }) || null)
+                    .addFields(
+                        { name: 'Discord User', value: `<@${discordLookup.user.id}>`, inline: true },
+                        { name: 'Username', value: truncateText(formatDiscordUserTag(discordLookup.user), 256), inline: true },
+                        { name: 'Discord ID', value: `\`${discordLookup.user.id}\``, inline: true },
+                        { name: 'Account Created', value: createdAt ? formatDiscordTimestamp(createdAt, 'F') : 'Unknown', inline: true },
+                        { name: 'Joined Server', value: discordLookup.member?.joinedAt ? formatDiscordTimestamp(discordLookup.member.joinedAt.toISOString(), 'F') : 'Not in server or unknown', inline: true },
+                        { name: 'Server Roles', value: `${discordLookup.member?.roles?.cache?.size ?? 0}`, inline: true },
+                        { name: 'Linked Roblox', value: linkedRobloxStr, inline: false }
+                    );
+                embeds.push(discordEmbed);
+            }
+
+            // 2. Build Roblox Embed
+            let finalRobloxLookup = robloxLookup;
+            if (!finalRobloxLookup && discordLookup && discordLookup.verifiedUser) {
+                // In case the full lookup failed above, fall back to whatever verifiedUser has
+                finalRobloxLookup = {
+                    id: discordLookup.verifiedUser.roblox_id,
+                    username: discordLookup.verifiedUser.roblox_username,
+                    displayName: discordLookup.verifiedUser.roblox_username,
+                    description: 'Full profile could not be loaded.',
+                    created: '',
+                    isBanned: false,
+                    avatarUrl: '',
+                    inGame: false,
+                    jobId: null
+                };
+            }
+
+            if (finalRobloxLookup) {
+                const profileUrl = `https://www.roblox.com/users/${finalRobloxLookup.id}/profile`;
+                const robloxEmbed = new EmbedBuilder()
+                    .setTitle(`Roblox Profile Info: ${finalRobloxLookup.username}`)
+                    .setURL(profileUrl)
+                    .setColor(finalRobloxLookup.isBanned ? '#ef4444' : finalRobloxLookup.inGame ? '#10b981' : '#0ea5e9')
+                    .setThumbnail(finalRobloxLookup.avatarUrl || `https://www.roblox.com/headshot-thumbnail/image?userId=${finalRobloxLookup.id}&width=420&height=420&format=png`)
+                    .addFields(
+                        { name: 'Username', value: `[${finalRobloxLookup.username}](${profileUrl})`, inline: true },
+                        { name: 'Display Name', value: truncateText(finalRobloxLookup.displayName || finalRobloxLookup.username, 256), inline: true },
+                        { name: 'Roblox ID', value: `\`${finalRobloxLookup.id}\``, inline: true },
+                        { name: 'Account Created', value: finalRobloxLookup.created ? formatDiscordTimestamp(finalRobloxLookup.created, 'F') : 'Unknown', inline: true },
+                        { name: 'Status', value: finalRobloxLookup.isBanned ? 'Banned' : finalRobloxLookup.inGame ? 'In Game' : 'Offline', inline: true },
+                        { name: 'Description', value: truncateText(finalRobloxLookup.description || 'No description provided.', 1024), inline: false }
+                    );
+
+                if (finalRobloxLookup.inGame && finalRobloxLookup.jobId) {
+                    robloxEmbed.addFields({
+                        name: 'Live Server',
+                        value: `User is active in job \`${finalRobloxLookup.jobId}\``,
+                        inline: false,
+                    });
+                }
+                embeds.push(robloxEmbed);
+            }
+
+            const staffNoteTarget = {
+                discordId: discordLookup?.user?.id || discordUserArg?.id || '',
+                robloxId: finalRobloxLookup?.id || discordLookup?.verifiedUser?.roblox_id || verifiedUserForRoblox?.roblox_id || '',
+                robloxUsername: finalRobloxLookup?.username || discordLookup?.verifiedUser?.roblox_username || verifiedUserForRoblox?.roblox_username || '',
+            };
+            let staffNotes = [];
+            if (showStaffControls) {
+                try {
+                    staffNotes = await fetchStaffNotes(guildId, staffNoteTarget, 5);
+                } catch (err) {
+                    console.warn('[STAFF_NOTES] Failed to load notes for lookup:', err.message);
+                }
+
+                // 3. Build Moderation Embed
+                const modEmbed = new EmbedBuilder()
+                    .setTitle(`Server Moderation History`)
+                    .setColor(moderationHistory.length > 0 ? '#ef4444' : '#0ea5e9')
+                    .setDescription(formatModerationHistory(moderationHistory))
+                    .setFooter({ text: `Ro-Link Utility System - ${moderationHistory.length} prior moderation action(s)` });
+                embeds.push(modEmbed);
+
+                const notesEmbed = new EmbedBuilder()
+                    .setTitle('Staff Notes')
+                    .setColor(staffNotes.length > 0 ? '#f59e0b' : '#64748b')
+                    .setDescription(formatStaffNotes(staffNotes))
+                    .setFooter({ text: `Ro-Link Systems - ${staffNotes.length} staff note(s)` });
+                embeds.push(notesEmbed);
+            }
+
+            // Determine if Join button is needed
+            let finalJobId = null;
+            if (finalRobloxLookup && finalRobloxLookup.inGame && finalRobloxLookup.jobId) {
+                finalJobId = finalRobloxLookup.jobId;
+            } else if (discordLookup && discordLookup.activeServer && discordLookup.activeServer.id) {
+                finalJobId = discordLookup.activeServer.id;
+            }
+
+            const actionButtons = [];
+            if (finalJobId) {
+                const { data: serverSettings } = await supabase
+                    .from('servers')
+                    .select('place_id')
+                    .eq('id', guildId)
+                    .maybeSingle();
+                const joinUrl = buildRobloxJoinUrl(serverSettings?.place_id, finalJobId);
+                if (joinUrl) {
+                    actionButtons.push(new ButtonBuilder().setLabel('Join Game').setURL(joinUrl).setStyle(ButtonStyle.Link));
+                }
+            }
+
+            if (showStaffControls) {
+                actionButtons.push(
+                    new ButtonBuilder().setLabel('Manage').setCustomId('lookup_manage').setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder().setLabel('Add Staff Note').setCustomId(buildStaffNoteModalCustomId(staffNoteTarget)).setStyle(ButtonStyle.Primary)
+                );
+            }
+
+            const components = actionButtons.length > 0
+                ? [new ActionRowBuilder().addComponents(...actionButtons)]
+                : [];
+
+            await interaction.editReply({ embeds, components });
+
+            // Log action
             await supabase.from('logs').insert([{
                 server_id: guildId,
                 action: 'LOOKUP',
-                target: lookup.username,
+                target: discordUserArg ? discordUserArg.id : (finalRobloxLookup ? finalRobloxLookup.username : 'Unknown'),
                 moderator: user.tag
             }]);
+
         } catch (e) {
             console.error('[LOOKUP] Error:', e.message);
-            return interaction.editReply(`âŒ ${e.message || 'Failed to lookup that Roblox user.'}`);
+            return interaction.editReply(`Failed to lookup user: ${e.message || 'Unknown error'}`);
         }
+    } else if (commandName === 'staff-note') {
+        const noteBody = interaction.options.getString('note');
+        const robloxUserArg = interaction.options.getString('roblox_user');
+        let discordUserArg = interaction.options.getUser('discord_user');
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+            if (!robloxUserArg && !discordUserArg) {
+                discordUserArg = interaction.user;
+            }
+
+            let target = { discordId: discordUserArg?.id || '' };
+            if (discordUserArg) {
+                const discordLookup = await fetchDiscordLookup(discordUserArg, guild, guildId);
+                target = {
+                    discordId: discordUserArg.id,
+                    robloxId: discordLookup.verifiedUser?.roblox_id || '',
+                    robloxUsername: discordLookup.verifiedUser?.roblox_username || '',
+                };
+            }
+
+            if (robloxUserArg) {
+                const robloxLookup = await fetchRobloxLookup(robloxUserArg, guildId);
+                const { data: verified } = await supabase
+                    .from('verified_users')
+                    .select('discord_id, roblox_id, roblox_username')
+                    .eq('roblox_id', robloxLookup.id)
+                    .maybeSingle();
+
+                target = {
+                    discordId: verified?.discord_id || target.discordId || '',
+                    robloxId: robloxLookup.id,
+                    robloxUsername: robloxLookup.username,
+                };
+            }
+
+            const note = await createStaffNote({
+                serverId: guildId,
+                target,
+                note: noteBody,
+                createdByDiscordId: user.id,
+                createdByTag: user.tag,
+            });
+
+            await supabase.from('logs').insert([{
+                server_id: guildId,
+                action: 'STAFF_NOTE',
+                target: note.target_roblox_username || note.target_roblox_id || note.target_discord_id || 'Unknown User',
+                moderator: user.tag,
+            }]);
+
+            await interaction.editReply(`Saved staff note for **${getStaffNoteTargetLabel(target)}**.`);
+        } catch (e) {
+            console.error('[STAFF_NOTE] Error:', e.message);
+            return interaction.editReply(`Failed to save staff note: ${e.message || 'Unknown error'}`);
+        }
+    } else if (commandName === 'servers') {
+        const search = String(interaction.options.getString('search') || '').trim().toLowerCase();
+        const { data: serverSettings } = await supabase
+            .from('servers')
+            .select('place_id')
+            .eq('id', guildId)
+            .maybeSingle();
+        const liveServers = await fetchLiveServers(guildId);
+        const matches = search
+            ? liveServers.filter((liveServer) => {
+                const jobId = String(liveServer.id || '').toLowerCase();
+                return jobId.includes(search)
+                    || normalizeLivePlayerList(liveServer.players).some((player) =>
+                        player.username.toLowerCase().includes(search)
+                        || player.displayName.toLowerCase().includes(search)
+                        || (player.userId ? player.userId.toLowerCase() === search : false)
+                    );
+            })
+            : liveServers;
+
+        if (search && matches.length === 1) {
+            const selectedServer = matches[0];
+            const player = normalizeLivePlayerList(selectedServer.players).find((candidate) =>
+                candidate.username.toLowerCase().includes(search)
+                || candidate.displayName.toLowerCase().includes(search)
+                || (candidate.userId ? candidate.userId.toLowerCase() === search : false)
+            ) || null;
+            const joinUrl = buildRobloxJoinUrl(serverSettings?.place_id, selectedServer.id);
+            const embed = new EmbedBuilder()
+                .setTitle(player ? `Live Player: ${player.username}` : `Live Server: ${formatJobId(selectedServer.id)}`)
+                .setColor(player ? '#10b981' : '#0ea5e9')
+                .addFields(
+                    { name: 'Job ID', value: `\`${selectedServer.id}\``, inline: false },
+                    { name: 'Players', value: `${getVisiblePlayerCount(selectedServer)}`, inline: true },
+                    { name: 'Updated', value: selectedServer.updated_at ? formatDiscordTimestamp(selectedServer.updated_at, 'R') : 'Unknown', inline: true },
+                    { name: player ? 'Matched Player' : 'Player List', value: player ? (player.userId ? `${player.username}\n\`ID: ${player.userId}\`` : player.username) : (normalizeLivePlayerList(selectedServer.players).slice(0, 10).map((livePlayer) => livePlayer.username).join('\n') || 'No resolved players reported.'), inline: false }
+                );
+            const menu = new StringSelectMenuBuilder()
+                .setCustomId(player ? `server_player_action|${encodeURIComponent(selectedServer.id)}|${encodeURIComponent(player.username)}` : `server_action|${encodeURIComponent(selectedServer.id)}`)
+                .setPlaceholder(player ? `Manage ${player.username}...` : 'Manage this server...')
+                .addOptions(player
+                    ? [
+                        new StringSelectMenuOptionBuilder().setLabel('Kick Player').setDescription('Kick this Roblox user').setValue('KICK'),
+                        new StringSelectMenuOptionBuilder().setLabel('Ban Player').setDescription('Ban this Roblox user').setValue('BAN'),
+                        new StringSelectMenuOptionBuilder().setLabel('Kill Player').setDescription('Kill this Roblox user').setValue('KILL'),
+                        new StringSelectMenuOptionBuilder().setLabel('Heal Player').setDescription('Heal this Roblox user').setValue('HEAL'),
+                    ]
+                    : [
+                        new StringSelectMenuOptionBuilder().setLabel('Shutdown Server').setDescription('Shut down this live server').setValue('SHUTDOWN'),
+                        new StringSelectMenuOptionBuilder().setLabel('Update Server').setDescription('Restart this live server').setValue('UPDATE'),
+                    ]);
+            const rows = [new ActionRowBuilder().addComponents(menu)];
+            if (joinUrl) {
+                rows.push(new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setLabel('Join Game').setURL(joinUrl).setStyle(ButtonStyle.Link)
+                ));
+            }
+            return interaction.reply({ embeds: [embed], components: rows, ephemeral: true });
+        }
+
+        const listedServers = matches.slice(0, 25);
+        const embed = new EmbedBuilder()
+            .setTitle(search ? 'Live Server Search Results' : 'Live Servers')
+            .setDescription(listedServers.length > 0
+                ? listedServers.map((liveServer, index) => {
+                    const players = normalizeLivePlayerList(liveServer.players);
+                    const sample = players.slice(0, 3).map((player) => player.username).join(', ');
+                    return `**${index + 1}.** \`${formatJobId(liveServer.id)}\` - ${getVisiblePlayerCount(liveServer)} player(s)${sample ? ` - ${sample}` : ''}`;
+                }).join('\n')
+                : 'No live servers found.')
+            .setColor('#0ea5e9');
+
+        const components = listedServers.length > 0
+            ? [new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('servers_select')
+                    .setPlaceholder('Choose a live server...')
+                    .addOptions(listedServers.map((liveServer) =>
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel(`Server ${formatJobId(liveServer.id)}`.slice(0, 100))
+                            .setDescription(`${getVisiblePlayerCount(liveServer)} player(s)`.slice(0, 100))
+                            .setValue(String(liveServer.id).slice(0, 100))
+                    ))
+            )]
+            : [];
+
+        return interaction.reply({ embeds: [embed], components, ephemeral: true });
     } else if (commandName === 'update-servers') {
         if (!interaction.member.permissions.has('Administrator') && !interaction.member.permissions.has('ManageGuild')) {
             return interaction.reply({ content: 'You do not have permission to use this command. (Requires Administrator/Manage Server)', ephemeral: true });
@@ -678,7 +1848,79 @@ client.on('interactionCreate', async interaction => {
             }]),
             interaction.reply(`🛑 **SHUTDOWN SIGNAL SENT**! Closing \`\${jobId || 'all active game servers'}\`.`)
         ]);
+    } else if (commandName === 'moderation') {
+        const embed = new EmbedBuilder()
+            .setTitle('Moderation Actions')
+            .setDescription('Select an action from the menu below.')
+            .setColor('#ef4444')
+            .addFields(
+                { name: 'Player Actions', value: '`BAN` `KICK` `UNBAN` `SOFTBAN`', inline: false },
+                { name: 'Server Actions', value: '`UPDATE` `SHUTDOWN`', inline: false }
+            )
+            .setFooter({ text: 'Ro-Link Moderation System' });
+
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('moderation_menu')
+                    .setPlaceholder('Choose a moderation action...')
+                    .addOptions(
+                        new StringSelectMenuOptionBuilder().setLabel('Ban').setDescription('Permanently ban a Roblox user').setValue('BAN'),
+                        new StringSelectMenuOptionBuilder().setLabel('Kick').setDescription('Kick a Roblox user from the server').setValue('KICK'),
+                        new StringSelectMenuOptionBuilder().setLabel('Unban').setDescription('Lift a Roblox ban').setValue('UNBAN'),
+                        new StringSelectMenuOptionBuilder().setLabel('Softban').setDescription('Temporarily ban and remove a Roblox user').setValue('SOFTBAN'),
+                        new StringSelectMenuOptionBuilder().setLabel('Update Servers').setDescription('Restart all Roblox servers').setValue('UPDATE'),
+                        new StringSelectMenuOptionBuilder().setLabel('Shutdown').setDescription('Shut down Roblox servers').setValue('SHUTDOWN'),
+                    ),
+            );
+
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
     } else if (commandName === 'misc') {
+        if (miscCommand) {
+            let targetUser = interaction.options.getString('username');
+            const args = { username: targetUser, moderator: user.tag };
+            if (miscCommand === 'SET_CHAR') {
+                args.char_user = interaction.options.getString('char_user');
+            }
+            if (miscCommand === 'TEAM') {
+                args.team_name = interaction.options.getString('team_name');
+            }
+            if (miscCommand === 'VIEW') {
+                const linkedRobloxUsername = await getLinkedRobloxUsername(user.id);
+                if (!linkedRobloxUsername) {
+                    return interaction.reply({ content: 'Link your Discord account to Roblox before using View.', ephemeral: true });
+                }
+                args.moderator_roblox_username = linkedRobloxUsername;
+                if (!targetUser) {
+                    targetUser = linkedRobloxUsername;
+                    args.username = linkedRobloxUsername;
+                }
+            }
+            if (miscCommand === 'TELEPORT_TO_ME') {
+                args.moderator_roblox_username = interaction.options.getString('moderator_username');
+            }
+            if (VALUE_INPUT_MISC_COMMANDS.has(miscCommand)) {
+                args.amount = interaction.options.getNumber('amount');
+            }
+
+            await Promise.all([
+                supabase.from('logs').insert([{
+                    server_id: guildId,
+                    action: miscCommand,
+                    target: targetUser,
+                    moderator: user.tag
+                }]),
+                supabase.from('command_queue').insert([{
+                    server_id: guildId,
+                    command: miscCommand,
+                    args,
+                    status: 'PENDING'
+                }]),
+                interaction.reply({ content: `Queued **${miscCommand}** for \`${targetUser}\`.`, ephemeral: true })
+            ]);
+            return;
+        }
+
         const embed = new EmbedBuilder()
             .setTitle('Miscellaneous Player Actions')
             .setDescription('Select an action from the menu below to apply it to a Roblox player.')
@@ -691,8 +1933,11 @@ client.on('interactionCreate', async interaction => {
                 { name: 'Set Char', value: 'Copies the appearance/bundle of another Roblox user.', inline: false },
                 { name: 'Heal', value: 'Restores player health to maximum.', inline: false },
                 { name: 'Kill', value: 'Immediately kills the target player.', inline: false },
+                { name: 'Ragdoll', value: 'Temporarily forces the target player into a ragdoll state.', inline: false },
                 { name: 'Reset', value: 'Resets the player character.', inline: false },
-                { name: 'Refresh', value: 'Respawn the player character.', inline: false }
+                { name: 'Refresh', value: 'Respawn the player character.', inline: false },
+                { name: 'View', value: 'View a player or reset your camera to yourself.', inline: false },
+                { name: 'Team', value: 'Move a player to a Roblox team.', inline: false }
             )
             .setFooter({ text: 'Ro-Link Utility System' });
 
@@ -727,6 +1972,22 @@ client.on('interactionCreate', async interaction => {
                             .setDescription('Restore health')
                             .setValue('HEAL'),
                         new StringSelectMenuOptionBuilder()
+                            .setLabel('Damage')
+                            .setDescription('Deal damage')
+                            .setValue('DAMAGE'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Max Health')
+                            .setDescription('Set maximum health')
+                            .setValue('MAX_HEALTH'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Walk Speed')
+                            .setDescription('Set walk speed')
+                            .setValue('WALK_SPEED'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Jump Power')
+                            .setDescription('Set jump power')
+                            .setValue('JUMP_POWER'),
+                        new StringSelectMenuOptionBuilder()
                             .setLabel('Kill')
                             .setDescription('Instant kill')
                             .setValue('KILL'),
@@ -738,6 +1999,42 @@ client.on('interactionCreate', async interaction => {
                             .setLabel('Refresh')
                             .setDescription('Refresh character')
                             .setValue('REFRESH'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('View')
+                            .setDescription('View or reset your camera')
+                            .setValue('VIEW'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Team')
+                            .setDescription('Move to a team')
+                            .setValue('TEAM'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Freeze')
+                            .setDescription('Anchor in place')
+                            .setValue('FREEZE'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Unfreeze')
+                            .setDescription('Remove freeze')
+                            .setValue('UNFREEZE'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Ragdoll')
+                            .setDescription('Temporarily ragdoll')
+                            .setValue('RAGDOLL'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Bring To Spawn')
+                            .setDescription('Move to spawn')
+                            .setValue('BRING_TO_SPAWN'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Teleport To Me')
+                            .setDescription('Move to a moderator')
+                            .setValue('TELEPORT_TO_ME'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Add ForceField')
+                            .setDescription('Add a ForceField')
+                            .setValue('FORCEFIELD_ADD'),
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel('Remove ForceField')
+                            .setDescription('Remove ForceFields')
+                            .setValue('FORCEFIELD_REMOVE'),
                     ),
             );
 
@@ -759,7 +2056,7 @@ client.on('interactionCreate', async interaction => {
             .addFields(
                 { name: 'Step 1', value: `Click [here](\${baseUrl}/verify) to go to the verification portal.` },
                 { name: 'Step 2', value: 'Log in with Discord and authorized Roblox via OAuth.' },
-                { name: 'Step 3', value: 'Return here and use `/get-roblox` to see your linked account!' }
+                { name: 'Step 3', value: 'Return here and use `/lookup` to see your linked account!' }
             )
             .setFooter({ text: 'Ro-Link Verification System' });
 
@@ -772,59 +2069,6 @@ client.on('interactionCreate', async interaction => {
             );
 
         await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
-    } else if (commandName === 'get-discord') {
-        const robloxUsername = interaction.options.getString('roblox_username');
-
-        await interaction.deferReply({ ephemeral: false });
-
-        const { data, error } = await supabase
-            .from('verified_users')
-            .select('*')
-            .ilike('roblox_username', robloxUsername)
-            .maybeSingle();
-
-        if (error || !data) {
-            return interaction.editReply(`❌ No Discord account found linked to Roblox user \`\${robloxUsername}\`.`);
-        }
-
-        const embed = new EmbedBuilder()
-            .setTitle('🔍 Ro-Link Lookup')
-            .setColor('#10b981')
-            .addFields(
-                { name: 'Roblox User', value: `[\${data.roblox_username}](https://www.roblox.com/users/\${data.roblox_id}/profile)`, inline: true },
-                { name: 'Discord User', value: `<@\${data.discord_id}>`, inline: true },
-                { name: 'Discord ID', value: `\`\${data.discord_id}\``, inline: false }
-            )
-            .setFooter({ text: 'Ro-Link Utility System' });
-
-        await interaction.editReply({ embeds: [embed] });
-
-    } else if (commandName === 'get-roblox') {
-        const discordUser = interaction.options.getUser('discord_user');
-
-        await interaction.deferReply({ ephemeral: false });
-
-        const { data, error } = await supabase
-            .from('verified_users')
-            .select('*')
-            .eq('discord_id', discordUser.id)
-            .maybeSingle();
-
-        if (error || !data) {
-            return interaction.editReply(`❌ No Roblox account found linked to <@\${discordUser.id}>.`);
-        }
-
-        const embed = new EmbedBuilder()
-            .setTitle('🔍 Ro-Link Lookup')
-            .setColor('#10b981')
-            .addFields(
-                { name: 'Discord User', value: `<@\${data.discord_id}>`, inline: true },
-                { name: 'Roblox User', value: `[\${data.roblox_username}](https://www.roblox.com/users/\${data.roblox_id}/profile)`, inline: true },
-                { name: 'Roblox ID', value: `\`\${data.roblox_id}\``, inline: false }
-            )
-            .setFooter({ text: 'Ro-Link Utility System' });
-
-        await interaction.editReply({ embeds: [embed] });
 
     } else if (commandName === 'report') {
         const { data: server, error: serverError } = await supabase
@@ -872,19 +2116,154 @@ client.on('interactionCreate', async interaction => {
 
     if (!interaction.isStringSelectMenu()) return;
 
+    if (interaction.customId === 'servers_select') {
+        const jobId = interaction.values[0];
+        const [liveServers, serverSettingsRes] = await Promise.all([
+            fetchLiveServers(interaction.guildId),
+            supabase.from('servers').select('place_id').eq('id', interaction.guildId).maybeSingle(),
+        ]);
+        const selectedServer = liveServers.find((liveServer) => String(liveServer.id || '') === jobId);
+        if (!selectedServer) {
+            return interaction.reply({ content: 'That live server is no longer active.', ephemeral: true });
+        }
+
+        const joinUrl = buildRobloxJoinUrl(serverSettingsRes.data?.place_id, selectedServer.id);
+        const players = normalizeLivePlayerList(selectedServer.players);
+        const embed = new EmbedBuilder()
+            .setTitle(`Live Server: ${formatJobId(selectedServer.id)}`)
+            .setColor('#0ea5e9')
+            .addFields(
+                { name: 'Job ID', value: `\`${selectedServer.id}\``, inline: false },
+                { name: 'Players', value: `${getVisiblePlayerCount(selectedServer)}`, inline: true },
+                { name: 'Updated', value: selectedServer.updated_at ? formatDiscordTimestamp(selectedServer.updated_at, 'R') : 'Unknown', inline: true },
+                { name: 'Player List', value: players.slice(0, 10).map((player) => player.username).join('\n') || 'No resolved players reported.', inline: false }
+            );
+        const rows = [
+            new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId(`server_action|${encodeURIComponent(jobId)}`)
+                    .setPlaceholder('Manage this server...')
+                    .addOptions(
+                        new StringSelectMenuOptionBuilder().setLabel('Shutdown Server').setDescription('Shut down this live server').setValue('SHUTDOWN'),
+                        new StringSelectMenuOptionBuilder().setLabel('Update Server').setDescription('Restart this live server').setValue('UPDATE'),
+                    )
+            )
+        ];
+        if (joinUrl) {
+            rows.push(new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setLabel('Join Game').setURL(joinUrl).setStyle(ButtonStyle.Link)
+            ));
+        }
+
+        return interaction.update({ embeds: [embed], components: rows });
+    }
+
+    if (interaction.customId.startsWith('server_action|') || interaction.customId.startsWith('server_player_action|')) {
+        const parts = interaction.customId.split('|');
+        const isPlayerAction = parts[0] === 'server_player_action';
+        const jobId = decodeURIComponent(parts[1] || '');
+        const username = isPlayerAction ? decodeURIComponent(parts[2] || '') : '';
+        const command = interaction.values[0];
+        const args = {
+            job_id: jobId,
+            moderator: interaction.user.tag,
+            reason: 'Discord live server action',
+        };
+        if (isPlayerAction) {
+            args.username = username;
+        }
+
+        await Promise.all([
+            supabase.from('command_queue').insert([{
+                server_id: interaction.guildId,
+                command,
+                args,
+                status: 'PENDING',
+            }]),
+            supabase.from('logs').insert([{
+                server_id: interaction.guildId,
+                action: command === 'UPDATE' ? 'UPDATE_SERVERS' : command,
+                target: isPlayerAction ? username : jobId,
+                moderator: interaction.user.tag,
+            }])
+        ]);
+
+        return interaction.reply({
+            content: `Queued **${command}** for ${isPlayerAction ? `\`${username}\`` : `server \`${formatJobId(jobId)}\``}.`,
+            ephemeral: true,
+        });
+    }
+
+    if (interaction.customId === 'moderation_menu') {
+        const action = interaction.values[0];
+
+        const modal = new ModalBuilder()
+            .setCustomId(`moderation_modal_${action}`)
+            .setTitle(`Moderation: ${action}`);
+
+        const rows = [];
+
+        if (['BAN', 'KICK', 'UNBAN', 'SOFTBAN'].includes(action)) {
+            rows.push(new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('username')
+                    .setLabel('Roblox Username')
+                    .setPlaceholder('Enter the Roblox username')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true)
+            ));
+        }
+
+        if (['BAN', 'KICK', 'SOFTBAN', 'UPDATE'].includes(action)) {
+            rows.push(new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('reason')
+                    .setLabel(action === 'UPDATE' ? 'Update Message' : 'Reason')
+                    .setPlaceholder(action === 'UPDATE' ? 'Message shown when players are kicked' : 'Reason for this action')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setRequired(false)
+            ));
+        }
+
+        if (action === 'SOFTBAN') {
+            rows.push(new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('duration_seconds')
+                    .setLabel('Duration Seconds')
+                    .setPlaceholder('3600')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(false)
+            ));
+        }
+
+        if (action === 'SHUTDOWN') {
+            rows.push(new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('job_id')
+                    .setLabel('Job ID')
+                    .setPlaceholder('Leave blank for all active servers')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(false)
+            ));
+        }
+
+        modal.addComponents(...rows);
+        await interaction.showModal(modal);
+    }
+
     if (interaction.customId === 'misc_menu') {
         const action = interaction.values[0];
 
         const modal = new ModalBuilder()
-            .setCustomId(`misc_modal_\${action}`)
-            .setTitle(`Action: \${action}`);
+            .setCustomId(`misc_modal_${action}`)
+            .setTitle(`Action: ${action}`);
 
         const targetUserInput = new TextInputBuilder()
             .setCustomId('target_user')
             .setLabel("Target Username")
-            .setPlaceholder('Enter the Roblox username')
+            .setPlaceholder(action === 'VIEW' ? 'Leave blank to reset your camera' : 'Enter the Roblox username')
             .setStyle(TextInputStyle.Short)
-            .setRequired(true);
+            .setRequired(action !== 'VIEW');
 
         const rows = [new ActionRowBuilder().addComponents(targetUserInput)];
 
@@ -898,6 +2277,36 @@ client.on('interactionCreate', async interaction => {
             rows.push(new ActionRowBuilder().addComponents(charUserInput));
         }
 
+        if (VALUE_INPUT_MISC_COMMANDS.has(action)) {
+            const amountInput = new TextInputBuilder()
+                .setCustomId('amount')
+                .setLabel('Amount')
+                .setPlaceholder('Enter a number')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+            rows.push(new ActionRowBuilder().addComponents(amountInput));
+        }
+
+        if (action === 'TEAM') {
+            const teamNameInput = new TextInputBuilder()
+                .setCustomId('team_name')
+                .setLabel('Roblox Team Name')
+                .setPlaceholder('Exact team name')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+            rows.push(new ActionRowBuilder().addComponents(teamNameInput));
+        }
+
+        if (action === 'TELEPORT_TO_ME') {
+            const moderatorUsernameInput = new TextInputBuilder()
+                .setCustomId('moderator_username')
+                .setLabel('Your Roblox Username')
+                .setPlaceholder('Moderator username in-game')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+            rows.push(new ActionRowBuilder().addComponents(moderatorUsernameInput));
+        }
+
         modal.addComponents(...rows);
         await interaction.showModal(modal);
     }
@@ -909,17 +2318,157 @@ client.on('interactionCreate', async interaction => {
 
     if (!interaction.isModalSubmit()) return;
 
+    if (interaction.customId.startsWith('staff_note_modal|')) {
+        if (!await isServerStaffInteraction(interaction)) {
+            return interaction.reply({ content: 'You do not have permission to add staff notes.', ephemeral: true });
+        }
+
+        try {
+            const target = decodeStaffNoteModalTarget(interaction.customId.replace('staff_note_modal|', ''));
+            const note = await createStaffNote({
+                serverId: interaction.guildId,
+                target,
+                note: interaction.fields.getTextInputValue('staff_note'),
+                createdByDiscordId: interaction.user.id,
+                createdByTag: interaction.user.tag,
+            });
+
+            await supabase.from('logs').insert([{
+                server_id: interaction.guildId,
+                action: 'STAFF_NOTE',
+                target: note.target_roblox_username || note.target_roblox_id || note.target_discord_id || 'Unknown User',
+                moderator: interaction.user.tag,
+            }]);
+
+            return interaction.reply({
+                content: `Saved staff note for **${getStaffNoteTargetLabel(target)}**.`,
+                ephemeral: true,
+            });
+        } catch (e) {
+            return interaction.reply({
+                content: `Failed to save staff note: ${e.message || 'Unknown error'}`,
+                ephemeral: true,
+            });
+        }
+    }
+
+    if (interaction.customId.startsWith('moderation_modal_')) {
+        const action = interaction.customId.replace('moderation_modal_', '');
+        const getOptionalField = (id) => {
+            try {
+                return interaction.fields.getTextInputValue(id);
+            } catch {
+                return '';
+            }
+        };
+
+        const targetUser = getOptionalField('username');
+        const reason = getOptionalField('reason') || 'No reason provided';
+        const jobId = getOptionalField('job_id');
+        const durationValue = Number(getOptionalField('duration_seconds') || 3600);
+        const durationSeconds = Number.isFinite(durationValue) && durationValue > 0 ? Math.floor(durationValue) : 3600;
+        const command = action === 'UPDATE' ? 'UPDATE' : action;
+        const args = { moderator: interaction.user.tag };
+        let target = targetUser || 'ALL';
+        let msgContent = `Queued **${command}**.`;
+
+        if (['BAN', 'KICK', 'UNBAN', 'SOFTBAN'].includes(command)) {
+            args.username = targetUser;
+            args.reason = reason;
+            target = targetUser;
+            msgContent = `Queued **${command}** for **${targetUser}**.`;
+        }
+
+        if (command === 'SOFTBAN') {
+            args.duration_seconds = durationSeconds;
+            msgContent = `Queued **SOFTBAN** for **${targetUser}** for ${durationSeconds} seconds.`;
+        }
+
+        if (command === 'UPDATE') {
+            args.reason = reason === 'No reason provided' ? 'Manual Update Triggered' : reason;
+            target = 'ALL';
+            msgContent = 'Queued **UPDATE** for all game servers.';
+        }
+
+        if (command === 'SHUTDOWN') {
+            args.job_id = jobId;
+            target = jobId || 'ALL';
+            msgContent = jobId ? `Queued **SHUTDOWN** for job **${jobId}**.` : 'Queued **SHUTDOWN** for all active game servers.';
+        }
+
+        await interaction.reply({ content: msgContent, ephemeral: true });
+
+        await supabase.from('command_queue').insert([{
+            server_id: interaction.guildId,
+            command,
+            args,
+            status: 'PENDING'
+        }]);
+
+        await supabase.from('logs').insert([{
+            server_id: interaction.guildId,
+            action: command === 'UPDATE' ? 'UPDATE_SERVERS' : command,
+            target,
+            moderator: interaction.user.tag
+        }]);
+    }
+
     if (interaction.customId.startsWith('misc_modal_')) {
         const action = interaction.customId.replace('misc_modal_', '');
-        const targetUser = interaction.fields.getTextInputValue('target_user');
+        const getOptionalField = (id) => {
+            try {
+                return interaction.fields.getTextInputValue(id);
+            } catch {
+                return '';
+            }
+        };
+        let targetUser = getOptionalField('target_user');
 
         let args = { username: targetUser, moderator: interaction.user.tag };
-        let msgContent = `Queuing **\${action}** for **\${targetUser}**...`;
+        let msgContent = `Queuing **${action}** for **${targetUser}**...`;
 
         if (action === 'SET_CHAR') {
             const charUser = interaction.fields.getTextInputValue('char_user');
             args.char_user = charUser;
-            msgContent = `Queuing **Set Character** (to \${charUser}) for **\${targetUser}**...`;
+            msgContent = `Queuing **Set Character** (to ${charUser}) for **${targetUser}**...`;
+        }
+
+        if (VALUE_INPUT_MISC_COMMANDS.has(action)) {
+            const amount = Number(interaction.fields.getTextInputValue('amount'));
+            if (!Number.isFinite(amount)) {
+                return interaction.reply({ content: 'Please provide a valid amount.', ephemeral: true });
+            }
+            args.amount = amount;
+            msgContent = `Queuing **${action}** (${amount}) for **${targetUser}**...`;
+        }
+
+        if (action === 'TEAM') {
+            const teamName = getOptionalField('team_name').trim();
+            if (!teamName) {
+                return interaction.reply({ content: 'Please provide a Roblox team name.', ephemeral: true });
+            }
+            args.team_name = teamName;
+            msgContent = `Queuing **Team** (${teamName}) for **${targetUser}**...`;
+        }
+
+        if (action === 'VIEW') {
+            const linkedRobloxUsername = await getLinkedRobloxUsername(interaction.user.id);
+            if (!linkedRobloxUsername) {
+                return interaction.reply({ content: 'Link your Discord account to Roblox before using View.', ephemeral: true });
+            }
+            args.moderator_roblox_username = linkedRobloxUsername;
+            if (!targetUser) {
+                targetUser = linkedRobloxUsername;
+                args.username = linkedRobloxUsername;
+            }
+            msgContent = targetUser === linkedRobloxUsername
+                ? 'Queuing **View** camera reset...'
+                : `Queuing **View** for **${targetUser}**...`;
+        }
+
+        if (action === 'TELEPORT_TO_ME') {
+            args.moderator_roblox_username = getOptionalField('moderator_username');
+            msgContent = `Queuing **Teleport To Me** for **${targetUser}**...`;
         }
 
         await interaction.reply({ content: msgContent, ephemeral: true });
@@ -949,6 +2498,42 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
 
     const customId = interaction.customId;
+
+    if (customId === 'lookup_manage') {
+        if (!await isServerStaffInteraction(interaction)) {
+            return interaction.reply({ content: 'You need moderation permissions to use these actions.', ephemeral: true });
+        }
+
+        const moderationPanel = buildModerationPanel();
+        const miscPanel = buildMiscPanel();
+        return interaction.reply({
+            embeds: [moderationPanel.embed, miscPanel.embed],
+            components: [moderationPanel.row, miscPanel.row],
+            ephemeral: true,
+        });
+    }
+
+    if (customId.startsWith('staff_note_modal|')) {
+        if (!await isServerStaffInteraction(interaction)) {
+            return interaction.reply({ content: 'You do not have permission to add staff notes.', ephemeral: true });
+        }
+
+        const modal = new ModalBuilder()
+            .setCustomId(customId)
+            .setTitle('Add Staff Note');
+
+        const noteInput = new TextInputBuilder()
+            .setCustomId('staff_note')
+            .setLabel('Staff Note')
+            .setPlaceholder('Add context only server staff should see.')
+            .setStyle(TextInputStyle.Paragraph)
+            .setMinLength(1)
+            .setMaxLength(1500)
+            .setRequired(true);
+
+        modal.addComponents(new ActionRowBuilder().addComponents(noteInput));
+        return interaction.showModal(modal);
+    }
 
     // Handle Report Toggle
     if (customId.startsWith('switch_')) {
@@ -1067,6 +2652,18 @@ client.on('interactionCreate', async interaction => {
         const openCloudKey = interaction.fields.getTextInputValue('api_key');
 
         await interaction.deferReply({ ephemeral: true });
+
+        let blockedServer = null;
+        try {
+            blockedServer = await findBlockedServerForGuild(interaction.guildId);
+        } catch (error) {
+            console.error(`[SETUP] Failed to check blocked status for ${interaction.guildId}:`, error.message);
+            return interaction.editReply('Unable to verify whether this server is allowed to use Ro-Link. Try again later.');
+        }
+
+        if (blockedServer) {
+            return interaction.editReply(getBlockedServerMessage(blockedServer));
+        }
 
         const { data: existingServer } = await supabase
             .from('servers')

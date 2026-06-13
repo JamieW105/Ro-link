@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 
 type SessionWithDiscord = Session & {
     accessToken?: string;
+    error?: string;
     user?: Session['user'] & {
         id?: string;
     };
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
 
     const session = await getServerSession(authOptions) as SessionWithDiscord | null;
 
-    if (!session || !session.accessToken || !session.user?.id) {
+    if (!session || !session.accessToken || session.error || !session.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

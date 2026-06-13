@@ -5,10 +5,12 @@ import { createClient } from '@supabase/supabase-js';
 import { resolveDashboardUserPermissions } from './gameAdmin';
 import {
     DiscordAccessTokenError,
+    DiscordRateLimitError,
     hasDiscordGuildManagePermission,
     listVisibleGuildsForDiscordSession,
     type VisibleDashboardGuild,
 } from './dashboardGuilds';
+import { findBlockedServer, getBlockedServerMessage } from './blockedServers';
 import { supabase } from './supabase';
 
 const PLUGIN_SESSION_TTL_MS = 60 * 60 * 1000;
@@ -77,6 +79,8 @@ export interface StudioPluginServerSummary {
     universeId: string;
     hasOpenCloudKey: boolean;
     hasApiKey: boolean;
+    apiKey: string | null;
+    apiBaseUrl: string;
     isConfigured: boolean;
     setupUrl: string;
 }
@@ -437,9 +441,23 @@ async function resolveManageableGuildsForSession(
     mode: 'prefer_snapshot' | 'refresh',
 ): Promise<VisibleDashboardGuild[]> {
     if (mode === 'refresh') {
-        const live = await getManageableGuildsForPlugin(session);
-        await persistGuildSnapshot(session.id, live);
-        return live;
+        try {
+            const live = await getManageableGuildsForPlugin(session);
+            await persistGuildSnapshot(session.id, live);
+            return live;
+        } catch (error) {
+            const fromSnapshot = parseGuildSnapshot(session.guild_snapshot);
+            if (fromSnapshot !== null && !(error instanceof DiscordAccessTokenError)) {
+                console.warn('[PLUGIN][SERVERS] Refresh failed; using cached guild snapshot.', {
+                    sessionId: session.id,
+                    discordUserId: session.discord_user_id || null,
+                    error: error instanceof Error ? error.message : error,
+                    retryAfter: error instanceof DiscordRateLimitError ? error.retryAfter : null,
+                });
+                return fromSnapshot;
+            }
+            throw error;
+        }
     }
 
     const fromSnapshot = parseGuildSnapshot(session.guild_snapshot);
@@ -519,15 +537,17 @@ export async function authorizeStudioPluginSession(sessionId: string, code: stri
         authorized_at: new Date().toISOString(),
     };
 
-    try {
-        const guilds = await getManageableGuildsForPlugin(authorizedSession);
-        await persistGuildSnapshot(existing.id, guilds);
-    } catch (snapshotError) {
-        console.warn('[PLUGIN][AUTHORIZE] Guild snapshot failed; /servers will compute live', {
-            sessionId: existing.id,
-            error: snapshotError instanceof Error ? snapshotError.message : snapshotError,
-        });
-    }
+    void (async () => {
+        try {
+            const guilds = await getManageableGuildsForPlugin(authorizedSession);
+            await persistGuildSnapshot(existing.id, guilds);
+        } catch (snapshotError) {
+            console.warn('[PLUGIN][AUTHORIZE] Guild snapshot failed; /servers will compute live', {
+                sessionId: existing.id,
+                error: snapshotError instanceof Error ? snapshotError.message : snapshotError,
+            });
+        }
+    })();
 
     return {
         pluginToken,
@@ -617,7 +637,8 @@ export async function getStudioPluginServers(req: Request, session: StudioPlugin
             const placeId = typeof setup?.place_id === 'string' ? setup.place_id : '';
             const universeId = typeof setup?.universe_id === 'string' ? setup.universe_id : '';
             const hasOpenCloudKey = Boolean(setup?.open_cloud_key?.trim());
-            const hasApiKey = Boolean(setup?.api_key?.trim());
+            const apiKey = setup?.api_key?.trim() || null;
+            const hasApiKey = Boolean(apiKey);
 
             return {
                 id: guild.id,
@@ -630,6 +651,8 @@ export async function getStudioPluginServers(req: Request, session: StudioPlugin
                 universeId,
                 hasOpenCloudKey,
                 hasApiKey,
+                apiKey,
+                apiBaseUrl: baseUrl,
                 isConfigured: Boolean(placeId && universeId && hasOpenCloudKey && hasApiKey),
                 setupUrl: `${baseUrl}/dashboard/${guild.id}/settings/setup`,
             } satisfies StudioPluginServerSummary;
@@ -675,6 +698,11 @@ export async function installStudioPluginServer(req: Request, session: StudioPlu
 
     if (!selectedGuild) {
         throw new Error('You do not have permission to configure that Ro-Link server.');
+    }
+
+    const blocked = await findBlockedServer(client, input.serverId);
+    if (blocked) {
+        throw new StudioPluginError(getBlockedServerMessage(blocked), 403);
     }
 
     const { data: existing } = await client

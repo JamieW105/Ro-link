@@ -4,6 +4,19 @@ export interface AdminPanelCommandDefinition {
     description: string;
     category: string;
     requiresTarget?: boolean;
+    source?: 'module';
+    moduleId?: string;
+    moduleName?: string;
+    sortOrder?: number;
+    fields?: AdminPanelCommandFieldDefinition[];
+}
+
+export interface AdminPanelCommandFieldDefinition {
+    id: string;
+    label: string;
+    type?: string;
+    required?: boolean;
+    multiline?: boolean;
 }
 
 export const ADMIN_PANEL_COMMANDS: AdminPanelCommandDefinition[] = [
@@ -19,6 +32,8 @@ export const ADMIN_PANEL_COMMANDS: AdminPanelCommandDefinition[] = [
     { id: 'KILL', label: 'Kill', description: 'Set a player’s health to zero.', category: 'Player', requiresTarget: true },
     { id: 'RESET', label: 'Reset', description: 'Respawn a player character.', category: 'Player', requiresTarget: true },
     { id: 'REFRESH', label: 'Refresh', description: 'Reload a player while preserving position.', category: 'Player', requiresTarget: true },
+    { id: 'VIEW', label: 'View', description: 'View a player or reset your camera to yourself.', category: 'Player' },
+    { id: 'TEAM', label: 'Team', description: 'Move a player to a Roblox team.', category: 'Player', requiresTarget: true },
     { id: 'SET_CHAR', label: 'Set Character', description: 'Copy another avatar onto the target.', category: 'Player', requiresTarget: true },
     { id: 'DAMAGE', label: 'Damage', description: 'Deal a chosen amount of damage.', category: 'Player', requiresTarget: true },
     { id: 'MAX_HEALTH', label: 'Max Health', description: 'Set a player’s maximum health.', category: 'Player', requiresTarget: true },
@@ -26,6 +41,7 @@ export const ADMIN_PANEL_COMMANDS: AdminPanelCommandDefinition[] = [
     { id: 'JUMP_POWER', label: 'Jump Power', description: 'Set a player’s jump power.', category: 'Player', requiresTarget: true },
     { id: 'FREEZE', label: 'Freeze', description: 'Anchor a player in place.', category: 'Player', requiresTarget: true },
     { id: 'UNFREEZE', label: 'Unfreeze', description: 'Remove an active freeze.', category: 'Player', requiresTarget: true },
+    { id: 'RAGDOLL', label: 'Ragdoll', description: 'Temporarily force a player into a ragdoll state.', category: 'Player', requiresTarget: true },
     { id: 'BRING_TO_SPAWN', label: 'Bring To Spawn', description: 'Move a player to spawn.', category: 'Player', requiresTarget: true },
     { id: 'TELEPORT_TO_ME', label: 'Teleport To Me', description: 'Move a player to the moderator.', category: 'Player', requiresTarget: true },
     { id: 'FORCEFIELD_ADD', label: 'Add ForceField', description: 'Add a ForceField to a player.', category: 'Player', requiresTarget: true },
@@ -62,6 +78,8 @@ export const MISC_ACTION_COMMAND_IDS = [
     'KILL',
     'RESET',
     'REFRESH',
+    'VIEW',
+    'TEAM',
     'SET_CHAR',
     'DAMAGE',
     'MAX_HEALTH',
@@ -69,6 +87,7 @@ export const MISC_ACTION_COMMAND_IDS = [
     'JUMP_POWER',
     'FREEZE',
     'UNFREEZE',
+    'RAGDOLL',
     'BRING_TO_SPAWN',
     'TELEPORT_TO_ME',
     'FORCEFIELD_ADD',
@@ -98,6 +117,8 @@ const COMMAND_ALIASES: Record<string, string> = {
     SOFT_BAN: 'SOFTBAN',
     SETCHAR: 'SET_CHAR',
     SET_CHARACTER: 'SET_CHAR',
+    SET_TEAM: 'TEAM',
+    SPECTATE: 'VIEW',
     NO_CLIP: 'NOCLIP',
     MAXHEALTH: 'MAX_HEALTH',
     WALKSPEED: 'WALK_SPEED',

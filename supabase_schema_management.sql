@@ -13,6 +13,12 @@ CREATE TABLE IF NOT EXISTS public.management_users (
     added_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Management Dashboard DM Opt-Outs
+CREATE TABLE IF NOT EXISTS public.management_dm_opt_outs (
+    discord_id TEXT PRIMARY KEY,
+    opted_out_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Blocked Servers
 CREATE TABLE IF NOT EXISTS public.blocked_servers (
     guild_id TEXT PRIMARY KEY,
@@ -22,6 +28,45 @@ CREATE TABLE IF NOT EXISTS public.blocked_servers (
     blocked_by TEXT NOT NULL, -- discord_id
     blocked_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Staff Moderation Actions
+CREATE TABLE IF NOT EXISTS public.staff_moderation_actions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    action_type TEXT NOT NULL CHECK (action_type IN ('removed', 'blocked')),
+    guild_id TEXT NOT NULL,
+    guild_name TEXT,
+    owner_id TEXT,
+    reason TEXT,
+    created_by TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'VOIDED')),
+    voided_by TEXT,
+    voided_at TIMESTAMPTZ,
+    forum_thread_id TEXT
+);
+
+CREATE INDEX IF NOT EXISTS staff_moderation_actions_guild_idx
+ON public.staff_moderation_actions(guild_id);
+
+CREATE INDEX IF NOT EXISTS staff_moderation_actions_status_idx
+ON public.staff_moderation_actions(status);
+
+ALTER TABLE public.blocked_servers
+ADD COLUMN IF NOT EXISTS moderation_action_id UUID REFERENCES public.staff_moderation_actions(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS blocked_servers_moderation_action_id_idx
+ON public.blocked_servers(moderation_action_id);
+
+DO $$
+BEGIN
+    IF to_regclass('public.logs') IS NOT NULL THEN
+        ALTER TABLE public.logs
+        ADD COLUMN IF NOT EXISTS moderation_action_id UUID REFERENCES public.staff_moderation_actions(id) ON DELETE SET NULL;
+
+        CREATE INDEX IF NOT EXISTS logs_moderation_action_id_idx
+        ON public.logs(moderation_action_id);
+    END IF;
+END $$;
 
 -- Job Applications
 CREATE TABLE IF NOT EXISTS public.job_applications (
@@ -54,6 +99,8 @@ CREATE TABLE IF NOT EXISTS public.update_posts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slug TEXT NOT NULL UNIQUE,
     version TEXT NOT NULL DEFAULT 'V2.01.0',
+    rolink_version TEXT NOT NULL DEFAULT 'V2.01.0',
+    plugin_version TEXT,
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     major_features JSONB NOT NULL DEFAULT '[]',
@@ -83,6 +130,25 @@ BEGIN
     IF NOT EXISTS (
         SELECT 1
         FROM information_schema.columns
+        WHERE table_name = 'update_posts' AND column_name = 'rolink_version'
+    ) THEN
+        ALTER TABLE public.update_posts ADD COLUMN rolink_version TEXT NOT NULL DEFAULT 'V2.01.0';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'update_posts' AND column_name = 'plugin_version'
+    ) THEN
+        ALTER TABLE public.update_posts ADD COLUMN plugin_version TEXT;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
         WHERE table_name = 'update_posts' AND column_name = 'status'
     ) THEN
         ALTER TABLE public.update_posts ADD COLUMN status TEXT NOT NULL DEFAULT 'DRAFT';
@@ -99,6 +165,10 @@ ALTER COLUMN published_at DROP DEFAULT;
 UPDATE public.update_posts
 SET version = 'V2.01.0'
 WHERE version IS NULL OR btrim(version) = '';
+
+UPDATE public.update_posts
+SET rolink_version = version
+WHERE rolink_version IS NULL OR btrim(rolink_version) = '';
 
 UPDATE public.update_posts
 SET status = 'PUBLISHED'

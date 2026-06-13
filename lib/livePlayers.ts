@@ -1,3 +1,5 @@
+import { buildRobloxAvatarUrl, normalizeRobloxAvatarUrl } from '@/lib/robloxAvatars';
+
 export interface LivePlayer {
     username: string;
     displayName: string;
@@ -136,14 +138,6 @@ function toRawLivePlayerEntries(rawPlayers: unknown) {
     return nestedEntries.length > 0 ? nestedEntries : Object.values(rawPlayers);
 }
 
-function buildAvatarFallback(userId: string | null) {
-    if (!userId) {
-        return null;
-    }
-
-    return `https://www.roblox.com/headshot-thumbnail/image?userId=${encodeURIComponent(userId)}&width=180&height=180&format=png`;
-}
-
 export function normalizeLivePlayer(rawPlayer: unknown): LivePlayer | null {
     if (typeof rawPlayer === 'string') {
         const username = trimString(rawPlayer);
@@ -174,12 +168,13 @@ export function normalizeLivePlayer(rawPlayer: unknown): LivePlayer | null {
     }
 
     const userId = trimString(player.userId || player.id) || null;
-    const avatarUrl = trimString(
+    const avatarUrl = normalizeRobloxAvatarUrl(
         player.avatarUrl
         || player.thumbnailUrl
         || player.characterThumbnail
         || player.headshotUrl,
-    ) || buildAvatarFallback(userId);
+        userId,
+    ) || buildRobloxAvatarUrl(userId);
 
     return {
         username,

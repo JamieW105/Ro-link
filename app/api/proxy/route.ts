@@ -1,10 +1,79 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+
+type RobloxProfilePayload = {
+    id: number;
+    username: string;
+    displayName: string;
+    description: string;
+    created: string;
+    isBanned?: boolean;
+    avatarUrl: string;
+};
+
+type CachedProfile = {
+    expiresAt: number;
+    payload: RobloxProfilePayload;
+};
+
+const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
+const profileCache = new Map<string, CachedProfile>();
+
+function trimString(value: unknown) {
+    return String(value ?? '').trim();
+}
+
+function getCachedProfile(cacheKey: string, includeExpired = false) {
+    const cached = profileCache.get(cacheKey);
+    if (!cached) {
+        return null;
+    }
+
+    if (!includeExpired && cached.expiresAt <= Date.now()) {
+        profileCache.delete(cacheKey);
+        return null;
+    }
+
+    return cached.payload;
+}
+
+function cacheProfile(cacheKey: string, payload: RobloxProfilePayload) {
+    profileCache.set(cacheKey, {
+        payload,
+        expiresAt: Date.now() + PROFILE_CACHE_TTL_MS,
+    });
+}
+
+async function resolveUserId(username: string) {
+    const numericUserId = Number(username);
+    if (Number.isInteger(numericUserId) && numericUserId > 0) {
+        return numericUserId;
+    }
+
+    const searchRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0',
+        },
+        body: JSON.stringify({ usernames: [username], excludeBannedUsers: false }),
+    });
+
+    if (!searchRes.ok) {
+        return { error: `Roblox Search Error (${searchRes.status})`, status: searchRes.status };
+    }
+
+    const searchData = await searchRes.json();
+    const userId = searchData?.data?.[0]?.id;
+    if (!userId) {
+        return { error: 'Player not found', status: 404 };
+    }
+
+    return Number(userId);
+}
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
-    const username = searchParams.get('username');
-    const serverId = searchParams.get('serverId');
+    const username = trimString(searchParams.get('username'));
 
     if (!username) {
         return NextResponse.json({
@@ -13,67 +82,55 @@ export async function GET(req: Request) {
         }, { status: 200 });
     }
 
-    // Fetch User's Open Cloud Key
-    let apiKey = null;
-    if (serverId) {
-        const { data: server } = await supabase
-            .from('servers')
-            .select('open_cloud_key')
-            .eq('id', serverId)
-            .single();
-        apiKey = server?.open_cloud_key;
+    const cacheKey = username.toLowerCase();
+    const cachedProfile = getCachedProfile(cacheKey);
+    if (cachedProfile) {
+        return NextResponse.json(cachedProfile, {
+            headers: { 'Cache-Control': 'private, max-age=300' },
+        });
     }
 
     try {
-        // 1. Search for user (Legacy Search does NOT support x-api-key)
-        const searchRes = await fetch(`https://users.roblox.com/v1/users/search?keyword=${username}&limit=10`, {
-            headers: { 'User-Agent': 'Mozilla/5.0' }
+        const resolvedUserId = await resolveUserId(username);
+        if (typeof resolvedUserId !== 'number') {
+            const staleProfile = getCachedProfile(cacheKey, true);
+            if (staleProfile && resolvedUserId.status === 429) {
+                return NextResponse.json(staleProfile, {
+                    headers: {
+                        'Cache-Control': 'private, max-age=60',
+                        'X-Roblox-Profile-Cache': 'stale',
+                    },
+                });
+            }
+
+            return NextResponse.json({ error: resolvedUserId.error }, { status: resolvedUserId.status });
+        }
+
+        const userId = resolvedUserId;
+        const profileRes = await fetch(`https://users.roblox.com/v1/users/${encodeURIComponent(String(userId))}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
         });
-
-        if (!searchRes.ok) {
-            if (searchRes.status === 429) {
-                return NextResponse.json({ error: 'Roblox Rate Limit reached.' }, { status: 429 });
+        if (!profileRes.ok) {
+            const staleProfile = getCachedProfile(cacheKey, true);
+            if (staleProfile && profileRes.status === 429) {
+                return NextResponse.json(staleProfile, {
+                    headers: {
+                        'Cache-Control': 'private, max-age=60',
+                        'X-Roblox-Profile-Cache': 'stale',
+                    },
+                });
             }
-            return NextResponse.json({ error: `Roblox Search Error (${searchRes.status})` }, { status: searchRes.status });
+
+            return NextResponse.json({ error: `Roblox Profile Error (${profileRes.status})` }, { status: profileRes.status });
         }
 
-        const searchData = await searchRes.json();
-        if (!searchData.data || searchData.data.length === 0) {
-            return NextResponse.json({ error: 'Player not found' }, { status: 404 });
-        }
+        const profileData = await profileRes.json();
 
-        const userId = searchData.data[0].id;
-
-        // 2. Get Detailed Profile (Use Cloud v2 if API key is available)
-        let profileData;
-        if (apiKey) {
-            const cloudRes = await fetch(`https://apis.roblox.com/cloud/v2/users/${userId}`, {
-                headers: { 'x-api-key': apiKey }
-            });
-            if (cloudRes.ok) {
-                profileData = await cloudRes.json();
-                // Map Cloud v2 fields to legacy fields for frontend compatibility
-                profileData.name = profileData.name.split('/').pop(); // "users/123" -> "123"
-                profileData.description = profileData.about;
-                profileData.created = profileData.createTime;
-                // profileData.isBanned is not available in Cloud API v2 standard response usually, 
-                // but we can default it or leave it undefined if not present.
-                // Legacy API provides isBanned. If we want isBanned, we might need to fallback or check legacy if critical.
-                // For now, let's keep it simple.
-            }
-        }
-
-        if (!profileData) {
-            const legacyProfileRes = await fetch('https://users.roblox.com/v1/users/' + userId);
-            profileData = await legacyProfileRes.json();
-        }
-
-        // 3. Get Avatar Thumbnail
         const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`);
-        const thumbData = await thumbRes.json();
+        const thumbData = thumbRes.ok ? await thumbRes.json() : {};
         const avatarUrl = thumbData.data?.[0]?.imageUrl || '';
 
-        return NextResponse.json({
+        const payload = {
             id: userId,
             username: profileData.name,
             displayName: profileData.displayName,
@@ -81,6 +138,13 @@ export async function GET(req: Request) {
             created: profileData.created,
             isBanned: profileData.isBanned,
             avatarUrl
+        };
+
+        cacheProfile(cacheKey, payload);
+        cacheProfile(String(userId), payload);
+
+        return NextResponse.json(payload, {
+            headers: { 'Cache-Control': 'private, max-age=300' },
         });
 
     } catch (error) {

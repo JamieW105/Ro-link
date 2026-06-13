@@ -67,3 +67,5 @@ Only the Discord Server Owner can run `/setup` to link a game.
 ## 📚 Documentation
 
 For detailed installation and configuration instructions, please read the [**Setup Guide**](guide.md).
+
+The setup guide also includes the marketplace **Module Developer API** for add-on authors, including `SendBotMessage`, lifecycle hooks, `CreateUI`, command registration, and player/helper functions.

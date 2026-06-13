@@ -13,6 +13,7 @@ const LIVE_SERVER_FRESHNESS_MS = 2 * 60 * 1000;
 
 const GLOBAL_COMMAND_LOOKUP = new Set<string>(GLOBAL_COMMAND_IDS);
 const PLAYER_TARGET_COMMAND_LOOKUP = new Set<string>([
+    'BROADCAST',
     'KICK',
     'BAN',
     'UNBAN',
@@ -28,10 +29,13 @@ const PLAYER_TARGET_COMMAND_LOOKUP = new Set<string>([
     'MAX_HEALTH',
     'RESET',
     'REFRESH',
+    'VIEW',
+    'TEAM',
     'WALK_SPEED',
     'JUMP_POWER',
     'FREEZE',
     'UNFREEZE',
+    'RAGDOLL',
     'BRING_TO_SPAWN',
     'TELEPORT_TO_ME',
     'FORCEFIELD_ADD',
@@ -120,6 +124,21 @@ async function getFreshLiveServers(serverId: string) {
     return (liveServers || []) as LiveServerRecord[];
 }
 
+export async function resolveLiveServerTargets(serverId: string) {
+    const liveServers = await getFreshLiveServers(serverId);
+    const jobIds = Array.from(new Set(
+        liveServers
+            .map((server) => trimString(server.id))
+            .filter(Boolean),
+    ));
+
+    return jobIds.map((jobId) => ({
+        deliveryId: crypto.randomUUID(),
+        jobId,
+        scope: 'SERVER' as const,
+    })) satisfies DeliveryTarget[];
+}
+
 function liveServerHasPlayer(server: LiveServerRecord, targetIdentity: string) {
     return Array.isArray(server.players)
         && server.players.some((player) => playerMatchesIdentity(player, targetIdentity));
@@ -144,7 +163,11 @@ export async function resolveDeliveryTargets(
     serverId: string,
     command: string,
     args: CommandArgs,
-    options?: { preferredJobId?: string },
+    options?: {
+        preferredJobId?: string;
+        allowGlobal?: boolean;
+        playerTargetCommands?: readonly string[];
+    },
 ) {
     const requestedJobId = trimString(args.job_id);
     if (requestedJobId) {
@@ -156,7 +179,7 @@ export async function resolveDeliveryTargets(
     }
 
     const requestedScope = trimString(args.target_scope).toUpperCase();
-    if (requestedScope === 'GLOBAL' && GLOBAL_COMMAND_LOOKUP.has(command)) {
+    if (requestedScope === 'GLOBAL' && (GLOBAL_COMMAND_LOOKUP.has(command) || options?.allowGlobal)) {
         const liveServers = await getFreshLiveServers(serverId);
         const jobIds = Array.from(new Set(
             liveServers
@@ -172,7 +195,8 @@ export async function resolveDeliveryTargets(
     }
 
     const targetIdentity = getTargetIdentity(args);
-    if (targetIdentity && PLAYER_TARGET_COMMAND_LOOKUP.has(command)) {
+    const playerTargetCommands = new Set(options?.playerTargetCommands ?? []);
+    if (targetIdentity && (PLAYER_TARGET_COMMAND_LOOKUP.has(command) || playerTargetCommands.has(command))) {
         const targetJobId = await resolvePlayerJobId(serverId, targetIdentity, options?.preferredJobId);
         if (!targetJobId) {
             return [] satisfies DeliveryTarget[];
@@ -183,6 +207,22 @@ export async function resolveDeliveryTargets(
             jobId: targetJobId,
             scope: 'SERVER',
         }] satisfies DeliveryTarget[];
+    }
+
+    if (command === 'VIEW') {
+        const viewerIdentity = trimString(args.moderator_roblox_username);
+        if (viewerIdentity) {
+            const targetJobId = await resolvePlayerJobId(serverId, viewerIdentity, options?.preferredJobId);
+            if (!targetJobId) {
+                return [] satisfies DeliveryTarget[];
+            }
+
+            return [{
+                deliveryId: crypto.randomUUID(),
+                jobId: targetJobId,
+                scope: 'SERVER',
+            }] satisfies DeliveryTarget[];
+        }
     }
 
     return [{

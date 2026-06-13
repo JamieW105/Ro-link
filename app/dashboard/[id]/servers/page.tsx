@@ -7,7 +7,6 @@ import { useParams } from "next/navigation";
 import { usePermissions } from "@/context/PermissionsContext";
 import { hasAdminPanelCommandAccess } from "@/lib/adminPanelCommands";
 import { normalizeLivePlayerList } from "@/lib/livePlayers";
-import { supabase } from "@/lib/supabase";
 
 interface LiveServer {
     id: string;
@@ -52,25 +51,16 @@ export default function ServersPage() {
         async function fetchData() {
             if (!id) return;
 
-            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-            const { data, error } = await supabase
-                .from('live_servers')
-                .select('*')
-                .eq('server_id', id)
-                .gte('updated_at', fiveMinutesAgo)
-                .order('updated_at', { ascending: false });
+            const response = await fetch(`/api/dashboard/live-servers?serverId=${encodeURIComponent(String(id))}&cleanupStale=true`, {
+                cache: 'no-store',
+            });
 
-            if (!error && data) {
+            if (response.ok) {
+                const data = await response.json();
                 setLiveServers(data);
             }
 
             setLoading(false);
-
-            await supabase
-                .from('live_servers')
-                .delete()
-                .eq('server_id', id)
-                .lt('updated_at', fiveMinutesAgo);
         }
 
         fetchData();

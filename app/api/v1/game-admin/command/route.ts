@@ -1,10 +1,10 @@
-export { GET, POST } from '../../command/route';
 import { NextResponse } from 'next/server';
 
 import { ADMIN_PANEL_COMMAND_IDS, normalizeAdminPanelCommand } from '@/lib/adminPanelCommands';
 import { buildDeliveryArgs, resolveDeliveryTargets, trimString, type CommandArgs } from '@/lib/commandDelivery';
 import { getServerByApiKey } from '@/lib/gameAdmin';
 import { logAction } from '@/lib/logger';
+import { collectModulePanelCommandsFromLiveServers } from '@/lib/modulePanelCommands';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { supabase } from '@/lib/supabase';
 
@@ -25,7 +25,29 @@ export async function POST(req: Request) {
         const rawArgs = typeof body?.args === 'object' && body.args ? body.args : {};
         const args: CommandArgs = { ...rawArgs };
 
-        if (!command || !ADMIN_PANEL_COMMAND_IDS.includes(command)) {
+        if (!command) {
+            return NextResponse.json({ error: 'Unknown command' }, { status: 400 });
+        }
+
+        const isBuiltInCommand = ADMIN_PANEL_COMMAND_IDS.includes(command);
+        const freshAfter = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { data: liveServers, error: liveServersError } = isBuiltInCommand
+            ? { data: null, error: null }
+            : await supabase
+                .from('live_servers')
+                .select('*')
+                .eq('server_id', server.id)
+                .gte('updated_at', freshAfter);
+
+        if (liveServersError) {
+            return NextResponse.json({ error: liveServersError.message }, { status: 500 });
+        }
+
+        const moduleCommandDefinition = isBuiltInCommand
+            ? null
+            : collectModulePanelCommandsFromLiveServers(liveServers || []).find((definition) => definition.id === command) || null;
+
+        if (!isBuiltInCommand && !moduleCommandDefinition) {
             return NextResponse.json({ error: 'Unknown command' }, { status: 400 });
         }
 
@@ -39,9 +61,32 @@ export async function POST(req: Request) {
         if (moderatorRobloxUsername) {
             baseArgs.moderator_roblox_username = moderatorRobloxUsername;
         }
+        if (command === 'VIEW' && !trimString(baseArgs.username) && moderatorRobloxUsername) {
+            baseArgs.target_label = moderatorRobloxUsername;
+        }
+        if (command === 'TEAM') {
+            const teamName = trimString(args.team_name || args.teamName || args.team);
+            if (!teamName) {
+                return NextResponse.json({ error: 'Team name is required.' }, { status: 400 });
+            }
+            baseArgs.team_name = teamName;
+        }
+        if (!isBuiltInCommand && moduleCommandDefinition?.requiresTarget) {
+            const targetIdentity = trimString(
+                baseArgs.username
+                || baseArgs.targetName
+                || baseArgs.userIdentity
+                || baseArgs.target_label,
+            );
+            if (!targetIdentity) {
+                return NextResponse.json({ error: 'A target player is required for that module command.' }, { status: 400 });
+            }
+        }
 
         const deliveryTargets = await resolveDeliveryTargets(server.id, command, baseArgs, {
             preferredJobId: trimString(body?.sourceJobId || args.source_job_id),
+            allowGlobal: !isBuiltInCommand,
+            playerTargetCommands: moduleCommandDefinition?.requiresTarget ? [command] : [],
         });
 
         if (deliveryTargets.length === 0) {

@@ -11,87 +11,13 @@ import { buildDeliveryArgs, resolveDeliveryTargets, trimString, type CommandArgs
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
 import { logAction } from '@/lib/logger';
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
+import { collectModulePanelCommandsFromLiveServers } from '@/lib/modulePanelCommands';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { supabase } from '@/lib/supabase';
 
-const GLOBAL_COMMAND_LOOKUP = new Set<string>(GLOBAL_COMMAND_IDS);
-const LIVE_SERVER_FRESHNESS_MS = 2 * 60 * 1000;
-
-type CommandArgs = Record<string, unknown>;
-type DeliveryTarget = {
-    deliveryId: string;
-    jobId: string | null;
-    scope: 'COMMAND' | 'SERVER' | 'GLOBAL';
-};
 type ServerModerationSettingsRecord = {
     enforce_moderation_role_hierarchy?: boolean | null;
 };
-
-function trimString(value: unknown) {
-    return String(value ?? '').trim();
-}
-
-function buildDeliveryArgs(baseArgs: CommandArgs, target: DeliveryTarget) {
-    const nextArgs: CommandArgs = { ...baseArgs };
-    nextArgs.delivery_id = target.deliveryId;
-
-    if (target.jobId) {
-        nextArgs.job_id = target.jobId;
-    } else {
-        delete nextArgs.job_id;
-    }
-
-    if (target.scope !== 'COMMAND') {
-        nextArgs.target_scope = target.scope;
-    } else if (!trimString(nextArgs.target_scope)) {
-        delete nextArgs.target_scope;
-    }
-
-    return nextArgs;
-}
-
-async function resolveDeliveryTargets(serverId: string, command: string, args: CommandArgs) {
-    const requestedJobId = trimString(args.job_id);
-    if (requestedJobId) {
-        return [{
-            deliveryId: crypto.randomUUID(),
-            jobId: requestedJobId,
-            scope: 'SERVER',
-        }] satisfies DeliveryTarget[];
-    }
-
-    const requestedScope = trimString(args.target_scope).toUpperCase();
-    if (requestedScope !== 'GLOBAL' || !GLOBAL_COMMAND_LOOKUP.has(command)) {
-        return [{
-            deliveryId: crypto.randomUUID(),
-            jobId: null,
-            scope: 'COMMAND',
-        }] satisfies DeliveryTarget[];
-    }
-
-    const freshAfter = new Date(Date.now() - LIVE_SERVER_FRESHNESS_MS).toISOString();
-    const { data: liveServers, error } = await supabase
-        .from('live_servers')
-        .select('id')
-        .eq('server_id', serverId)
-        .gte('updated_at', freshAfter);
-
-    if (error) {
-        throw new Error(error.message);
-    }
-
-    const jobIds = Array.from(new Set(
-        (liveServers || [])
-            .map((server) => trimString((server as { id?: string }).id))
-            .filter(Boolean),
-    ));
-
-    return jobIds.map((jobId) => ({
-        deliveryId: crypto.randomUUID(),
-        jobId,
-        scope: 'GLOBAL',
-    })) satisfies DeliveryTarget[];
-}
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
@@ -109,18 +35,41 @@ export async function POST(req: Request) {
         if (!serverId || !command) {
             return NextResponse.json({ error: 'Missing serverId or command' }, { status: 400 });
         }
-        if (!ADMIN_PANEL_COMMAND_IDS.includes(command)) {
-            return NextResponse.json({ error: 'Unknown command' }, { status: 400 });
-        }
 
         const discordUserId = trimString((session.user as { id?: string }).id);
         const permissions = await resolveDashboardUserPermissions(serverId, discordUserId);
-        if (!permissions.is_admin && !permissions.can_access_dashboard) {
+        if (!permissions.is_admin && !permissions.can_access_dashboard && !permissions.can_access_live_panel) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        if (!canUseDashboardCommand(permissions, command)) {
+        const isBuiltInCommand = ADMIN_PANEL_COMMAND_IDS.includes(command);
+        const freshAfter = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { data: liveServers, error: liveServersError } = isBuiltInCommand
+            ? { data: null, error: null }
+            : await supabase
+                .from('live_servers')
+                .select('*')
+                .eq('server_id', serverId)
+                .gte('updated_at', freshAfter);
+
+        if (liveServersError) {
+            return NextResponse.json({ error: liveServersError.message }, { status: 500 });
+        }
+
+        const moduleCommandDefinition = isBuiltInCommand
+            ? null
+            : collectModulePanelCommandsFromLiveServers(liveServers || []).find((definition) => definition.id === command) || null;
+
+        if (!isBuiltInCommand && !moduleCommandDefinition) {
+            return NextResponse.json({ error: 'Unknown command' }, { status: 400 });
+        }
+
+        if (isBuiltInCommand && !canUseDashboardCommand(permissions, command)) {
             return NextResponse.json({ error: 'You do not have permission to use that Roblox admin command.' }, { status: 403 });
+        }
+
+        if (!isBuiltInCommand && !permissions.is_admin && !permissions.can_access_live_panel) {
+            return NextResponse.json({ error: 'You do not have permission to use module panel commands.' }, { status: 403 });
         }
 
         const [{ data: serverSettings, error: serverSettingsError }, { data: verifiedUser }] = await Promise.all([
@@ -140,7 +89,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: serverSettingsError.message }, { status: 500 });
         }
 
-        if (commandRequiresModerationHierarchy(command)) {
+        if (isBuiltInCommand && commandRequiresModerationHierarchy(command)) {
             const hierarchyCheck = await evaluateModerationRoleHierarchy({
                 serverId,
                 moderatorDiscordId: discordUserId,
@@ -169,8 +118,21 @@ export async function POST(req: Request) {
         if (moderatorRobloxUsername) {
             baseArgs.moderator_roblox_username = moderatorRobloxUsername;
         }
+        if (command === 'VIEW' && !trimString(baseArgs.username) && moderatorRobloxUsername) {
+            baseArgs.target_label = moderatorRobloxUsername;
+        }
+        if (command === 'TEAM') {
+            const teamName = trimString(args.team_name || args.teamName || args.team);
+            if (!teamName) {
+                return NextResponse.json({ error: 'Team name is required.' }, { status: 400 });
+            }
+            baseArgs.team_name = teamName;
+        }
 
-        const deliveryTargets = await resolveDeliveryTargets(serverId, command, baseArgs);
+        const deliveryTargets = await resolveDeliveryTargets(serverId, command, baseArgs, {
+            allowGlobal: !isBuiltInCommand,
+            playerTargetCommands: moduleCommandDefinition?.requiresTarget ? [command] : [],
+        });
         if (deliveryTargets.length === 0) {
             return NextResponse.json({ error: 'No live servers are available for that command target.' }, { status: 400 });
         }
@@ -215,7 +177,7 @@ export async function POST(req: Request) {
             serverId,
             command,
             logTarget || 'server',
-            moderator,
+            discordUserId ? `<@${discordUserId}>` : moderator,
             trimString(args.reason || args.message || 'Dashboard action'),
         );
 

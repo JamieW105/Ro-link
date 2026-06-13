@@ -8,7 +8,10 @@ import {
     normalizeAddonModule,
     sanitizeAddonModuleInput,
     slugifyModuleName,
+    trimModuleString,
 } from '@/lib/modules';
+import { createDiscordDmChannel, sendDiscordMessage } from '@/lib/moduleDiscord';
+import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
 
 async function requireModuleManager() {
@@ -56,6 +59,100 @@ type RouteContext = {
     }>;
 };
 
+function getBaseUrl() {
+    return (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
+}
+
+function buildMarketplaceModuleUrl(slug: string) {
+    const normalizedSlug = trimModuleString(slug, 80);
+    return normalizedSlug
+        ? `${getBaseUrl()}/dashboard/marketplace/${encodeURIComponent(normalizedSlug)}`
+        : `${getBaseUrl()}/dashboard/marketplace`;
+}
+
+function buildModuleCreatorTermsUrl() {
+    return `${getBaseUrl()}/terms/modules/create`;
+}
+
+async function notifyModuleCreator(
+    discordId: string | null | undefined,
+    status: 'PUBLISHED' | 'REJECTED',
+    moduleName: string,
+    moduleSlug: string,
+    moderationNote: string,
+) {
+    if (!discordId) return;
+
+    try {
+        const channelId = await createDiscordDmChannel(discordId);
+        const accepted = status === 'PUBLISHED';
+        const marketplaceUrl = buildMarketplaceModuleUrl(moduleSlug);
+        const termsUrl = buildModuleCreatorTermsUrl();
+        await sendDiscordMessage(channelId, {
+            embeds: [
+                {
+                    title: accepted ? 'Module Accepted' : 'Module Denied',
+                    url: accepted ? marketplaceUrl : termsUrl,
+                    description: accepted
+                        ? `Your Ro-Link module "${moduleName}" has been accepted and published. It is now available in the marketplace.`
+                        : `Your Ro-Link module "${moduleName}" has been denied.${moderationNote ? `\n\n**Moderation note:** ${moderationNote}` : ''}`,
+                    color: accepted ? 0x10b981 : 0xef4444,
+                    fields: accepted
+                        ? [
+                            { name: 'Marketplace URL', value: marketplaceUrl },
+                            { name: 'Module Creator Terms', value: termsUrl },
+                        ]
+                        : [
+                            { name: 'Module Creator Terms', value: termsUrl },
+                            { name: 'Next Step', value: 'Review the terms before submitting another module.' },
+                        ],
+                },
+            ],
+        });
+    } catch (error) {
+        console.error('[MODULES] Failed to DM module creator', {
+            discordId,
+            status,
+            error: error instanceof Error ? error.message : error,
+        });
+    }
+}
+
+async function notifyModuleCreatorCodeEdited(
+    discordId: string | null | undefined,
+    moduleName: string,
+    moduleSlug: string,
+    moderatorDiscordId: string,
+    editReason: string,
+) {
+    if (!discordId) return;
+
+    try {
+        const channelId = await createDiscordDmChannel(discordId);
+        const marketplaceUrl = buildMarketplaceModuleUrl(moduleSlug);
+        await sendDiscordMessage(channelId, {
+            embeds: [
+                {
+                    title: 'Module Code Edited By Moderation',
+                    url: marketplaceUrl,
+                    description: `A Ro-Link moderator edited the source code for your module "${moduleName}".`,
+                    color: 0x38bdf8,
+                    fields: [
+                        { name: 'Moderator', value: moderatorDiscordId },
+                        { name: 'Reason', value: editReason },
+                        { name: 'Module', value: marketplaceUrl },
+                    ],
+                },
+            ],
+        });
+    } catch (error) {
+        console.error('[MODULES] Failed to DM module creator about code edit', {
+            discordId,
+            error: error instanceof Error ? error.message : error,
+        });
+    }
+}
+
 export async function GET(_req: Request, context: RouteContext) {
     const auth = await requireModuleManager();
     if ('error' in auth) return auth.error;
@@ -75,7 +172,36 @@ export async function GET(_req: Request, context: RouteContext) {
         return NextResponse.json({ error: 'Module not found' }, { status: 404 });
     }
 
-    return NextResponse.json(normalizeAddonModule(data, true));
+    const staffDiscordIds = await getRoLinkStaffDiscordIds();
+    const [labeledModule] = applyOfficialModuleLabels([data as Record<string, unknown>], staffDiscordIds);
+    const addonModule = normalizeAddonModule(labeledModule, true);
+    let creatorHistory: ReturnType<typeof normalizeAddonModule>[] = [];
+
+    const authorDiscordId = addonModule?.authorDiscordId;
+    if (authorDiscordId) {
+        const { data: historyRows, error: historyError } = await supabase
+            .from('addon_modules')
+            .select('*')
+            .eq('author_discord_id', authorDiscordId)
+            .neq('id', id)
+            .in('status', ['PUBLISHED', 'REJECTED', 'ARCHIVED'])
+            .order('reviewed_at', { ascending: false })
+            .order('updated_at', { ascending: false })
+            .limit(25);
+
+        if (historyError) {
+            return NextResponse.json({ error: historyError.message }, { status: 500 });
+        }
+
+        creatorHistory = applyOfficialModuleLabels((historyRows || []) as Record<string, unknown>[], staffDiscordIds)
+            .map((row) => normalizeAddonModule(row, false))
+            .filter(Boolean);
+    }
+
+    return NextResponse.json({
+        ...addonModule,
+        creatorHistory,
+    });
 }
 
 export async function PATCH(req: Request, context: RouteContext) {
@@ -90,9 +216,34 @@ export async function PATCH(req: Request, context: RouteContext) {
     }
 
     const input = sanitized.input;
+    const { data: existingModule, error: existingModuleError } = await supabase
+        .from('addon_modules')
+        .select('id, name, slug, status, author_discord_id, source_code')
+        .eq('id', id)
+        .maybeSingle<{ id: string; name?: string | null; slug?: string | null; status?: string | null; author_discord_id?: string | null; source_code?: string | null }>();
+
+    if (existingModuleError) {
+        return NextResponse.json({ error: existingModuleError.message }, { status: 500 });
+    }
+
+    if (!existingModule) {
+        return NextResponse.json({ error: 'Module not found' }, { status: 404 });
+    }
+
     const updates: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
     };
+    const moderationNote = 'moderationNote' in body || 'moderation_note' in body
+        ? trimModuleString(body.moderationNote ?? body.moderation_note, 2000)
+        : undefined;
+    const codeEditReason = 'codeEditReason' in body || 'code_edit_reason' in body
+        ? trimModuleString(body.codeEditReason ?? body.code_edit_reason, 1000)
+        : '';
+    const sourceCodeChanged = input.sourceCode !== undefined && input.sourceCode !== String(existingModule.source_code || '');
+
+    if (sourceCodeChanged && !codeEditReason) {
+        return NextResponse.json({ error: 'A code edit reason is required.' }, { status: 400 });
+    }
 
     if (input.name !== undefined) updates.name = input.name;
     if (input.description !== undefined) updates.description = input.description;
@@ -100,11 +251,29 @@ export async function PATCH(req: Request, context: RouteContext) {
     if (input.category !== undefined) updates.category = input.category;
     if (input.status !== undefined) {
         updates.status = input.status;
+        updates.reviewed_at = input.status === 'PUBLISHED' || input.status === 'REJECTED'
+            ? new Date().toISOString()
+            : null;
+        updates.reviewed_by_discord_id = input.status === 'PUBLISHED' || input.status === 'REJECTED'
+            ? auth.userId
+            : null;
         updates.published_at = input.status === 'PUBLISHED' ? new Date().toISOString() : null;
+        if (input.status === 'PENDING_REVIEW') {
+            updates.submitted_at = new Date().toISOString();
+        }
+    }
+    if (moderationNote !== undefined) {
+        updates.moderation_note = moderationNote;
     }
     if (input.sourceCode !== undefined) {
         updates.source_code = input.sourceCode;
         updates.source_checksum = checksumModuleSource(input.sourceCode);
+        updates.config_schema = input.configSchema || {};
+    }
+    if (input.status === 'REJECTED') {
+        updates.source_code = '';
+        updates.source_checksum = checksumModuleSource('');
+        updates.config_schema = {};
     }
     if (input.slug !== undefined || input.name !== undefined) {
         updates.slug = await buildUniqueSlug(input.slug || input.name || 'module', id);
@@ -125,7 +294,44 @@ export async function PATCH(req: Request, context: RouteContext) {
         return NextResponse.json({ error: 'Module not found' }, { status: 404 });
     }
 
-    return NextResponse.json(normalizeAddonModule(data, true));
+    if (input.status === 'REJECTED') {
+        const { error: installCleanupError } = await supabase
+            .from('server_addon_modules')
+            .delete()
+            .eq('module_id', id);
+
+        if (installCleanupError) {
+            return NextResponse.json({ error: installCleanupError.message }, { status: 500 });
+        }
+    }
+
+    if (
+        (input.status === 'PUBLISHED' || input.status === 'REJECTED')
+        && existingModule.status !== input.status
+    ) {
+        await notifyModuleCreator(
+            existingModule.author_discord_id,
+            input.status,
+            String(data.name || existingModule.name || 'Untitled Module'),
+            String(data.slug || ''),
+            String(data.moderation_note || moderationNote || ''),
+        );
+    }
+
+    if (sourceCodeChanged) {
+        await notifyModuleCreatorCodeEdited(
+            existingModule.author_discord_id,
+            String(data.name || existingModule.name || 'Untitled Module'),
+            String(data.slug || existingModule.slug || ''),
+            auth.userId,
+            codeEditReason,
+        );
+    }
+
+    const staffDiscordIds = await getRoLinkStaffDiscordIds();
+    const [labeledModule] = applyOfficialModuleLabels([data as Record<string, unknown>], staffDiscordIds);
+
+    return NextResponse.json(normalizeAddonModule(labeledModule, true));
 }
 
 export async function DELETE(_req: Request, context: RouteContext) {

@@ -1,0 +1,9 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://192.168.68.120:3001
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 1706ms
+ GET /auth/signin?callbackUrl=https%3A%2F%2Ftest.rolink.site%2F 200 in 2.2s (compile: 1849ms, proxy.ts: 151ms, render: 189ms)
+ HEAD /api/auth/custom-dashboard?callbackUrl=https%3A%2F%2Ftest.rolink.site%2F 307 in 140ms (compile: 114ms, proxy.ts: 8ms, render: 18ms)

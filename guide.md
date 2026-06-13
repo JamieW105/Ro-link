@@ -146,6 +146,315 @@ Once your web server is running and your Discord server is linked via `/setup`:
 
 ---
 
+## Module Developer API
+
+Marketplace modules are uploaded from the management portal, published by users with the required management permissions, enabled per Discord server from the dashboard, installed by the Studio plugin into `ReplicatedStorage["RoLink Admin"]["Custom Modules"]`, and loaded by the Roblox admin panel at runtime. All modules are obfuscated before they are inserted into a person's game.
+
+Each uploaded Luau module can declare a top-level `CONFIG` table before returning its module table. `CONFIG.Version` is used as the module's update version when the upload form does not provide one. The dashboard reads the rest of that schema and saves per-server values.
+
+```lua
+CONFIG = {
+    Version = "1.0.0",
+    Debug_UI = {
+        Short_Description = "Show a debug panel for this module.",
+        Type = "Bool",
+        Default = true,
+        Options = {}
+    },
+    Theme = {
+        Short_Description = "Theme used by this module.",
+        Type = "Dropdown",
+        Default = "Sky",
+        Options = { "Sky", "Emerald", "Amber" }
+    },
+    Welcome_Message = {
+        Short_Description = "Message shown by this module.",
+        Type = "String",
+        Default = "Welcome to the server.",
+        Options = {}
+    },
+    Announcement = {
+        Short_Description = "Message to send immediately to live game servers.",
+        Type = "String",
+        Default = "",
+        LIVE = true,
+        ButtonText = "Send",
+        Options = {}
+    },
+    Enabled_Checks = {
+        Short_Description = "Checks the module should run.",
+        Type = "CheckBoxes",
+        Default = { "ui", "hooks" },
+        Options = { "ui", "hooks", "messages" }
+    },
+    Accent_Color = {
+        Short_Description = "Accent color as a hex value.",
+        Type = "Color Wheel",
+        Default = "#38bdf8",
+        Options = {}
+    },
+    Max_Open_Reports = {
+        Short_Description = "Maximum open reports to show in module UI.",
+        Type = "Integer",
+        Default = 10,
+        Options = {}
+    }
+}
+
+return {
+    Init = function(context, settings)
+        context.Log("Module loaded", context.Module.name, context.Settings.Debug_UI)
+    end,
+
+    Commands = {
+        hello = function(command, context, args)
+            context.Log("Hello command ran")
+        end
+    }
+}
+```
+
+### Getting Module Config From Ro-Link
+
+Module config has two parts:
+
+- `CONFIG` is the schema you declare in the uploaded module source. Ro-Link reads this table to build the dashboard form for each server.
+- Saved module settings are the per-server values chosen in the dashboard at **Dashboard > Modules > Configure** for the module. At runtime, Ro-Link passes those saved values into the module as `context.Settings` and as the second `settings` argument to `Init`.
+- Live config fields set `LIVE = true`. These fields show a dashboard send button, are not saved into `context.Settings`, and are delivered to running Roblox servers as a live module action. Use `ButtonText`, `LiveButtonText`, or `SendText` to customize the button label.
+
+Use `context.Settings.<FieldName>` or `settings.<FieldName>` to read the values saved in Ro-Link. Use `context.Config` only when you need the schema metadata, such as the field type, default, options, or description.
+
+```lua
+return {
+    Init = function(context, settings)
+        local debugEnabled = settings.Debug_UI
+        local theme = context.Settings.Theme
+
+        if debugEnabled then
+            context.Log("Debug UI enabled with theme", theme)
+        end
+    end,
+
+    Commands = {
+        theme = function(command, context)
+            return context.Notify(command.Player, "Theme: " .. tostring(context.Settings.Theme), true)
+        end
+    }
+}
+```
+
+Live config handlers can be declared with `LiveConfig`, `LiveActions`, `Live`, or `OnLiveConfig`. The handler receives the command payload, a runtime context, the submitted value, and the field key.
+
+```lua
+CONFIG = {
+    Announcement = {
+        Short_Description = "Send an announcement to live servers.",
+        Type = "String",
+        Default = "",
+        LIVE = true,
+        ButtonText = "Send"
+    }
+}
+
+return {
+    LiveConfig = {
+        Announcement = function(command, context, value)
+            for _, player in ipairs(context.GetPlayers()) do
+                context.Notify(player, tostring(value), true)
+            end
+        end
+    }
+}
+```
+
+Live config fields can also act as one-button action forms by declaring `SubInputs`, `Inputs`, or `Fields`. Sub inputs support the same field types as normal config fields. Use `Type = "Player"` for a searchable Roblox user selector and `Type = "Server"` for a searchable live server selector. Player selectors can use `Source = "roblox-users"` for Roblox-wide search, `Source = "live-players"` for everyone currently playing this game through Ro-Link, or `Source = "live-server-players"` with `Reference = "<server field key>"` to search players in a selected live server.
+
+```lua
+CONFIG = {
+    ServerMessage = {
+        Short_Description = "Send a targeted live message.",
+        Type = "Group",
+        LIVE = true,
+        ButtonText = "Send Message",
+        SubInputs = {
+            TargetServer = {
+                Type = "Server",
+                Source = "live-servers",
+                Label = "Server"
+            },
+            TargetPlayer = {
+                Type = "Player",
+                Source = "live-server-players",
+                Reference = "TargetServer",
+                Label = "Player"
+            },
+            Message = {
+                Type = "String",
+                Default = "Hello"
+            }
+        }
+    }
+}
+
+return {
+    LiveConfig = {
+        ServerMessage = function(command, context, value)
+            context.Log(value.TargetServer.jobId, value.TargetPlayer.username, value.Message)
+        end
+    }
+}
+```
+
+### Context Fields and Helpers
+
+| API | Purpose |
+| --- | --- |
+| `context.Module` | Published module metadata for the running add-on. |
+| `context.Config` | Parsed module `CONFIG` schema from the uploaded source. |
+| `context.Settings` | Per-server module settings from the dashboard. |
+| `context.Services` | Whitelisted Roblox services such as `Players`, `HttpService`, `ReplicatedStorage`, `RunService`, `Workspace`, `Lighting`, `MessagingService`, and `ServerScriptService`. |
+| `context.RegisterCommand(commandName, handler)` | Registers a module command. You can also return a `Commands` table. |
+| `context.RegisterPanelCommand(definition, handler)` | Registers a module command and exposes it in the in-game Cmds panel with title, description, target, and field metadata. |
+| `context.OnAdminPanelOpened(handler)` | Runs when an authorized player opens the admin panel. |
+| `context.OnCommandBarOpened(handler)` | Runs when an authorized player opens the command bar. |
+| `context.SendBotMessage(target, user, channelId, content)` | Sends a Discord bot message through Ro-Link with server and channel validation. |
+| `context.GetDiscordChannels()` | Returns Discord channels the bot can send to for the current server. |
+| `context.GetUserData(user)` | Returns Roblox user data, Discord server rank, and linked Discord user/member data when available. |
+| `context.GetReports(options)` | Reads reports for the current server. Options can include `status`, `limit`, `target`, and `reporter`. |
+| `context.GetReport(reportId)` | Reads one report for the current server. |
+| `context.CreateReport(body)` | Creates a pending report for the current server. |
+| `context.UpdateReport(reportId, updates)` | Edits report status, note, target, reason, or moderator fields for the current server. |
+| `context.CreateUI(target, functionOrTree, props)` | Creates Roblox UI for a player, all players, or a target list. Installed modules should pass a function or UI tree table. |
+| `_G.RoLinkModuleUI.Bind(guiObject, handler, options)` | Binds client UI interactions from `CreateUI` instances back to server-side module code. |
+| `context.FindPlayer(target)` | Finds one live Roblox player by player instance, username, or UserId. |
+| `context.GetPlayers()` | Returns live Roblox players. |
+| `context.Notify(target, message, success)` | Shows admin feedback where the Studio package has the feedback remote available. |
+| `context.Log(...)` | Prints a namespaced module log line. |
+
+### SendBotMessage
+
+`SendBotMessage` accepts these target values:
+
+- `channel`: sends to `channelId`. The channel must belong to the current Discord server and be sendable by the bot.
+- `serverowner`: DMs the Discord server owner.
+- `user`, `dm`, or `member`: DMs the provided Discord user. The user must be a member of the current Discord server.
+
+```lua
+context.SendBotMessage("channel", nil, "123456789012345678", {
+    PlainText = "Plain text message",
+    Embed = {
+        Title = "Optional embed",
+        Content = "Embed body",
+        media = "https://example.com/image.png",
+        Footer = "Footer text",
+        icon = "https://example.com/icon.png",
+        Color = 0x38bdf8
+    }
+})
+```
+
+`Embed` is optional. `PlainText` is optional when an embed has content. `Footer` and `Footor` are both accepted for compatibility.
+
+### GetUserData
+
+`GetUserData` accepts a Roblox `Player`, username, UserId, or an identity table such as `{ robloxId = 123 }`, `{ robloxUsername = "Player" }`, or `{ discordId = "123456789012345678" }`. It returns Roblox user data, the user's highest Discord server role/rank, and linked Discord user/member data when the Roblox account is linked.
+
+```lua
+local ok, data = context.GetUserData(player)
+
+if ok then
+    context.Log("Roblox user", data.user.robloxUsername, data.user.robloxId)
+
+    if data.linked and data.discordUser then
+        context.Log("Discord user", data.discordUser.username, data.discordUser.id)
+    end
+
+    if data.serverRank then
+        context.Log("Highest role", data.serverRank.highestRole and data.serverRank.highestRole.name or "none")
+        context.Log("Role position", data.serverRank.highestPosition)
+    end
+end
+```
+
+### Cmds Panel Commands and Reports
+
+Use `RegisterPanelCommand` when your module command should show in the in-game Cmds panel. `RegisterCommand` still registers a runtime command handler, but `RegisterPanelCommand` also supplies the metadata the command bar needs.
+
+```lua
+return {
+    Init = function(context)
+        context.RegisterPanelCommand({
+            Name = "flag_report",
+            Title = "Flag Report",
+            Description = "Add a moderator note to a report.",
+            Category = "Reports",
+            TargetRequired = false,
+            Fields = {
+                { id = "reportId", label = "Report ID", required = true },
+                { id = "note", label = "Note", required = true, multiline = true }
+            }
+        }, function(command, commandContext, args)
+            return commandContext.UpdateReport(args.reportId, {
+                moderatorNote = args.note
+            })
+        end)
+    end
+}
+```
+
+Report helpers use the running server's Ro-Link API key, so a module can only read or edit reports for the Discord server attached to that Roblox server.
+
+```lua
+local ok, reports = context.GetReports({ status = "PENDING", limit = 25 })
+if ok then
+    for _, report in ipairs(reports) do
+        context.Log(report.id, report.reported_roblox_username, report.reason)
+    end
+end
+
+context.UpdateReport(reportId, {
+    status = "RESOLVED",
+    moderatorNote = "Resolved from an in-game module command."
+})
+```
+
+### Lifecycle Hooks and UI
+
+```lua
+return {
+    Init = function(context)
+        context.OnAdminPanelOpened(function(player)
+            context.Notify(player, "Admin panel opened", true)
+        end)
+
+        context.OnCommandBarOpened(function(player)
+            context.CreateUI(player, function(ui)
+                local button = ui.Create("TextButton", {
+                    Size = UDim2.new(0, 260, 0, 48),
+                    Text = "Send module ping",
+                    BackgroundColor3 = Color3.fromRGB(15, 23, 42),
+                    TextColor3 = Color3.fromRGB(255, 255, 255)
+                })
+
+                _G.RoLinkModuleUI.Bind(button, function(clickingPlayer, payload)
+                    context.Notify(clickingPlayer, "Button clicked from " .. payload.Name, true)
+                end, {
+                    Module = context.Module,
+                    Events = { "Activated" }
+                })
+
+                return button
+            end)
+        end)
+    end
+}
+```
+
+Marketplace modules are installed by the Studio plugin as ModuleScripts, so `CreateUI` source strings are disabled in the runtime loader.
+Use `_G.RoLinkModuleUI.Bind` with instances returned by `ui.Create` when the UI needs button, textbox, or other client input events. The callback runs on the server with `(player, payload, instance)`.
+
+---
+
 ## ⚠️ Troubleshooting
 
 -   **Bot Offline?**: The Vercel integration is serverless, so the bot won't show as "Online" unless you run `npm run bot` on a VPS or local machine. However, commands will still work perfectly via slash commands.
