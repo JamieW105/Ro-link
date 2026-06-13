@@ -104,9 +104,14 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
                     </Link>
 
                     <div className="mt-10 flex flex-wrap gap-2">
-                        {post.version && (
+                        {post.rolink_version && (
                             <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
-                                {post.version}
+                                Ro-Link {post.rolink_version}
+                            </span>
+                        )}
+                        {post.plugin_version && (
+                            <span className="rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-violet-300">
+                                Plugin {post.plugin_version}
                             </span>
                         )}
                         <span className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-300">

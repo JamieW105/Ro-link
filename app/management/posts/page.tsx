@@ -132,9 +132,14 @@ export default function ManagePostsPage() {
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="space-y-2">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            {post.version && (
+                                            {post.rolink_version && (
                                                 <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
-                                                    {post.version}
+                                                    Ro-Link {post.rolink_version}
+                                                </span>
+                                            )}
+                                            {post.plugin_version && (
+                                                <span className="rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-violet-300">
+                                                    Plugin {post.plugin_version}
                                                 </span>
                                             )}
                                             <span className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] ${isPublished ? 'border-slate-700 bg-slate-800/80 text-slate-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'}`}>

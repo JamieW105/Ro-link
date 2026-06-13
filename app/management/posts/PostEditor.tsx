@@ -96,7 +96,8 @@ export default function PostEditor({
     submitLabel,
 }: PostEditorProps) {
     const router = useRouter();
-    const [version, setVersion] = useState(initialPost?.version || DEFAULT_ROLINK_VERSION);
+    const [rolinkVersion, setRolinkVersion] = useState(initialPost?.rolink_version || initialPost?.version || DEFAULT_ROLINK_VERSION);
+    const [pluginVersion, setPluginVersion] = useState(initialPost?.plugin_version || '');
     const [title, setTitle] = useState(initialPost?.title || '');
     const [description, setDescription] = useState(initialPost?.description || '');
     const [majorFeatures, setMajorFeatures] = useState<UpdatePostMajorFeature[]>(
@@ -176,7 +177,9 @@ export default function PostEditor({
                 method: submitMethod,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    version,
+                    version: rolinkVersion,
+                    rolink_version: rolinkVersion,
+                    plugin_version: pluginVersion,
                     title,
                     description,
                     major_features: majorFeatures,
@@ -214,16 +217,29 @@ export default function PostEditor({
 
             <form onSubmit={handleSubmit} className="space-y-8">
                 <section className="rounded-3xl border border-slate-800 bg-slate-900/50 p-8 space-y-6">
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Version</label>
-                        <input
-                            type="text"
-                            value={version}
-                            onChange={(event) => setVersion(event.target.value)}
-                            placeholder={DEFAULT_ROLINK_VERSION}
-                            className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-base font-bold text-white focus:outline-none focus:border-sky-500"
-                            required
-                        />
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Ro-Link Version</label>
+                            <input
+                                type="text"
+                                value={rolinkVersion}
+                                onChange={(event) => setRolinkVersion(event.target.value)}
+                                placeholder={DEFAULT_ROLINK_VERSION}
+                                className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-base font-bold text-white focus:outline-none focus:border-sky-500"
+                                required
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Plugin Version</label>
+                            <input
+                                type="text"
+                                value={pluginVersion}
+                                onChange={(event) => setPluginVersion(event.target.value)}
+                                placeholder="Plugin v1.0.0"
+                                className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-base font-bold text-white focus:outline-none focus:border-sky-500"
+                            />
+                        </div>
                     </div>
 
                     <div className="space-y-2">
@@ -368,7 +384,7 @@ export default function PostEditor({
                     </Link>
                     <button
                         type="submit"
-                        disabled={processing || !version || !title || !description}
+                        disabled={processing || !rolinkVersion || !title || !description}
                         className="bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white px-10 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-sky-900/40"
                     >
                         {processing ? 'Saving...' : submitLabel}

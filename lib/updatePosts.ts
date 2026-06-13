@@ -11,6 +11,8 @@ export interface UpdatePostRecord {
     id: string;
     slug: string;
     version: string | null;
+    rolink_version: string | null;
+    plugin_version: string | null;
     title: string;
     description: string;
     major_features: UpdatePostMajorFeature[];
@@ -26,6 +28,8 @@ export interface UpdatePostRecord {
 
 export interface UpdatePostInput {
     version: string;
+    rolink_version: string;
+    plugin_version: string | null;
     title: string;
     description: string;
     major_features: UpdatePostMajorFeature[];
@@ -105,7 +109,8 @@ export function sanitizeUpdatePostInput(rawBody: unknown, options: { requireUpda
         ? rawBody as Record<string, unknown>
         : {};
 
-    const version = trimString(body.version);
+    const rolink_version = trimString(body.rolink_version || body.version);
+    const plugin_version = trimString(body.plugin_version);
     const title = trimString(body.title);
     const description = trimString(body.description);
     const major_features = normalizeMajorFeatures(body.major_features);
@@ -113,8 +118,8 @@ export function sanitizeUpdatePostInput(rawBody: unknown, options: { requireUpda
     const qol_updates = normalizeUpdateStringList(body.qol_updates);
     const bug_fixes = normalizeUpdateStringList(body.bug_fixes);
 
-    if (!version) {
-        return { error: 'Version is required.' } as const;
+    if (!rolink_version) {
+        return { error: 'Ro-Link version is required.' } as const;
     }
 
     if (!title) {
@@ -130,7 +135,9 @@ export function sanitizeUpdatePostInput(rawBody: unknown, options: { requireUpda
     }
 
     return {
-        version,
+        version: rolink_version,
+        rolink_version,
+        plugin_version: plugin_version || null,
         title,
         description,
         major_features,
@@ -148,7 +155,8 @@ export function normalizeUpdatePost(rawPost: unknown): UpdatePostRecord | null {
     const post = rawPost as Record<string, unknown>;
     const id = trimString(post.id);
     const slug = trimString(post.slug);
-    const version = trimString(post.version) || null;
+    const rolink_version = trimString(post.rolink_version || post.version) || null;
+    const plugin_version = trimString(post.plugin_version) || null;
     const title = trimString(post.title);
     const description = trimString(post.description);
     const published_at = trimString(post.published_at) || null;
@@ -163,7 +171,9 @@ export function normalizeUpdatePost(rawPost: unknown): UpdatePostRecord | null {
     return {
         id,
         slug,
-        version,
+        version: rolink_version,
+        rolink_version,
+        plugin_version,
         title,
         description,
         major_features: normalizeMajorFeatures(post.major_features),

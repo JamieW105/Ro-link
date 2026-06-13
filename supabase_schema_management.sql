@@ -99,6 +99,8 @@ CREATE TABLE IF NOT EXISTS public.update_posts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slug TEXT NOT NULL UNIQUE,
     version TEXT NOT NULL DEFAULT 'V2.01.0',
+    rolink_version TEXT NOT NULL DEFAULT 'V2.01.0',
+    plugin_version TEXT,
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     major_features JSONB NOT NULL DEFAULT '[]',
@@ -128,6 +130,25 @@ BEGIN
     IF NOT EXISTS (
         SELECT 1
         FROM information_schema.columns
+        WHERE table_name = 'update_posts' AND column_name = 'rolink_version'
+    ) THEN
+        ALTER TABLE public.update_posts ADD COLUMN rolink_version TEXT NOT NULL DEFAULT 'V2.01.0';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'update_posts' AND column_name = 'plugin_version'
+    ) THEN
+        ALTER TABLE public.update_posts ADD COLUMN plugin_version TEXT;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
         WHERE table_name = 'update_posts' AND column_name = 'status'
     ) THEN
         ALTER TABLE public.update_posts ADD COLUMN status TEXT NOT NULL DEFAULT 'DRAFT';
@@ -144,6 +165,10 @@ ALTER COLUMN published_at DROP DEFAULT;
 UPDATE public.update_posts
 SET version = 'V2.01.0'
 WHERE version IS NULL OR btrim(version) = '';
+
+UPDATE public.update_posts
+SET rolink_version = version
+WHERE rolink_version IS NULL OR btrim(rolink_version) = '';
 
 UPDATE public.update_posts
 SET status = 'PUBLISHED'

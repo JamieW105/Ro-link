@@ -96,9 +96,18 @@ export default function Home() {
         const res = await fetch('/api/posts');
         const posts = await res.json();
         if (Array.isArray(posts)) {
-          const latestPostWithVersion = posts.find((post) => typeof post?.version === 'string' && post.version.trim());
-          if (latestPostWithVersion?.version) {
-            setLatestVersion(latestPostWithVersion.version.trim());
+          const latestPostWithVersion = posts.find((post) => (
+            typeof post?.rolink_version === 'string' && post.rolink_version.trim()
+          ) || (
+            typeof post?.version === 'string' && post.version.trim()
+          ));
+          const rolinkVersion = typeof latestPostWithVersion?.rolink_version === 'string' && latestPostWithVersion.rolink_version.trim()
+            ? latestPostWithVersion.rolink_version.trim()
+            : typeof latestPostWithVersion?.version === 'string'
+              ? latestPostWithVersion.version.trim()
+              : '';
+          if (rolinkVersion) {
+            setLatestVersion(rolinkVersion);
           }
         }
       } catch (err) {
