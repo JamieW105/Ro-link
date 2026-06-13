@@ -72,6 +72,7 @@ export default function ManageServers() {
     const [ruleCheck, setRuleCheck] = useState<RuleCheckSummary | null>(null);
     const [checkingRules, setCheckingRules] = useState(false);
     const [ruleCheckError, setRuleCheckError] = useState("");
+    const [currentRuleCheckServer, setCurrentRuleCheckServer] = useState<{ id: string; name: string; index: number; total: number } | null>(null);
 
     useEffect(() => {
         Promise.all([
@@ -165,24 +166,76 @@ export default function ManageServers() {
         try {
             const guildIds = servers
                 .filter((server) => server.bot_present !== false)
-                .map((server) => server.id);
-            const res = await fetch('/api/management/servers/rule-check', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ guildIds }),
-            });
-            const data = await res.json();
+                .map((server) => ({ id: server.id, name: server.name || server.id }));
 
-            if (!res.ok) {
-                setRuleCheckError(data.error || 'Failed to run server rule check.');
+            if (guildIds.length === 0) {
+                setRuleCheckError('No servers with the bot present are available to scan.');
                 return;
             }
 
-            setRuleCheck(data);
+            setRuleCheck({
+                checkedAt: new Date().toISOString(),
+                scannedServers: 0,
+                flaggedServers: 0,
+                checkedMessages: 0,
+                translatedMessages: 0,
+                translationProvider: '',
+                capped: false,
+                maxServers: guildIds.length,
+                results: [],
+            });
+
+            for (const [index, guild] of guildIds.entries()) {
+                setCurrentRuleCheckServer({
+                    id: guild.id,
+                    name: guild.name,
+                    index: index + 1,
+                    total: guildIds.length,
+                });
+
+                const res = await fetch('/api/management/servers/rule-check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ guildIds: [guild.id] }),
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    setRuleCheckError(data.error || `Failed to scan ${guild.name}.`);
+                    return;
+                }
+
+                const result = Array.isArray(data.results) ? data.results[0] : null;
+                if (!result) {
+                    setRuleCheckError(`No scan result was returned for ${guild.name}.`);
+                    return;
+                }
+
+                setRuleCheck((previous) => {
+                    const previousResults = previous?.results || [];
+                    const results = [
+                        ...previousResults.filter((item) => item.id !== result.id),
+                        result,
+                    ];
+
+                    return {
+                        checkedAt: data.checkedAt || previous?.checkedAt || new Date().toISOString(),
+                        scannedServers: results.length,
+                        flaggedServers: results.filter((item) => item.issues.length > 0).length,
+                        checkedMessages: results.reduce((sum, item) => sum + item.checkedMessages, 0),
+                        translatedMessages: results.reduce((sum, item) => sum + item.translatedMessages, 0),
+                        translationProvider: data.translationProvider || previous?.translationProvider || '',
+                        capped: false,
+                        maxServers: guildIds.length,
+                        results,
+                    };
+                });
+            }
         } catch {
             setRuleCheckError("Error running server rule check.");
         } finally {
             setCheckingRules(false);
+            setCurrentRuleCheckServer(null);
         }
     };
 
@@ -306,7 +359,7 @@ export default function ManageServers() {
                     <div className="max-w-2xl">
                         <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-white">Server Rule Check</h2>
                         <p className="mt-2 text-sm text-slate-400">
-                            Samples recent readable channels for common scam, raid, adult content, and exploit indicators. Likely non-English messages are translated to English before matching.
+                            Scans the 30 most recent messages from each readable channel for common scam, raid, adult content, and exploit indicators. Likely non-English messages are translated to English before matching.
                         </p>
                     </div>
                     <button
@@ -320,6 +373,12 @@ export default function ManageServers() {
 
                 {ruleCheckError && (
                     <p className="mt-4 text-sm font-medium text-red-400">{ruleCheckError}</p>
+                )}
+
+                {checkingRules && currentRuleCheckServer && (
+                    <div className="mt-4 rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-3 text-sm text-indigo-200">
+                        Scanning {currentRuleCheckServer.name} ({currentRuleCheckServer.index} of {currentRuleCheckServer.total})
+                    </div>
                 )}
 
                 {ruleCheck && (
@@ -344,7 +403,10 @@ export default function ManageServers() {
                         </div>
 
                         <div className="flex flex-col gap-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-                            <span>Checked {new Date(ruleCheck.checkedAt).toLocaleString()} using {ruleCheck.translationProvider}.</span>
+                            <span>
+                                Checked {new Date(ruleCheck.checkedAt).toLocaleString()}
+                                {ruleCheck.translationProvider ? ` using ${ruleCheck.translationProvider}.` : '.'}
+                            </span>
                             <span>Review evidence before removing or blocking a server.</span>
                         </div>
 
@@ -458,7 +520,16 @@ export default function ManageServers() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        {serverCheck ? (
+                                        {checkingRules && currentRuleCheckServer?.id === server.id ? (
+                                            <div className="flex flex-col gap-1">
+                                                <span className="w-fit rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-indigo-300">
+                                                    Scanning
+                                                </span>
+                                                <span className="text-[10px] text-slate-500">
+                                                    {currentRuleCheckServer.index} of {currentRuleCheckServer.total}
+                                                </span>
+                                            </div>
+                                        ) : serverCheck ? (
                                             <div className="flex flex-col gap-1">
                                                 <span className={`w-fit rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${getRuleCheckStatusClass(serverCheck.status)}`}>
                                                     {serverCheck.status}
