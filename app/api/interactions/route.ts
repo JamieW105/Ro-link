@@ -879,7 +879,8 @@ async function editOriginalInteractionResponse(applicationId: string, interactio
     }
 
     try {
-        const { flags: _flags, ...editableData } = data;
+        const editableData = { ...data };
+        delete editableData.flags;
         const response = await fetch(
             `${DISCORD_API_BASE_URL}/webhooks/${encodeURIComponent(normalizedApplicationId)}/${encodeURIComponent(normalizedInteractionToken)}/messages/@original`,
             {
@@ -4257,6 +4258,78 @@ local function buildUiTree(spec, parent)
 	return instance
 end
 
+local function getCustomModulesFolder()
+	local root = ReplicatedStorage:FindFirstChild("RoLink Admin")
+	if not root then
+		return nil
+	end
+	return root:FindFirstChild("Custom Modules")
+end
+
+local function normalizeInstalledModuleKey(value)
+	local text = string.lower(tostring(value or ""))
+	text = string.gsub(text, "[^%w]+", "-")
+	text = string.gsub(text, "^-+", "")
+	text = string.gsub(text, "-+$", "")
+	return text
+end
+
+local function putModuleMetadata(metadataByKey, value, moduleInfo)
+	local text = tostring(value or "")
+	if text == "" then
+		return
+	end
+	metadataByKey[text] = moduleInfo
+	metadataByKey[string.lower(text)] = moduleInfo
+	metadataByKey[normalizeInstalledModuleKey(text)] = moduleInfo
+end
+
+local function buildModuleMetadataByKey(modules)
+	local metadataByKey = {}
+	if type(modules) ~= "table" then
+		return metadataByKey
+	end
+	for _, moduleInfo in ipairs(modules) do
+		putModuleMetadata(metadataByKey, moduleInfo.id, moduleInfo)
+		putModuleMetadata(metadataByKey, moduleInfo.slug, moduleInfo)
+		putModuleMetadata(metadataByKey, moduleInfo.name, moduleInfo)
+		putModuleMetadata(metadataByKey, moduleInfo.sourceChecksum, moduleInfo)
+	end
+	return metadataByKey
+end
+
+local function lookupModuleMetadata(metadataByKey, value)
+	local text = tostring(value or "")
+	if text == "" then
+		return nil
+	end
+	return metadataByKey[text] or metadataByKey[string.lower(text)] or metadataByKey[normalizeInstalledModuleKey(text)]
+end
+
+local function resolveInstalledModuleInfo(moduleScript, metadataByKey)
+	local attributeNames = {
+		"RoLinkModuleId",
+		"RoLinkModuleSlug",
+		"ModuleId",
+		"ModuleSlug",
+		"RoLinkSourceChecksum",
+		"SourceChecksum"
+	}
+	for _, attributeName in ipairs(attributeNames) do
+		local ok, value = pcall(function()
+			return moduleScript:GetAttribute(attributeName)
+		end)
+		if ok then
+			local moduleInfo = lookupModuleMetadata(metadataByKey, value)
+			if moduleInfo then
+				return moduleInfo
+			end
+		end
+	end
+
+	return lookupModuleMetadata(metadataByKey, moduleScript.Name)
+end
+
 function RoLink:RequestModuleJson(path, method, body)
 	local request = {
 		Url = URL .. path,
@@ -4420,16 +4493,8 @@ function RoLink:CreateModuleUi(moduleInfo, target, sourceOrTree, props)
 			elseif type(sourceOrTree) == "function" then
 				local ok, result = pcall(sourceOrTree, { Player = player, PlayerGui = playerGui, Module = latestModuleInfo, Config = latestModuleInfo and latestModuleInfo.configSchema or {}, Settings = latestModuleInfo and latestModuleInfo.settings or {} }, player, props or {})
 				results[player.Name] = ok and attachUiResult(playerGui, moduleInfo, result) or tostring(result)
-			elseif type(sourceOrTree) == "string" and type(loadstring) == "function" then
-				local chunk, loadError = loadstring(sourceOrTree)
-				if chunk then
-					local ok, result = pcall(chunk, { Player = player, PlayerGui = playerGui, Module = latestModuleInfo, Config = latestModuleInfo and latestModuleInfo.configSchema or {}, Settings = latestModuleInfo and latestModuleInfo.settings or {} }, player, props or {})
-					results[player.Name] = ok and attachUiResult(playerGui, moduleInfo, result) or tostring(result)
-				else
-					results[player.Name] = tostring(loadError)
-				end
 			else
-				results[player.Name] = "CreateUI expects source code, a function, or a UI tree table."
+				results[player.Name] = "CreateUI expects a function or a UI tree table. Source strings are not supported."
 			end
 		else
 			results[player.Name] = "PlayerGui is not available."
@@ -4710,151 +4775,168 @@ function RoLink:BuildModuleContext(moduleInfo)
 	}
 end
 
-function RoLink:LoadModules()
-	local loader = loadstring
-	if type(loader) ~= "function" then
-		warn("[Ro-Link] Add-on modules require ServerScriptService.LoadStringEnabled.")
-		return
+function RoLink:ClearModuleBindings(moduleKey)
+	for commandName, binding in pairs(self.moduleCommands or {}) do
+		if binding.moduleKey == moduleKey then
+			self.moduleCommands[commandName] = nil
+			if self.moduleCommandModules then
+				self.moduleCommandModules[commandName] = nil
+			end
+			if self.moduleCommandPanelVisible then
+				self.moduleCommandPanelVisible[commandName] = nil
+			end
+			if self.moduleCommandDefinitions then
+				self.moduleCommandDefinitions[commandName] = nil
+			end
+		end
+	end
+	for _, handlers in pairs(self.moduleHooks or {}) do
+		for index = #handlers, 1, -1 do
+			if handlers[index].moduleKey == moduleKey then
+				table.remove(handlers, index)
+			end
+		end
+	end
+	if self.loadedModules then
+		self.loadedModules[moduleKey] = nil
+	end
+end
+
+function RoLink:UpdateModuleBindingMetadata(moduleKey, moduleInfo)
+	for commandName, binding in pairs(self.moduleCommands or {}) do
+		if binding.moduleKey == moduleKey then
+			binding.module = moduleInfo
+			if self.moduleCommandModules then
+				self.moduleCommandModules[commandName] = moduleInfo
+			end
+		end
+	end
+	for _, handlers in pairs(self.moduleHooks or {}) do
+		for _, binding in ipairs(handlers) do
+			if binding.moduleKey == moduleKey then
+				binding.module = moduleInfo
+			end
+		end
+	end
+end
+
+function RoLink:StartInstalledModule(moduleScript, moduleInfo)
+	if type(moduleInfo) ~= "table" then
+		return false, nil
+	end
+	local moduleKey = moduleKeyOf(moduleInfo)
+	if moduleKey == "" or moduleKey == "unknown" then
+		moduleKey = moduleScript.Name
+	end
+	local checksum = tostring((moduleInfo and (moduleInfo.sourceChecksum or moduleInfo.version)) or "")
+	local existing = self.loadedModules[moduleKey]
+
+	if existing and existing.instance == moduleScript and existing.checksum == checksum then
+		existing.module = moduleInfo
+		self:UpdateModuleBindingMetadata(moduleKey, moduleInfo)
+		return true, moduleKey
 	end
 
-	local ok, response = pcall(function()
-		return Http:RequestAsync({
-			Url = URL .. "/api/v1/game-admin/modules",
-			Method = "GET",
-			Headers = { ["x-api-key"] = KEY }
-		})
-	end)
+	self:ClearModuleBindings(moduleKey)
 
-	if not ok or not response or response.StatusCode ~= 200 then
-		return
+	local runOk, exported = pcall(require, moduleScript)
+	if not runOk then
+		warn("[Ro-Link] Module " .. moduleKey .. " failed during startup: " .. tostring(exported))
+		return false, moduleKey
 	end
 
-	local decodedOk, payload = pcall(function()
-		return Http:JSONDecode(response.Body)
-	end)
-
-	if not decodedOk or type(payload) ~= "table" or type(payload.modules) ~= "table" then
-		return
+	local context = self:BuildModuleContext(moduleInfo)
+	local initFailed = false
+	if type(exported) == "function" then
+		exported = { Init = exported }
 	end
-
-	for _, moduleInfo in ipairs(payload.modules) do
-		local moduleKey = tostring(moduleInfo.slug or moduleInfo.id or "")
-		local source = tostring(moduleInfo.sourceCode or "")
-		local checksum = tostring(moduleInfo.sourceChecksum or moduleInfo.version or "")
-
-		if moduleKey ~= "" and source ~= "" then
-			local existing = self.loadedModules[moduleKey]
-			if not existing or existing.checksum ~= checksum then
-				for commandName, binding in pairs(self.moduleCommands) do
-					if binding.moduleKey == moduleKey then
-						self.moduleCommands[commandName] = nil
-						if self.moduleCommandModules then
-							self.moduleCommandModules[commandName] = nil
-						end
-						if self.moduleCommandPanelVisible then
-							self.moduleCommandPanelVisible[commandName] = nil
-						end
-						if self.moduleCommandDefinitions then
-							self.moduleCommandDefinitions[commandName] = nil
-						end
-					end
-				end
-				for _, handlers in pairs(self.moduleHooks or {}) do
-					for index = #handlers, 1, -1 do
-						if handlers[index].moduleKey == moduleKey then
-							table.remove(handlers, index)
-						end
-					end
-				end
-
-				local chunk, loadError = loader(source)
-				if not chunk then
-					warn("[Ro-Link] Failed to load module " .. moduleKey .. ": " .. tostring(loadError))
-				else
-					local runOk, exported = pcall(chunk)
-					if not runOk then
-						warn("[Ro-Link] Module " .. moduleKey .. " failed during startup: " .. tostring(exported))
-					else
-						local context = self:BuildModuleContext(moduleInfo)
-						local initFailed = false
-						if type(exported) == "function" then
-							exported = { Init = exported }
-						end
-						if type(exported) == "table" then
-							if type(exported.Commands) == "table" then
-								for commandName, handler in pairs(exported.Commands) do
-									context.RegisterCommand(commandName, handler)
-								end
-							end
-							if type(exported.PanelCommands) == "table" then
-								for commandName, panelCommand in pairs(exported.PanelCommands) do
-									if type(panelCommand) == "function" then
-										context.RegisterPanelCommand({
-											Name = tostring(commandName),
-											Title = tostring(commandName),
-											Description = "Registered by " .. tostring((moduleInfo and (moduleInfo.name or moduleInfo.slug)) or "marketplace module"),
-											Category = "Marketplace",
-											TargetRequired = false,
-											Fields = {}
-										}, panelCommand)
-									elseif type(panelCommand) == "table" then
-										local handler = panelCommand.Handler or panelCommand.handler
-										if type(handler) == "function" then
-											panelCommand.Name = panelCommand.Name or panelCommand.name or tostring(commandName)
-											context.RegisterPanelCommand(panelCommand, handler)
-										end
-									end
-								end
-							end
-							if type(exported.OnAdminPanelOpened) == "function" then
-								context.OnAdminPanelOpened(exported.OnAdminPanelOpened)
-							elseif type(exported.AdminPanelOpened) == "function" then
-								context.OnAdminPanelOpened(exported.AdminPanelOpened)
-							end
-							if type(exported.OnCommandBarOpened) == "function" then
-								context.OnCommandBarOpened(exported.OnCommandBarOpened)
-							elseif type(exported.CommandBarOpened) == "function" then
-								context.OnCommandBarOpened(exported.CommandBarOpened)
-							end
-							if type(exported.Init) == "function" then
-								local initOk, initError = pcall(exported.Init, context, moduleSettingsOf(context.RefreshConfig()))
-								if not initOk then
-									warn("[Ro-Link] Module " .. moduleKey .. " init failed: " .. tostring(initError))
-									for commandName, binding in pairs(self.moduleCommands) do
-										if binding.moduleKey == moduleKey then
-											self.moduleCommands[commandName] = nil
-											if self.moduleCommandModules then
-												self.moduleCommandModules[commandName] = nil
-											end
-											if self.moduleCommandPanelVisible then
-												self.moduleCommandPanelVisible[commandName] = nil
-											end
-											if self.moduleCommandDefinitions then
-												self.moduleCommandDefinitions[commandName] = nil
-											end
-										end
-									end
-									for _, handlers in pairs(self.moduleHooks or {}) do
-										for index = #handlers, 1, -1 do
-											if handlers[index].moduleKey == moduleKey then
-												table.remove(handlers, index)
-											end
-										end
-									end
-									initFailed = true
-								end
-							end
-						end
-						if not initFailed then
-							self.loadedModules[moduleKey] = {
-								checksum = checksum,
-								module = moduleInfo,
-								exported = exported
-							}
-						end
+	if type(exported) == "table" then
+		if type(exported.Commands) == "table" then
+			for commandName, handler in pairs(exported.Commands) do
+				context.RegisterCommand(commandName, handler)
+			end
+		end
+		if type(exported.PanelCommands) == "table" then
+			for commandName, panelCommand in pairs(exported.PanelCommands) do
+				if type(panelCommand) == "function" then
+					context.RegisterPanelCommand({
+						Name = tostring(commandName),
+						Title = tostring(commandName),
+						Description = "Registered by " .. tostring((moduleInfo and (moduleInfo.name or moduleInfo.slug)) or "marketplace module"),
+						Category = "Marketplace",
+						TargetRequired = false,
+						Fields = {}
+					}, panelCommand)
+				elseif type(panelCommand) == "table" then
+					local handler = panelCommand.Handler or panelCommand.handler
+					if type(handler) == "function" then
+						panelCommand.Name = panelCommand.Name or panelCommand.name or tostring(commandName)
+						context.RegisterPanelCommand(panelCommand, handler)
 					end
 				end
 			end
+		end
+		if type(exported.OnAdminPanelOpened) == "function" then
+			context.OnAdminPanelOpened(exported.OnAdminPanelOpened)
+		elseif type(exported.AdminPanelOpened) == "function" then
+			context.OnAdminPanelOpened(exported.AdminPanelOpened)
+		end
+		if type(exported.OnCommandBarOpened) == "function" then
+			context.OnCommandBarOpened(exported.OnCommandBarOpened)
+		elseif type(exported.CommandBarOpened) == "function" then
+			context.OnCommandBarOpened(exported.CommandBarOpened)
+		end
+		if type(exported.Init) == "function" then
+			local initOk, initError = pcall(exported.Init, context, moduleSettingsOf(context.RefreshConfig()))
+			if not initOk then
+				warn("[Ro-Link] Module " .. moduleKey .. " init failed: " .. tostring(initError))
+				self:ClearModuleBindings(moduleKey)
+				initFailed = true
+			end
+		end
+	end
+
+	if initFailed then
+		return false, moduleKey
+	end
+
+	self.loadedModules[moduleKey] = {
+		checksum = checksum,
+		module = moduleInfo,
+		exported = exported,
+		instance = moduleScript
+	}
+	return true, moduleKey
+end
+
+function RoLink:LoadModules()
+	local modulesFolder = getCustomModulesFolder()
+	if not modulesFolder then
+		return
+	end
+
+	local metadataByKey = {}
+	local ok, payload = self:RequestModuleJson("/api/v1/game-admin/modules?configOnly=1", "GET")
+	if ok and type(payload) == "table" and type(payload.modules) == "table" then
+		metadataByKey = buildModuleMetadataByKey(payload.modules)
+	end
+
+	local seenModuleKeys = {}
+	for _, moduleScript in ipairs(modulesFolder:GetDescendants()) do
+		if moduleScript:IsA("ModuleScript") then
+			local moduleInfo = resolveInstalledModuleInfo(moduleScript, metadataByKey)
+			if moduleInfo then
+				local started, moduleKey = self:StartInstalledModule(moduleScript, moduleInfo)
+				if started and moduleKey then
+					seenModuleKeys[moduleKey] = true
+				end
+			end
+		end
+	end
+
+	for moduleKey, existing in pairs(self.loadedModules or {}) do
+		if existing and existing.instance and not seenModuleKeys[moduleKey] then
+			self:ClearModuleBindings(moduleKey)
 		end
 	end
 end

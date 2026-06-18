@@ -148,7 +148,7 @@ Once your web server is running and your Discord server is linked via `/setup`:
 
 ## Module Developer API
 
-Marketplace modules are uploaded from the management portal, published by users with the required management permissions, enabled per Discord server from the dashboard, installed by the Studio plugin into `ReplicatedStorage["RoLink Admin"]["Custom Modules"]`, and loaded by the Roblox admin panel at runtime. All modules are obfuscated before they are inserted into a person's game.
+Marketplace modules are uploaded from the management portal, published by users with the required management permissions, enabled per Discord server from the dashboard, installed by the Studio plugin into `ReplicatedStorage["RoLink Admin"]["Custom Modules"]`, and loaded by the Roblox admin panel at runtime as readable ModuleScripts.
 
 Each uploaded Luau module can declare a top-level `CONFIG` table before returning its module table. `CONFIG.Version` is used as the module's update version when the upload form does not provide one. The dashboard reads the rest of that schema and saves per-server values.
 
@@ -450,7 +450,7 @@ return {
 }
 ```
 
-Marketplace modules are installed by the Studio plugin as ModuleScripts, so `CreateUI` source strings are disabled in the runtime loader.
+Marketplace modules are installed by the Studio plugin as ModuleScripts, so `CreateUI` source strings are not supported in the runtime loader.
 Use `_G.RoLinkModuleUI.Bind` with instances returned by `ui.Create` when the UI needs button, textbox, or other client input events. The callback runs on the server with `(player, payload, instance)`.
 
 ---

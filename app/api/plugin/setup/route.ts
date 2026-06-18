@@ -15,13 +15,11 @@ export async function POST(req: Request) {
             serverId?: string;
             placeId?: string;
             universeId?: string;
-            openCloudKey?: string;
         } | null;
 
         const serverId = body?.serverId?.trim();
         const placeId = body?.placeId?.trim();
         const universeId = body?.universeId?.trim();
-        const openCloudKey = body?.openCloudKey?.trim();
 
         if (!serverId || !placeId || !universeId) {
             return NextResponse.json({
@@ -33,7 +31,6 @@ export async function POST(req: Request) {
             serverId,
             placeId,
             universeId,
-            openCloudKey,
         });
 
         if (!result.ok) {

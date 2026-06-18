@@ -9,7 +9,7 @@ export default function ModuleCreatorTermsPage() {
                 </Link>
 
                 <h1 className="mb-4 text-5xl font-black uppercase italic tracking-tight text-white">Module Creator Terms</h1>
-                <p className="mb-12 text-sm font-bold uppercase tracking-[0.3em] text-slate-500">Last Updated: May 15, 2026</p>
+                <p className="mb-12 text-sm font-bold uppercase tracking-[0.3em] text-slate-500">Last Updated: June 18, 2026</p>
 
                 <div className="space-y-12 leading-relaxed">
                     <section>
@@ -19,7 +19,7 @@ export default function ModuleCreatorTermsPage() {
 
                     <section>
                         <h2 className="mb-4 border-l-4 border-sky-600 pl-4 text-xl font-bold uppercase tracking-wider text-white">2. Prohibited Modules</h2>
-                        <p>Modules may not include malicious code, credential harvesting, hidden remote control, exploit tooling, NSFW content, harassment features, unauthorized data collection, or code designed to bypass platform or Ro-Link safety controls.</p>
+                        <p>Modules may not include malicious code, credential harvesting, hidden remote control, exploit tooling, NSFW content, harassment features, unauthorized data collection, obfuscated code, runtime asset loading, or code designed to bypass platform or Ro-Link safety controls.</p>
                     </section>
 
                     <section>

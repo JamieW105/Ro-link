@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getServerByApiKey } from '@/lib/gameAdmin';
-import { normalizeAddonModule, normalizeServerCustomModule, obfuscateModuleSourceForStudio, parseModuleConfigSettings, parseStoredModuleConfigSchema } from '@/lib/modules';
+import { normalizeAddonModule, normalizeServerCustomModule, parseModuleConfigSettings, parseStoredModuleConfigSchema } from '@/lib/modules';
 import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
 
@@ -124,7 +124,7 @@ export async function GET(req: Request) {
 
             return {
                 ...normalized,
-                ...(configOnly ? {} : { sourceCode: obfuscateModuleSourceForStudio(String(normalized.sourceCode || '')) }),
+                ...(configOnly ? {} : { sourceCode: String(normalized.sourceCode || '') }),
                 settings: parseModuleConfigSettings(row.settings, configSchema),
             };
         })
@@ -140,7 +140,7 @@ export async function GET(req: Request) {
 
             return {
                 ...normalized,
-                ...(configOnly ? {} : { sourceCode: obfuscateModuleSourceForStudio(String(normalized.sourceCode || '')) }),
+                ...(configOnly ? {} : { sourceCode: String(normalized.sourceCode || '') }),
                 settings: parseModuleConfigSettings(row.settings, configSchema),
             };
         })
@@ -157,15 +157,15 @@ export async function GET(req: Request) {
 
     if (configOnly) {
         if (requestedModuleId || requestedModuleSlug) {
-            const module = filteredModules[0] || null;
-            if (!module) {
+            const selectedModule = filteredModules[0] || null;
+            if (!selectedModule) {
                 return NextResponse.json({ error: 'Module not found.' }, { status: 404 });
             }
 
             return NextResponse.json(
                 {
                     serverId: server.id,
-                    module,
+                    module: selectedModule,
                 },
                 {
                     headers: {

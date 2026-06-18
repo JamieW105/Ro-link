@@ -689,7 +689,6 @@ export async function installStudioPluginServer(req: Request, session: StudioPlu
     serverId: string;
     placeId: string;
     universeId: string;
-    openCloudKey?: string;
 }) {
     const client = getSupabaseAdmin();
     const baseUrl = buildPublicBaseUrl(req);
@@ -711,12 +710,12 @@ export async function installStudioPluginServer(req: Request, session: StudioPlu
         .eq('id', input.serverId)
         .maybeSingle<ServerSetupRecord>();
 
-    const resolvedOpenCloudKey = (input.openCloudKey || existing?.open_cloud_key || '').trim();
+    const resolvedOpenCloudKey = (existing?.open_cloud_key || '').trim();
     if (!resolvedOpenCloudKey) {
         return {
             ok: false,
             status: 412,
-            error: 'This server still needs an Open Cloud API key before the plugin can finish setup.',
+            error: 'This server still needs an Open Cloud API key on the Ro-Link dashboard before the plugin can finish setup.',
             missingBasics: ['open_cloud_key'],
             setupUrl: `${baseUrl}/dashboard/${input.serverId}/settings/setup`,
         } as const;
