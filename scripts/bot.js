@@ -659,6 +659,75 @@ function findPlayerServer(liveServers, identity) {
     return { server: null, player: null };
 }
 
+function findPlayerServerByIdentities(liveServers, identities) {
+    for (const identity of identities) {
+        const normalized = String(identity || '').trim();
+        if (!normalized) continue;
+
+        const match = findPlayerServer(liveServers, normalized);
+        if (match.server) return match.server;
+    }
+
+    return null;
+}
+
+async function resolveReportLiveServerContext(guildId, placeId, reporterDiscordId, reportedIdentity) {
+    const empty = {
+        reporter_live_server_id: null,
+        reporter_join_url: null,
+        reported_live_server_id: null,
+        reported_join_url: null,
+    };
+
+    try {
+        const reporterId = String(reporterDiscordId || '').trim();
+        const reportedId = String(reportedIdentity || '').trim();
+        const freshAfter = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const [liveServersRes, reporterRes, reportedRes] = await Promise.all([
+            supabase
+                .from('live_servers')
+                .select('id, players')
+                .eq('server_id', guildId)
+                .gte('updated_at', freshAfter)
+                .order('updated_at', { ascending: false }),
+            /^\d{5,32}$/.test(reporterId)
+                ? supabase.from('verified_users').select('discord_id, roblox_id, roblox_username').eq('discord_id', reporterId).maybeSingle()
+                : Promise.resolve({ data: null, error: null }),
+            /^\d{17,20}$/.test(reportedId)
+                ? supabase.from('verified_users').select('discord_id, roblox_id, roblox_username').eq('discord_id', reportedId).maybeSingle()
+                : Promise.resolve({ data: null, error: null }),
+        ]);
+
+        if (liveServersRes.error || reporterRes.error || reportedRes.error) {
+            throw liveServersRes.error || reporterRes.error || reportedRes.error;
+        }
+
+        const liveServers = Array.isArray(liveServersRes.data) ? liveServersRes.data : [];
+        const reporterServer = findPlayerServerByIdentities(liveServers, [
+            reporterId,
+            reporterRes.data?.roblox_username,
+            reporterRes.data?.roblox_id,
+        ]);
+        const reportedServer = findPlayerServerByIdentities(liveServers, [
+            reportedId,
+            reportedRes.data?.roblox_username,
+            reportedRes.data?.roblox_id,
+        ]);
+        const reporterJobId = String(reporterServer?.id || '').trim() || null;
+        const reportedJobId = String(reportedServer?.id || '').trim() || null;
+
+        return {
+            reporter_live_server_id: reporterJobId,
+            reporter_join_url: reporterJobId ? buildRobloxJoinUrl(placeId, reporterJobId) || null : null,
+            reported_live_server_id: reportedJobId,
+            reported_join_url: reportedJobId ? buildRobloxJoinUrl(placeId, reportedJobId) || null : null,
+        };
+    } catch (error) {
+        console.warn('[REPORTS] Failed to capture live server context:', error);
+        return empty;
+    }
+}
+
 async function fetchDiscordLookup(discordUser, guild, serverId) {
     const userId = String(discordUser?.id || '').trim();
     if (!userId) {
@@ -2773,15 +2842,28 @@ client.on('interactionCreate', async interaction => {
 
     await interaction.deferReply({ ephemeral: true });
 
+    const { data: server } = await supabase
+        .from('servers')
+        .select('reports_channel_id, moderator_role_id, place_id')
+        .eq('id', guildId)
+        .single();
+    const liveServerContext = await resolveReportLiveServerContext(
+        guildId,
+        server?.place_id,
+        interaction.user.id,
+        targetInput,
+    );
+
     // 1. Save to Database
-    const { error: dbError } = await supabase.from('reports').insert([{
+    const { data: createdReport, error: dbError } = await supabase.from('reports').insert([{
         server_id: guildId,
         reporter_discord_id: interaction.user.id,
         reporter_roblox_username: null,
         reported_roblox_username: targetInput,
         reason: reason,
-        status: 'PENDING'
-    }]);
+        status: 'PENDING',
+        ...liveServerContext,
+    }]).select('id, reporter_live_server_id, reporter_join_url, reported_live_server_id, reported_join_url').single();
 
     if (dbError) {
         console.error('Report DB Error:', dbError);
@@ -2789,12 +2871,6 @@ client.on('interactionCreate', async interaction => {
     }
 
     // 2. Send Notification to Channel (if configured)
-    const { data: server } = await supabase
-        .from('servers')
-        .select('reports_channel_id, moderator_role_id')
-        .eq('id', guildId)
-        .single();
-
     if (server?.reports_channel_id) {
         console.log(`[REPORTS] Forwarding report to channel: ${server.reports_channel_id}`);
         const channel = await client.channels.fetch(server.reports_channel_id).catch(err => {
@@ -2811,6 +2887,12 @@ client.on('interactionCreate', async interaction => {
                 .addFields(
                     { name: 'Reported User', value: `\`${targetInput}\``, inline: true },
                     { name: 'Reporter', value: `<@${interaction.user.id}>`, inline: true },
+                    ...(createdReport?.reporter_live_server_id
+                        ? [{ name: 'Reporter Server', value: `\`${createdReport.reporter_live_server_id}\`\n${createdReport.reporter_join_url ? `[Join server](${createdReport.reporter_join_url})` : 'Join link unavailable'}` }]
+                        : []),
+                    ...(createdReport?.reported_live_server_id
+                        ? [{ name: 'Reported User Server', value: `\`${createdReport.reported_live_server_id}\`\n${createdReport.reported_join_url ? `[Join server](${createdReport.reported_join_url})` : 'Join link unavailable'}` }]
+                        : []),
                     { name: 'Reason', value: reason }
                 )
                 .setFooter({ text: `Ro-Link Systems • ID: ${guildId}` })

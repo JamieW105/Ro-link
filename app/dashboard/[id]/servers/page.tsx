@@ -31,6 +31,22 @@ function formatServerId(serverId: string) {
     return `${serverId.slice(0, 8).toUpperCase()}...`;
 }
 
+const RestartIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M21 12a9 9 0 0 1-9 9 8.6 8.6 0 0 1-6-2.4" />
+        <path d="M3 12a9 9 0 0 1 15-6.6" />
+        <path d="M18 2v4h-4" />
+        <path d="M6 22v-4h4" />
+    </svg>
+);
+
+const ShutdownIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 2v10" />
+        <path d="M18.4 6.6a9 9 0 1 1-12.8 0" />
+    </svg>
+);
+
 export default function ServersPage() {
     const { id } = useParams();
     const perms = usePermissions();
@@ -110,6 +126,15 @@ export default function ServersPage() {
         };
     }
 
+    function buildServerTargetArgs(serverId: string, extraArgs: Record<string, unknown> = {}) {
+        return {
+            ...extraArgs,
+            target_scope: 'SERVER',
+            target_label: serverId,
+            job_id: serverId,
+        };
+    }
+
     async function sendCommand(command: string, extraArgs: Record<string, unknown>, confirmMessage?: string, successMessage?: string) {
         if (!id) return;
         if (confirmMessage && !confirm(confirmMessage)) {
@@ -139,6 +164,50 @@ export default function ServersPage() {
             setNotice({
                 type: 'success',
                 text: trimString(payload.warning) || successMessage || `${command} queued for ${targetLabel}.`,
+            });
+        } catch (error) {
+            setNotice({ type: 'error', text: `Failed to send command: ${String(error)}` });
+        } finally {
+            setActionLoading(null);
+        }
+    }
+
+    async function sendServerCommand(serverId: string, command: 'UPDATE' | 'SHUTDOWN') {
+        if (!id) return;
+
+        const label = command === 'UPDATE' ? 'Restart' : 'Shut down';
+        const reason = command === 'UPDATE' ? trimString(restartReason) : trimString(shutdownReason);
+        const confirmation = command === 'UPDATE'
+            ? `Restart server ${formatServerId(serverId)}? Players will be moved through a reserved server and then back into public servers.`
+            : `Shut down server ${formatServerId(serverId)}? Players in this live server will be disconnected.`;
+
+        if (!confirm(confirmation)) {
+            return;
+        }
+
+        setActionLoading(`${command}:${serverId}`);
+        setNotice(null);
+
+        try {
+            const response = await fetch('/api/dashboard/command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverId: id,
+                    command,
+                    args: buildServerTargetArgs(serverId, { reason }),
+                }),
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                setNotice({ type: 'error', text: trimString(payload.error) || 'Failed to send command.' });
+                return;
+            }
+
+            setNotice({
+                type: 'success',
+                text: trimString(payload.warning) || `${label} queued for server ${formatServerId(serverId)}.`,
             });
         } catch (error) {
             setNotice({ type: 'error', text: `Failed to send command: ${String(error)}` });
@@ -363,12 +432,13 @@ export default function ServersPage() {
 
                             return (
                                 <div key={server.id} className="bg-slate-950/10">
-                                    <button
-                                        type="button"
-                                        onClick={() => setExpandedServerId(isExpanded ? null : server.id)}
-                                        className="w-full px-5 py-5 text-left transition-all hover:bg-sky-500/5"
-                                    >
-                                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                    <div className="flex flex-col gap-3 px-5 py-5 transition-all hover:bg-sky-500/5 xl:flex-row xl:items-center xl:justify-between">
+                                        <button
+                                            type="button"
+                                            onClick={() => setExpandedServerId(isExpanded ? null : server.id)}
+                                            className="min-w-0 flex-1 text-left"
+                                        >
+                                            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                                             <div className="flex items-start gap-4">
                                                 <div className={`mt-1 flex h-10 w-10 items-center justify-center rounded-xl border text-sm font-black transition-transform ${isExpanded
                                                     ? 'border-sky-500/30 bg-sky-500/10 text-sky-400 rotate-180'
@@ -409,8 +479,38 @@ export default function ServersPage() {
                                                     </p>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </button>
+                                            </div>
+                                        </button>
+
+                                        {(canRestart || canShutdown) && (
+                                            <div className="flex shrink-0 items-center gap-2">
+                                                {canRestart && (
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`Restart server ${formatServerId(server.id)}`}
+                                                        title={`Restart ${formatServerId(server.id)}`}
+                                                        onClick={() => sendServerCommand(server.id, 'UPDATE')}
+                                                        disabled={actionLoading === `UPDATE:${server.id}`}
+                                                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-300 transition-all hover:border-amber-300 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
+                                                    >
+                                                        <RestartIcon />
+                                                    </button>
+                                                )}
+                                                {canShutdown && (
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`Shut down server ${formatServerId(server.id)}`}
+                                                        title={`Shut down ${formatServerId(server.id)}`}
+                                                        onClick={() => sendServerCommand(server.id, 'SHUTDOWN')}
+                                                        disabled={actionLoading === `SHUTDOWN:${server.id}`}
+                                                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-500/25 bg-red-500/10 text-red-300 transition-all hover:border-red-300 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
+                                                    >
+                                                        <ShutdownIcon />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
 
                                     {isExpanded && (
                                         <div className="border-t border-slate-800/60 px-5 pb-5">

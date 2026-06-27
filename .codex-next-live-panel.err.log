@@ -1,0 +1,19 @@
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+Error [DiscordRateLimitError]: Failed to fetch user guilds (429)
+    at listVisibleGuildsForDiscordSession (lib\dashboardGuilds.ts:152:23)
+    at async GET (app\api\guilds\route.ts:33:31)
+  150 |                 const retryAfterHeader = res.headers.get('retry-after');
+  151 |                 const retryAfter = retryAfterHeader ? Number(retryAfterHeader) : null;
+> 152 |                 throw new DiscordRateLimitError(`Failed to fetch user guilds (${res.statu...
+      |                       ^
+  153 |             }
+  154 |             if (userGuilds.length === 0) {
+  155 |                 throw new Error(`Failed to fetch user guilds (${res.status})`); {
+  retryAfter: 926
+}
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled

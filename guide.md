@@ -322,7 +322,7 @@ return {
 | `context.GetUserData(user)` | Returns Roblox user data, Discord server rank, and linked Discord user/member data when available. |
 | `context.GetReports(options)` | Reads reports for the current server. Options can include `status`, `limit`, `target`, and `reporter`. |
 | `context.GetReport(reportId)` | Reads one report for the current server. |
-| `context.CreateReport(body)` | Creates a pending report for the current server. |
+| `context.CreateReport(body)` | Creates a pending report and snapshots the reporter and reported player's live servers and join links. |
 | `context.UpdateReport(reportId, updates)` | Edits report status, note, target, reason, or moderator fields for the current server. |
 | `context.CreateUI(target, functionOrTree, props)` | Creates Roblox UI for a player, all players, or a target list. Installed modules should pass a function or UI tree table. |
 | `_G.RoLinkModuleUI.Bind(guiObject, handler, options)` | Binds client UI interactions from `CreateUI` instances back to server-side module code. |

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getServerByApiKey } from '@/lib/gameAdmin';
+import { resolveReportServerContext } from '@/lib/reportServerContext';
 import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -98,12 +99,22 @@ export async function POST(req: Request) {
 
     const reporterDiscordId = trimString(body.reporterDiscordId ?? body.reporter_discord_id ?? body.discordId, 120);
     const reporterRobloxUsername = trimString(body.reporterRobloxUsername ?? body.reporter_roblox_username, 120) || null;
+    const reporterLiveServerId = trimString(body.reporterLiveServerId ?? body.reporter_live_server_id ?? body.jobId ?? body.job_id, 200);
     const reportedRobloxUsername = trimString(body.reportedRobloxUsername ?? body.reported_roblox_username ?? body.target, 120);
     const reason = trimString(body.reason ?? body.message, 2000);
 
     if (!reportedRobloxUsername || !reason) {
         return NextResponse.json({ error: 'reportedRobloxUsername and reason are required.' }, { status: 400 });
     }
+
+    const liveServerContext = await resolveReportServerContext({
+        serverId: access.server.id,
+        placeId: access.server.place_id,
+        reporterDiscordId,
+        reporterRobloxUsername,
+        reporterLiveServerId,
+        reportedRobloxUsername,
+    });
 
     const { data, error } = await getSupabaseAdmin()
         .from('reports')
@@ -114,6 +125,7 @@ export async function POST(req: Request) {
             reported_roblox_username: reportedRobloxUsername,
             reason,
             status: 'PENDING',
+            ...liveServerContext,
         })
         .select('*')
         .single();

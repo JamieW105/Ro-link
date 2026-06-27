@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { usePermissions } from '@/context/PermissionsContext';
 import {
@@ -16,6 +16,7 @@ import {
 } from '@/lib/adminPanelCommands';
 import { normalizeDashboardLogs, type NormalizedDashboardLog } from '@/lib/logRecords';
 import { normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
+import type { PlayerPresenceActivity } from '@/lib/playerPresence';
 import { buildRobloxAvatarUrl } from '@/lib/robloxAvatars';
 
 interface LiveServerRecord {
@@ -34,6 +35,37 @@ interface LivePanelPayload {
     liveServers?: LiveServerRecord[];
     modulePanelCommands?: AdminPanelCommandDefinition[];
     logs?: unknown[];
+    playerActivity?: PlayerPresenceActivity[];
+    pendingReports?: PendingReport[];
+}
+
+interface PendingReport {
+    id: string;
+    reported_roblox_username: string;
+    reporter_roblox_username?: string | null;
+    reporter_discord_id?: string | null;
+    reason: string;
+    created_at: string;
+}
+
+type ReportStatus = 'PENDING' | 'RESOLVED' | 'DISMISSED';
+type ReportStatusFilter = ReportStatus | 'ALL';
+
+interface LiveReport extends PendingReport {
+    status?: ReportStatus | string | null;
+    reporter_live_server_id?: string | null;
+    reporter_join_url?: string | null;
+    reported_live_server_id?: string | null;
+    reported_join_url?: string | null;
+    moderator_id?: string | null;
+    moderator_note?: string | null;
+    resolved_at?: string | null;
+}
+
+interface ReportTargetProfile {
+    discord_id?: string | null;
+    roblox_id?: string | null;
+    roblox_username?: string | null;
 }
 
 interface VisibleGuild {
@@ -116,6 +148,7 @@ type PresenceState = 'live' | 'recently-left' | 'history' | 'searched';
 type LivePanelUser = LivePlayer & {
     presence: PresenceState;
     serverId: string | null;
+    joinedAt?: number;
     leftAt?: number;
     sourceReason?: string;
 };
@@ -133,6 +166,7 @@ type ConfirmAction = {
 } | null;
 
 type PanelModal = 'announce' | 'command' | null;
+type RightPaneMode = 'lookup' | 'reports';
 type AnnouncementTargetType = '' | 'global' | 'user';
 
 type ParsedCommandBar = {
@@ -151,7 +185,6 @@ type CommandBarSuggestion = {
 
 const USERNAME_PATTERN = /@?([A-Za-z0-9_]{3,20})/;
 const DISCORD_ID_PATTERN = /^\d{17,20}$/;
-const RECENT_LEFT_TTL_MS = 10 * 60 * 1000;
 const VALUE_COMMAND_SET = new Set<string>(VALUE_INPUT_COMMAND_IDS);
 const NUMERIC_GLOBAL_COMMANDS = new Set<string>(['GRAVITY', 'BRIGHTNESS']);
 const TARGET_VALUE_COMMANDS = new Set<string>(['SET_CHAR', 'TEAM']);
@@ -216,10 +249,34 @@ const AnnounceIcon = () => (
     </svg>
 );
 
+const ReportIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6" />
+        <path d="M8 13h8M8 17h5" />
+    </svg>
+);
+
 const CloseIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
         <path d="M18 6 6 18" />
         <path d="m6 6 12 12" />
+    </svg>
+);
+
+const ServerRestartIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M21 12a9 9 0 0 1-9 9 8.6 8.6 0 0 1-6-2.4" />
+        <path d="M3 12a9 9 0 0 1 15-6.6" />
+        <path d="M18 2v4h-4" />
+        <path d="M6 22v-4h4" />
+    </svg>
+);
+
+const ServerShutdownIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 2v10" />
+        <path d="M18.4 6.6a9 9 0 1 1-12.8 0" />
     </svg>
 );
 
@@ -304,6 +361,85 @@ function toPanelUser(player: LivePlayer, serverId: string | null, presence: Pres
     };
 }
 
+function getPresenceTimestamp(value: string) {
+    const timestamp = new Date(value).getTime();
+    return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function presenceActivityMatchesUser(activity: PlayerPresenceActivity, user: Pick<LivePanelUser, 'username' | 'userId'>) {
+    const activityUserId = normalizeIdentity(activity.roblox_user_id);
+    const userId = normalizeIdentity(user.userId);
+    if (activityUserId && userId && activityUserId === userId) {
+        return true;
+    }
+
+    return normalizeIdentity(activity.username) === normalizeIdentity(user.username);
+}
+
+function toRecentlyLeftUser(activity: PlayerPresenceActivity): LivePanelUser {
+    return {
+        username: activity.username,
+        displayName: activity.display_name || activity.username,
+        userId: activity.roblox_user_id || null,
+        avatarUrl: activity.avatar_url || buildAvatarFallback(activity.roblox_user_id || null),
+        presence: 'recently-left',
+        serverId: activity.job_id || null,
+        leftAt: getPresenceTimestamp(activity.occurred_at),
+        sourceReason: 'Recently left the game',
+    };
+}
+
+function targetMatchScore(user: LivePanelUser, rawQuery: string) {
+    const query = normalizeIdentity(rawQuery).replace(/^@/, '');
+    if (!query) {
+        return 0;
+    }
+
+    const candidates = [user.username, user.displayName, user.userId]
+        .map(normalizeIdentity)
+        .filter(Boolean);
+
+    if (candidates.some((candidate) => candidate === query)) {
+        return 0;
+    }
+    if (candidates.some((candidate) => candidate.startsWith(query))) {
+        return 1;
+    }
+    if (candidates.some((candidate) => candidate.includes(query))) {
+        return 2;
+    }
+
+    return null;
+}
+
+function getTargetActivityTimestamp(user: LivePanelUser) {
+    if (user.presence === 'live') {
+        return user.joinedAt || 0;
+    }
+    if (user.presence === 'recently-left') {
+        return user.leftAt || 0;
+    }
+    return 0;
+}
+
+function rankTargetUsers(users: LivePanelUser[], query: string) {
+    return users
+        .map((user) => ({ user, score: targetMatchScore(user, query) }))
+        .filter((entry): entry is { user: LivePanelUser; score: number } => entry.score !== null)
+        .sort((left, right) => {
+            const matchDifference = left.score - right.score;
+            if (matchDifference !== 0) return matchDifference;
+
+            const activityDifference = getTargetActivityTimestamp(right.user) - getTargetActivityTimestamp(left.user);
+            if (activityDifference !== 0) return activityDifference;
+
+            const presenceRank = (user: LivePanelUser) => user.presence === 'live' ? 0 : user.presence === 'recently-left' ? 1 : 2;
+            const presenceDifference = presenceRank(left.user) - presenceRank(right.user);
+            return presenceDifference || left.user.username.localeCompare(right.user.username, undefined, { sensitivity: 'base' });
+        })
+        .map(({ user }) => user);
+}
+
 function placeholderUser(identity: string, reason: string): LivePanelUser {
     const username = extractUsername(identity) || trimString(identity) || 'UnknownUser';
     return {
@@ -378,6 +514,53 @@ function formatTime(value: string) {
     }
 
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDateTime(value: string | null | undefined) {
+    if (!value) {
+        return 'Unknown';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return 'Unknown';
+    }
+
+    return date.toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function shortReportId(reportId: string) {
+    return reportId.slice(0, 8).toUpperCase();
+}
+
+function getReportStatus(report: Pick<LiveReport, 'status'> | null | undefined): ReportStatus {
+    const status = trimString(report?.status).toUpperCase();
+    if (status === 'RESOLVED' || status === 'DISMISSED') {
+        return status;
+    }
+
+    return 'PENDING';
+}
+
+function reportStatusClass(status: string | null | undefined) {
+    const normalized = trimString(status).toUpperCase();
+    if (normalized === 'RESOLVED') {
+        return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300';
+    }
+    if (normalized === 'DISMISSED') {
+        return 'border-slate-700 bg-slate-800/60 text-slate-400';
+    }
+
+    return 'border-amber-500/25 bg-amber-500/10 text-amber-300';
+}
+
+function getReportReporterLabel(report: LiveReport) {
+    return report.reporter_roblox_username || report.reporter_discord_id || 'Unknown reporter';
 }
 
 function presenceLabel(user: LivePanelUser) {
@@ -610,19 +793,19 @@ export default function LivePanelPage() {
     const perms = usePermissions();
     const guildId = String(params.id ?? '');
 
-    const previousLiveUsersRef = useRef<Map<string, LivePanelUser>>(new Map());
-
     const [serverName, setServerName] = useState('Live Server');
     const [placeId, setPlaceId] = useState<string | null>(null);
     const [liveServers, setLiveServers] = useState<LiveServerRecord[]>([]);
+    const [playerActivity, setPlayerActivity] = useState<PlayerPresenceActivity[]>([]);
     const [logs, setLogs] = useState<NormalizedDashboardLog[]>([]);
-    const [recentlyLeftUsers, setRecentlyLeftUsers] = useState<Record<string, LivePanelUser>>({});
+    const [pendingReports, setPendingReports] = useState<PendingReport[]>([]);
     const [loading, setLoading] = useState(true);
     const [notice, setNotice] = useState<NoticeState>(null);
     const [serverSearch, setServerSearch] = useState('');
     const [logSearch, setLogSearch] = useState('');
     const [profileSearch, setProfileSearch] = useState('');
     const [selectedProfileUser, setSelectedProfileUser] = useState<LivePanelUser | null>(null);
+    const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>('lookup');
     const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
     const [panelModal, setPanelModal] = useState<PanelModal>(null);
     const [commandBarValue, setCommandBarValue] = useState('');
@@ -644,6 +827,19 @@ export default function LivePanelPage() {
     const [profileCommandValue, setProfileCommandValue] = useState('');
     const [moduleLiveActions, setModuleLiveActions] = useState<ModuleLiveAction[]>([]);
     const [modulePanelCommands, setModulePanelCommands] = useState<AdminPanelCommandDefinition[]>([]);
+    const [reportStatusFilter, setReportStatusFilter] = useState<ReportStatusFilter>('PENDING');
+    const [reportSearch, setReportSearch] = useState('');
+    const [panelReports, setPanelReports] = useState<LiveReport[]>([]);
+    const [reportsLoading, setReportsLoading] = useState(false);
+    const [reportsNotice, setReportsNotice] = useState<NoticeState>(null);
+    const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+    const [selectedReport, setSelectedReport] = useState<LiveReport | null>(null);
+    const [selectedReportProfile, setSelectedReportProfile] = useState<ReportTargetProfile | null>(null);
+    const [selectedReportLogs, setSelectedReportLogs] = useState<NormalizedDashboardLog[]>([]);
+    const [reportDetailLoading, setReportDetailLoading] = useState(false);
+    const [reportModeratorNote, setReportModeratorNote] = useState('');
+    const [reportActionLoading, setReportActionLoading] = useState<string | null>(null);
+    const canManageReports = perms.is_admin || perms.can_manage_reports;
 
     const clearSelectedProfile = useCallback(() => {
         setSelectedProfileUser(null);
@@ -675,8 +871,10 @@ export default function LivePanelPage() {
 
             setPlaceId(payload.server?.placeId || null);
             setLiveServers(Array.isArray(payload.liveServers) ? payload.liveServers : []);
+            setPlayerActivity(Array.isArray(payload.playerActivity) ? payload.playerActivity : []);
             setModulePanelCommands(Array.isArray(payload.modulePanelCommands) ? payload.modulePanelCommands : []);
             setLogs(normalizeDashboardLogs(payload.logs || []));
+            setPendingReports(Array.isArray(payload.pendingReports) ? payload.pendingReports : []);
         } catch (error) {
             setNotice({ type: 'error', text: `Failed to load the Live Panel: ${String(error)}` });
         } finally {
@@ -686,11 +884,119 @@ export default function LivePanelPage() {
         }
     }, [guildId]);
 
+    const loadPanelReports = useCallback(async (status: ReportStatusFilter = 'PENDING') => {
+        if (!guildId || !canManageReports) {
+            setPanelReports([]);
+            return;
+        }
+
+        setReportsLoading(true);
+        setReportsNotice(null);
+
+        try {
+            const response = await fetch(`/api/reports?serverId=${encodeURIComponent(guildId)}&status=${encodeURIComponent(status)}`, {
+                cache: 'no-store',
+            });
+            const payload = await response.json().catch(() => ([])) as LiveReport[] | { error?: string };
+
+            if (!response.ok || !Array.isArray(payload)) {
+                const errorText = Array.isArray(payload) ? '' : trimString(payload.error);
+                setPanelReports([]);
+                setReportsNotice({ type: 'error', text: errorText || 'Failed to load reports.' });
+                return;
+            }
+
+            setPanelReports(payload);
+        } catch (error) {
+            setPanelReports([]);
+            setReportsNotice({ type: 'error', text: `Failed to load reports: ${String(error)}` });
+        } finally {
+            setReportsLoading(false);
+        }
+    }, [canManageReports, guildId]);
+
+    const loadReportDetail = useCallback(async (reportId: string) => {
+        if (!guildId || !canManageReports || !reportId) return;
+
+        setReportDetailLoading(true);
+        setReportsNotice(null);
+
+        try {
+            const response = await fetch(`/api/reports/${encodeURIComponent(reportId)}/context?serverId=${encodeURIComponent(guildId)}`, {
+                cache: 'no-store',
+            });
+            const payload = await response.json().catch(() => ({})) as {
+                report?: LiveReport;
+                profile?: ReportTargetProfile | null;
+                logs?: unknown[];
+                error?: string;
+            };
+
+            if (!response.ok || !payload.report) {
+                setSelectedReport(null);
+                setSelectedReportProfile(null);
+                setSelectedReportLogs([]);
+                setReportModeratorNote('');
+                setReportsNotice({ type: 'error', text: payload.error || 'Failed to load report details.' });
+                return;
+            }
+
+            setSelectedReport(payload.report);
+            setSelectedReportProfile(payload.profile || null);
+            setSelectedReportLogs(normalizeDashboardLogs(payload.logs || []));
+            setReportModeratorNote(trimString(payload.report.moderator_note));
+        } catch (error) {
+            setSelectedReport(null);
+            setSelectedReportProfile(null);
+            setSelectedReportLogs([]);
+            setReportModeratorNote('');
+            setReportsNotice({ type: 'error', text: `Failed to load report details: ${String(error)}` });
+        } finally {
+            setReportDetailLoading(false);
+        }
+    }, [canManageReports, guildId]);
+
     useEffect(() => {
         loadPanel(true);
         const interval = window.setInterval(() => loadPanel(false), 7000);
         return () => window.clearInterval(interval);
     }, [loadPanel]);
+
+    useEffect(() => {
+        if (!canManageReports || rightPaneMode !== 'reports') {
+            return;
+        }
+
+        loadPanelReports(reportStatusFilter);
+    }, [canManageReports, loadPanelReports, reportStatusFilter, rightPaneMode]);
+
+    useEffect(() => {
+        if (rightPaneMode !== 'reports') {
+            return;
+        }
+
+        if (panelReports.length === 0) {
+            return;
+        }
+
+        if (selectedReportId && panelReports.some((report) => report.id === selectedReportId)) {
+            return;
+        }
+
+        setSelectedReportId(panelReports[0].id);
+    }, [panelReports, rightPaneMode, selectedReportId]);
+
+    useEffect(() => {
+        if (rightPaneMode !== 'reports' || !selectedReportId) {
+            setSelectedReport(null);
+            setSelectedReportProfile(null);
+            setSelectedReportLogs([]);
+            setReportModeratorNote('');
+            return;
+        }
+
+        loadReportDetail(selectedReportId);
+    }, [loadReportDetail, rightPaneMode, selectedReportId]);
 
     useEffect(() => {
         if (!selectedProfileUser) return;
@@ -784,45 +1090,6 @@ export default function LivePanelPage() {
         })
     ), [liveServers]);
 
-    useEffect(() => {
-        const nextLiveUsers = new Map<string, LivePanelUser>();
-        for (const server of enrichedServers) {
-            for (const player of server.players) {
-                nextLiveUsers.set(getUserKey(player), player);
-            }
-        }
-
-        const previousLiveUsers = previousLiveUsersRef.current;
-        const now = Date.now();
-        const leftUsers: Record<string, LivePanelUser> = {};
-
-        previousLiveUsers.forEach((player, key) => {
-            if (!nextLiveUsers.has(key)) {
-                leftUsers[key] = {
-                    ...player,
-                    presence: 'recently-left',
-                    leftAt: now,
-                    sourceReason: 'Recently left the game',
-                };
-            }
-        });
-
-        previousLiveUsersRef.current = nextLiveUsers;
-
-        setRecentlyLeftUsers((current) => {
-            const merged = { ...current, ...leftUsers };
-            for (const [key, user] of Object.entries(merged)) {
-                if (user.leftAt && now - user.leftAt > RECENT_LEFT_TTL_MS) {
-                    delete merged[key];
-                }
-                if (nextLiveUsers.has(key)) {
-                    delete merged[key];
-                }
-            }
-            return merged;
-        });
-    }, [enrichedServers]);
-
     const liveUserMap = useMemo(() => {
         const users = new Map<string, LivePanelUser>();
         for (const server of enrichedServers) {
@@ -837,15 +1104,55 @@ export default function LivePanelPage() {
         return users;
     }, [enrichedServers]);
 
+    const liveUsers = useMemo(() => {
+        const users = new Map<string, LivePanelUser>();
+        for (const server of enrichedServers) {
+            for (const player of server.players) {
+                users.set(getUserKey(player), player);
+            }
+        }
+        return Array.from(users.values());
+    }, [enrichedServers]);
+
     const allKnownUsers = useMemo(() => {
         const users = new Map<string, LivePanelUser>();
-        liveUserMap.forEach((user, key) => {
-            if (key.startsWith('username:') || key.startsWith('id:')) {
-                users.set(getUserKey(user), user);
-            }
-        });
+        const recentActivity = [...playerActivity]
+            .sort((left, right) => getPresenceTimestamp(right.occurred_at) - getPresenceTimestamp(left.occurred_at));
 
-        Object.entries(recentlyLeftUsers).forEach(([key, user]) => users.set(key, user));
+        for (const user of liveUsers) {
+            const latestJoin = recentActivity.find((activity) => (
+                activity.event_type === 'JOIN'
+                && activity.job_id === user.serverId
+                && presenceActivityMatchesUser(activity, user)
+            ));
+            users.set(getUserKey(user), {
+                ...user,
+                ...(latestJoin ? {
+                    joinedAt: getPresenceTimestamp(latestJoin.occurred_at),
+                    sourceReason: `Joined at ${formatTime(latestJoin.occurred_at)}`,
+                } : {}),
+            });
+        }
+
+        for (const activity of recentActivity) {
+            if (activity.event_type !== 'LEAVE') {
+                continue;
+            }
+
+            const user = toRecentlyLeftUser(activity);
+            if (liveUsers.some((liveUser) => presenceActivityMatchesUser(activity, liveUser))) {
+                continue;
+            }
+
+            if (Array.from(users.values()).some((knownUser) => presenceActivityMatchesUser(activity, knownUser))) {
+                continue;
+            }
+
+            const userKey = getUserKey(user);
+            if (!users.has(userKey)) {
+                users.set(userKey, user);
+            }
+        }
 
         for (const log of logs) {
             for (const [value, reason] of [
@@ -856,7 +1163,8 @@ export default function LivePanelPage() {
             ] as Array<[string, string]>) {
                 if (!isLikelyUserText(value)) continue;
                 const username = extractUsername(value);
-                const existing = liveUserMap.get(`username:${username.toLowerCase()}`);
+                const existing = liveUserMap.get(`username:${username.toLowerCase()}`)
+                    || Array.from(users.values()).find((knownUser) => normalizeIdentity(knownUser.username) === normalizeIdentity(username));
                 const user = existing || placeholderUser(username || value, reason);
                 users.set(getUserKey(user), {
                     ...user,
@@ -870,7 +1178,7 @@ export default function LivePanelPage() {
                 const rank = (user: LivePanelUser) => user.presence === 'live' ? 0 : user.presence === 'recently-left' ? 1 : 2;
                 return rank(left) - rank(right) || left.username.localeCompare(right.username);
             });
-    }, [liveUserMap, logs, recentlyLeftUsers]);
+    }, [liveUserMap, liveUsers, logs, playerActivity]);
 
     const filteredServers = useMemo(() => {
         const query = serverSearch.trim().toLowerCase();
@@ -899,6 +1207,19 @@ export default function LivePanelPage() {
         ));
     }, [logSearch, logs]);
 
+    const filteredPanelReports = useMemo(() => {
+        const query = reportSearch.trim().toLowerCase();
+        if (!query) return panelReports;
+
+        return panelReports.filter((report) => (
+            shortReportId(report.id).toLowerCase().includes(query)
+            || report.reported_roblox_username.toLowerCase().includes(query)
+            || getReportReporterLabel(report).toLowerCase().includes(query)
+            || report.reason.toLowerCase().includes(query)
+            || getReportStatus(report).toLowerCase().includes(query)
+        ));
+    }, [panelReports, reportSearch]);
+
     const availableCommands = useMemo(() => {
         const builtInCommands = ADMIN_PANEL_COMMANDS.filter((command) => canUseDashboardCommand(perms, command.id));
         const builtInIds = new Set(builtInCommands.map((command) => command.id));
@@ -913,18 +1234,13 @@ export default function LivePanelPage() {
         const query = profileSearch.trim().toLowerCase();
         if (!query) return [];
 
-        const ranked = allKnownUsers
-            .filter((user) => (
-                user.username.toLowerCase().includes(query)
-                || user.displayName.toLowerCase().includes(query)
-                || normalizeIdentity(user.userId).includes(query)
-            ))
+        const ranked = rankTargetUsers(allKnownUsers, query)
             .map((user) => {
                 const recentLog = logs.find((log) => logMentionsUser(log, user));
                 const reason = user.presence === 'live'
-                    ? `In ${formatServerId(user.serverId || '')}`
+                    ? `${user.joinedAt ? `Joined ${formatTime(new Date(user.joinedAt).toISOString())} · ` : ''}In ${formatServerId(user.serverId || '')}`
                     : user.presence === 'recently-left'
-                        ? 'Recently left the game'
+                        ? `${user.leftAt ? `Left ${formatTime(new Date(user.leftAt).toISOString())}` : 'Recently left the game'}`
                         : recentLog
                             ? `Recent ${recentLog.action}`
                             : user.sourceReason || 'Known user';
@@ -943,19 +1259,17 @@ export default function LivePanelPage() {
         const items: CommandBarSuggestion[] = [];
         const userMatches = (rawSearch: string) => {
             const search = rawSearch.trim().toLowerCase().replace(/^@/, '');
-            return allKnownUsers
-                .filter((user) => (
-                    !search
-                    || user.username.toLowerCase().includes(search)
-                    || user.displayName.toLowerCase().includes(search)
-                    || normalizeIdentity(user.userId).includes(search)
-                ))
+            return rankTargetUsers(allKnownUsers, search)
                 .slice(0, 6);
         };
         const userReason = (user: LivePanelUser) => {
             const recentLog = logs.find((log) => logMentionsUser(log, user));
-            if (user.presence === 'live') return `In ${formatServerId(user.serverId || '')}`;
-            if (user.presence === 'recently-left') return 'Recently left the game';
+            if (user.presence === 'live') return user.joinedAt
+                ? `Joined ${formatTime(new Date(user.joinedAt).toISOString())} in ${formatServerId(user.serverId || '')}`
+                : `In ${formatServerId(user.serverId || '')}`;
+            if (user.presence === 'recently-left') return user.leftAt
+                ? `Left ${formatTime(new Date(user.leftAt).toISOString())}`
+                : 'Recently left the game';
             if (recentLog) return `Recent ${recentLog.action}`;
             return user.sourceReason || 'Known user';
         };
@@ -1209,7 +1523,14 @@ export default function LivePanelPage() {
     }
 
     function selectProfileUser(user: LivePanelUser) {
-        const normalizedUser = liveUserMap.get(getUserKey(user)) || liveUserMap.get(`username:${user.username.toLowerCase()}`) || user;
+        const liveMatch = liveUserMap.get(getUserKey(user)) || liveUserMap.get(`username:${user.username.toLowerCase()}`);
+        const normalizedUser = liveMatch
+            ? {
+                ...liveMatch,
+                joinedAt: user.joinedAt,
+                sourceReason: user.sourceReason || liveMatch.sourceReason,
+            }
+            : user;
         setSelectedProfileUser(normalizedUser);
         setProfileSearch(normalizedUser.username);
         setNoteText('');
@@ -1262,6 +1583,33 @@ export default function LivePanelPage() {
         } finally {
             setActionLoading(null);
         }
+    }
+
+    async function sendServerLifecycleCommand(serverId: string, command: 'UPDATE' | 'SHUTDOWN') {
+        if (!canUseDashboardCommand(perms, command)) {
+            setNotice({ type: 'error', text: 'You do not have permission to use that server action.' });
+            return;
+        }
+
+        const label = command === 'UPDATE' ? 'Restart' : 'Shut down';
+        const confirmation = command === 'UPDATE'
+            ? `Restart server ${formatServerId(serverId)}? Players will be moved through a reserved server and then back into public servers.`
+            : `Shut down server ${formatServerId(serverId)}? Players in this live server will be disconnected.`;
+
+        if (!confirm(confirmation)) {
+            return;
+        }
+
+        await sendCommand(
+            command,
+            {
+                job_id: serverId,
+                target_scope: 'SERVER',
+                target_label: serverId,
+                reason: command === 'UPDATE' ? 'Live Panel quick restart' : 'Live Panel quick shutdown',
+            },
+            `${label} queued for server ${formatServerId(serverId)}.`,
+        );
     }
 
     async function sendPlayerCommand(command: string, user: LivePanelUser) {
@@ -1636,6 +1984,152 @@ export default function LivePanelPage() {
         }
     }
 
+    function openReportTargetProfile() {
+        if (!selectedReport) return;
+
+        const targetUsername = trimString(selectedReportProfile?.roblox_username) || trimString(selectedReport.reported_roblox_username);
+        if (!targetUsername) {
+            setReportsNotice({ type: 'error', text: 'This report does not have a usable target.' });
+            return;
+        }
+
+        setRightPaneMode('lookup');
+        selectProfileUser(resolveUserFromText(targetUsername));
+    }
+
+    async function patchSelectedReportStatus(status: ReportStatus, defaultNote: string) {
+        if (!selectedReportId) return null;
+
+        const moderatorNote = reportModeratorNote.trim() || defaultNote;
+        const response = await fetch(`/api/reports/${encodeURIComponent(selectedReportId)}?serverId=${encodeURIComponent(guildId)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                status,
+                moderatorNote,
+            }),
+        });
+        const payload = await response.json().catch(() => ({})) as LiveReport & { error?: string };
+
+        if (!response.ok) {
+            throw new Error(payload.error || 'Failed to update report.');
+        }
+
+        return payload;
+    }
+
+    async function updateSelectedReportStatus(status: ReportStatus) {
+        if (!selectedReport) return;
+
+        const isClosing = status === 'RESOLVED' || status === 'DISMISSED';
+        if (isClosing && !window.confirm(`${status === 'RESOLVED' ? 'Resolve' : 'Dismiss'} report #${shortReportId(selectedReport.id)}?`)) {
+            return;
+        }
+
+        setReportActionLoading(status);
+        setReportsNotice(null);
+
+        try {
+            const updatedReport = await patchSelectedReportStatus(
+                status,
+                status === 'RESOLVED' ? 'Resolved from Live Panel reports manager' : status === 'DISMISSED' ? 'Dismissed from Live Panel reports manager' : 'Reopened from Live Panel reports manager',
+            );
+
+            if (updatedReport) {
+                setSelectedReport(updatedReport);
+                setReportModeratorNote(trimString(updatedReport.moderator_note));
+                setReportsNotice({ type: 'success', text: `Report #${shortReportId(updatedReport.id)} marked ${status.toLowerCase()}.` });
+                await Promise.all([
+                    loadPanel(false),
+                    loadPanelReports(reportStatusFilter),
+                ]);
+
+                if (reportStatusFilter !== 'ALL' && reportStatusFilter !== status) {
+                    setSelectedReportId(null);
+                }
+            }
+        } catch (error) {
+            setReportsNotice({ type: 'error', text: error instanceof Error ? error.message : String(error) });
+        } finally {
+            setReportActionLoading(null);
+        }
+    }
+
+    async function runReportModerationAction(command: 'KICK' | 'BAN' | 'SOFTBAN') {
+        if (!selectedReport) return;
+
+        if (!canUseDashboardCommand(perms, command)) {
+            setReportsNotice({ type: 'error', text: `You do not have permission to use ${command}.` });
+            return;
+        }
+
+        const targetIsDiscordId = DISCORD_ID_PATTERN.test(trimString(selectedReport.reported_roblox_username));
+        const targetUsername = trimString(selectedReportProfile?.roblox_username) || trimString(selectedReport.reported_roblox_username);
+
+        if (targetIsDiscordId && !selectedReportProfile?.roblox_username) {
+            setReportsNotice({ type: 'error', text: 'This report targets an unlinked Discord ID, so Roblox moderation commands cannot be applied.' });
+            return;
+        }
+
+        if (!targetUsername) {
+            setReportsNotice({ type: 'error', text: 'This report does not have a usable Roblox target.' });
+            return;
+        }
+
+        if (!window.confirm(`${command} ${targetUsername} and resolve report #${shortReportId(selectedReport.id)}?`)) {
+            return;
+        }
+
+        setReportActionLoading(command);
+        setReportsNotice(null);
+
+        const actionReason = reportModeratorNote.trim() || `Re: Report #${shortReportId(selectedReport.id)} - ${selectedReport.reason}`;
+
+        try {
+            const commandResponse = await fetch('/api/dashboard/command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serverId: guildId,
+                    command,
+                    args: {
+                        username: targetUsername,
+                        reason: actionReason,
+                        ...(selectedReport.reported_live_server_id ? { job_id: selectedReport.reported_live_server_id } : {}),
+                    },
+                }),
+            });
+            const commandPayload = await commandResponse.json().catch(() => ({})) as { error?: string; warning?: string };
+
+            if (!commandResponse.ok) {
+                setReportsNotice({ type: 'error', text: commandPayload.error || 'Failed to send moderation command.' });
+                return;
+            }
+
+            const updatedReport = await patchSelectedReportStatus('RESOLVED', `Action: ${command} - ${actionReason}`);
+            if (updatedReport) {
+                setSelectedReport(updatedReport);
+                setReportModeratorNote(trimString(updatedReport.moderator_note));
+                setReportsNotice({
+                    type: 'success',
+                    text: commandPayload.warning || `${command} queued for ${targetUsername} and report #${shortReportId(updatedReport.id)} resolved.`,
+                });
+                await Promise.all([
+                    loadPanel(false),
+                    loadPanelReports(reportStatusFilter),
+                ]);
+
+                if (reportStatusFilter !== 'ALL' && reportStatusFilter !== 'RESOLVED') {
+                    setSelectedReportId(null);
+                }
+            }
+        } catch (error) {
+            setReportsNotice({ type: 'error', text: error instanceof Error ? error.message : String(error) });
+        } finally {
+            setReportActionLoading(null);
+        }
+    }
+
     const quickActions = [
         { command: 'REFRESH', label: 'Refresh', icon: <RefreshIcon />, tone: 'text-sky-300 hover:border-sky-400/50 hover:bg-sky-500/10' },
         { command: 'RESET', label: 'Reset', icon: <ResetIcon />, tone: 'text-indigo-300 hover:border-indigo-400/50 hover:bg-indigo-500/10' },
@@ -1643,8 +2137,14 @@ export default function LivePanelPage() {
         { command: 'BAN', label: 'Ban', icon: <BanIcon />, tone: 'text-red-300 hover:border-red-400/50 hover:bg-red-500/10' },
         { command: 'SOFTBAN', label: 'Temp Ban', icon: <TempBanIcon />, tone: 'text-rose-300 hover:border-rose-400/50 hover:bg-rose-500/10' },
     ].filter((action) => canUseDashboardCommand(perms, action.command));
+    const selectedReportStatus = getReportStatus(selectedReport);
+    const selectedReportTargetUsername = trimString(selectedReportProfile?.roblox_username) || trimString(selectedReport?.reported_roblox_username);
+    const selectedReportTargetId = trimString(selectedReportProfile?.roblox_id);
+    const selectedReportDiscordId = trimString(selectedReportProfile?.discord_id);
     const canRunCommands = availableCommands.length > 0;
     const canAnnounce = canUseDashboardCommand(perms, 'BROADCAST');
+    const canRestartServers = canUseDashboardCommand(perms, 'UPDATE');
+    const canShutdownServers = canUseDashboardCommand(perms, 'SHUTDOWN');
 
     if (loading) {
         return (
@@ -1685,7 +2185,7 @@ export default function LivePanelPage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3 lg:min-w-[390px]">
+                    <div className={`grid gap-3 lg:min-w-[390px] ${canManageReports ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
                         <div className="rounded-xl border border-slate-800 bg-black/20 px-4 py-3">
                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Servers</p>
                             <p className="mt-1 text-2xl font-black text-white">{enrichedServers.length}</p>
@@ -1698,6 +2198,12 @@ export default function LivePanelPage() {
                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Logs</p>
                             <p className="mt-1 text-2xl font-black text-sky-300">{logs.length}</p>
                         </div>
+                        {canManageReports && (
+                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Reports</p>
+                                <p className="mt-1 text-2xl font-black text-amber-300">{pendingReports.length}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </header>
@@ -1756,6 +2262,68 @@ export default function LivePanelPage() {
                         </div>
                     </div>
 
+                    {canManageReports && (
+                        <div className="shrink-0 border-b border-slate-800 bg-amber-500/[0.03] p-5">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 text-amber-200">
+                                    <ReportIcon />
+                                    <h2 className="text-sm font-black uppercase tracking-widest">Unmoderated Reports</h2>
+                                    <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-black text-amber-300">{pendingReports.length}</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        clearSelectedProfile();
+                                        setRightPaneMode('reports');
+                                    }}
+                                    className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-200 transition-colors hover:border-amber-300/50 hover:bg-amber-500/20"
+                                >
+                                    Manage
+                                </button>
+                            </div>
+
+                            {pendingReports.length === 0 ? (
+                                <p className="mt-3 text-xs font-medium text-slate-500">No reports are awaiting moderation.</p>
+                            ) : (
+                                <div className="mt-3 space-y-2">
+                                    {pendingReports.slice(0, 3).map((report) => (
+                                        <button
+                                            key={report.id}
+                                            type="button"
+                                            onClick={() => {
+                                                clearSelectedProfile();
+                                                setRightPaneMode('reports');
+                                                setReportStatusFilter('PENDING');
+                                                setSelectedReportId(report.id);
+                                            }}
+                                            className="block w-full rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-2.5 text-left transition-colors hover:border-amber-400/40 hover:bg-amber-500/5"
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="min-w-0 truncate text-xs font-black text-white">{report.reported_roblox_username}</span>
+                                                <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">{formatTime(report.created_at)}</span>
+                                            </div>
+                                            <p className="mt-1 truncate text-xs font-medium text-slate-400">{report.reason}</p>
+                                            <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-wider text-slate-600">By {report.reporter_roblox_username || report.reporter_discord_id || 'Unknown'}</p>
+                                        </button>
+                                    ))}
+                                    {pendingReports.length > 3 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                clearSelectedProfile();
+                                                setRightPaneMode('reports');
+                                                setReportStatusFilter('PENDING');
+                                            }}
+                                            className="block w-full pt-1 text-right text-[10px] font-black uppercase tracking-widest text-amber-300 transition-colors hover:text-amber-100"
+                                        >
+                                            View all {pendingReports.length} reports
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     <div className="flex min-h-0 flex-1 flex-col">
                         <div className="shrink-0 border-b border-slate-800 p-5">
                             <div className="mb-3 flex items-center justify-between">
@@ -1794,24 +2362,50 @@ export default function LivePanelPage() {
                                                             {server.visiblePlayerCount} player{server.visiblePlayerCount === 1 ? '' : 's'} active, last pulse {formatTime(server.updated_at)}
                                                         </p>
                                                     </div>
-                                                    {joinUrl ? (
-                                                        <a
-                                                            href={joinUrl}
-                                                            className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-500/25 bg-emerald-500/15 text-emerald-300 transition-all hover:border-emerald-300 hover:bg-emerald-500/25"
-                                                        >
-                                                            <PlayIcon />
-                                                            <ActionTooltip label="Join Server" />
-                                                        </a>
-                                                    ) : (
-                                                        <button
-                                                            type="button"
-                                                            disabled
-                                                            className="group relative flex h-10 w-10 shrink-0 cursor-not-allowed items-center justify-center rounded-xl border border-slate-800 bg-slate-950 text-slate-600"
-                                                        >
-                                                            <PlayIcon />
-                                                            <ActionTooltip label="Set Place ID to Join" />
-                                                        </button>
-                                                    )}
+                                                    <div className="flex shrink-0 items-center gap-2">
+                                                        {joinUrl ? (
+                                                            <a
+                                                                href={joinUrl}
+                                                                className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-500/25 bg-emerald-500/15 text-emerald-300 transition-all hover:border-emerald-300 hover:bg-emerald-500/25"
+                                                            >
+                                                                <PlayIcon />
+                                                                <ActionTooltip label="Join Server" />
+                                                            </a>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                disabled
+                                                                className="group relative flex h-10 w-10 shrink-0 cursor-not-allowed items-center justify-center rounded-xl border border-slate-800 bg-slate-950 text-slate-600"
+                                                            >
+                                                                <PlayIcon />
+                                                                <ActionTooltip label="Set Place ID to Join" />
+                                                            </button>
+                                                        )}
+                                                        {canRestartServers && (
+                                                            <button
+                                                                type="button"
+                                                                aria-label={`Restart server ${formatServerId(server.id)}`}
+                                                                onClick={() => sendServerLifecycleCommand(server.id, 'UPDATE')}
+                                                                disabled={actionLoading === 'UPDATE'}
+                                                                className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-300 transition-all hover:border-amber-300 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
+                                                            >
+                                                                <ServerRestartIcon />
+                                                                <ActionTooltip label="Restart Server" />
+                                                            </button>
+                                                        )}
+                                                        {canShutdownServers && (
+                                                            <button
+                                                                type="button"
+                                                                aria-label={`Shut down server ${formatServerId(server.id)}`}
+                                                                onClick={() => sendServerLifecycleCommand(server.id, 'SHUTDOWN')}
+                                                                disabled={actionLoading === 'SHUTDOWN'}
+                                                                className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-500/25 bg-red-500/10 text-red-300 transition-all hover:border-red-300 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
+                                                            >
+                                                                <ServerShutdownIcon />
+                                                                <ActionTooltip label="Shut Down Server" />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
 
                                                 <div className="mt-4 flex flex-wrap gap-2">
@@ -2041,9 +2635,9 @@ export default function LivePanelPage() {
                                             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3">
                                                 <div className="flex items-center justify-between gap-3">
                                                     <span className="text-xs font-black uppercase tracking-widest text-emerald-200">Joined</span>
-                                                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">{panelUser.serverId ? formatServerId(panelUser.serverId) : 'Live'}</span>
+                                                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">{panelUser.joinedAt ? formatTime(new Date(panelUser.joinedAt).toISOString()) : panelUser.serverId ? formatServerId(panelUser.serverId) : 'Live'}</span>
                                                 </div>
-                                                <p className="mt-1 text-xs font-medium text-emerald-100/70">Currently connected to a tracked live server.</p>
+                                                <p className="mt-1 text-xs font-medium text-emerald-100/70">{panelUser.joinedAt ? 'Current join time from the tracked live roster.' : 'Currently connected to a tracked live server.'}</p>
                                             </div>
                                         )}
                                         {panelUser.presence === 'recently-left' && (
@@ -2072,6 +2666,270 @@ export default function LivePanelPage() {
                                             </div>
                                         )}
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : rightPaneMode === 'reports' && canManageReports ? (
+                        <div className="flex min-h-0 flex-1 flex-col">
+                            <div className="shrink-0 border-b border-slate-800 bg-slate-950/30 p-5">
+                                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                                    <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-300">Reports Manager</p>
+                                        <h2 className="mt-1 text-xl font-black text-white">Live Reports</h2>
+                                        <p className="mt-1 text-xs font-medium text-slate-500">Review player reports without leaving live operations.</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setRightPaneMode('lookup')}
+                                        className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-300 transition-colors hover:border-sky-400/50 hover:text-white"
+                                    >
+                                        Lookup
+                                    </button>
+                                </div>
+
+                                <div className="mt-4">
+                                    <input
+                                        value={reportSearch}
+                                        onChange={(event) => setReportSearch(event.target.value)}
+                                        placeholder="Search reports"
+                                        className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm font-medium text-white outline-none transition-all placeholder:text-slate-600 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/10"
+                                    />
+                                </div>
+
+                                {reportsNotice && (
+                                    <div className={`mt-4 rounded-xl border px-4 py-3 text-xs font-semibold ${reportsNotice.type === 'success'
+                                        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+                                        : 'border-red-500/20 bg-red-500/10 text-red-300'
+                                        }`}>
+                                        {reportsNotice.text}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(240px,0.8fr)_minmax(340px,1.2fr)]">
+                                <div className="custom-scrollbar min-h-0 overflow-y-auto border-b border-slate-800 xl:border-b-0 xl:border-r">
+                                    {reportsLoading ? (
+                                        <div className="p-10 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600">Loading reports...</div>
+                                    ) : filteredPanelReports.length === 0 ? (
+                                        <div className="p-10 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600">No reports matched.</div>
+                                    ) : (
+                                        <div className="divide-y divide-slate-800/70">
+                                            {filteredPanelReports.map((report) => {
+                                                const status = getReportStatus(report);
+                                                const selected = selectedReportId === report.id;
+                                                return (
+                                                    <button
+                                                        key={report.id}
+                                                        type="button"
+                                                        onClick={() => setSelectedReportId(report.id)}
+                                                        className={`block w-full px-5 py-4 text-left transition-colors ${selected ? 'bg-amber-500/10' : 'hover:bg-amber-500/5'}`}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div className="min-w-0">
+                                                                <p className="truncate text-sm font-black text-white">{report.reported_roblox_username}</p>
+                                                                <p className="mt-1 truncate font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">#{shortReportId(report.id)}</p>
+                                                            </div>
+                                                            <span className={`shrink-0 rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${reportStatusClass(status)}`}>
+                                                                {status.toLowerCase()}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">{report.reason}</p>
+                                                        <div className="mt-3 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                                                            <span className="min-w-0 truncate">By {getReportReporterLabel(report)}</span>
+                                                            <span className="shrink-0">{formatTime(report.created_at)}</span>
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="custom-scrollbar min-h-0 overflow-y-auto p-5">
+                                    {reportDetailLoading ? (
+                                        <div className="flex min-h-72 items-center justify-center text-[10px] font-bold uppercase tracking-widest text-slate-600">Loading report details...</div>
+                                    ) : selectedReport ? (
+                                        <div className="space-y-4">
+                                            <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                                    <div className="min-w-0">
+                                                        <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-slate-500">Report #{shortReportId(selectedReport.id)}</p>
+                                                        <h3 className="mt-1 truncate text-xl font-black text-white">{selectedReportTargetUsername || 'Unknown target'}</h3>
+                                                        <p className="mt-1 text-xs font-semibold text-slate-500">Submitted {formatDateTime(selectedReport.created_at)}</p>
+                                                    </div>
+                                                    <span className={`w-fit rounded-lg border px-3 py-1 text-[10px] font-black uppercase tracking-wider ${reportStatusClass(selectedReportStatus)}`}>
+                                                        {selectedReportStatus.toLowerCase()}
+                                                    </span>
+                                                </div>
+
+                                                <div className="mt-4 grid grid-cols-2 gap-3">
+                                                    <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
+                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Reporter</p>
+                                                        <p className="mt-1 truncate text-sm font-black text-white">{getReportReporterLabel(selectedReport)}</p>
+                                                    </div>
+                                                    <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
+                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Roblox ID</p>
+                                                        <p className="mt-1 truncate font-mono text-xs font-bold text-sky-300">{selectedReportTargetId || 'Unknown'}</p>
+                                                    </div>
+                                                    <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
+                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Discord</p>
+                                                        <p className="mt-1 truncate font-mono text-xs font-bold text-indigo-300">{selectedReportDiscordId || selectedReport.reported_roblox_username || 'Unknown'}</p>
+                                                    </div>
+                                                    <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
+                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Closed</p>
+                                                        <p className="mt-1 truncate text-xs font-bold text-slate-300">{selectedReport.resolved_at ? formatDateTime(selectedReport.resolved_at) : 'Open'}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                                <div className="mb-3 flex items-center justify-between gap-3">
+                                                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Report Evidence</h3>
+                                                    <button
+                                                        type="button"
+                                                        onClick={openReportTargetProfile}
+                                                        disabled={!selectedReportTargetUsername}
+                                                        className="rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                                                    >
+                                                        Target Profile
+                                                    </button>
+                                                </div>
+                                                <p className="whitespace-pre-wrap rounded-xl border border-slate-800 bg-black/20 p-4 text-sm leading-6 text-slate-300">{selectedReport.reason || 'No reason provided.'}</p>
+                                            </div>
+
+                                            <div className="grid gap-3 md:grid-cols-2">
+                                                {[
+                                                    {
+                                                        label: 'Reporter server',
+                                                        jobId: selectedReport.reporter_live_server_id,
+                                                        joinUrl: selectedReport.reporter_join_url,
+                                                    },
+                                                    {
+                                                        label: 'Reported user server',
+                                                        jobId: selectedReport.reported_live_server_id,
+                                                        joinUrl: selectedReport.reported_join_url,
+                                                    },
+                                                ].map((serverContext) => (
+                                                    <div key={serverContext.label} className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{serverContext.label}</p>
+                                                        {serverContext.jobId ? (
+                                                            <>
+                                                                <p className="mt-2 break-all font-mono text-xs text-slate-300">{serverContext.jobId}</p>
+                                                                {serverContext.joinUrl && (
+                                                                    <a
+                                                                        href={serverContext.joinUrl}
+                                                                        className="mt-3 inline-flex rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-emerald-300 transition-colors hover:bg-emerald-500/20"
+                                                                    >
+                                                                        Join server
+                                                                    </a>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            <p className="mt-2 text-xs font-medium text-slate-500">No live server snapshot was captured.</p>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                                <h3 className="text-sm font-black uppercase tracking-widest text-white">Moderator Note</h3>
+                                                <textarea
+                                                    value={reportModeratorNote}
+                                                    onChange={(event) => setReportModeratorNote(event.target.value)}
+                                                    rows={3}
+                                                    placeholder="Add an internal note before resolving or dismissing"
+                                                    className="mt-3 w-full resize-none rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500/60"
+                                                />
+                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                    {(['KICK', 'SOFTBAN', 'BAN'] as const)
+                                                        .filter((command) => canUseDashboardCommand(perms, command))
+                                                        .map((command) => (
+                                                            <button
+                                                                key={command}
+                                                                type="button"
+                                                                disabled={reportActionLoading !== null}
+                                                                onClick={() => runReportModerationAction(command)}
+                                                                className={`rounded-xl border px-3 py-2.5 text-[10px] font-black uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${command === 'BAN'
+                                                                    ? 'border-red-500/25 bg-red-500/10 text-red-200 hover:bg-red-500/20'
+                                                                    : command === 'SOFTBAN'
+                                                                        ? 'border-rose-500/25 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20'
+                                                                        : 'border-amber-500/25 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20'
+                                                                    }`}
+                                                            >
+                                                                {reportActionLoading === command
+                                                                    ? 'Running...'
+                                                                    : `${command === 'SOFTBAN' ? 'Temp Ban' : command.charAt(0) + command.slice(1).toLowerCase()} & Resolve`}
+                                                            </button>
+                                                        ))}
+                                                    {selectedReportStatus !== 'RESOLVED' && (
+                                                        <button
+                                                            type="button"
+                                                            disabled={reportActionLoading !== null}
+                                                            onClick={() => updateSelectedReportStatus('RESOLVED')}
+                                                            className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        >
+                                                            {reportActionLoading === 'RESOLVED' ? 'Saving...' : 'Resolve'}
+                                                        </button>
+                                                    )}
+                                                    {selectedReportStatus !== 'DISMISSED' && (
+                                                        <button
+                                                            type="button"
+                                                            disabled={reportActionLoading !== null}
+                                                            onClick={() => updateSelectedReportStatus('DISMISSED')}
+                                                            className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-colors hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                                        >
+                                                            {reportActionLoading === 'DISMISSED' ? 'Saving...' : 'Dismiss'}
+                                                        </button>
+                                                    )}
+                                                    {selectedReportStatus !== 'PENDING' && (
+                                                        <button
+                                                            type="button"
+                                                            disabled={reportActionLoading !== null}
+                                                            onClick={() => updateSelectedReportStatus('PENDING')}
+                                                            className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        >
+                                                            {reportActionLoading === 'PENDING' ? 'Saving...' : 'Reopen'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                                <div className="mb-3 flex items-center justify-between gap-3">
+                                                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Target History</h3>
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{selectedReportLogs.length} shown</span>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {selectedReportLogs.slice(0, 12).map((log) => (
+                                                        <div key={log.id} className="rounded-xl border border-slate-800 bg-black/20 p-3">
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <span className="text-xs font-black uppercase tracking-widest text-white">{log.action}</span>
+                                                                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">{formatTime(log.timestamp)}</span>
+                                                            </div>
+                                                            <p className="mt-1 text-xs font-medium text-slate-400">
+                                                                Target <ClickableUserText value={log.target} onOpen={() => {
+                                                                    setRightPaneMode('lookup');
+                                                                    selectProfileUser(resolveUserFromText(log.target));
+                                                                }} /> by <ClickableUserText value={log.moderator} onOpen={() => {
+                                                                    setRightPaneMode('lookup');
+                                                                    selectProfileUser(resolveUserFromText(log.moderator));
+                                                                }} />
+                                                            </p>
+                                                        </div>
+                                                    ))}
+                                                    {selectedReportLogs.length === 0 && (
+                                                        <div className="rounded-xl border border-dashed border-slate-800 p-6 text-center text-xs font-semibold text-slate-500">
+                                                            No moderation history found for this target.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex min-h-72 items-center justify-center rounded-2xl border border-dashed border-slate-800 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                            Select a report to review.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

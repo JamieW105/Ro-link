@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getServerByApiKey } from '@/lib/gameAdmin';
+import { logAction } from '@/lib/logger';
 import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
 const VALID_REPORT_STATUSES = new Set(['PENDING', 'RESOLVED', 'DISMISSED']);
+
+function getReportLogAction(status: string) {
+    if (status === 'RESOLVED') return 'REPORT_RESOLVED';
+    if (status === 'DISMISSED') return 'REPORT_DISMISSED';
+    if (status === 'PENDING') return 'REPORT_REOPENED';
+    return 'REPORT_UPDATED';
+}
 
 function trimString(value: unknown, maxLength = 5000) {
     return String(value ?? '').trim().slice(0, maxLength);
@@ -130,6 +138,21 @@ export async function PATCH(
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    const moderatorId = trimString(body.moderatorId ?? body.moderator_id, 120);
+    const moderator = /^\d{17,20}$/.test(moderatorId) ? `<@${moderatorId}>` : moderatorId || 'Game Admin';
+    const actionDescription = status
+        ? `Report #${trimString(data.id, 120).slice(0, 8)} marked ${status.toLowerCase()}.`
+        : `Report #${trimString(data.id, 120).slice(0, 8)} updated.`;
+    const moderatorNote = trimString(body.moderatorNote ?? body.moderator_note, 2000);
+
+    await logAction(
+        access.server.id,
+        getReportLogAction(status),
+        trimString(data.reported_roblox_username, 120) || 'Unknown Target',
+        moderator,
+        moderatorNote ? `${actionDescription} Note: ${moderatorNote}` : actionDescription,
+    );
 
     return NextResponse.json({ serverId: access.server.id, report: data });
 }

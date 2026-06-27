@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { enrichLogRecordsWithLinkedUsers, expandLinkedLogTargets } from '@/lib/logIdentity';
 import { collectModulePanelCommandsFromLiveServers } from '@/lib/modulePanelCommands';
-import { canAccessLivePanel, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
+import { buildPlayerPresenceEvents, PLAYER_PRESENCE_RETENTION_MS, type PlayerPresenceActivity } from '@/lib/playerPresence';
+import { canAccessLivePanel, canManageReports, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 function parseLimit(value: string | null, fallback: number, max: number) {
@@ -31,6 +32,78 @@ function sortAndLimitLogs(logs: Record<string, unknown>[], limit: number) {
         .slice(0, limit);
 }
 
+function isMissingPlayerPresenceEventsTable(error: { code?: string } | null) {
+    return error?.code === '42P01' || error?.code === 'PGRST205';
+}
+
+type LiveServerRoster = {
+    id?: unknown;
+    players?: unknown;
+};
+
+async function cleanupStaleLiveServers(
+    client: ReturnType<typeof getSupabaseAdmin>,
+    serverId: string,
+    staleTime: string,
+    canStorePresence: boolean,
+) {
+    const { data: staleServers, error: staleQueryError } = await client
+        .from('live_servers')
+        .select('id, players')
+        .eq('server_id', serverId)
+        .lt('updated_at', staleTime);
+
+    if (staleQueryError) {
+        console.error('[Live Panel API] Stale server lookup failed:', staleQueryError);
+        return;
+    }
+
+    const staleRosters = (staleServers || []) as LiveServerRoster[];
+    const staleIds = staleRosters.map((server) => trimString(server.id)).filter(Boolean);
+    if (staleIds.length === 0) {
+        return;
+    }
+
+    const { data: deletedServers, error: cleanupError } = await client
+        .from('live_servers')
+        .delete()
+        .eq('server_id', serverId)
+        .lt('updated_at', staleTime)
+        .in('id', staleIds)
+        .select('id');
+
+    if (cleanupError) {
+        console.error('[Live Panel API] Stale cleanup failed:', cleanupError);
+        return;
+    }
+
+    if (!canStorePresence) {
+        return;
+    }
+
+    const deletedIds = new Set(((deletedServers || []) as LiveServerRoster[]).map((server) => trimString(server.id)));
+    const events = staleRosters
+        .filter((server) => deletedIds.has(trimString(server.id)))
+        .flatMap((server) => buildPlayerPresenceEvents({
+            previousPlayers: server.players,
+            currentPlayers: [],
+            serverId,
+            jobId: trimString(server.id),
+        }));
+
+    if (events.length === 0) {
+        return;
+    }
+
+    const { error: presenceError } = await client
+        .from('player_presence_events')
+        .insert(events);
+
+    if (presenceError && !isMissingPlayerPresenceEventsTable(presenceError)) {
+        console.error('[Live Panel API] Failed to store leave events for stale live servers:', presenceError);
+    }
+}
+
 export async function GET(req: NextRequest) {
     const serverId = trimString(req.nextUrl.searchParams.get('serverId'));
     const target = trimString(req.nextUrl.searchParams.get('target'));
@@ -44,6 +117,8 @@ export async function GET(req: NextRequest) {
 
     const client = getSupabaseAdmin();
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const playerActivitySince = new Date(Date.now() - PLAYER_PRESENCE_RETENTION_MS).toISOString();
+    const canViewReports = canManageReports(access.permissions);
 
     const createLogsQuery = () => client
         .from('logs')
@@ -55,7 +130,7 @@ export async function GET(req: NextRequest) {
     const linkedTargets = target ? await expandLinkedLogTargets(client, [target]) : [];
     const hasLinkedTargets = linkedTargets.some((value) => value !== target);
 
-    const [serverResult, liveServersResult, logsResult] = await Promise.all([
+    const [serverResult, liveServersResult, logsResult, reportsResult, playerActivityResult] = await Promise.all([
         client
             .from('servers')
             .select('id, place_id')
@@ -77,6 +152,22 @@ export async function GET(req: NextRequest) {
                     : createLogsQuery().ilike('moderator', `%${target}%`),
             ])
             : createLogsQuery(),
+        canViewReports
+            ? client
+                .from('reports')
+                .select('id, reported_roblox_username, reporter_roblox_username, reporter_discord_id, reason, created_at')
+                .eq('server_id', serverId)
+                .eq('status', 'PENDING')
+                .order('created_at', { ascending: false })
+                .limit(20)
+            : Promise.resolve({ data: [], error: null }),
+        client
+            .from('player_presence_events')
+            .select('id, server_id, job_id, roblox_user_id, username, display_name, avatar_url, event_type, occurred_at')
+            .eq('server_id', serverId)
+            .gte('occurred_at', playerActivitySince)
+            .order('occurred_at', { ascending: false })
+            .limit(5000),
     ]);
 
     if (serverResult.error) {
@@ -96,15 +187,31 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: logsResult.error.message }, { status: 500 });
     }
 
-    if (cleanupStale) {
-        const { error: cleanupError } = await client
-            .from('live_servers')
-            .delete()
-            .eq('server_id', serverId)
-            .lt('updated_at', fiveMinutesAgo);
+    if (reportsResult.error) {
+        return NextResponse.json({ error: reportsResult.error.message }, { status: 500 });
+    }
 
-        if (cleanupError) {
-            console.error('[Live Panel API] Stale cleanup failed:', cleanupError);
+    if (playerActivityResult.error && !isMissingPlayerPresenceEventsTable(playerActivityResult.error)) {
+        return NextResponse.json({ error: playerActivityResult.error.message }, { status: 500 });
+    }
+
+    if (playerActivityResult.error && isMissingPlayerPresenceEventsTable(playerActivityResult.error)) {
+        console.warn('[Live Panel API] player_presence_events is missing; no join/leave activity will be returned until the schema is migrated.');
+    }
+
+    if (cleanupStale) {
+        await cleanupStaleLiveServers(client, serverId, fiveMinutesAgo, !playerActivityResult.error);
+
+        if (!playerActivityResult.error) {
+            const { error: activityCleanupError } = await client
+                .from('player_presence_events')
+                .delete()
+                .eq('server_id', serverId)
+                .lt('occurred_at', playerActivitySince);
+
+            if (activityCleanupError) {
+                console.error('[Live Panel API] Player activity cleanup failed:', activityCleanupError);
+            }
         }
     }
 
@@ -119,7 +226,9 @@ export async function GET(req: NextRequest) {
             placeId: trimString(serverResult.data?.place_id) || null,
         },
         liveServers: liveServersResult.data || [],
+        playerActivity: playerActivityResult.error ? [] : (playerActivityResult.data || []) as PlayerPresenceActivity[],
         modulePanelCommands: collectModulePanelCommandsFromLiveServers(liveServersResult.data || []),
         logs,
+        pendingReports: reportsResult.data || [],
     });
 }

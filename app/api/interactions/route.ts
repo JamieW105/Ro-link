@@ -8,6 +8,7 @@ import { buildDeliveryArgs, resolveDeliveryTargets, type CommandArgs } from '@/l
 import { findLivePlayer, normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { resolveReportServerContext } from '@/lib/reportServerContext';
 import {
     buildStaffActionModerationComponents,
     buildStaffBlockServerComponents,
@@ -3843,17 +3844,30 @@ export async function POST(req: Request) {
             if (custom_id === 'report_submit') {
                 const targetInput = getModalField(modalComponents, 'target_input');
                 const reason = getModalField(modalComponents, 'reason');
+                const reporterDiscordId = member?.user?.id || interactionUser?.id;
 
                 // 1. Save to Database
                 const reportClient = getSupabaseAdmin();
+                const { data: server } = await reportClient
+                    .from('servers')
+                    .select('reports_channel_id, place_id')
+                    .eq('id', guild_id)
+                    .single();
+                const liveServerContext = await resolveReportServerContext({
+                    serverId: guild_id,
+                    placeId: server?.place_id,
+                    reporterDiscordId,
+                    reportedRobloxUsername: targetInput,
+                });
                 const { data: createdReport, error: dbError } = await reportClient.from('reports').insert([{
                     server_id: guild_id,
-                    reporter_discord_id: member?.user?.id || interactionUser?.id,
+                    reporter_discord_id: reporterDiscordId,
                     reporter_roblox_username: null,
                     reported_roblox_username: targetInput,
                     reason: reason,
-                    status: 'PENDING'
-                }]).select('id').single();
+                    status: 'PENDING',
+                    ...liveServerContext,
+                }]).select('id, reporter_live_server_id, reporter_join_url, reported_live_server_id, reported_join_url').single();
 
                 if (dbError) {
                     console.error('Report DB Error:', dbError);
@@ -3870,14 +3884,7 @@ export async function POST(req: Request) {
                         data: { content: `Error: Failed to create the report record. Please try again later.`, flags: 64 }
                     });
                 }
-
                 // 2. Send Notification to Channel (if configured)
-                const { data: server } = await reportClient
-                    .from('servers')
-                    .select('reports_channel_id')
-                    .eq('id', guild_id)
-                    .single();
-
                 let reportForwardWarning = '';
 
                 if (server?.reports_channel_id) {
@@ -3908,6 +3915,12 @@ export async function POST(req: Request) {
                                 fields: [
                                     { name: 'Reported User', value: `\`${targetInput}\``, inline: true },
                                     { name: 'Reporter', value: `<@${member?.user?.id || interactionUser?.id}>`, inline: true },
+                                    ...(createdReport.reporter_live_server_id
+                                        ? [{ name: 'Reporter Server', value: `\`${createdReport.reporter_live_server_id}\`\n${createdReport.reporter_join_url ? `[Join server](${createdReport.reporter_join_url})` : 'Join link unavailable'}`, inline: false }]
+                                        : []),
+                                    ...(createdReport.reported_live_server_id
+                                        ? [{ name: 'Reported User Server', value: `\`${createdReport.reported_live_server_id}\`\n${createdReport.reported_join_url ? `[Join server](${createdReport.reported_join_url})` : 'Join link unavailable'}`, inline: false }]
+                                        : []),
                                     { name: 'Reason', value: reason }
                                 ],
                                 footer: { text: `Ro-Link Systems • ID: ${guild_id}` },
@@ -4389,7 +4402,16 @@ function RoLink:GetModuleReport(reportId)
 end
 
 function RoLink:CreateModuleReport(body)
-	return self:RequestModuleJson("/api/v1/game-admin/reports", "POST", body or {})
+	local payload = {}
+	if type(body) == "table" then
+		for key, value in pairs(body) do
+			payload[key] = value
+		end
+	end
+	if payload.reporterLiveServerId == nil and payload.reporter_live_server_id == nil then
+		payload.reporterLiveServerId = game.JobId
+	end
+	return self:RequestModuleJson("/api/v1/game-admin/reports", "POST", payload)
 end
 
 function RoLink:UpdateModuleReport(reportId, updates)

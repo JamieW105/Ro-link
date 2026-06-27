@@ -3,9 +3,17 @@ import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
+import { logAction } from '@/lib/logger';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 const VALID_REPORT_STATUSES = new Set(['PENDING', 'RESOLVED', 'DISMISSED']);
+
+function getReportLogAction(status: string) {
+    if (status === 'RESOLVED') return 'REPORT_RESOLVED';
+    if (status === 'DISMISSED') return 'REPORT_DISMISSED';
+    if (status === 'PENDING') return 'REPORT_REOPENED';
+    return 'REPORT_UPDATED';
+}
 
 function trimString(value: unknown) {
     return String(value ?? '').trim();
@@ -112,6 +120,21 @@ export async function PATCH(
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    const action = getReportLogAction(status);
+    const moderator = access.userId ? `<@${access.userId}>` : trimString(access.session.user?.name) || 'Web Admin';
+    const actionDescription = status
+        ? `Report #${trimString(data.id).slice(0, 8)} marked ${status.toLowerCase()}.`
+        : `Report #${trimString(data.id).slice(0, 8)} updated.`;
+    const logReason = moderatorNote ? `${actionDescription} Note: ${moderatorNote}` : actionDescription;
+
+    await logAction(
+        serverId,
+        action,
+        trimString(data.reported_roblox_username) || 'Unknown Target',
+        moderator,
+        logReason,
+    );
 
     return NextResponse.json(data);
 }

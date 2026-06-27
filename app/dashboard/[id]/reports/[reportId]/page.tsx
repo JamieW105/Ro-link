@@ -213,18 +213,6 @@ export default function ReportDetailsPage() {
             return;
         }
 
-        const moderator = (session?.user as any)?.name || 'Web Admin';
-        await fetch('/api/logs', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                serverId: id,
-                action: 'REPORT_DISMISSED',
-                target: report.reported_roblox_username,
-                moderator: moderator
-            })
-        });
-
         router.push(`/dashboard/${id}/reports`);
     };
 
@@ -277,6 +265,42 @@ export default function ReportDetailsPage() {
                                         <p className="text-xs font-mono text-slate-500">Discord ID: {report.reporter_discord_id}</p>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                {[
+                                    {
+                                        label: 'Reporter server at submission',
+                                        jobId: report.reporter_live_server_id,
+                                        joinUrl: report.reporter_join_url,
+                                    },
+                                    {
+                                        label: 'Reported user server at submission',
+                                        jobId: report.reported_live_server_id,
+                                        joinUrl: report.reported_join_url,
+                                    },
+                                ].map((serverContext) => (
+                                    <div key={serverContext.label} className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-4">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{serverContext.label}</p>
+                                        {serverContext.jobId ? (
+                                            <>
+                                                <p className="mt-2 break-all font-mono text-xs text-slate-300">{serverContext.jobId}</p>
+                                                {serverContext.joinUrl && (
+                                                    <a
+                                                        href={serverContext.joinUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="mt-3 inline-flex text-xs font-bold text-sky-400 hover:text-sky-300"
+                                                    >
+                                                        Join server ↗
+                                                    </a>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <p className="mt-2 text-xs text-slate-500">Not found in a live server when reported.</p>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
 
                             <div className="bg-slate-800/30 p-4 sm:p-6 rounded-xl border border-slate-700/50">

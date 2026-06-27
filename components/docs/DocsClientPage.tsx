@@ -557,7 +557,7 @@ const moduleDeveloperFunctions = [
     ['GetUserData(user)', 'function', 'Returns Roblox user data, server role rank, and linked Discord user/member data when the user is linked.'],
     ['GetReports(options)', 'function', 'Reads reports for the current server. options can include status, limit, target, or reporter.'],
     ['GetReport(reportId)', 'function', 'Reads one report from the current server.'],
-    ['CreateReport(body)', 'function', 'Creates a pending report for the current server.'],
+    ['CreateReport(body)', 'function', 'Creates a pending report and snapshots the reporter and reported player live servers with join links.'],
     ['UpdateReport(reportId, updates)', 'function', 'Edits report status, notes, target, reason, or moderator fields for the current server.'],
     ['CreateUI(target, functionOrTree, props)', 'function', 'Creates Roblox UI for one player, all players, or a target list. Installed modules should pass a function or UI tree table.'],
     ['_G.RoLinkModuleUI.Bind(guiObject, handler, options)', 'function', 'Binds client UI input from CreateUI instances back to server-side module code.'],
