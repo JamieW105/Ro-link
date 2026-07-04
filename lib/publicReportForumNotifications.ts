@@ -3,6 +3,8 @@ import type { StaffModerationActionRecord } from './staffModerationActions';
 
 const PUBLIC_REPORT_FORUM_CHANNEL_ID = '1522776711677218857';
 const DISCORD_EPOCH = 1420070400000n;
+export const PUBLIC_REPORT_OPEN_TAG_ID = '1522810550206332998';
+export const PUBLIC_REPORT_MODERATED_TAG_ID = '1522810445176504340';
 
 export type PublicReportTargetType = 'ROBLOX_USER' | 'DISCORD_USER' | 'DISCORD_SERVER' | 'ROBLOX_GAME';
 
@@ -23,6 +25,11 @@ export type PublicReportRecord = {
     target_id: string;
     reason: string;
     evidence_links?: string[] | null;
+    status?: string | null;
+    moderation_action?: string | null;
+    moderation_reason?: string | null;
+    moderated_by?: string | null;
+    moderated_at?: string | null;
     discord_thread_id?: string | null;
     discord_thread_url?: string | null;
     created_at?: string | null;
@@ -750,11 +757,73 @@ export async function createPublicReportForumThread(input: {
         body: JSON.stringify({
             name: buildThreadName(input.report),
             auto_archive_duration: 10080,
-            applied_tags: [PUBLIC_REPORT_TAG_IDS[input.report.target_type]],
+            applied_tags: [PUBLIC_REPORT_TAG_IDS[input.report.target_type], PUBLIC_REPORT_OPEN_TAG_ID],
             message: {
                 embeds,
+                components: buildPublicReportActionComponents(input.report.id),
                 allowed_mentions: { parse: [] },
             },
+        }),
+    });
+}
+
+export type PublicReportAction = 'ban' | 'void';
+
+const PUBLIC_REPORT_ACTION_CUSTOM_ID_PREFIX = 'public_report_action';
+
+export function buildPublicReportActionCustomId(action: PublicReportAction, reportId: string) {
+    return [
+        PUBLIC_REPORT_ACTION_CUSTOM_ID_PREFIX,
+        action,
+        encodeURIComponent(trimString(reportId, 80)),
+    ].join('|');
+}
+
+export function parsePublicReportActionCustomId(customId: string) {
+    const [prefix, action = '', encodedReportId = ''] = String(customId ?? '').split('|');
+    if (prefix !== PUBLIC_REPORT_ACTION_CUSTOM_ID_PREFIX) return null;
+    if (action !== 'ban' && action !== 'void') return null;
+
+    const reportId = decodeURIComponent(encodedReportId).trim();
+    if (!reportId) return null;
+
+    return { action, reportId } satisfies { action: PublicReportAction; reportId: string };
+}
+
+export function buildPublicReportActionComponents(reportId: string, disabled = false) {
+    return [{
+        type: 1,
+        components: [
+            {
+                type: 2,
+                style: 4,
+                label: 'Ban Target',
+                custom_id: buildPublicReportActionCustomId('ban', reportId),
+                disabled,
+            },
+            {
+                type: 2,
+                style: 2,
+                label: 'Void Report',
+                custom_id: buildPublicReportActionCustomId('void', reportId),
+                disabled,
+            },
+        ],
+    }];
+}
+
+export async function markPublicReportThreadModerated(input: {
+    threadId: string;
+    targetType: PublicReportTargetType;
+}) {
+    const botToken = trimString(process.env.DISCORD_TOKEN);
+    const threadId = trimString(input.threadId, 80);
+    if (!botToken || !threadId) return;
+
+    await discordApiFetch(botToken, `/channels/${encodeURIComponent(threadId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+            applied_tags: [PUBLIC_REPORT_TAG_IDS[input.targetType], PUBLIC_REPORT_MODERATED_TAG_ID],
         }),
     });
 }

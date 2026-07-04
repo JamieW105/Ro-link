@@ -22,6 +22,12 @@ import {
     parseStaffBlockServerCustomId,
     parseStaffVoidModerationCustomId,
 } from '@/lib/staffActionComponents';
+import {
+    markPublicReportThreadModerated,
+    parsePublicReportActionCustomId,
+    type PublicReportAction,
+    type PublicReportRecord,
+} from '@/lib/publicReportForumNotifications';
 import { closeStaffActionForumThread } from '@/lib/staffForumNotifications';
 import { fetchStaffModerationAction, voidStaffModerationAction } from '@/lib/staffModerationActions';
 import discordCommands from '@/lib/discordCommands.json';
@@ -1820,6 +1826,124 @@ function buildReportChannelComponents(reportId: string, target: string, mode: Re
     }];
 }
 
+const PUBLIC_REPORT_ACTION_MODAL_PREFIX = 'public_report_action_modal';
+
+function buildPublicReportActionModalCustomId(action: PublicReportAction, reportId: string) {
+    return [
+        PUBLIC_REPORT_ACTION_MODAL_PREFIX,
+        action,
+        encodeURIComponent(String(reportId ?? '').trim()),
+    ].join('|');
+}
+
+function parsePublicReportActionModalCustomId(customId: string) {
+    const [prefix, action = '', encodedReportId = ''] = String(customId ?? '').split('|');
+    if (prefix !== PUBLIC_REPORT_ACTION_MODAL_PREFIX) return null;
+    if (action !== 'ban' && action !== 'void') return null;
+
+    const reportId = decodeURIComponent(encodedReportId).trim();
+    if (!reportId) return null;
+
+    return { action, reportId } satisfies { action: PublicReportAction; reportId: string };
+}
+
+function publicReportActionLabel(action: PublicReportAction) {
+    return action === 'ban' ? 'Ban Target' : 'Void Report';
+}
+
+async function canRunPublicReportAction(userId: string, action: PublicReportAction) {
+    if (action === 'ban') {
+        return await hasGlobalManagementPermission(userId, 'BLOCK_SERVERS');
+    }
+
+    return await hasGlobalManagementPermission(userId, 'MANAGE_SERVERS')
+        || await hasGlobalManagementPermission(userId, 'BLOCK_SERVERS');
+}
+
+async function applyPublicReportAction(input: {
+    action: PublicReportAction;
+    reportId: string;
+    reason: string;
+    moderatorDiscordId: string;
+    fallbackThreadId?: string | null;
+}) {
+    const client = getSupabaseAdmin();
+    const reason = String(input.reason ?? '').trim().slice(0, 2000);
+    if (reason.length < 3) {
+        throw new Error('A reason is required.');
+    }
+
+    const { data: reportData, error: fetchError } = await client
+        .from('public_reports')
+        .select('*')
+        .eq('id', input.reportId)
+        .maybeSingle();
+
+    if (fetchError) {
+        throw new Error(fetchError.message);
+    }
+
+    if (!reportData) {
+        throw new Error('Public report not found.');
+    }
+
+    const report = reportData as PublicReportRecord & { status?: string | null };
+    const currentStatus = String(report.status ?? 'OPEN').trim().toUpperCase();
+    if (currentStatus === 'RESOLVED' || currentStatus === 'DISMISSED') {
+        throw new Error('This public report has already been moderated.');
+    }
+
+    const now = new Date().toISOString();
+    if (input.action === 'ban') {
+        const { error: banError } = await client
+            .from('dgsu_bans')
+            .upsert({
+                target_type: report.target_type,
+                target_id: report.target_id,
+                reason,
+                source_public_report_id: report.id,
+                banned_by: input.moderatorDiscordId,
+                metadata: {
+                    source: 'public_report_quick_action',
+                    publicReportId: report.id,
+                },
+                updated_at: now,
+            }, { onConflict: 'target_type,target_id' });
+
+        if (banError) {
+            throw new Error(banError.message);
+        }
+    }
+
+    const { data: updatedReport, error: updateError } = await client
+        .from('public_reports')
+        .update({
+            status: input.action === 'ban' ? 'RESOLVED' : 'DISMISSED',
+            moderation_action: input.action === 'ban' ? 'BAN' : 'VOID',
+            moderation_reason: reason,
+            moderated_by: input.moderatorDiscordId,
+            moderated_at: now,
+            updated_at: now,
+        })
+        .eq('id', report.id)
+        .select('*')
+        .single();
+
+    if (updateError) {
+        throw new Error(updateError.message);
+    }
+
+    const threadId = String(report.discord_thread_id || input.fallbackThreadId || '').trim();
+    if (threadId) {
+        await markPublicReportThreadModerated({
+            threadId,
+            targetType: report.target_type,
+        });
+    }
+
+    return updatedReport as PublicReportRecord & { status?: string | null };
+}
+
 async function findPendingReportIdByTarget(serverId: string, target: string) {
     const client = getSupabaseAdmin();
     const { data, error } = await client
@@ -2983,6 +3107,38 @@ export async function POST(req: Request) {
                 }
             }
 
+            const publicReportAction = parsePublicReportActionCustomId(cid);
+            if (publicReportAction) {
+                if (!(await canRunPublicReportAction(userId, publicReportAction.action))) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: 'You do not have permission to moderate public reports.', flags: 64 }
+                    });
+                }
+
+                const actionLabel = publicReportActionLabel(publicReportAction.action);
+                return NextResponse.json({
+                    type: 9,
+                    data: {
+                        title: actionLabel,
+                        custom_id: buildPublicReportActionModalCustomId(publicReportAction.action, publicReportAction.reportId),
+                        components: [{
+                            type: 1,
+                            components: [{
+                                type: 4,
+                                custom_id: 'reason',
+                                label: 'Reason',
+                                style: 2,
+                                min_length: 3,
+                                max_length: 1000,
+                                placeholder: `Reason for ${actionLabel.toLowerCase()}`,
+                                required: true
+                            }]
+                        }]
+                    }
+                });
+            }
+
             // Public Button: Report Form
             if (cid === 'report_open') {
                 return NextResponse.json({
@@ -3687,6 +3843,41 @@ export async function POST(req: Request) {
 
             if (!custom_id) {
                 return NextResponse.json({ error: 'Missing modal custom_id' }, { status: 400 });
+            }
+
+            const publicReportModalAction = parsePublicReportActionModalCustomId(custom_id);
+            if (publicReportModalAction) {
+                if (!(await canRunPublicReportAction(userId, publicReportModalAction.action))) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: 'You do not have permission to moderate public reports.', flags: 64 }
+                    });
+                }
+
+                const reason = getModalField(modalComponents, 'reason');
+                try {
+                    const report = await applyPublicReportAction({
+                        action: publicReportModalAction.action,
+                        reportId: publicReportModalAction.reportId,
+                        reason,
+                        moderatorDiscordId: userId,
+                        fallbackThreadId: interaction.channel_id,
+                    });
+                    const actionLabel = publicReportActionLabel(publicReportModalAction.action);
+
+                    return NextResponse.json({
+                        type: 4,
+                        data: {
+                            content: `${actionLabel} completed for public report \`${report.id}\`.`,
+                            flags: 64
+                        }
+                    });
+                } catch (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `Error: ${getErrorMessage(error, 'Failed to moderate public report.')}`, flags: 64 }
+                    });
+                }
             }
 
             if (custom_id.startsWith('staff_note_modal|')) {
