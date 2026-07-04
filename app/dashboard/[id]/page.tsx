@@ -14,13 +14,13 @@ type IconProps = {
 };
 
 const ActivityIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M22 12h-4l-3 8L9 4l-3 8H2" />
     </svg>
 );
 
 const ServerIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <rect width="20" height="8" x="2" y="2" rx="2" />
         <rect width="20" height="8" x="2" y="14" rx="2" />
         <path d="M6 6h.01" />
@@ -29,14 +29,14 @@ const ServerIcon = ({ className = "h-4 w-4" }: IconProps) => (
 );
 
 const ShieldIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
         <path d="m9 12 2 2 4-4" />
     </svg>
 );
 
 const KeyIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <path d="m21 2-2 2" />
         <path d="m15 8 2 2" />
         <path d="M7 14a5 5 0 1 1 7-7l7 7-3 3-2-2-2 2-2-2-1.4 1.4A5 5 0 0 1 7 14Z" />
@@ -44,7 +44,7 @@ const KeyIcon = ({ className = "h-4 w-4" }: IconProps) => (
 );
 
 const RadioIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M4.9 19.1a10 10 0 0 1 0-14.2" />
         <path d="M7.8 16.2a6 6 0 0 1 0-8.5" />
         <circle cx="12" cy="12" r="2" />
@@ -54,7 +54,7 @@ const RadioIcon = ({ className = "h-4 w-4" }: IconProps) => (
 );
 
 const LayersIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <path d="m12 2 9 5-9 5-9-5 9-5Z" />
         <path d="m3 12 9 5 9-5" />
         <path d="m3 17 9 5 9-5" />
@@ -62,7 +62,7 @@ const LayersIcon = ({ className = "h-4 w-4" }: IconProps) => (
 );
 
 const AlertIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
         <path d="M12 9v4" />
         <path d="M12 17h.01" />
@@ -70,14 +70,14 @@ const AlertIcon = ({ className = "h-4 w-4" }: IconProps) => (
 );
 
 const ArrowIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
         <path d="M5 12h14" />
         <path d="m13 6 6 6-6 6" />
     </svg>
 );
 
 const CopyIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <rect width="13" height="13" x="9" y="9" rx="2" />
         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
     </svg>

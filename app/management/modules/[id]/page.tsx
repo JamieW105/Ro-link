@@ -94,7 +94,7 @@ function fieldDescription(field: ModuleConfigField) {
 
 function CheckIcon() {
     return (
-        <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20" fill="none">
+        <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
             <path d="M4.5 10.4 8.2 14l7.3-8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     );
@@ -102,7 +102,7 @@ function CheckIcon() {
 
 function XIcon() {
     return (
-        <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20" fill="none">
+        <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
             <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
         </svg>
     );

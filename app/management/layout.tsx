@@ -95,7 +95,7 @@ export default function ManagementLayout({
                         className="ml-auto rounded-lg border border-slate-800 p-2 text-slate-400 hover:text-white md:hidden"
                         aria-label="Close navigation"
                     >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-4 w-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 6l12 12M18 6 6 18" />
                         </svg>
                     </button>
@@ -114,7 +114,7 @@ export default function ManagementLayout({
                                     : 'text-slate-400 hover:text-white hover:bg-slate-800'
                                     }`}
                             >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} />
                                 </svg>
                                 {item.name}
@@ -125,7 +125,7 @@ export default function ManagementLayout({
 
                 <div className="p-4 border-t border-slate-800">
                     <Link href="/dashboard" className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-400 hover:text-white transition-all">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                         </svg>
                         Exit Management
@@ -145,7 +145,7 @@ export default function ManagementLayout({
                         className="rounded-xl border border-slate-800 bg-slate-900/60 p-2 text-slate-300 hover:text-white"
                         aria-label="Open navigation"
                     >
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-5 w-5" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M3 12h18M3 18h18" />
                         </svg>
                     </button>

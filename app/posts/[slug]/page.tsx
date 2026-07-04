@@ -97,7 +97,7 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
             <div className="mx-auto max-w-5xl px-6 py-20 sm:px-8">
                 <header className="max-w-4xl">
                     <Link href="/posts" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.25em] text-sky-400 transition-colors hover:text-sky-300">
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-4 w-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                         </svg>
                         Back to Updates
