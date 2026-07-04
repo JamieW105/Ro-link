@@ -168,15 +168,15 @@ export async function GET(req: Request) {
 
     if (configOnly) {
         if (requestedModuleId || requestedModuleSlug) {
-            const module = filteredModules[0] || null;
-            if (!module) {
+            const selectedModule = filteredModules[0] || null;
+            if (!selectedModule) {
                 return NextResponse.json({ error: 'Module not found.' }, { status: 404 });
             }
 
             return NextResponse.json(
                 {
                     serverId: server.id,
-                    module,
+                    module: selectedModule,
                 },
                 {
                     headers: {

@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ permissions: [] });
     }
 
-    // @ts-ignore
+    // @ts-expect-error Supabase relation typing does not include the joined role shape.
     const permissions = user.role?.permissions || [];
     return NextResponse.json({ permissions });
 }

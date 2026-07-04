@@ -231,7 +231,7 @@ export default function VerificationPage() {
                                     </div>
                                     <div>
                                         <h4 className="text-sm font-bold text-white uppercase tracking-tight">Block Unverified Joins</h4>
-                                        <p className="text-[11px] text-slate-500 font-medium mt-1">Automatically kick players from the Roblox game if they haven't linked their Discord account.</p>
+                                        <p className="text-[11px] text-slate-500 font-medium mt-1">Automatically kick players from the Roblox game if they haven&apos;t linked their Discord account.</p>
                                     </div>
                                 </div>
                                 <button

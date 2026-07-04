@@ -49,7 +49,7 @@ export async function hasPermission(discordId: string, permission: ManagementPer
     const user = await getManagementUser(discordId);
     if (!user) return false;
 
-    // @ts-ignore
+    // @ts-expect-error Supabase relation typing does not include the joined role shape.
     const permissions = user.role?.permissions as string[] || [];
     return permissions.includes(permission) || permissions.includes('MANAGE_RO_LINK');
 }

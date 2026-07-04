@@ -292,11 +292,11 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: error.message }, { status: 500 });
             }
 
-            const module = normalizeServerCustomModule(data as Record<string, unknown>, false);
+            const customModule = normalizeServerCustomModule(data as Record<string, unknown>, false);
 
             return NextResponse.json({
                 success: !hasReviewFailures,
-                module,
+                module: customModule,
                 reviewResults,
                 warning: getCustomModuleFailureMessage(reviewResults) || undefined,
             }, { status: customAction === 'create' ? 201 : 200 });

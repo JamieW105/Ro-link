@@ -24,8 +24,6 @@ export default function ReportsPage() {
     const [reports, setReports] = useState<any[]>([]);
     const [loadingReports, setLoadingReports] = useState(true);
 
-    if (!perms.can_manage_reports) return null;
-
     // Fetch Reports
     useEffect(() => {
         if (!id) return;
@@ -58,6 +56,8 @@ export default function ReportsPage() {
 
         fetchData();
     }, [id]);
+
+    if (!perms.can_manage_reports) return null;
 
     return (
         <div className="space-y-8 max-w-6xl animate-in fade-in slide-in-from-bottom-2 duration-500">
