@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { findBlockedServer, getBlockedServerMessage } from '@/lib/blockedServers';
+import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS, findDgsuBanForTargets, findDgsuBanForUser } from '@/lib/dgsuBans';
 import { resolveDashboardUserPermissions, type DashboardPermissions } from '@/lib/gameAdmin';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -27,7 +28,18 @@ export async function requireDashboardAccess(serverId: string, predicate?: (perm
     }
 
     try {
-        const blocked = await findBlockedServer(getSupabaseAdmin(), serverId);
+        const client = getSupabaseAdmin();
+        const userBan = await findDgsuBanForUser(client, { discordUserId: userId });
+        if (userBan) {
+            return { error: NextResponse.json({ error: DGSU_BAN_ERROR_MESSAGE }, { status: DGSU_BAN_ERROR_STATUS }) };
+        }
+
+        const serverBan = await findDgsuBanForTargets(client, [{ type: 'DISCORD_SERVER', targetId: serverId }]);
+        if (serverBan) {
+            return { error: NextResponse.json({ error: DGSU_BAN_ERROR_MESSAGE }, { status: DGSU_BAN_ERROR_STATUS }) };
+        }
+
+        const blocked = await findBlockedServer(client, serverId);
         if (blocked) {
             return { error: NextResponse.json({ error: getBlockedServerMessage(blocked) }, { status: 403 }) };
         }

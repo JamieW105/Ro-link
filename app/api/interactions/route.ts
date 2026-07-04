@@ -3,6 +3,13 @@ import nacl from 'tweetnacl';
 import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { findBlockedServer, getBlockedServerMessage } from '@/lib/blockedServers';
+import {
+    banUserForDgsuGameAttempt,
+    DGSU_BAN_ERROR_MESSAGE,
+    findDgsuBanForRobloxGame,
+    findDgsuBanForTargets,
+    findDgsuBanForUser,
+} from '@/lib/dgsuBans';
 import { logAction } from '@/lib/logger';
 import { buildDeliveryArgs, resolveDeliveryTargets, type CommandArgs } from '@/lib/commandDelivery';
 import { findLivePlayer, normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
@@ -1901,6 +1908,16 @@ export async function POST(req: Request) {
         const userTag = user ? `${user.username}${user.discriminator !== '0' ? '#' + user.discriminator : ''}` : 'Unknown';
         const logActor = userId ? `<@${userId}>` : userTag;
 
+        if (userId) {
+            const dgsuUserBan = await findDgsuBanForUser(supabase, { discordUserId: userId });
+            if (dgsuUserBan) {
+                return NextResponse.json({
+                    type: 4,
+                    data: { content: DGSU_BAN_ERROR_MESSAGE, flags: 64 }
+                });
+            }
+        }
+
         // Helper to check permissions against RBAC
         async function checkPermission(permissionKey: string) {
             if (!member) return false;
@@ -2027,6 +2044,14 @@ export async function POST(req: Request) {
                 }
 
                 // Check if already setup
+                const serverBan = await findDgsuBanForTargets(supabase, [{ type: 'DISCORD_SERVER', targetId: guild_id }]);
+                if (serverBan) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: DGSU_BAN_ERROR_MESSAGE, flags: 64 }
+                    });
+                }
+
                 const { data: existingServer } = await supabase
                     .from('servers')
                     .select('*')
@@ -3966,6 +3991,33 @@ export async function POST(req: Request) {
                 const placeId = getModalField(modalComponents, 'place_id').trim();
                 const universeId = getModalField(modalComponents, 'universe_id').trim();
                 const openCloudKey = getModalField(modalComponents, 'api_key').trim();
+                const modalServerBan = await findDgsuBanForTargets(supabase, [{ type: 'DISCORD_SERVER', targetId: guild_id }]);
+                if (modalServerBan) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: DGSU_BAN_ERROR_MESSAGE, flags: 64 }
+                    });
+                }
+
+                const modalGameBan = await findDgsuBanForRobloxGame(supabase, {
+                    placeId,
+                    universeId,
+                });
+                if (modalGameBan.ban) {
+                    await banUserForDgsuGameAttempt(supabase, {
+                        discordUserId: userId,
+                        serverId: guild_id,
+                        placeId,
+                        universeId: modalGameBan.universeId || universeId,
+                        sourceBan: modalGameBan.ban,
+                    });
+
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: DGSU_BAN_ERROR_MESSAGE, flags: 64 }
+                    });
+                }
+
                 const blocked = await findBlockedServer(supabase, guild_id);
                 if (blocked) {
                     return NextResponse.json({

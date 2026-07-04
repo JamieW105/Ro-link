@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
-import { aggregateDashboardPermissions, emptyDashboardPermissions, getServerByApiKey } from '@/lib/gameAdmin';
+import { aggregateDashboardPermissions, emptyDashboardPermissions, getServerByApiKey, isDgsuGameAdminAccessError } from '@/lib/gameAdmin';
+import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
 import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 import { supabase } from '@/lib/supabase';
 
@@ -358,6 +359,10 @@ export async function GET(req: Request) {
     try {
         return await handle(req);
     } catch (error) {
+        if (isDgsuGameAdminAccessError(error)) {
+            return NextResponse.json({ error: DGSU_BAN_ERROR_MESSAGE, code: 'dgsu_ban', message: DGSU_BAN_ERROR_MESSAGE }, { status: DGSU_BAN_ERROR_STATUS });
+        }
+
         const message = error instanceof Error ? error.message : 'Failed to load user data.';
         return NextResponse.json({ error: message }, { status: 500 });
     }
@@ -367,6 +372,10 @@ export async function POST(req: Request) {
     try {
         return await handle(req);
     } catch (error) {
+        if (isDgsuGameAdminAccessError(error)) {
+            return NextResponse.json({ error: DGSU_BAN_ERROR_MESSAGE, code: 'dgsu_ban', message: DGSU_BAN_ERROR_MESSAGE }, { status: DGSU_BAN_ERROR_STATUS });
+        }
+
         const message = error instanceof Error ? error.message : 'Failed to load user data.';
         return NextResponse.json({ error: message }, { status: 500 });
     }

@@ -7,11 +7,11 @@ export default function TermsPage() {
         <div className="min-h-screen bg-[#020617] text-slate-300 font-sans selection:bg-sky-500/30">
             <div className="max-w-4xl mx-auto px-6 py-20">
                 <Link href="/" className="text-sky-500 font-bold text-xs uppercase tracking-widest hover:text-sky-400 transition-colors mb-12 inline-block">
-                    ← Back to Home
+                    Back to Home
                 </Link>
 
                 <h1 className="text-5xl font-black text-white mb-4 tracking-tight uppercase italic">Terms of Service</h1>
-                <p className="text-slate-500 text-sm font-bold uppercase tracking-[0.3em] mb-12">Last Updated: March 30, 2026</p>
+                <p className="text-slate-500 text-sm font-bold uppercase tracking-[0.3em] mb-12">Last Updated: July 4, 2026</p>
 
                 <div className="space-y-12 leading-relaxed">
                     <section>
@@ -27,21 +27,28 @@ export default function TermsPage() {
 
                     <section>
                         <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">3. User Responsibility</h2>
-                        <p>You are responsible for maintaining the security of your account credentials (including API keys and Discord login sessions). You agree not to use Ro-Link for any illegal or unauthorized purpose, including violating Roblox or Discord's respective Terms of Service.</p>
+                        <p>You are responsible for maintaining the security of your account credentials, including API keys and Discord login sessions. You agree not to use Ro-Link for any illegal or unauthorized purpose, including violating Roblox or Discord&apos;s respective Terms of Service.</p>
                     </section>
 
                     <section>
                         <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">4. Prohibited Content and Communities</h2>
                         <p>Ro-Link may not be used in connection with communities, servers, or experiences that use, promote, distribute, or are primarily associated with NSFW, sexual, or otherwise inappropriate content. Any server found to be using NSFW content or clearly associated with NSFW content may have Ro-Link removed from that server without notice.</p>
+                        <p className="mt-4">Ro-Link may also restrict, remove, block, or investigate games, Discord servers, Roblox users, or Discord users that qualify as a DGSU under the <Link href="/dgsu" className="text-sky-400 hover:text-sky-300 font-bold">Dangerous Game, Server, or User Policy</Link>. That policy is incorporated into these Terms and is binding on all Ro-Link users and connected communities.</p>
                     </section>
 
                     <section>
-                        <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">5. Limitations of Liability</h2>
-                        <p>Ro-Link is provided "as is" without any warranties. We are not responsible for any damage, loss of data, or service interruptions caused by the use of our services, or actions taken by the Roblox or Discord platforms that may affect our functionality.</p>
+                        <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">5. DGSU Policy</h2>
+                        <p>The DGSU Policy explains what Ro-Link counts as a dangerous game, server, or user, including unsafe Roblox games, unsafe Discord servers, unsafe Roblox users, unsafe Discord users, evasion networks, scam activity, exploit activity, and related conduct. By using Ro-Link, you agree that Ro-Link staff may apply the DGSU Policy when reviewing reports, restricting access, removing the bot, blocking servers, preserving evidence, or taking other moderation action.</p>
+                        <p className="mt-4"><Link href="/dgsu" className="text-sky-400 hover:text-sky-300 font-bold">Read the DGSU Policy</Link></p>
                     </section>
 
                     <section>
-                        <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">6. Termination</h2>
+                        <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">6. Limitations of Liability</h2>
+                        <p>Ro-Link is provided &quot;as is&quot; without any warranties. We are not responsible for any damage, loss of data, or service interruptions caused by the use of our services, or actions taken by the Roblox or Discord platforms that may affect our functionality.</p>
+                    </section>
+
+                    <section>
+                        <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">7. Termination</h2>
                         <p>We reserve the right to terminate or suspend access to our services immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms.</p>
                     </section>
                 </div>

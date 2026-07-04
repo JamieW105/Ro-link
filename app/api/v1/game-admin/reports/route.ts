@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
-import { getServerByApiKey } from '@/lib/gameAdmin';
+import { getServerByApiKey, isDgsuGameAdminAccessError } from '@/lib/gameAdmin';
+import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
 import { resolveReportServerContext } from '@/lib/reportServerContext';
 import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
@@ -28,7 +29,21 @@ async function requireReportApiAccess(req: Request, bodyKey?: unknown) {
         };
     }
 
-    const server = await getServerByApiKey(auth.key);
+    let server;
+    try {
+        server = await getServerByApiKey(auth.key);
+    } catch (error) {
+        if (isDgsuGameAdminAccessError(error)) {
+            return {
+                error: NextResponse.json(
+                    { error: DGSU_BAN_ERROR_MESSAGE, code: 'dgsu_ban', message: DGSU_BAN_ERROR_MESSAGE },
+                    { status: DGSU_BAN_ERROR_STATUS },
+                ),
+            };
+        }
+        throw error;
+    }
+
     if (!server) {
         return { error: NextResponse.json({ error: 'Invalid API Key' }, { status: 403 }) };
     }

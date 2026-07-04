@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 
+import { DGSU_BAN_AUTH_ERROR, DGSU_BAN_ERROR_MESSAGE } from '@/lib/dgsuBanConstants';
+
 function getConfiguredRootDomains() {
     const configured = process.env.NEXT_PUBLIC_ROLINK_ROOT_DOMAINS
         || process.env.NEXT_PUBLIC_ROLINK_ROOT_DOMAIN
@@ -56,6 +58,9 @@ function SignInContent() {
     const searchParams = useSearchParams();
     const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
     const error = searchParams.get('error');
+    const errorMessage = error === DGSU_BAN_AUTH_ERROR
+        ? DGSU_BAN_ERROR_MESSAGE
+        : 'Discord sign in could not be completed. Please try again.';
     const [isSigningIn, setIsSigningIn] = useState(false);
     const [destination, setDestination] = useState('Ro-Link');
 
@@ -110,7 +115,7 @@ function SignInContent() {
 
                 {error ? (
                     <div className="mb-5 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-                        Discord sign in could not be completed. Please try again.
+                        {errorMessage}
                     </div>
                 ) : null}
 

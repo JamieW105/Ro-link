@@ -1,25 +1,48 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import type { Session } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { supabase } from '@/lib/supabase';
+import { DGSU_BAN_ERROR_MESSAGE } from '@/lib/dgsuBanConstants';
+import { banUserForDgsuAssociation, findDgsuBanForUser } from '@/lib/dgsuBans';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+
+type SessionWithAccessToken = Session & {
+    accessToken?: string;
+    user?: Session['user'] & { id?: string };
+};
+
+type DiscordGuildSummary = {
+    id?: string;
+};
+
+type DiscordMemberPayload = {
+    user?: {
+        username?: string;
+    };
+};
+
+function buildBaseUrl() {
+    return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+}
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions) as SessionWithAccessToken | null;
 
     if (!session || !session.user) {
-        return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/verify?error=unauthorized`);
+        return NextResponse.redirect(`${buildBaseUrl()}/verify?error=unauthorized`);
     }
 
     if (!code) {
-        return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/verify?error=no_code`);
+        return NextResponse.redirect(`${buildBaseUrl()}/verify?error=no_code`);
     }
 
     try {
+        const db = getSupabaseAdmin();
         const clientId = process.env.ROBLOX_CLIENT_ID;
         const clientSecret = process.env.ROBLOX_CLIENT_SECRET;
-        const redirectUri = `${process.env.NEXT_PUBLIC_BASE_URL}/api/roblox/callback`;
+        const redirectUri = `${buildBaseUrl()}/api/roblox/callback`;
 
         // 1. Exchange code for token
         const tokenRes = await fetch('https://apis.roblox.com/oauth/v1/token', {
@@ -48,12 +71,39 @@ export async function GET(req: Request) {
         const userData = await userRes.json();
         const robloxId = userData.sub;
         const robloxUsername = userData.preferred_username || userData.nickname || userData.name;
+        const discordId = session.user?.id || '';
+
+        const dgsuBan = await findDgsuBanForUser(db, {
+            discordUserId: discordId,
+            robloxUserId: robloxId,
+        });
+        if (dgsuBan) {
+            await banUserForDgsuAssociation(db, {
+                discordUserId: discordId,
+                robloxUserId: robloxId,
+                sourceBan: dgsuBan,
+                reason: 'Automatically banned after linking a Roblox account associated with an existing DGSU ban.',
+                metadata: {
+                    trigger: 'roblox_account_link',
+                    robloxUsername,
+                },
+            });
+
+            console.warn('[ROBLOX OAUTH] DGSU banned Roblox account linked to Discord account', {
+                discordId,
+                robloxId,
+                banTargetType: dgsuBan.target_type,
+                banTargetId: dgsuBan.target_id,
+            });
+
+            return NextResponse.redirect(`${buildBaseUrl()}/verify?error=dgsu_ban&message=${encodeURIComponent(DGSU_BAN_ERROR_MESSAGE)}`);
+        }
 
         // 3. Store in Database
-        const { error: dbError } = await supabase
+        const { error: dbError } = await db
             .from('verified_users')
             .upsert({
-                discord_id: (session.user as any).id,
+                discord_id: discordId,
                 roblox_id: robloxId,
                 roblox_username: robloxUsername,
                 updated_at: new Date()
@@ -63,8 +113,7 @@ export async function GET(req: Request) {
 
         // 4. Update roles for existing servers
         const discordToken = process.env.DISCORD_TOKEN;
-        const accessToken = (session as any).accessToken;
-        const discordId = (session.user as any).id;
+        const accessToken = session.accessToken;
 
         if (accessToken && discordToken && discordId) {
             try {
@@ -74,12 +123,14 @@ export async function GET(req: Request) {
                 });
 
                 if (guildsRes.ok) {
-                    const userGuilds = await guildsRes.json();
-                    const userGuildIds = userGuilds.map((g: any) => g.id);
+                    const userGuilds = await guildsRes.json() as DiscordGuildSummary[];
+                    const userGuildIds = userGuilds
+                        .map((guild) => guild.id)
+                        .filter((guildId): guildId is string => Boolean(guildId));
 
                     if (userGuildIds.length > 0) {
                         // Find matching servers in our DB that have verified_role or nick_template set
-                        const { data: dbServers } = await supabase
+                        const { data: dbServers } = await db
                             .from('servers')
                             .select('id, verified_role, nick_template')
                             .in('id', userGuildIds);
@@ -89,7 +140,7 @@ export async function GET(req: Request) {
                                 if (!server.verified_role && !server.nick_template) continue;
 
                                 // Fetch the Discord member object first to get their username for the template
-                                let memberData: any = null;
+                                let memberData: DiscordMemberPayload | null = null;
                                 if (server.nick_template) {
                                     const memberRes = await fetch(`https://discord.com/api/v10/guilds/${server.id}/members/${discordId}`, {
                                         headers: { Authorization: `Bot ${discordToken}` }
@@ -132,10 +183,10 @@ export async function GET(req: Request) {
             }
         }
 
-        return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/verify?success=true`);
+        return NextResponse.redirect(`${buildBaseUrl()}/verify?success=true`);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('[ROBLOX CALLBACK] Error:', err);
-        return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/verify?error=callback_failed`);
+        return NextResponse.redirect(`${buildBaseUrl()}/verify?error=callback_failed`);
     }
 }

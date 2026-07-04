@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
+import { DGSU_BAN_AUTH_ERROR, DGSU_BAN_ERROR_MESSAGE } from "@/lib/dgsuBanConstants";
 import { buildRobloxAvatarUrl } from "@/lib/robloxAvatars";
 
 const RobloxIcon = () => (
@@ -25,6 +26,7 @@ export default function VerifyPage() {
     const [linkedAccount, setLinkedAccount] = useState<LinkedAccount | null>(null);
     const [fetchingLinked, setFetchingLinked] = useState(true);
     const [failedAvatarUserId, setFailedAvatarUserId] = useState<string | null>(null);
+    const pageError = session?.error === DGSU_BAN_AUTH_ERROR ? DGSU_BAN_ERROR_MESSAGE : null;
 
     useEffect(() => {
         let cancelled = false;
@@ -119,6 +121,12 @@ export default function VerifyPage() {
 
                     <h1 className="text-3xl font-black text-white mb-2 tracking-tight uppercase italic">Account Verification</h1>
                     <p className="text-slate-400 mb-10 text-xs font-bold uppercase tracking-[0.2em]">Discord Link Portal</p>
+
+                    {pageError ? (
+                        <div className="mb-8 rounded-2xl border border-red-500/25 bg-red-500/10 px-5 py-4 text-sm font-semibold leading-6 text-red-100">
+                            {pageError}
+                        </div>
+                    ) : null}
 
                     {linkedAccount ? (
                         <div className="space-y-8 animate-in fade-in zoom-in duration-500">

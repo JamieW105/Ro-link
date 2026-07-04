@@ -57,6 +57,7 @@ export default function CareersPage() {
                     </Link>
                     <div className="flex items-center gap-6">
                         <Link href="/" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">Home</Link>
+                        <Link href="/report" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">Report</Link>
                         {session ? (
                             <Link href="/dashboard" className="bg-sky-600 px-5 py-2 rounded-lg text-xs font-bold text-white hover:bg-sky-500 transition-all">Dashboard</Link>
                         ) : (

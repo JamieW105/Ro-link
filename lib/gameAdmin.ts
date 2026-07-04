@@ -2,7 +2,8 @@ import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
 import { normalizeAdminPanelCommandList } from './adminPanelCommands';
-import { findServerByKey } from './serverAuth';
+import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from './dgsuBanConstants';
+import { findServerByKeyWithDiagnostics } from './serverAuth';
 import { supabase } from './supabase';
 
 export interface DashboardPermissions {
@@ -85,6 +86,20 @@ const ADMINISTRATOR_PERMISSION = 0x8n;
 const rest = process.env.DISCORD_TOKEN
     ? new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN)
     : null;
+
+export class DgsuGameAdminAccessError extends Error {
+    status: number;
+
+    constructor() {
+        super(DGSU_BAN_ERROR_MESSAGE);
+        this.name = 'DgsuGameAdminAccessError';
+        this.status = DGSU_BAN_ERROR_STATUS;
+    }
+}
+
+export function isDgsuGameAdminAccessError(error: unknown): error is DgsuGameAdminAccessError {
+    return error instanceof DgsuGameAdminAccessError;
+}
 
 export function emptyDashboardPermissions(): DashboardPermissions {
     return {
@@ -219,14 +234,20 @@ export async function resolveDashboardUserPermissions(serverId: string, discordU
 }
 
 export async function getServerByApiKey(apiKey: string) {
-    const server = await findServerByKey<GameAdminServerRecord>(
+    const lookup = await findServerByKeyWithDiagnostics<GameAdminServerRecord>(
         'id, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy, place_id, universe_id',
         apiKey,
     );
+    if (lookup.error === 'dgsu_ban') {
+        throw new DgsuGameAdminAccessError();
+    }
+
+    const server = lookup.server;
     if (!server) {
         console.warn('[RoLinkAPI][GameAdmin] Server key lookup returned no server', {
             keyPrefix: String(apiKey || '').slice(0, 6),
             keyLength: String(apiKey || '').length,
+            lookupError: lookup.error,
         });
     }
     return server;

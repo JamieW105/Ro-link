@@ -2,6 +2,9 @@ import NextAuth from "next-auth"
 import type { AuthOptions, Session } from "next-auth"
 import DiscordProvider from "next-auth/providers/discord"
 import { getSharedDashboardCookieDomain, isAllowedDashboardUrl } from "@/lib/customDashboardDomains"
+import { DGSU_BAN_AUTH_ERROR } from "@/lib/dgsuBanConstants"
+import { findDgsuBanForDiscordLogin, findDgsuBanForUser } from "@/lib/dgsuBans"
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin"
 
 type TokenShape = {
     accessToken?: string
@@ -128,6 +131,39 @@ export const authOptions: AuthOptions = {
         }
         : undefined,
     callbacks: {
+        async signIn({ user, account }) {
+            const discordUserId = String(user?.id || account?.providerAccountId || "").trim()
+            const discordAccessToken = typeof account?.access_token === "string"
+                ? account.access_token
+                : undefined
+
+            if (!discordUserId) {
+                return true
+            }
+
+            try {
+                const ban = await findDgsuBanForDiscordLogin(getSupabaseAdmin(), {
+                    discordUserId,
+                    discordAccessToken,
+                })
+
+                if (ban) {
+                    console.warn("[AUTH] DGSU banned account attempted sign in", {
+                        discordUserId,
+                        banTargetType: ban.target_type,
+                        banTargetId: ban.target_id,
+                    })
+                    return `/auth/signin?error=${encodeURIComponent(DGSU_BAN_AUTH_ERROR)}`
+                }
+            } catch (error) {
+                console.error("[AUTH] DGSU login check failed", {
+                    discordUserId,
+                    error: error instanceof Error ? error.message : error,
+                })
+            }
+
+            return true
+        },
         async jwt({ token, account }: { token: TokenShape; account?: DiscordAccount }) {
             if (account) {
                 token.accessToken = account.access_token
@@ -156,6 +192,30 @@ export const authOptions: AuthOptions = {
             if (session.user) {
                 session.user.id = token.sub
             }
+
+            if (token.sub) {
+                try {
+                    const ban = await findDgsuBanForUser(getSupabaseAdmin(), {
+                        discordUserId: token.sub,
+                    })
+
+                    if (ban) {
+                        console.warn("[AUTH] Existing session belongs to DGSU banned account", {
+                            discordUserId: token.sub,
+                            banTargetType: ban.target_type,
+                            banTargetId: ban.target_id,
+                        })
+                        session.accessToken = undefined
+                        session.error = DGSU_BAN_AUTH_ERROR
+                    }
+                } catch (error) {
+                    console.error("[AUTH] DGSU session check failed", {
+                        discordUserId: token.sub,
+                        error: error instanceof Error ? error.message : error,
+                    })
+                }
+            }
+
             return session
         },
         async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {

@@ -2014,6 +2014,9 @@ export default function DocsClientPage() {
                     </Link>
 
                     <div className="hidden items-center gap-4 lg:flex">
+                        <Link href="/report" className="rounded-full border border-white/10 bg-white/[0.02] px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:text-white">
+                            Report
+                        </Link>
                         <button
                             type="button"
                             onClick={() => setSearchOpen(true)}

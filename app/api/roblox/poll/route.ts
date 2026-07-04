@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { findServerByKeyWithDiagnostics } from '@/lib/serverAuth';
+import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
 import { normalizeModulePanelCommandDefinition } from '@/lib/modulePanelCommands';
 import type { AdminPanelCommandDefinition } from '@/lib/adminPanelCommands';
 import { buildPlayerPresenceEvents, PLAYER_PRESENCE_RETENTION_MS } from '@/lib/playerPresence';
@@ -322,6 +323,19 @@ export async function POST(req: Request) {
                 auth: authDebug,
                 lookupError: lookup.error,
             });
+            if (lookup.error === 'dgsu_ban') {
+                return NextResponse.json({
+                    error: DGSU_BAN_ERROR_MESSAGE,
+                    code: 'dgsu_ban',
+                    message: DGSU_BAN_ERROR_MESSAGE,
+                    auth: authDebug,
+                    lookup: {
+                        matchedBy: lookup.matchedBy,
+                        error: lookup.error,
+                    },
+                }, { status: DGSU_BAN_ERROR_STATUS });
+            }
+
             return NextResponse.json({
                 error: 'Invalid API Key',
                 code: 'invalid_api_key',

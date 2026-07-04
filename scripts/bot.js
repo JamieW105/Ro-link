@@ -66,6 +66,11 @@ const MISC_SUBCOMMAND_TO_COMMAND = {
 };
 const VALUE_INPUT_MISC_COMMANDS = new Set(['DAMAGE', 'MAX_HEALTH', 'WALK_SPEED', 'JUMP_POWER']);
 const MODERATION_LOG_ACTIONS = new Set(['BAN', 'KICK', 'UNBAN', 'SOFTBAN', 'DISCORD_BAN', 'DISCORD_KICK', 'TIMEOUT', 'MUTE']);
+const DGSU_BAN_ERROR_MESSAGE = 'Error (554) User or user assocated with a DGSU Ban has attempted to use the platform. Please contact support.';
+
+function trimString(value, maxLength = 5000) {
+    return String(value ?? '').trim().slice(0, maxLength);
+}
 
 async function getLinkedRobloxUsername(discordId) {
     if (!supabase || !discordId) return '';
@@ -100,6 +105,158 @@ function getBlockedServerMessage(blocked) {
     return reason
         ? `This server is blocked from using Ro-Link. Reason: ${reason}`
         : 'This server is blocked from using Ro-Link.';
+}
+
+async function findDgsuBanForTargets(rawTargets) {
+    if (!supabase) return null;
+
+    const targets = rawTargets
+        .map((target) => ({
+            type: target.type,
+            targetId: trimString(target.targetId, 120),
+        }))
+        .filter((target) => target.type && target.targetId);
+
+    if (targets.length === 0) return null;
+
+    const targetKeys = new Set(targets.map((target) => `${target.type}:${target.targetId}`));
+    const targetTypes = [...new Set(targets.map((target) => target.type))];
+    const targetIds = [...new Set(targets.map((target) => target.targetId))];
+
+    const { data, error } = await supabase
+        .from('dgsu_bans')
+        .select('id, target_type, target_id, reason, source_public_report_id, banned_by, metadata, created_at, updated_at')
+        .in('target_type', targetTypes)
+        .in('target_id', targetIds)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        if (error.code === '42P01' || error.code === 'PGRST205' || error.code === 'PGRST204') {
+            console.warn('[DGSU] dgsu_bans table is missing; DGSU ban enforcement is inactive until the schema is migrated.');
+            return null;
+        }
+        throw error;
+    }
+
+    return (data || []).find((row) => targetKeys.has(`${row.target_type}:${row.target_id}`)) || null;
+}
+
+async function findLinkedRobloxId(discordUserId) {
+    const normalizedDiscordUserId = trimString(discordUserId, 80);
+    if (!supabase || !normalizedDiscordUserId) return '';
+
+    const { data, error } = await supabase
+        .from('verified_users')
+        .select('roblox_id')
+        .eq('discord_id', normalizedDiscordUserId)
+        .maybeSingle();
+
+    if (error) throw error;
+    return trimString(data?.roblox_id, 80);
+}
+
+async function findDgsuBanForUser(discordUserId) {
+    const normalizedDiscordUserId = trimString(discordUserId, 80);
+    const targets = [];
+    if (normalizedDiscordUserId) {
+        targets.push({ type: 'DISCORD_USER', targetId: normalizedDiscordUserId });
+    }
+
+    const robloxId = await findLinkedRobloxId(normalizedDiscordUserId);
+    if (robloxId) {
+        targets.push({ type: 'ROBLOX_USER', targetId: robloxId });
+    }
+
+    return findDgsuBanForTargets(targets);
+}
+
+async function resolveUniverseIdForPlace(placeId) {
+    const normalizedPlaceId = trimString(placeId, 80);
+    if (!normalizedPlaceId) return '';
+
+    try {
+        const response = await fetch(`https://apis.roblox.com/universes/v1/places/${encodeURIComponent(normalizedPlaceId)}/universe`);
+        if (!response.ok) return '';
+        const payload = await response.json().catch(() => null);
+        return trimString(payload?.universeId, 80);
+    } catch (error) {
+        console.warn('[DGSU] Failed to resolve Roblox universe for place.', {
+            placeId: normalizedPlaceId,
+            error: error instanceof Error ? error.message : error,
+        });
+        return '';
+    }
+}
+
+async function findDgsuBanForRobloxGame(placeId, universeId) {
+    const normalizedPlaceId = trimString(placeId, 80);
+    let normalizedUniverseId = trimString(universeId, 80);
+    const targets = [];
+
+    if (normalizedPlaceId) targets.push({ type: 'ROBLOX_GAME', targetId: normalizedPlaceId });
+    if (normalizedUniverseId) targets.push({ type: 'ROBLOX_GAME', targetId: normalizedUniverseId });
+
+    let ban = await findDgsuBanForTargets(targets);
+    if (!ban && normalizedPlaceId) {
+        const resolvedUniverseId = await resolveUniverseIdForPlace(normalizedPlaceId);
+        if (resolvedUniverseId) {
+            normalizedUniverseId = resolvedUniverseId;
+            ban = await findDgsuBanForTargets([{ type: 'ROBLOX_GAME', targetId: resolvedUniverseId }]);
+        }
+    }
+
+    return { ban, universeId: normalizedUniverseId };
+}
+
+async function banUserForDgsuGameAttempt(input) {
+    if (!supabase) return;
+
+    const discordUserId = trimString(input.discordUserId, 80);
+    const linkedRobloxId = await findLinkedRobloxId(discordUserId);
+    const sourceBan = input.sourceBan || null;
+    const metadata = {
+        trigger: 'banned_game_connection_attempt',
+        serverId: trimString(input.serverId, 80) || null,
+        placeId: trimString(input.placeId, 80) || null,
+        universeId: trimString(input.universeId, 80) || null,
+        sourceDgsuBanId: sourceBan?.id || null,
+        sourceTargetType: sourceBan?.target_type || null,
+        sourceTargetId: sourceBan?.target_id || null,
+    };
+    const rows = [];
+    const now = new Date().toISOString();
+
+    if (discordUserId) {
+        rows.push({
+            target_type: 'DISCORD_USER',
+            target_id: discordUserId,
+            reason: 'Automatically banned after attempting to connect a Roblox game with an existing DGSU ban.',
+            source_public_report_id: sourceBan?.source_public_report_id || null,
+            banned_by: 'system:dgsu-association',
+            metadata,
+            updated_at: now,
+        });
+    }
+
+    if (linkedRobloxId) {
+        rows.push({
+            target_type: 'ROBLOX_USER',
+            target_id: linkedRobloxId,
+            reason: 'Automatically banned after attempting to connect a Roblox game with an existing DGSU ban.',
+            source_public_report_id: sourceBan?.source_public_report_id || null,
+            banned_by: 'system:dgsu-association',
+            metadata,
+            updated_at: now,
+        });
+    }
+
+    if (rows.length === 0) return;
+
+    const { error } = await supabase
+        .from('dgsu_bans')
+        .upsert(rows, { onConflict: 'target_type,target_id' });
+
+    if (error) throw error;
 }
 
 function buildModerationPanel() {
@@ -2722,6 +2879,11 @@ client.on('interactionCreate', async interaction => {
 
         await interaction.deferReply({ ephemeral: true });
 
+        const userBan = await findDgsuBanForUser(interaction.user?.id);
+        if (userBan) {
+            return interaction.editReply(DGSU_BAN_ERROR_MESSAGE);
+        }
+
         let blockedServer = null;
         try {
             blockedServer = await findBlockedServerForGuild(interaction.guildId);
@@ -2732,6 +2894,24 @@ client.on('interactionCreate', async interaction => {
 
         if (blockedServer) {
             return interaction.editReply(getBlockedServerMessage(blockedServer));
+        }
+
+        const serverBan = await findDgsuBanForTargets([{ type: 'DISCORD_SERVER', targetId: interaction.guildId }]);
+        if (serverBan) {
+            return interaction.editReply(DGSU_BAN_ERROR_MESSAGE);
+        }
+
+        const gameBan = await findDgsuBanForRobloxGame(placeId, universeId);
+        if (gameBan.ban) {
+            await banUserForDgsuGameAttempt({
+                discordUserId: interaction.user?.id,
+                serverId: interaction.guildId,
+                placeId,
+                universeId: gameBan.universeId || universeId,
+                sourceBan: gameBan.ban,
+            });
+
+            return interaction.editReply(DGSU_BAN_ERROR_MESSAGE);
         }
 
         const { data: existingServer } = await supabase
