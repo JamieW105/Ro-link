@@ -137,6 +137,8 @@ function isSiteTestingHost(req: NextRequest) {
 function isSiteTestingPublicPath(pathname: string) {
     return pathname === '/auth/signin'
         || pathname.startsWith('/api/auth')
+        || pathname === '/plugin/connect'
+        || pathname === '/api/plugin/session/authorize'
         || pathname.startsWith('/_next')
         || pathname.startsWith('/Media')
         || pathname === '/favicon.ico'
