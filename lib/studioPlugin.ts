@@ -20,6 +20,7 @@ import {
     findDgsuBanForUser,
 } from './dgsuBans';
 import { findBlockedServer, getBlockedServerMessage } from './blockedServers';
+import { getDiscordOAuthConfig } from './discordOAuthConfig';
 import { supabase } from './supabase';
 
 const PLUGIN_SESSION_TTL_MS = 60 * 60 * 1000;
@@ -262,14 +263,16 @@ async function refreshDiscordTokenState(tokenState: DiscordTokenState) {
         throw new StudioPluginError('Discord sign-in expired. Sign in with Discord again to reconnect Studio.', 401);
     }
 
+    const discordOAuthConfig = getDiscordOAuthConfig();
+
     const response = await fetch('https://discord.com/api/oauth2/token', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-            client_id: process.env.DISCORD_CLIENT_ID || '',
-            client_secret: process.env.DISCORD_CLIENT_SECRET || '',
+            client_id: discordOAuthConfig.clientId,
+            client_secret: discordOAuthConfig.clientSecret,
             grant_type: 'refresh_token',
             refresh_token: tokenState.refreshToken,
         }),

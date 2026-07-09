@@ -4,6 +4,7 @@ import DiscordProvider from "next-auth/providers/discord"
 import { getSharedDashboardCookieDomain, isAllowedDashboardUrl } from "@/lib/customDashboardDomains"
 import { DGSU_BAN_AUTH_ERROR } from "@/lib/dgsuBanConstants"
 import { findDgsuBanForDiscordLogin, findDgsuBanForUser } from "@/lib/dgsuBans"
+import { getDiscordOAuthConfig } from "@/lib/discordOAuthConfig"
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin"
 
 type TokenShape = {
@@ -26,6 +27,7 @@ type DiscordAccount = {
 const cookieDomain = getSharedDashboardCookieDomain()
 const secureCookies = process.env.NODE_ENV === "production"
     || Boolean(process.env.NEXTAUTH_URL?.startsWith("https://"))
+const discordOAuthConfig = getDiscordOAuthConfig()
 
 async function refreshDiscordAccessToken(token: TokenShape) {
     if (!token.refreshToken) {
@@ -46,8 +48,8 @@ async function refreshDiscordAccessToken(token: TokenShape) {
                 "Content-Type": "application/x-www-form-urlencoded",
             },
             body: new URLSearchParams({
-                client_id: process.env.DISCORD_CLIENT_ID!,
-                client_secret: process.env.DISCORD_CLIENT_SECRET!,
+                client_id: discordOAuthConfig.clientId,
+                client_secret: discordOAuthConfig.clientSecret,
                 grant_type: "refresh_token",
                 refresh_token: token.refreshToken,
             }),
@@ -108,8 +110,8 @@ async function refreshDiscordAccessToken(token: TokenShape) {
 export const authOptions: AuthOptions = {
     providers: [
         DiscordProvider({
-            clientId: process.env.DISCORD_CLIENT_ID!,
-            clientSecret: process.env.DISCORD_CLIENT_SECRET!,
+            clientId: discordOAuthConfig.clientId,
+            clientSecret: discordOAuthConfig.clientSecret,
             authorization: { params: { scope: 'identify guilds' } },
         }),
     ],
