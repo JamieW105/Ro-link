@@ -126,8 +126,8 @@ export default function Home() {
 
     fetchStats();
 
-    // 2. Poll every 60s for updates
-    const interval = setInterval(fetchStats, 60000);
+    // Poll in place so landing stats stay fresh without a page reload.
+    const interval = setInterval(fetchStats, 10000);
 
     return () => {
       clearInterval(interval);
