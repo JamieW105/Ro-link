@@ -7,6 +7,7 @@ import { DEFAULT_ROLINK_VERSION } from "@/lib/updatePosts";
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
 
 const SUPPORT_DISCORD_URL = "https://discord.gg/C3n4nAwYMw";
+const STATUS_PAGE_URL = "https://status.rolink.cloud";
 
 // SVGs
 const RocketIcon = () => (
@@ -44,6 +45,8 @@ const DiscordIcon = () => (
 export default function Home() {
   const [serverCount, setServerCount] = useState<number | null>(null);
   const [commandCount, setCommandCount] = useState<number | null>(null);
+  const [responseTimeMs, setResponseTimeMs] = useState<number | null>(null);
+  const [serviceStatus, setServiceStatus] = useState<'checking' | 'operational' | 'degraded'>('checking');
   const [latestVersion, setLatestVersion] = useState(DEFAULT_ROLINK_VERSION);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -86,12 +89,16 @@ export default function Home() {
     async function fetchStats() {
       // Real-time Bot Server Count (From Discord API)
       try {
+        const requestStartedAt = performance.now();
         const res = await fetch('/api/stats');
+        setResponseTimeMs(Math.max(1, Math.round(performance.now() - requestStartedAt)));
+        setServiceStatus(res.ok ? 'operational' : 'degraded');
         const data = await res.json();
         if (data.guild_count !== undefined) setServerCount(data.guild_count);
         if (data.command_count !== undefined) setCommandCount(data.command_count);
       } catch (err) {
         console.error("Failed to fetch server count", err);
+        setServiceStatus('degraded');
       }
 
       try {
@@ -261,8 +268,8 @@ export default function Home() {
           <div className="motion-list mt-16 md:mt-24 pt-12 border-t border-slate-800/50 w-full grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-4">
             <StatItem label="Servers" value={serverCount !== null ? serverCount.toLocaleString() : "0"} />
             <StatItem label="Commands" value={commandCount !== null ? commandCount.toLocaleString() : "0"} />
-            <StatItem label="Response" value="< 45ms" />
-            <StatItem label="Uptime" value="100%" />
+            <StatItem label="Response" value={responseTimeMs !== null ? `${responseTimeMs}ms` : "..."} />
+            <StatItem label="API Status" value={serviceStatus === 'operational' ? "Live" : serviceStatus === 'degraded' ? "Issue" : "..."} />
           </div>
 
           {/* Features Grid */}
@@ -382,14 +389,14 @@ export default function Home() {
         </main>
 
         <footer className="mt-24 md:mt-40 py-12 border-t border-slate-800/50 flex flex-col md:flex-row items-center justify-between text-slate-500">
-          <p className="text-sm font-medium">© {new Date().getFullYear()} Ro-Link Systems Group</p>
+          <p className="text-sm font-medium">© {new Date().getFullYear()} Core Engine Solutions Management Group</p>
           <div className="flex gap-8 mt-6 md:mt-0">
             <Link href="/posts" className="text-xs hover:text-white transition-colors">Updates</Link>
             <Link href="/report" className="text-xs hover:text-white transition-colors">Report</Link>
             <Link href="/terms" className="text-xs hover:text-white transition-colors">Legal</Link>
             <Link href="/dgsu" className="text-xs hover:text-white transition-colors">DGSU</Link>
             <Link href="/privacy" className="text-xs hover:text-white transition-colors">Privacy</Link>
-            <a href="#" className="text-xs hover:text-white transition-colors">Status</a>
+            <a href={STATUS_PAGE_URL} target="_blank" rel="noopener noreferrer" className="text-xs hover:text-white transition-colors">Status</a>
           </div>
         </footer>
       </div>
