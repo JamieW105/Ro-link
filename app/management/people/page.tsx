@@ -21,6 +21,7 @@ const ALL_PERMISSIONS = [
     { id: 'POST_UPDATES', name: 'Post Updates' },
     { id: 'BLOCK_SERVERS', name: 'Block Servers' },
     { id: 'MANAGE_MODULES', name: 'Manage Modules' },
+    { id: 'SITE_TESTING_ACCESS', name: 'Site Testing Access' },
     { id: 'MANAGE_RO_LINK', name: 'Manage Ro-Link (Full Admin)' },
 ];
 

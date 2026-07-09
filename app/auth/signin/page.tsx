@@ -9,7 +9,7 @@ import { DGSU_BAN_AUTH_ERROR, DGSU_BAN_ERROR_MESSAGE } from '@/lib/dgsuBanConsta
 function getConfiguredRootDomains() {
     const configured = process.env.NEXT_PUBLIC_ROLINK_ROOT_DOMAINS
         || process.env.NEXT_PUBLIC_ROLINK_ROOT_DOMAIN
-        || 'rolink.cloud';
+        || 'rolink.cloud,rolink.site';
 
     return configured
         .split(',')

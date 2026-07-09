@@ -21,7 +21,7 @@ export default function ManagementLayout({
             const userId = (session.user as any).id;
             // Cherubdude check
             if (userId === '953414442060746854') {
-                setPerms(['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'POST_UPDATES', 'BLOCK_SERVERS', 'MANAGE_MODULES', 'MANAGE_RO_LINK']);
+                setPerms(['RO_LINK_DASHBOARD', 'MANAGE_SERVERS', 'POST_JOB_APPLICATION', 'POST_UPDATES', 'BLOCK_SERVERS', 'MANAGE_MODULES', 'SITE_TESTING_ACCESS', 'MANAGE_RO_LINK']);
                 setLoading(false);
                 return;
             }

@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 import { resolveDashboardSubdomainFromHostnameCandidates } from '@/lib/customDashboardDomains';
 import { consumeRateLimit, rateLimitHeaders, type RateLimitRule, type RateLimitResult } from '@/lib/rateLimit';
+
+const SITE_TESTING_DOMAIN = 'rolink.site';
+const SITE_TESTING_PERMISSION = 'SITE_TESTING_ACCESS';
+const FULL_MANAGEMENT_PERMISSION = 'MANAGE_RO_LINK';
 
 const IGNORED_SUBDOMAINS = new Set([
     'admin',
@@ -50,6 +55,93 @@ async function resolveDashboardServerId(subdomain: string) {
 
 function firstHeaderValue(value: string | null) {
     return (value || '').split(',')[0]?.trim() || '';
+}
+
+function normalizeHostname(value: string | null | undefined) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    try {
+        const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+        return url.hostname.toLowerCase().replace(/\.$/, '');
+    } catch {
+        return raw.split(':')[0]?.toLowerCase().replace(/\.$/, '') || '';
+    }
+}
+
+function getForwardedHostnames(value: string | null) {
+    const header = String(value || '').trim();
+    if (!header) return [];
+
+    return header
+        .split(',')
+        .map((entry) => entry
+            .split(';')
+            .map((part) => part.trim())
+            .find((part) => part.toLowerCase().startsWith('host=')) || entry)
+        .map((part) => part.includes('=') ? part.slice(part.indexOf('=') + 1) : part)
+        .map((host) => normalizeHostname(host.replace(/^"|"$/g, '')))
+        .filter(Boolean);
+}
+
+function getForwardedHost(value: string | null) {
+    const header = firstHeaderValue(value);
+    if (!header) return '';
+
+    const hostPart = header
+        .split(';')
+        .map((part) => part.trim())
+        .find((part) => part.toLowerCase().startsWith('host='));
+
+    return (hostPart ? hostPart.slice(hostPart.indexOf('=') + 1) : header).replace(/^"|"$/g, '');
+}
+
+function getRequestHost(req: NextRequest) {
+    return firstHeaderValue(req.headers.get('host'))
+        || firstHeaderValue(req.headers.get('x-original-host'))
+        || firstHeaderValue(req.headers.get('x-forwarded-host'))
+        || getForwardedHost(req.headers.get('forwarded'))
+        || req.nextUrl.host;
+}
+
+function getExternalRequestUrl(req: NextRequest) {
+    const url = req.nextUrl.clone();
+    const host = getRequestHost(req);
+    const protocol = getForwardedProtocol(req);
+
+    if (host) {
+        url.host = host;
+    }
+
+    if (protocol) {
+        url.protocol = `${protocol}:`;
+    }
+
+    return url.href;
+}
+
+function isSiteTestingHost(req: NextRequest) {
+    const hostnames = [
+        normalizeHostname(req.headers.get('host')),
+        normalizeHostname(req.headers.get('x-original-host')),
+        ...getForwardedHostnames(req.headers.get('x-forwarded-host')),
+        ...getForwardedHostnames(req.headers.get('forwarded')),
+        normalizeHostname(req.nextUrl.hostname),
+    ].filter(Boolean);
+
+    return hostnames.some((hostname) => (
+        hostname === SITE_TESTING_DOMAIN || hostname.endsWith(`.${SITE_TESTING_DOMAIN}`)
+    ));
+}
+
+function isSiteTestingPublicPath(pathname: string) {
+    return pathname === '/auth/signin'
+        || pathname.startsWith('/api/auth')
+        || pathname.startsWith('/_next')
+        || pathname.startsWith('/Media')
+        || pathname === '/favicon.ico'
+        || pathname === '/icon.png'
+        || pathname === '/site-testing-access';
 }
 
 function getForwardedProtocol(req: NextRequest) {
@@ -162,11 +254,89 @@ function isDashboardIndexPath(pathname: string) {
         || pathname === '/dashboards/';
 }
 
+async function hasSiteTestingAccess(discordUserId: string) {
+    if (discordUserId === '953414442060746854') {
+        return true;
+    }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+        console.error('[SiteTestingGate] Missing Supabase configuration.');
+        return false;
+    }
+
+    const url = new URL('/rest/v1/management_users', supabaseUrl);
+    url.searchParams.set('select', 'role:management_roles(permissions)');
+    url.searchParams.set('discord_id', `eq.${discordUserId}`);
+    url.searchParams.set('limit', '1');
+
+    const response = await fetch(url, {
+        headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+        },
+        next: { revalidate: 30 },
+    });
+
+    if (!response.ok) {
+        console.error('[SiteTestingGate] Failed to resolve management permissions.', {
+            discordUserId,
+            status: response.status,
+        });
+        return false;
+    }
+
+    const rows = await response.json() as Array<{ role?: { permissions?: string[] | null } | null }>;
+    const permissions = rows[0]?.role?.permissions || [];
+    return permissions.includes(SITE_TESTING_PERMISSION) || permissions.includes(FULL_MANAGEMENT_PERMISSION);
+}
+
+async function enforceSiteTestingAccess(req: NextRequest) {
+    if (!isSiteTestingHost(req)) {
+        return null;
+    }
+
+    const { pathname } = req.nextUrl;
+    if (isSiteTestingPublicPath(pathname)) {
+        return null;
+    }
+
+    const token = await getToken({
+        req,
+        secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+    });
+
+    const discordUserId = String(token?.sub || '').trim();
+    if (!discordUserId) {
+        const url = req.nextUrl.clone();
+        url.pathname = '/auth/signin';
+        url.search = '';
+        url.searchParams.set('callbackUrl', getExternalRequestUrl(req));
+        return applySecurityHeaders(NextResponse.redirect(url), req);
+    }
+
+    if (await hasSiteTestingAccess(discordUserId)) {
+        return null;
+    }
+
+    const url = req.nextUrl.clone();
+    url.pathname = '/site-testing-access';
+    url.search = '';
+    return applySecurityHeaders(NextResponse.redirect(url), req);
+}
+
 export async function proxy(req: NextRequest) {
     if (shouldEnforceHttps(req)) {
         const url = req.nextUrl.clone();
         url.protocol = 'https:';
         return applySecurityHeaders(NextResponse.redirect(url, 308), req);
+    }
+
+    const siteTestingResponse = await enforceSiteTestingAccess(req);
+    if (siteTestingResponse) {
+        return siteTestingResponse;
     }
 
     const apiRateLimit = getApiRateLimitRule(req.nextUrl.pathname, req.method);

@@ -1,4 +1,5 @@
 const DEFAULT_ROLINK_ROOT_DOMAIN = 'rolink.cloud';
+const ADDITIONAL_ROLINK_ROOT_DOMAINS = ['rolink.site'];
 
 function readHostname(value: string | undefined) {
     if (!value) return null;
@@ -43,6 +44,7 @@ export function getRolinkRootDomains() {
     return Array.from(new Set([
         ...explicitDomains,
         DEFAULT_ROLINK_ROOT_DOMAIN,
+        ...ADDITIONAL_ROLINK_ROOT_DOMAINS,
         ...automaticDomains,
     ]));
 }
