@@ -183,6 +183,14 @@ export async function POST(req: Request) {
         });
 
         const verifiedUser = context.reporterLookup.verifiedUser;
+        if (!trimString(verifiedUser?.roblox_id, 80)) {
+            return responseWithRateLimit(
+                { error: 'Link your Roblox account before submitting a report.' },
+                { status: 403 },
+                rateLimit,
+            );
+        }
+
         const discordUser = context.reporterLookup.discordUser;
         const reporterTag = discordUser?.username
             ? discordUser.discriminator && discordUser.discriminator !== '0'

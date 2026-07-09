@@ -25,17 +25,49 @@ function buildBaseUrl() {
     return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 }
 
+function normalizeReturnTo(value: unknown) {
+    const returnTo = typeof value === 'string' ? value : '';
+    if (!returnTo || !returnTo.startsWith('/') || returnTo.startsWith('//')) {
+        return '/verify';
+    }
+
+    return returnTo.slice(0, 200);
+}
+
+function getReturnTo(searchParams: URLSearchParams) {
+    const rawState = searchParams.get('state');
+    if (!rawState) return '/verify';
+
+    try {
+        const decodedState = rawState.startsWith('%') ? decodeURIComponent(rawState) : rawState;
+        const state = JSON.parse(decodedState) as { returnTo?: unknown };
+        return normalizeReturnTo(state.returnTo);
+    } catch {
+        return '/verify';
+    }
+}
+
+function buildRedirectUrl(path: string, params?: Record<string, string>) {
+    const url = new URL(normalizeReturnTo(path), buildBaseUrl());
+    for (const [key, value] of Object.entries(params || {})) {
+        url.searchParams.set(key, value);
+    }
+
+    return url.toString();
+}
+
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
+    const returnTo = getReturnTo(searchParams);
     const session = await getServerSession(authOptions) as SessionWithAccessToken | null;
 
     if (!session || !session.user) {
-        return NextResponse.redirect(`${buildBaseUrl()}/verify?error=unauthorized`);
+        return NextResponse.redirect(buildRedirectUrl(returnTo, { error: 'unauthorized' }));
     }
 
     if (!code) {
-        return NextResponse.redirect(`${buildBaseUrl()}/verify?error=no_code`);
+        return NextResponse.redirect(buildRedirectUrl(returnTo, { error: 'no_code' }));
     }
 
     try {
@@ -96,7 +128,10 @@ export async function GET(req: Request) {
                 banTargetId: dgsuBan.target_id,
             });
 
-            return NextResponse.redirect(`${buildBaseUrl()}/verify?error=dgsu_ban&message=${encodeURIComponent(DGSU_BAN_ERROR_MESSAGE)}`);
+            return NextResponse.redirect(buildRedirectUrl(returnTo, {
+                error: 'dgsu_ban',
+                message: DGSU_BAN_ERROR_MESSAGE,
+            }));
         }
 
         // 3. Store in Database
@@ -183,10 +218,10 @@ export async function GET(req: Request) {
             }
         }
 
-        return NextResponse.redirect(`${buildBaseUrl()}/verify?success=true`);
+        return NextResponse.redirect(buildRedirectUrl(returnTo, { success: 'true' }));
 
     } catch (err: unknown) {
         console.error('[ROBLOX CALLBACK] Error:', err);
-        return NextResponse.redirect(`${buildBaseUrl()}/verify?error=callback_failed`);
+        return NextResponse.redirect(buildRedirectUrl(returnTo, { error: 'callback_failed' }));
     }
 }

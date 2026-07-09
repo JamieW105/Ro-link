@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { DEFAULT_ROLINK_VERSION } from "@/lib/updatePosts";
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
 
+const SUPPORT_DISCORD_URL = "https://discord.gg/C3n4nAwYMw";
+
 // SVGs
 const RocketIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" /><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" /><path d="M9 12H4s.5-1 1-4c2 0 3 .5 3 .5L12 11Z" /><path d="M15 9h5s1 .5 4 1c0 2-.5 3-.5 3L11 12Z" /></svg>
@@ -155,6 +157,15 @@ export default function Home() {
             <Link href="/report" className="text-sm font-semibold text-slate-400 hover:text-white transition-colors">
               Report
             </Link>
+            <a
+              href={SUPPORT_DISCORD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-slate-400 hover:text-white transition-colors"
+            >
+              <DiscordIcon />
+              Support Server
+            </a>
             <button
               onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}
               className="px-5 py-2 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-lg transition-all shadow-md shadow-sky-900/20"
@@ -191,6 +202,15 @@ export default function Home() {
             <Link href="/report" className="text-base font-semibold text-slate-300 hover:text-white transition-colors">
               Report
             </Link>
+            <a
+              href={SUPPORT_DISCORD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-base font-semibold text-slate-300 hover:text-white transition-colors"
+            >
+              <DiscordIcon />
+              Support Server
+            </a>
             <button
               onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}
               className="w-full px-5 py-3 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-xl transition-all shadow-md shadow-sky-900/10 text-center"
@@ -225,6 +245,15 @@ export default function Home() {
             >
               <DiscordIcon />
               Add to Discord
+            </a>
+            <a
+              href={SUPPORT_DISCORD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 px-8 py-3.5 border border-slate-700 bg-slate-900/60 text-white rounded-lg font-bold text-sm hover:border-slate-500 hover:bg-slate-800 transition-all w-full sm:w-auto"
+            >
+              <DiscordIcon />
+              Join Discord
             </a>
           </div>
 

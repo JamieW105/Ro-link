@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 type TargetKind = 'user' | 'server' | 'game';
 type UserPlatform = 'roblox' | 'discord';
@@ -13,6 +13,11 @@ type SubmitResult = {
     threadId?: string;
     threadUrl?: string;
     error?: string;
+};
+
+type LinkedAccount = {
+    roblox_id: string | number;
+    roblox_username: string | null;
 };
 
 const targetOptions: Array<{ value: TargetKind; label: string; description: string }> = [
@@ -58,8 +63,17 @@ function DiscordIcon() {
     );
 }
 
+function RobloxIcon() {
+    return (
+        <Image src="/Media/Roblox.png" alt="" width={18} height={18} className="h-4 w-4 object-contain" />
+    );
+}
+
 export default function ReportPage() {
     const { data: session, status } = useSession();
+    const [linkedAccount, setLinkedAccount] = useState<LinkedAccount | null>(null);
+    const [linkedAccountLoading, setLinkedAccountLoading] = useState(true);
+    const [linkingRoblox, setLinkingRoblox] = useState(false);
     const [targetKind, setTargetKind] = useState<TargetKind>('user');
     const [userPlatform, setUserPlatform] = useState<UserPlatform>('roblox');
     const [targetId, setTargetId] = useState('');
@@ -67,6 +81,40 @@ export default function ReportPage() {
     const [evidenceLinks, setEvidenceLinks] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [result, setResult] = useState<SubmitResult | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadLinkedAccount() {
+            setLinkedAccountLoading(true);
+            setLinkedAccount(null);
+
+            try {
+                const response = await fetch('/api/verify/linked-account', { cache: 'no-store' });
+                if (cancelled) return;
+
+                if (response.ok) {
+                    const data = await response.json() as LinkedAccount | null;
+                    setLinkedAccount(data?.roblox_id ? data : null);
+                }
+            } finally {
+                if (!cancelled) {
+                    setLinkedAccountLoading(false);
+                }
+            }
+        }
+
+        if (session?.user) {
+            loadLinkedAccount();
+        } else if (status !== 'loading') {
+            setLinkedAccount(null);
+            setLinkedAccountLoading(false);
+        }
+
+        return () => {
+            cancelled = true;
+        };
+    }, [session?.user, status]);
 
     const targetLabel = useMemo(() => {
         if (targetKind === 'game') return 'Roblox game ID';
@@ -92,12 +140,29 @@ export default function ReportPage() {
             .length
     ), [evidenceLinks]);
 
-    const disabled = submitting || status === 'loading' || !session;
+    const formVisible = Boolean(session?.user && linkedAccount?.roblox_id);
+    const authLoading = status === 'loading' || (Boolean(session?.user) && linkedAccountLoading);
+    const disabled = submitting || authLoading || !formVisible;
+    const linkedRobloxUsername = formVisible ? linkedAccount?.roblox_username : null;
+
+    function handleDiscordSignIn() {
+        signIn('discord', { callbackUrl: '/report' });
+    }
+
+    function handleRobloxLink() {
+        setLinkingRoblox(true);
+        window.location.href = '/api/roblox/auth?returnTo=/report';
+    }
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!session) {
-            signIn('discord', { callbackUrl: '/report' });
+            handleDiscordSignIn();
+            return;
+        }
+
+        if (!linkedAccount?.roblox_id) {
+            setResult({ error: 'Link your Roblox account before submitting a report.' });
             return;
         }
 
@@ -152,7 +217,7 @@ export default function ReportPage() {
                         ) : (
                             <button
                                 type="button"
-                                onClick={() => signIn('discord', { callbackUrl: '/report' })}
+                                onClick={handleDiscordSignIn}
                                 className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-sky-500"
                             >
                                 Sign In
@@ -176,6 +241,68 @@ export default function ReportPage() {
                         </div>
                     </div>
 
+                    {!formVisible ? (
+                        <div className="space-y-5 p-5 sm:p-7">
+                            {authLoading ? (
+                                <div className="rounded-lg border border-slate-800 bg-slate-950 px-5 py-8 text-center">
+                                    <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-sky-500 border-t-transparent" />
+                                    <p className="mt-4 text-sm font-semibold text-slate-300">Checking your account verification...</p>
+                                </div>
+                            ) : !session ? (
+                                <div className="rounded-lg border border-slate-800 bg-slate-950 px-5 py-6">
+                                    <div className="flex items-start gap-4">
+                                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#5865F2]/25 bg-[#5865F2]/10 text-[#AAB2FF]">
+                                            <DiscordIcon />
+                                        </span>
+                                        <div className="min-w-0">
+                                            <h2 className="text-lg font-bold text-white">Sign in to submit a report</h2>
+                                            <p className="mt-2 text-sm leading-6 text-slate-400">
+                                                Public reports require a Discord sign-in before you can link and verify your Roblox account.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleDiscordSignIn}
+                                        className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#5865F2] px-5 text-sm font-bold text-white transition hover:bg-[#4752C4] sm:w-auto"
+                                    >
+                                        <DiscordIcon />
+                                        Sign In With Discord
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="rounded-lg border border-slate-800 bg-slate-950 px-5 py-6">
+                                    <div className="flex items-start gap-4">
+                                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white text-black">
+                                            <RobloxIcon />
+                                        </span>
+                                        <div className="min-w-0">
+                                            <h2 className="text-lg font-bold text-white">Link your Roblox account</h2>
+                                            <p className="mt-2 text-sm leading-6 text-slate-400">
+                                                Reports can only be submitted from verified Ro-Link users. Link your Roblox account here, then the report form will unlock automatically.
+                                            </p>
+                                            <p className="mt-3 text-xs font-semibold text-slate-500">
+                                                Signed in as {session.user?.name || 'Discord user'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleRobloxLink}
+                                        disabled={linkingRoblox}
+                                        className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-white px-5 text-sm font-black uppercase tracking-wider text-black transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-70 sm:w-auto"
+                                    >
+                                        {linkingRoblox ? (
+                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />
+                                        ) : (
+                                            <RobloxIcon />
+                                        )}
+                                        {linkingRoblox ? 'Opening Roblox...' : 'Link Roblox Account'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
                     <form onSubmit={handleSubmit} className="space-y-6 p-5 sm:p-7">
                         <div>
                             <label className="mb-3 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Target</label>
@@ -287,29 +414,19 @@ export default function ReportPage() {
 
                         <div className="flex flex-col gap-3 border-t border-slate-800 pt-6 sm:flex-row sm:items-center sm:justify-between">
                             <p className="text-xs text-slate-500">
-                                {session ? `Signed in as ${session.user?.name || 'Discord user'}` : 'Discord sign-in is required.'}
+                                {`Signed in as ${session?.user?.name || 'Discord user'} · Roblox linked${linkedRobloxUsername ? ` as ${linkedRobloxUsername}` : ''}`}
                             </p>
-                            {session ? (
-                                <button
-                                    type="submit"
-                                    disabled={disabled || !targetId.trim() || !reason.trim() || !evidenceLinks.trim()}
-                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-sky-600 px-5 text-sm font-bold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <SendIcon />
-                                    {submitting ? 'Submitting...' : 'Submit Report'}
-                                </button>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => signIn('discord', { callbackUrl: '/report' })}
-                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#5865F2] px-5 text-sm font-bold text-white transition hover:bg-[#4752C4]"
-                                >
-                                    <DiscordIcon />
-                                    Sign In With Discord
-                                </button>
-                            )}
+                            <button
+                                type="submit"
+                                disabled={disabled || !targetId.trim() || !reason.trim() || !evidenceLinks.trim()}
+                                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-sky-600 px-5 text-sm font-bold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <SendIcon />
+                                {submitting ? 'Submitting...' : 'Submit Report'}
+                            </button>
                         </div>
                     </form>
+                    )}
                 </section>
 
                 <aside className="space-y-4">
