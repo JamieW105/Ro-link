@@ -7,6 +7,7 @@ import { logAction } from '@/lib/logger';
 import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 import { findServerByKeyWithDiagnostics } from '@/lib/serverAuth';
 import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
+import { buildDeliveryArgs, resolveDeliveryTargets, type CommandArgs } from '@/lib/commandDelivery';
 
 type ApiCommandServerRecord = {
     id: string;
@@ -17,6 +18,46 @@ type ApiCommandServerRecord = {
 
 function trimString(value: unknown) {
     return String(value ?? '').trim();
+}
+
+const COMMAND_ALIASES: Record<string, string> = {
+    SOFT_BAN: 'SOFTBAN',
+    SETCHAR: 'SET_CHAR',
+    SET_CHARACTER: 'SET_CHAR',
+    SET_TEAM: 'TEAM',
+    SPECTATE: 'VIEW',
+    NO_CLIP: 'NOCLIP',
+    MAXHEALTH: 'MAX_HEALTH',
+    WALKSPEED: 'WALK_SPEED',
+    JUMPPOWER: 'JUMP_POWER',
+    TELEPORTTOME: 'TELEPORT_TO_ME',
+    BRINGTOSPAWN: 'BRING_TO_SPAWN',
+    FORCEFIELDADD: 'FORCEFIELD_ADD',
+    FORCEFIELDREMOVE: 'FORCEFIELD_REMOVE',
+};
+
+function normalizeCommandName(value: unknown) {
+    const normalized = trimString(value).toUpperCase().replace(/[\s-]+/g, '_');
+    return COMMAND_ALIASES[normalized] || normalized;
+}
+
+function normalizeRemoteArgs(rawArgs: unknown): CommandArgs {
+    const args = rawArgs && typeof rawArgs === 'object' ? { ...(rawArgs as CommandArgs) } : {};
+    const username = trimString(args.username || args.targetName || args.userIdentity || args.target_label || args.target);
+    if (username) {
+        // Keep every supported name in sync so both old and current game bridges execute it.
+        args.username = username;
+        args.targetName = username;
+        args.userIdentity = username;
+    }
+
+    const characterUser = trimString(args.char_user || args.charUser || args.characterUser);
+    if (characterUser) args.char_user = characterUser;
+
+    const amount = args.amount ?? args.value;
+    if (amount !== undefined && amount !== null && trimString(amount)) args.amount = amount;
+
+    return args;
 }
 
 export async function GET(req: Request) {
@@ -95,8 +136,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Command is required' }, { status: 400 });
     }
 
-    const commandName = trimString(command).toUpperCase();
-    const safeArgs = args || {};
+    const commandName = normalizeCommandName(command);
+    const safeArgs = normalizeRemoteArgs(args);
     const modName = trimString(moderator) || 'API User';
 
     try {
@@ -131,19 +172,39 @@ export async function POST(req: Request) {
             }
         }
 
-        // 3. Queue Command
-        const { error: queueError } = await supabase.from('command_queue').insert([{
-            server_id: server.id,
-            command: commandName,
-            args: { ...safeArgs, moderator: modName },
-            status: 'PENDING'
-        }]);
+        const baseArgs: CommandArgs = { ...safeArgs, moderator: modName };
+        const deliveryTargets = await resolveDeliveryTargets(server.id, commandName, baseArgs, {
+            allowGlobal: true,
+        });
+        if (deliveryTargets.length === 0) {
+            return NextResponse.json({
+                error: 'No live server currently has that target player.',
+            }, { status: 404 });
+        }
+
+        // 3. Queue one targeted delivery per live destination.
+        const { error: queueError } = await supabase.from('command_queue').insert(
+            deliveryTargets.map((target) => ({
+                server_id: server.id,
+                command: commandName,
+                args: buildDeliveryArgs(baseArgs, target),
+                status: 'PENDING',
+            })),
+        );
 
         if (queueError) throw queueError;
 
         // 4. Trigger Instant Message (MessagingService)
         // This is "fire and forget" for speed, but ideally we await it if reliability > latency
-        const msgResult = await sendRobloxMessage(server.id, commandName, { ...safeArgs, moderator: modName }, server);
+        const messageResults = await Promise.all(
+            deliveryTargets.map((target) => sendRobloxMessage(
+                server.id,
+                commandName,
+                buildDeliveryArgs(baseArgs, target),
+                server,
+            )),
+        );
+        const messageSent = messageResults.some((result) => result.success);
 
         // 5. Log Action (via Unified Logger)
         const moderatorLogValue = trimString(moderatorDiscordId)
@@ -154,7 +215,8 @@ export async function POST(req: Request) {
         return NextResponse.json({
             success: true,
             message: `Command ${commandName} queued.`,
-            open_cloud_status: msgResult.success ? 'Sent' : 'Failed'
+            open_cloud_status: messageSent ? 'Sent' : 'Failed',
+            deliveredTargets: deliveryTargets.length,
         });
 
     } catch (err: unknown) {
