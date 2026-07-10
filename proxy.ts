@@ -97,11 +97,15 @@ function getForwardedHost(value: string | null) {
 }
 
 function getRequestHost(req: NextRequest) {
-    return firstHeaderValue(req.headers.get('host'))
-        || firstHeaderValue(req.headers.get('x-original-host'))
+    const directHost = firstHeaderValue(req.headers.get('host')) || req.nextUrl.host;
+    if (process.env.TRUST_PROXY_HEADERS !== 'true') {
+        return directHost;
+    }
+
+    return firstHeaderValue(req.headers.get('x-original-host'))
         || firstHeaderValue(req.headers.get('x-forwarded-host'))
         || getForwardedHost(req.headers.get('forwarded'))
-        || req.nextUrl.host;
+        || directHost;
 }
 
 function getExternalRequestUrl(req: NextRequest) {
@@ -123,13 +127,17 @@ function getExternalRequestUrl(req: NextRequest) {
 function isSiteTestingHost(req: NextRequest) {
     const hostnames = [
         normalizeHostname(req.headers.get('host')),
-        normalizeHostname(req.headers.get('x-original-host')),
-        ...getForwardedHostnames(req.headers.get('x-forwarded-host')),
-        ...getForwardedHostnames(req.headers.get('forwarded')),
         normalizeHostname(req.nextUrl.hostname),
-    ].filter(Boolean);
+    ];
+    if (process.env.TRUST_PROXY_HEADERS === 'true') {
+        hostnames.push(
+            normalizeHostname(req.headers.get('x-original-host')),
+            ...getForwardedHostnames(req.headers.get('x-forwarded-host')),
+            ...getForwardedHostnames(req.headers.get('forwarded')),
+        );
+    }
 
-    return hostnames.some((hostname) => (
+    return hostnames.filter(Boolean).some((hostname) => (
         hostname === SITE_TESTING_DOMAIN || hostname.endsWith(`.${SITE_TESTING_DOMAIN}`)
     ));
 }
@@ -147,6 +155,11 @@ function isSiteTestingPublicPath(pathname: string) {
 }
 
 function getForwardedProtocol(req: NextRequest) {
+    // These headers must only be trusted when the deployment's edge proxy
+    // strips client-provided values.  Direct deployments can opt out.
+    if (process.env.TRUST_PROXY_HEADERS !== 'true') {
+        return '';
+    }
     const forwardedProto = firstHeaderValue(req.headers.get('x-forwarded-proto')).toLowerCase();
     if (forwardedProto) {
         return forwardedProto;
@@ -180,6 +193,9 @@ function shouldEnforceHttps(req: NextRequest) {
 }
 
 function getClientIp(req: NextRequest) {
+    if (process.env.TRUST_PROXY_HEADERS !== 'true') {
+        return 'direct-client';
+    }
     return firstHeaderValue(req.headers.get('cf-connecting-ip'))
         || firstHeaderValue(req.headers.get('x-real-ip'))
         || firstHeaderValue(req.headers.get('x-forwarded-for'))
@@ -191,6 +207,7 @@ function applySecurityHeaders(response: NextResponse, req: NextRequest) {
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     response.headers.set('X-Frame-Options', 'SAMEORIGIN');
     response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    response.headers.set('Content-Security-Policy', "base-uri 'self'; frame-ancestors 'self'; object-src 'none'; form-action 'self'");
 
     if (process.env.NODE_ENV === 'production' && !isLocalHost(req.nextUrl.hostname)) {
         response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');

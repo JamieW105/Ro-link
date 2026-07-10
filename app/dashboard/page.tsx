@@ -55,10 +55,9 @@ function ServerIconLink({
         <Link
             href={href}
             aria-label={label}
-            className={`group/server-action relative flex h-10 min-w-[5.25rem] items-center justify-center gap-1.5 rounded-lg border px-2 transition-all ${toneClass}`}
+            className={`group/server-action relative flex h-10 w-10 items-center justify-center rounded-lg border transition-all ${toneClass}`}
         >
             {children}
-            <span className="text-[9px] font-bold uppercase leading-none tracking-wide">{label === 'Open Console' ? 'Console' : label === 'Live Panel' ? 'Live' : 'Market'}</span>
             <ActionTooltip label={label} />
         </Link>
     );

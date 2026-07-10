@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { findServerByKeyWithDiagnostics } from '@/lib/serverAuth';
+import { readServerApiKey } from '@/lib/serverApiKey';
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
@@ -7,17 +9,28 @@ export async function GET(req: Request) {
     const robloxUsername = searchParams.get('robloxUsername');
     const discordId = searchParams.get('discordId');
 
-    // Heartbeat check for uptime monitors
-    if (!robloxUserId && !robloxUsername && !discordId || searchParams.get('status') === 'check' || req.headers.get('user-agent')?.includes('Better Uptime')) {
+    // Heartbeat check for uptime monitors. Do not use the user agent as an
+    // authorization bypass for lookups.
+    if ((!robloxUserId && !robloxUsername && !discordId) || searchParams.get('status') === 'check') {
         return NextResponse.json({
             status: 'API Active',
             message: 'Ready for bidirectional mapping'
         }, { status: 200 });
     }
 
+    const apiKey = readServerApiKey(req);
+    if (!apiKey) {
+        return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
+    }
+
+    const server = await findServerByKeyWithDiagnostics<{ id: string }>('id', apiKey);
+    if (!server.server) {
+        return NextResponse.json({ error: 'Invalid API Key' }, { status: 403 });
+    }
+
     try {
         if (robloxUserId || robloxUsername) {
-            let query = supabase.from('verified_users').select('*');
+            let query = supabase.from('verified_users').select('discord_id, roblox_id, roblox_username');
 
             if (robloxUserId) {
                 query = query.eq('roblox_id', robloxUserId);
@@ -42,7 +55,7 @@ export async function GET(req: Request) {
             // Find Roblox via Discord
             const { data, error } = await supabase
                 .from('verified_users')
-                .select('*')
+                .select('discord_id, roblox_id, roblox_username')
                 .eq('discord_id', discordId)
                 .maybeSingle();
 

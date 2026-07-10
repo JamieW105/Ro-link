@@ -76,6 +76,7 @@ DISCORD_TOKEN=your_bot_token_here
 DISCORD_CLIENT_ID=your_application_id_here
 DISCORD_PUBLIC_KEY=your_public_key_here
 DISCORD_BEARER_TOKEN=your_oauth2_bearer_token_here # Optional: For status updates via API
+TRUST_PROXY_HEADERS=true # Only when your trusted CDN/proxy strips client supplied forwarded headers
 
 # Application URL (Production or Localhost)
 NEXT_PUBLIC_BASE_URL=http://localhost:3000

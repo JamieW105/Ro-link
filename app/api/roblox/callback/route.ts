@@ -1,3 +1,5 @@
+import { timingSafeEqual } from 'crypto';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import type { Session } from 'next-auth';
@@ -34,17 +36,13 @@ function normalizeReturnTo(value: unknown) {
     return returnTo.slice(0, 200);
 }
 
-function getReturnTo(searchParams: URLSearchParams) {
-    const rawState = searchParams.get('state');
-    if (!rawState) return '/verify';
+const OAUTH_STATE_COOKIE = '__Host-rolink-roblox-oauth';
 
-    try {
-        const decodedState = rawState.startsWith('%') ? decodeURIComponent(rawState) : rawState;
-        const state = JSON.parse(decodedState) as { returnTo?: unknown };
-        return normalizeReturnTo(state.returnTo);
-    } catch {
-        return '/verify';
-    }
+function stateMatches(received: string, expected: string) {
+    const receivedBytes = Buffer.from(received);
+    const expectedBytes = Buffer.from(expected);
+    return receivedBytes.length === expectedBytes.length
+        && timingSafeEqual(receivedBytes, expectedBytes);
 }
 
 function buildRedirectUrl(path: string, params?: Record<string, string>) {
@@ -59,7 +57,24 @@ function buildRedirectUrl(path: string, params?: Record<string, string>) {
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
-    const returnTo = getReturnTo(searchParams);
+    const receivedState = searchParams.get('state') || '';
+    const cookieStore = await cookies();
+    const stateCookie = cookieStore.get(OAUTH_STATE_COOKIE)?.value;
+    cookieStore.delete(OAUTH_STATE_COOKIE);
+    let returnTo = '/verify';
+    let stateIsValid = false;
+    try {
+        const stored = JSON.parse(stateCookie || '') as { state?: unknown; returnTo?: unknown };
+        const expectedState = typeof stored.state === 'string' ? stored.state : '';
+        stateIsValid = Boolean(expectedState && receivedState && stateMatches(receivedState, expectedState));
+        returnTo = normalizeReturnTo(stored.returnTo);
+    } catch {
+        stateIsValid = false;
+    }
+
+    if (!stateIsValid) {
+        return NextResponse.redirect(buildRedirectUrl('/verify', { error: 'invalid_state' }));
+    }
     const session = await getServerSession(authOptions) as SessionWithAccessToken | null;
 
     if (!session || !session.user) {

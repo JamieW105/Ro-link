@@ -61,6 +61,11 @@ async function verifyDiscordRequest(request: Request) {
         return { isValid: false };
     }
 
+    const timestampSeconds = Number(timestamp);
+    if (!Number.isFinite(timestampSeconds) || Math.abs(Date.now() - timestampSeconds * 1000) > 5 * 60 * 1000) {
+        return { isValid: false };
+    }
+
     try {
         const body = await request.text();
         const encoder = new TextEncoder();
@@ -4347,10 +4352,11 @@ function RoLink:Initialize()
 		
 		if self.settings and self.settings.blockUnverified then
 			local s, r = pcall(function()
-				return Http:RequestAsync({
-					Url = URL .. "/api/v1/lookup?robloxId=" .. player.UserId,
-					Method = "GET"
-				})
+					return Http:RequestAsync({
+						Url = URL .. "/api/v1/lookup?robloxId=" .. player.UserId,
+						Method = "GET",
+						Headers = { ["x-api-key"] = KEY }
+					})
 			end)
 			
 			-- 404 means the user has no mapping in Ro-Link
