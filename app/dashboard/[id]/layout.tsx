@@ -69,81 +69,68 @@ type CustomDashboardPreview = {
 // --- PREMIUM SVG ICONS ---
 
 const HomeIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path fillRule="evenodd" d="m2.5 9.1 9.5-7 9.5 7a1.5 1.5 0 0 1-.9 2.7H20v8a2.2 2.2 0 0 1-2.2 2.2H6.2A2.2 2.2 0 0 1 4 19.8v-8h-.6a1.5 1.5 0 0 1-.9-2.7ZM8 20h2.5v-6h3v6H16v-6.5H8V20Z" />
     </svg>
 );
 
 const ServersIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path fillRule="evenodd" d="M4 2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm0 13h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2Zm2-9h2v2H6V6Zm0 11h2v2H6v-2Z" />
     </svg>
 );
 
 const LivePanelIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" />
-        <path d="M8 21h8" />
-        <path d="M12 16v5" />
-        <path d="m10 8 4 2-4 2Z" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path fillRule="evenodd" d="M4 4.5A2.5 2.5 0 0 1 6.5 2h11A2.5 2.5 0 0 1 20 4.5v9a2.5 2.5 0 0 1-2.5 2.5h-4v3H16a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h2.5v-3h-4A2.5 2.5 0 0 1 4 13.5v-9ZM10 7v5l5-2.5L10 7Z" />
     </svg>
 );
 
 const MagicIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" /><path d="M17.8 11.8 19 13" /><path d="M15 9h0" /><path d="M17.8 6.2 19 5" /><path d="m3 21 9-9" /><path d="M12.2 6.2 11 5" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="m3 21 8.6-8.6 1.4 1.4L4.4 22.4 3 21Zm12-19 1.1 3.9L20 7l-3.9 1.1L15 12l-1.1-3.9L10 7l3.9-1.1L15 2Zm5 12 .7 2.3L23 17l-2.3.7L20 20l-.7-2.3L17 17l2.3-.7L20 14Z" />
     </svg>
 );
 
 const BackIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="m12 19-7-7 7-7" /><path d="M19 12H5" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="m10.4 4.3 1.4 1.4L7.5 10H20v2H7.5l4.3 4.3-1.4 1.4L3.7 11l6.7-6.7Z" />
     </svg>
 );
 
 const HamburgerIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <rect x="3" y="5" width="18" height="2.5" rx="1.25" /><rect x="3" y="10.75" width="18" height="2.5" rx="1.25" /><rect x="3" y="16.5" width="18" height="2.5" rx="1.25" />
     </svg>
 );
 
 const LookupIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path fillRule="evenodd" d="M10.8 3a7.8 7.8 0 1 0 4.8 13.95l4.72 4.73 1.42-1.42-4.73-4.72A7.8 7.8 0 0 0 10.8 3Zm0 2a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 0 1 0-11.6Z" />
     </svg>
 );
 
 const VerificationIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        <path d="m9 12 2 2 4-4" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path fillRule="evenodd" d="M12 1.5 21 5v7c0 5.8-3.7 9.5-9 11.5C6.7 21.5 3 17.8 3 12V5l9-3.5Zm0 4L6 7.8V12c0 3.7 2.2 6.4 6 8 3.8-1.6 6-4.3 6-8V7.8L12 5.5Zm-1.3 10.2-3-3 1.6-1.6 1.4 1.4 3.8-3.8 1.6 1.6-5.4 5.4Z" />
     </svg>
 );
 
 const ModulesIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-        <path d="m3.3 7 8.7 5 8.7-5" />
-        <path d="M12 22V12" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="m12 2 9 5v10l-9 5-9-5V7l9-5Zm0 2.3L5.2 8 12 11.7 18.8 8 12 4.3Zm-7 5.5v6l6 3.33v-6L5 9.8Zm8 3.33v6L19 15.8v-6l-6 3.33Z" />
     </svg>
 );
 
 const ReportsIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-        <line x1="12" y1="9" x2="12" y2="13" />
-        <line x1="12" y1="17" x2="12.01" y2="17" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path fillRule="evenodd" d="m10.26 3.7-8.6 14.35A2 2 0 0 0 3.38 21h17.24a2 2 0 0 0 1.72-2.95L13.74 3.7a2 2 0 0 0-3.48 0ZM11 9h2v5h-2V9Zm0 7h2v2h-2v-2Z" />
     </svg>
 );
 
 const ScrollIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M7 21h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z" />
-        <path d="M12 11V7" />
-        <path d="M12 17v-2" />
-        <path d="M8 7h8" />
-        <path d="M8 11h8" />
-        <path d="M8 15h8" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path fillRule="evenodd" d="M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm2 4h8v2H8V6Zm0 4h8v2H8v-2Zm0 4h5v2H8v-2Z" />
     </svg>
 );
 
@@ -154,38 +141,38 @@ const OverviewIcon = () => (
 );
 
 const RolesIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="m16 11 2 2 4-4" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.87 0-7 2.24-7 5v3h14v-3c0-2.76-3.13-5-7-5Zm8-2.3-1.4-1.4-1.4 1.4 2.8 2.8 5-5-1.4-1.4-3.6 3.6Z" />
     </svg>
 );
 
 const CommandsIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 11a9 9 0 0 1 9 9" /><path d="M4 4a16 16 0 0 1 16 16" /><circle cx="5" cy="19" r="1" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path fillRule="evenodd" d="M3 4a1 1 0 0 1 1-1c9.39 0 17 7.61 17 17a1 1 0 1 1-2 0C19 11.72 12.28 5 4 5a1 1 0 0 1-1-1Zm0 7a1 1 0 0 1 1-1c5.52 0 10 4.48 10 10a1 1 0 1 1-2 0c0-4.42-3.58-8-8-8a1 1 0 0 1-1-1Zm1 6a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z" />
     </svg>
 );
 
 const SettingsReportsIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><path d="M12 9v4" /><path d="M12 17h.01" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path fillRule="evenodd" d="m10.26 3.7-8.6 14.35A2 2 0 0 0 3.38 21h17.24a2 2 0 0 0 1.72-2.95L13.74 3.7a2 2 0 0 0-3.48 0ZM11 9h2v5h-2V9Zm0 7h2v2h-2v-2Z" />
     </svg>
 );
 
 const DashboardIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect width="18" height="14" x="3" y="5" rx="2" /><path d="M7 9h10" /><path d="M7 13h4" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path fillRule="evenodd" d="M4 3h16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 4v2h12V7H6Zm0 5v5h5v-5H6Zm7 0v2h5v-2h-5Zm0 3v2h5v-2h-5Z" />
     </svg>
 );
 
 const ShieldIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2 21 5v7c0 5.8-3.7 9.5-9 11.5C6.7 21.5 3 17.8 3 12V5l9-3Z" />
     </svg>
 );
 
 const CloseIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="m6.7 5.3 5.3 5.3 5.3-5.3 1.4 1.4-5.3 5.3 5.3 5.3-1.4 1.4-5.3-5.3-5.3 5.3-1.4-1.4 5.3-5.3-5.3-5.3 1.4-1.4Z" />
     </svg>
 );
 
