@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
     const robloxUserId = trimString(req.nextUrl.searchParams.get('robloxUserId'));
     const before = trimString(req.nextUrl.searchParams.get('before'));
     const level = trimString(req.nextUrl.searchParams.get('level')).toLowerCase();
+    const source = trimString(req.nextUrl.searchParams.get('source')).toLowerCase();
 
     if (!jobId) {
         return NextResponse.json({ error: 'Live server job ID required' }, { status: 400 });
@@ -33,6 +34,7 @@ export async function GET(req: NextRequest) {
         .limit(parseLimit(req.nextUrl.searchParams.get('limit')));
 
     if (robloxUserId) query = query.eq('roblox_user_id', robloxUserId);
+    if (source === 'server' || source === 'client') query = query.eq('source', source);
     if (before && !Number.isNaN(Date.parse(before))) query = query.lt('created_at', before);
     if (['debug', 'info', 'warn', 'error'].includes(level)) query = query.eq('level', level);
 

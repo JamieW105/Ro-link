@@ -180,7 +180,7 @@ type ConfirmAction = {
 } | null;
 
 type PanelModal = 'announce' | 'command' | null;
-type RightPaneMode = 'lookup' | 'reports';
+type RightPaneMode = 'lookup' | 'reports' | 'runtime-logs';
 type AnnouncementTargetType = '' | 'global' | 'user';
 type RuntimeLogTarget = { jobId: string; user: LivePanelUser | null } | null;
 type ContextMenuTarget = { x: number; y: number; jobId: string; user: LivePanelUser | null } | null;
@@ -1620,13 +1620,16 @@ export default function LivePanelPage() {
         }
     }
 
-    async function openRuntimeLogs(jobId: string, user: LivePanelUser | null = null) {
-        setContextMenu(null);
-        setRuntimeLogTarget({ jobId, user });
-        setRuntimeLogs([]);
-        setRuntimeLogsLoading(true);
+    async function openRuntimeLogs(jobId: string, user: LivePanelUser | null = null, isRefresh = false) {
+        if (!isRefresh) {
+            setContextMenu(null);
+            setRuntimeLogTarget({ jobId, user });
+            setRightPaneMode('runtime-logs');
+            setRuntimeLogs([]);
+            setRuntimeLogsLoading(true);
+        }
         try {
-            const params = new URLSearchParams({ serverId: guildId, jobId, limit: '120' });
+            const params = new URLSearchParams({ serverId: guildId, jobId, limit: '120', source: user ? 'client' : 'server' });
             if (user?.userId) params.set('robloxUserId', user.userId);
             const response = await fetch(`/api/dashboard/runtime-logs?${params.toString()}`, { cache: 'no-store' });
             const payload = await response.json().catch(() => ({})) as { logs?: RuntimeLogRecord[]; error?: string };
@@ -1640,9 +1643,30 @@ export default function LivePanelPage() {
             setNotice({ type: 'error', text: `Failed to load runtime logs: ${String(error)}` });
             setRuntimeLogTarget(null);
         } finally {
-            setRuntimeLogsLoading(false);
+            if (!isRefresh) setRuntimeLogsLoading(false);
         }
     }
+
+    useEffect(() => {
+        if (rightPaneMode !== 'runtime-logs' || !runtimeLogTarget) {
+            return undefined;
+        }
+
+        const refreshLogs = () => openRuntimeLogs(runtimeLogTarget.jobId, runtimeLogTarget.user, true);
+        const onEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setRuntimeLogTarget(null);
+                setRightPaneMode('lookup');
+            }
+        };
+
+        const interval = window.setInterval(refreshLogs, 7000);
+        window.addEventListener('keydown', onEscape);
+        return () => {
+            window.clearInterval(interval);
+            window.removeEventListener('keydown', onEscape);
+        };
+    }, [rightPaneMode, runtimeLogTarget]);
 
     function openPlayerMessage(user: LivePanelUser) {
         setContextMenu(null);
@@ -2737,6 +2761,35 @@ export default function LivePanelPage() {
                                 </div>
                             </div>
                         </div>
+                    ) : rightPaneMode === 'runtime-logs' && runtimeLogTarget ? (
+                        <div className="flex min-h-0 flex-1 flex-col bg-[#020617]">
+                            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-800 bg-slate-950/50 p-5">
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">Live raw console</p>
+                                    <h2 className="mt-1 truncate text-xl font-black text-white">{runtimeLogTarget.user ? `${runtimeLogTarget.user.username}'s client logs` : `Server ${formatServerId(runtimeLogTarget.jobId)} logs`}</h2>
+                                    <p className="mt-1 text-xs font-medium text-slate-500">Refreshing every 7 seconds. Press Esc to return to live commands.</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => { setRuntimeLogTarget(null); setRightPaneMode('lookup'); }}
+                                    className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-500 transition-colors hover:text-white"
+                                    aria-label="Return to live commands"
+                                >
+                                    <CloseIcon />
+                                </button>
+                            </div>
+                            <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto bg-black/35 p-4 font-mono text-xs leading-6">
+                                {runtimeLogsLoading && runtimeLogs.length === 0 ? (
+                                    <div className="p-8 text-center font-sans text-xs font-bold text-slate-500">Loading live console...</div>
+                                ) : runtimeLogs.length === 0 ? (
+                                    <div className="p-8 text-center font-sans text-xs font-semibold text-slate-500">No runtime logs were reported for this target.</div>
+                                ) : runtimeLogs.slice().reverse().map((log) => (
+                                    <div key={log.id} className={`whitespace-pre-wrap break-words ${log.level === 'error' ? 'text-red-400' : log.level === 'warn' ? 'text-orange-400' : 'text-white'}`}>
+                                        <span className="mr-2 select-none text-slate-600">[{formatTime(log.created_at)}]</span>{log.message}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     ) : rightPaneMode === 'reports' && canManageReports ? (
                         <div className="flex min-h-0 flex-1 flex-col">
                             <div className="shrink-0 border-b border-slate-800 bg-slate-950/30 p-5">
@@ -3134,22 +3187,6 @@ export default function LivePanelPage() {
                     ) : (
                         <button type="button" onClick={() => openRuntimeLogs(contextMenu.jobId)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-sky-200 hover:bg-sky-500/10">View server logs</button>
                     )}
-                </div>
-            )}
-
-            {runtimeLogTarget && (
-                <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-                    <div className="flex max-h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-[#020617] shadow-2xl">
-                        <div className="flex items-start justify-between gap-4 border-b border-slate-800 bg-slate-900/60 px-6 py-5">
-                            <div><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">Runtime telemetry</p><h3 className="mt-1 text-xl font-black text-white">{runtimeLogTarget.user ? `${runtimeLogTarget.user.username}'s client logs` : `Server ${formatServerId(runtimeLogTarget.jobId)} logs`}</h3></div>
-                            <button type="button" onClick={() => setRuntimeLogTarget(null)} className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-500 transition-colors hover:text-white"><CloseIcon /></button>
-                        </div>
-                        <div className="custom-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto p-5">
-                            {runtimeLogsLoading ? <div className="p-8 text-center text-xs font-bold text-slate-500">Loading logs…</div> : runtimeLogs.length === 0 ? <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center text-xs font-semibold text-slate-500">No runtime logs were reported for this target.</div> : runtimeLogs.map((log) => (
-                                <div key={log.id} className="rounded-xl border border-slate-800 bg-black/20 p-3"><div className="flex items-center justify-between gap-3"><span className={`rounded-md px-2 py-1 text-[10px] font-black uppercase ${log.level === 'error' ? 'bg-red-500/10 text-red-300' : log.level === 'warn' ? 'bg-amber-500/10 text-amber-300' : 'bg-sky-500/10 text-sky-300'}`}>{log.level} · {log.event_type}</span><span className="font-mono text-[10px] font-bold text-slate-500">{formatTime(log.created_at)}</span></div><p className="mt-2 whitespace-pre-wrap text-xs text-slate-300">{log.message}</p></div>
-                            ))}
-                        </div>
-                    </div>
                 </div>
             )}
 
