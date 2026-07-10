@@ -25,6 +25,13 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* App icon language: compact, rounded and weighty like the solid reference set. */
+svg[stroke="currentColor"] {
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 :root {
   --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-sharp: cubic-bezier(0.16, 1, 0.3, 1);
