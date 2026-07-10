@@ -145,6 +145,12 @@ function isSiteTestingHost(req: NextRequest) {
 function isSiteTestingPublicPath(pathname: string) {
     return pathname === '/auth/signin'
         || pathname.startsWith('/api/auth')
+        // Roblox game servers authenticate these routes with their server API
+        // key. They cannot carry a browser session through the testing-site
+        // gate, so redirecting them to /auth/signin turns POSTs into 405s.
+        || pathname.startsWith('/api/v1/game-admin/')
+        || pathname === '/api/roblox/poll'
+        || pathname === '/api/roblox/message'
         || pathname === '/plugin/connect'
         || pathname === '/api/plugin/session/authorize'
         || pathname.startsWith('/_next')
