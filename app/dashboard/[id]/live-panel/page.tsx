@@ -39,6 +39,20 @@ interface LivePanelPayload {
     pendingReports?: PendingReport[];
 }
 
+interface RuntimeLogRecord {
+    id: string;
+    job_id: string;
+    source: 'server' | 'client';
+    level: 'debug' | 'info' | 'warn' | 'error';
+    event_type: string;
+    roblox_user_id?: string | null;
+    roblox_username?: string | null;
+    display_name?: string | null;
+    message: string;
+    metadata?: Record<string, string> | null;
+    created_at: string;
+}
+
 interface PendingReport {
     id: string;
     reported_roblox_username: string;
@@ -168,6 +182,8 @@ type ConfirmAction = {
 type PanelModal = 'announce' | 'command' | null;
 type RightPaneMode = 'lookup' | 'reports';
 type AnnouncementTargetType = '' | 'global' | 'user';
+type RuntimeLogTarget = { jobId: string; user: LivePanelUser | null } | null;
+type ContextMenuTarget = { x: number; y: number; jobId: string; user: LivePanelUser | null } | null;
 
 type ParsedCommandBar = {
     command: AdminPanelCommandDefinition | null;
@@ -723,13 +739,14 @@ function ActionTooltip({ label }: { label: string }) {
     );
 }
 
-function UserAvatarButton({ user, onClick, compact = false }: { user: LivePanelUser; onClick: () => void; compact?: boolean }) {
+function UserAvatarButton({ user, onClick, onContextMenu, compact = false }: { user: LivePanelUser; onClick: () => void; onContextMenu?: (event: React.MouseEvent<HTMLButtonElement>) => void; compact?: boolean }) {
     const sizeClass = compact ? 'h-8 w-8' : 'h-10 w-10';
 
     return (
         <button
             type="button"
             onClick={onClick}
+            onContextMenu={onContextMenu}
             className={`group relative ${sizeClass} shrink-0 rounded-xl border border-slate-700 bg-slate-900 transition-all hover:border-sky-400/60 hover:shadow-lg hover:shadow-sky-950/30`}
         >
             <span className="block h-full w-full overflow-hidden rounded-[inherit]">
@@ -839,6 +856,10 @@ export default function LivePanelPage() {
     const [reportDetailLoading, setReportDetailLoading] = useState(false);
     const [reportModeratorNote, setReportModeratorNote] = useState('');
     const [reportActionLoading, setReportActionLoading] = useState<string | null>(null);
+    const [contextMenu, setContextMenu] = useState<ContextMenuTarget>(null);
+    const [runtimeLogTarget, setRuntimeLogTarget] = useState<RuntimeLogTarget>(null);
+    const [runtimeLogs, setRuntimeLogs] = useState<RuntimeLogRecord[]>([]);
+    const [runtimeLogsLoading, setRuntimeLogsLoading] = useState(false);
     const canManageReports = perms.is_admin || perms.can_manage_reports;
 
     const clearSelectedProfile = useCallback(() => {
@@ -851,6 +872,20 @@ export default function LivePanelPage() {
         setProfileCommand('');
         setProfileCommandValue('');
     }, []);
+
+    useEffect(() => {
+        if (!contextMenu) return undefined;
+        const close = () => setContextMenu(null);
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') close();
+        };
+        window.addEventListener('pointerdown', close);
+        window.addEventListener('keydown', closeOnEscape);
+        return () => {
+            window.removeEventListener('pointerdown', close);
+            window.removeEventListener('keydown', closeOnEscape);
+        };
+    }, [contextMenu]);
 
     const loadPanel = useCallback(async (showLoader = false) => {
         if (!guildId) return;
@@ -1583,6 +1618,38 @@ export default function LivePanelPage() {
         } finally {
             setActionLoading(null);
         }
+    }
+
+    async function openRuntimeLogs(jobId: string, user: LivePanelUser | null = null) {
+        setContextMenu(null);
+        setRuntimeLogTarget({ jobId, user });
+        setRuntimeLogs([]);
+        setRuntimeLogsLoading(true);
+        try {
+            const params = new URLSearchParams({ serverId: guildId, jobId, limit: '120' });
+            if (user?.userId) params.set('robloxUserId', user.userId);
+            const response = await fetch(`/api/dashboard/runtime-logs?${params.toString()}`, { cache: 'no-store' });
+            const payload = await response.json().catch(() => ({})) as { logs?: RuntimeLogRecord[]; error?: string };
+            if (!response.ok) {
+                setNotice({ type: 'error', text: payload.error || 'Failed to load runtime logs.' });
+                setRuntimeLogTarget(null);
+                return;
+            }
+            setRuntimeLogs(Array.isArray(payload.logs) ? payload.logs : []);
+        } catch (error) {
+            setNotice({ type: 'error', text: `Failed to load runtime logs: ${String(error)}` });
+            setRuntimeLogTarget(null);
+        } finally {
+            setRuntimeLogsLoading(false);
+        }
+    }
+
+    function openPlayerMessage(user: LivePanelUser) {
+        setContextMenu(null);
+        setAnnouncementTargetType('user');
+        setAnnouncementUser(user.username);
+        setAnnouncement('');
+        setPanelModal('announce');
     }
 
     async function sendServerLifecycleCommand(serverId: string, command: 'UPDATE' | 'SHUTDOWN') {
@@ -2348,7 +2415,7 @@ export default function LivePanelPage() {
                                     {filteredServers.map((server) => {
                                         const joinUrl = buildJoinUrl(placeId, server.id);
                                         return (
-                                            <div key={server.id} className="m-3 rounded-2xl border border-slate-700/70 bg-slate-950/45 p-4 shadow-inner shadow-black/20 transition-all hover:border-sky-400/40 hover:bg-sky-500/5">
+                                            <div key={server.id} onContextMenu={(event) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, jobId: server.id, user: null }); }} className="m-3 rounded-2xl border border-slate-700/70 bg-slate-950/45 p-4 shadow-inner shadow-black/20 transition-all hover:border-sky-400/40 hover:bg-sky-500/5">
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="min-w-0">
                                                         <button
@@ -2416,6 +2483,7 @@ export default function LivePanelPage() {
                                                                 user={player}
                                                                 compact
                                                                 onClick={() => selectProfileUser(player)}
+                                                                onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ x: event.clientX, y: event.clientY, jobId: server.id, user: player }); }}
                                                             />
                                                         ))
                                                     ) : (
@@ -3043,6 +3111,43 @@ export default function LivePanelPage() {
                             >
                                 Confirm
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {contextMenu && (
+                <div
+                    role="menu"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    style={{ left: Math.min(contextMenu.x, window.innerWidth - 224), top: Math.min(contextMenu.y, window.innerHeight - 220) }}
+                    className="fixed z-[120] w-52 overflow-hidden rounded-xl border border-slate-700 bg-slate-950 p-1 shadow-2xl shadow-black/60"
+                >
+                    {contextMenu.user ? (
+                        <>
+                            <p className="truncate px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500">@{contextMenu.user.username}</p>
+                            <button type="button" onClick={() => openRuntimeLogs(contextMenu.jobId, contextMenu.user)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-sky-200 hover:bg-sky-500/10">View user&apos;s client logs</button>
+                            <button type="button" onClick={() => openPlayerMessage(contextMenu.user!)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-200 hover:bg-slate-800">Message</button>
+                            {canUseDashboardCommand(perms, 'KICK') && <button type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('KICK', contextMenu.user!); }} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-amber-300 hover:bg-amber-500/10">Kick</button>}
+                            {canUseDashboardCommand(perms, 'BAN') && <button type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('BAN', contextMenu.user!); }} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-red-300 hover:bg-red-500/10">Ban</button>}
+                        </>
+                    ) : (
+                        <button type="button" onClick={() => openRuntimeLogs(contextMenu.jobId)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-sky-200 hover:bg-sky-500/10">View server logs</button>
+                    )}
+                </div>
+            )}
+
+            {runtimeLogTarget && (
+                <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+                    <div className="flex max-h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-[#020617] shadow-2xl">
+                        <div className="flex items-start justify-between gap-4 border-b border-slate-800 bg-slate-900/60 px-6 py-5">
+                            <div><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">Runtime telemetry</p><h3 className="mt-1 text-xl font-black text-white">{runtimeLogTarget.user ? `${runtimeLogTarget.user.username}'s client logs` : `Server ${formatServerId(runtimeLogTarget.jobId)} logs`}</h3></div>
+                            <button type="button" onClick={() => setRuntimeLogTarget(null)} className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-500 transition-colors hover:text-white"><CloseIcon /></button>
+                        </div>
+                        <div className="custom-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto p-5">
+                            {runtimeLogsLoading ? <div className="p-8 text-center text-xs font-bold text-slate-500">Loading logs…</div> : runtimeLogs.length === 0 ? <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center text-xs font-semibold text-slate-500">No runtime logs were reported for this target.</div> : runtimeLogs.map((log) => (
+                                <div key={log.id} className="rounded-xl border border-slate-800 bg-black/20 p-3"><div className="flex items-center justify-between gap-3"><span className={`rounded-md px-2 py-1 text-[10px] font-black uppercase ${log.level === 'error' ? 'bg-red-500/10 text-red-300' : log.level === 'warn' ? 'bg-amber-500/10 text-amber-300' : 'bg-sky-500/10 text-sky-300'}`}>{log.level} · {log.event_type}</span><span className="font-mono text-[10px] font-bold text-slate-500">{formatTime(log.created_at)}</span></div><p className="mt-2 whitespace-pre-wrap text-xs text-slate-300">{log.message}</p></div>
+                            ))}
                         </div>
                     </div>
                 </div>
