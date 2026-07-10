@@ -23,6 +23,10 @@ function trimString(value: unknown) {
     return String(value ?? '').trim();
 }
 
+function createPollTraceId() {
+    return `poll-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function getCommandTargetJobId(command: QueuedCommand) {
     return trimString(command?.args?.job_id);
 }
@@ -290,14 +294,25 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+    const traceId = createPollTraceId();
+    const startedAt = Date.now();
     try {
         const body = await req.json().catch(() => ({}));
         const { jobId, playerCount, players, status } = body;
         const modulePanelCommands = normalizeModulePanelCommandPayload(body.modulePanelCommands ?? body.module_panel_commands);
         const auth = readServerApiKeyDetails(req, body.apiKey ?? body.key ?? body.serverKey ?? body.securityKey);
         const authDebug = describeServerApiKeyDetails(auth);
+        console.info('[RoLinkAPI][Poll] Request received', {
+            traceId,
+            jobId: trimString(jobId) || null,
+            status: trimString(status) || 'ACTIVE',
+            playerCount: Number.isFinite(Number(playerCount)) ? Number(playerCount) : null,
+            rosterCount: Array.isArray(players) ? players.length : null,
+            moduleCommandCount: modulePanelCommands.length,
+            auth: authDebug,
+        });
         if (!auth.key) {
-            console.warn('[RoLinkAPI][Poll] Missing API key', { auth: authDebug });
+            console.warn('[RoLinkAPI][Poll] Missing API key', { traceId, auth: authDebug });
             return NextResponse.json({
                 error: 'Missing API Key',
                 code: 'missing_api_key',
@@ -320,6 +335,7 @@ export async function POST(req: Request) {
         const server = lookup.server;
         if (!server) {
             console.warn('[RoLinkAPI][Poll] Invalid API key', {
+                traceId,
                 auth: authDebug,
                 lookupError: lookup.error,
             });
@@ -350,6 +366,7 @@ export async function POST(req: Request) {
 
         if (lookup.matchedBy !== 'api_key') {
             console.warn('[RoLinkAPI][Poll] Accepted fallback server key', {
+                traceId,
                 auth: authDebug,
                 matchedBy: lookup.matchedBy,
                 serverId: server.id,
@@ -357,6 +374,11 @@ export async function POST(req: Request) {
         }
 
         const db = getSupabaseAdmin();
+        console.info('[RoLinkAPI][Poll] Server key accepted', {
+            traceId,
+            serverId: server.id,
+            matchedBy: lookup.matchedBy,
+        });
 
         // 2. Handle Shutdown (Explicit via status or implicit via 0 players)
         if (jobId) {
@@ -378,7 +400,12 @@ export async function POST(req: Request) {
                     jobId,
                 });
 
-                console.log(`[POLL] Server ${jobId} removed (Status: ${status || '0 Players'}).`);
+                console.info('[RoLinkAPI][Poll] Live server removed', {
+                    traceId,
+                    serverId: server.id,
+                    jobId,
+                    status: status || '0 Players',
+                });
             } else {
                 // Normal update
                 await upsertLiveServer({
@@ -396,6 +423,14 @@ export async function POST(req: Request) {
                     currentPlayers: players,
                     serverId: server.id,
                     jobId,
+                });
+
+                console.info('[RoLinkAPI][Poll] Live server heartbeat stored', {
+                    traceId,
+                    serverId: server.id,
+                    jobId,
+                    playerCount: Number(playerCount) || 0,
+                    rosterCount: Array.isArray(players) ? players.length : 0,
                 });
             }
 
@@ -431,6 +466,14 @@ export async function POST(req: Request) {
             if (updateError) throw updateError;
         }
 
+        console.info('[RoLinkAPI][Poll] Request complete', {
+            traceId,
+            serverId: server.id,
+            jobId: trimString(jobId) || null,
+            commandCount: relevantCommands.length,
+            durationMs: Date.now() - startedAt,
+        });
+
         return NextResponse.json({
             commands: relevantCommands,
             settings: {
@@ -441,7 +484,11 @@ export async function POST(req: Request) {
         });
 
     } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        console.error('[RoLinkAPI][Poll] Request failed', {
+            traceId,
+            durationMs: Date.now() - startedAt,
+            error: error instanceof Error ? error.message : String(error),
+        });
+        return NextResponse.json({ error: 'Internal Server Error', traceId }, { status: 500 });
     }
 }
