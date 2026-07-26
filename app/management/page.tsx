@@ -38,7 +38,7 @@ export default function ManagementOverview() {
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[
+                {([
                     { label: 'Total Servers', value: stats.totalServers, color: 'text-sky-400', icon: Server },
                     { label: 'Active Jobs', value: stats.activeApplications, color: 'text-emerald-400', icon: BriefcaseBusiness },
                     { label: 'Job Submissions', value: stats.totalSubmissions, color: 'text-purple-400', icon: ClipboardList },
