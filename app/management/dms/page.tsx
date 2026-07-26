@@ -1,4 +1,5 @@
 'use client';
+import { ManagementIcon } from "@/components/ui/ManagementIcon";
 
 import { useEffect, useMemo, useState } from 'react';
 
@@ -387,114 +388,44 @@ export default function ManagementDmsPage() {
                                             <input
                                                 type="checkbox"
                                                 checked={field.inline}
-                                                onChange={(event) => updateField(index, { inline: event.target.checked })}
-                                                className="h-4 w-4 rounded border-slate-700 bg-slate-950"
-                                            />
-                                            Inline
-                                        </label>
+                  …38900 tokens truncated…                                     placeholder="Provide a reason for acceptance or denial..."
+                                            value={reason}
+                                            onChange={(e) => setReason(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex gap-4">
                                         <button
-                                            type="button"
-                                            onClick={() => removeField(index)}
-                                            className="rounded-lg p-2 text-red-400 transition-all hover:bg-red-400/10"
-                                            title="Remove field"
+                                            onClick={() => handleReview('DENIED')}
+                                            disabled={processing || !reason.trim()}
+                                            className="flex-1 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/20 px-6 py-3 rounded-2xl font-bold transition-all disabled:opacity-50"
                                         >
-                                            <svg className="h-4 w-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 6l12 12M18 6 6 18" />
-                                            </svg>
+                                            Deny Application
+                                        </button>
+                                        <button
+                                            onClick={() => handleReview('ACCEPTED')}
+                                            disabled={processing || !reason.trim()}
+                                            className="flex-1 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-500 hover:text-white border border-emerald-500/20 px-6 py-3 rounded-2xl font-bold transition-all disabled:opacity-50"
+                                        >
+                                            Accept Application
                                         </button>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    </section>
-                </div>
-
-                <aside className="space-y-4 xl:sticky xl:top-8 xl:self-start">
-                    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
-                        <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-white">Preview</h2>
-                        <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-4">
-                            {plainText.trim() && (
-                                <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{plainText}</p>
-                            )}
-                            {(plainText.trim() || hasEmbedContent) && (
-                                <div
-                                    className={`mt-3 bg-slate-900/80 p-4 ${removeSetColor ? 'rounded-xl' : 'rounded-r-xl border-l-4'}`}
-                                    style={removeSetColor ? undefined : { borderColor: parseHexColor(color) }}
-                                >
-                                    <div className="mb-3 flex items-center gap-2">
-                                        <img src={RO_LINK_ICON} alt="" className="h-5 w-5 rounded" />
-                                        <span className="text-xs font-bold text-white">Ro-Link</span>
-                                    </div>
-                                    {embedTitle.trim() && <h3 className="break-words text-sm font-bold text-white">{embedTitle}</h3>}
-                                    {description.trim() && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-300">{description}</p>}
-                                    {thumbnailUrl.trim() && <p className="mt-3 truncate text-xs text-sky-300">Thumbnail: {thumbnailUrl}</p>}
-                                    {imageUrl.trim() && <p className="mt-2 truncate text-xs text-sky-300">Image: {imageUrl}</p>}
-                                    {cleanFields.length > 0 && (
-                                        <div className="mt-3 grid gap-2">
-                                            {cleanFields.map((field, index) => (
-                                                <div key={`${field.name}-${index}`}>
-                                                    <p className="break-words text-xs font-bold text-white">{field.name}</p>
-                                                    <p className="break-words text-xs text-slate-400">{field.value}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                    <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-500">
-                                        <img src={footerIconUrl.trim() || RO_LINK_ICON} alt="" className="h-4 w-4 rounded" />
-                                        <span className="break-words">{activeFooterText}</span>
-                                    </div>
+                            ) : (
+                                <div className="pt-8 border-t border-slate-800">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Previous Feedback</h4>
+                                    <p className="text-slate-400 italic font-medium">{selected.review_reason || "No feedback provided."}</p>
                                 </div>
-                            )}
-                            {!plainText.trim() && !hasEmbedContent && (
-                                <p className="text-sm text-slate-500">Build a plaintext message, embed, or both.</p>
                             )}
                         </div>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={sendMessage}
-                        disabled={!canSend}
-                        className="w-full rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold text-white transition-all hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        {sending ? 'Sending...' : `Send to ${selectedCount} recipient${selectedCount === 1 ? '' : 's'}`}
-                    </button>
-
-                    {result && (
-                        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 text-sm">
-                            <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-white">Result</h2>
-                            <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-                                <div className="rounded-xl bg-slate-950 p-3">
-                                    <p className="font-mono text-lg font-bold text-slate-200">{result.attempted}</p>
-                                    <p className="text-[10px] uppercase tracking-wider text-slate-500">Attempted</p>
-                                </div>
-                                <div className="rounded-xl bg-slate-950 p-3">
-                                    <p className="font-mono text-lg font-bold text-emerald-300">{result.sent}</p>
-                                    <p className="text-[10px] uppercase tracking-wider text-slate-500">Sent</p>
-                                </div>
-                                <div className="rounded-xl bg-slate-950 p-3">
-                                    <p className="font-mono text-lg font-bold text-red-300">{result.failed}</p>
-                                    <p className="text-[10px] uppercase tracking-wider text-slate-500">Failed</p>
-                                </div>
-                            </div>
-                            {Number(result.skippedOptedOut || 0) > 0 && (
-                                <p className="mt-3 rounded-lg bg-slate-950 px-3 py-2 text-xs text-slate-400">
-                                    Skipped {result.skippedOptedOut} opted-out recipient{result.skippedOptedOut === 1 ? '' : 's'}.
-                                </p>
-                            )}
-                            {result.failures && result.failures.length > 0 && (
-                                <div className="mt-4 space-y-2">
-                                    {result.failures.map((failure) => (
-                                        <p key={failure.userId} className="break-words rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">
-                                            {failure.userId}: {failure.error}
-                                        </p>
-                                    ))}
-                                </div>
-                            )}
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-600 py-32 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
+                            <ManagementIcon name="document" className="w-12 h-12 mb-4 opacity-20" />
+                            <p>Select a submission to review details.</p>
                         </div>
                     )}
-                </aside>
+                </div>
             </div>
         </div>
     );
 }
+

@@ -16,6 +16,7 @@ import {
 } from '@/lib/adminPanelCommands';
 import { normalizeDashboardLogs, type NormalizedDashboardLog } from '@/lib/logRecords';
 import { normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
+import { getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 import type { PlayerPresenceActivity } from '@/lib/playerPresence';
 import { buildRobloxAvatarUrl } from '@/lib/robloxAvatars';
 
@@ -2263,7 +2264,7 @@ export default function LivePanelPage() {
                 <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex min-w-0 items-center gap-4">
                         <img
-                            src={session?.user?.image || '/Media/Ro-LinkIcon.png'}
+                            src={getDiscordMediaProxyUrl(session?.user?.image) || '/Media/Ro-LinkIcon.png'}
                             alt=""
                             className="h-16 w-16 rounded-2xl border border-sky-500/25 bg-slate-900 object-cover p-0.5 shadow-lg shadow-sky-950/30"
                         />

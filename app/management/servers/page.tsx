@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { getDiscordGuildIconProxyUrl } from '@/lib/discordMedia';
 
 interface Server {
     id: string;
@@ -433,7 +434,7 @@ export default function ManageServers() {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
                                             {server.icon ? (
-                                                <img src={`https://cdn.discordapp.com/icons/${server.id}/${server.icon}.png`} className="w-8 h-8 rounded-lg" alt="" />
+                                                <img src={getDiscordGuildIconProxyUrl(server.id, server.icon)} className="w-8 h-8 rounded-lg" alt="" />
                                             ) : (
                                                 <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-sky-500 font-bold">
                                                     {(server.name || "?")[0]}

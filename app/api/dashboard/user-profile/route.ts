@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { canUseLivePanelUserTools, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
+import { getDiscordAvatarProxyUrl, getDiscordDefaultAvatarProxyUrl } from '@/lib/discordMedia';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 type VerifiedUserRecord = {
@@ -122,11 +123,10 @@ function buildDiscordAvatarUrl(user: DiscordUserRecord | null) {
     const id = trimString(user?.id);
     const avatar = trimString(user?.avatar);
     if (!id || !avatar) {
-        return 'https://cdn.discordapp.com/embed/avatars/0.png';
+        return getDiscordDefaultAvatarProxyUrl();
     }
 
-    const extension = avatar.startsWith('a_') ? 'gif' : 'png';
-    return `https://cdn.discordapp.com/avatars/${encodeURIComponent(id)}/${encodeURIComponent(avatar)}.${extension}?size=128`;
+    return getDiscordAvatarProxyUrl(id, avatar);
 }
 
 async function fetchRobloxUserByUsername(username: string) {

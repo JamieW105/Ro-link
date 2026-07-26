@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 
 type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
 
@@ -290,7 +291,7 @@ export default function DashboardMarketplacePage() {
                                 Sign Out
                             </button>
                         </div>
-                        <img src={session?.user?.image || ''} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm" />
+                        <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm" />
                     </div>
                 </div>
             </nav>
@@ -576,7 +577,7 @@ export default function DashboardMarketplacePage() {
                                                 >
                                                     {server.icon ? (
                                                         <img
-                                                            src={`https://cdn.discordapp.com/icons/${server.id}/${server.icon}.png`}
+                                                            src={getDiscordGuildIconProxyUrl(server.id, server.icon)}
                                                             alt=""
                                                             className="h-11 w-11 shrink-0 rounded-lg border border-white/5 object-cover"
                                                         />

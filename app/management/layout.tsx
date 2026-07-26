@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from "react";
+import { ArrowLeft, Blocks, BriefcaseBusiness, FileText, LayoutDashboard, Menu, MessageSquare, OctagonX, Server, UsersRound, X, type LucideIcon } from "lucide-react";
 
 export default function ManagementLayout({
     children,
@@ -63,15 +64,15 @@ export default function ManagementLayout({
         );
     }
 
-    const navItems = [
-        { name: 'Overview', href: '/management', icon: 'M3 9h18M9 3v18', perm: 'RO_LINK_DASHBOARD' },
-        { name: 'Servers', href: '/management/servers', icon: 'M5 12h14M12 5l7 7-7 7', perm: 'MANAGE_SERVERS' },
-        { name: 'Job Apps', href: '/management/jobs', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', perm: 'POST_JOB_APPLICATION' },
-        { name: 'Updates', href: '/management/posts', icon: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01', perm: 'POST_UPDATES' },
-        { name: 'DMs', href: '/management/dms', icon: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z', perm: 'MANAGE_RO_LINK' },
-        { name: 'Modules', href: '/management/modules', icon: 'M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16zM3.3 7l8.7 5 8.7-5M12 22V12', perm: 'MANAGE_MODULES' },
-        { name: 'Blocking', href: '/management/blocking', icon: 'M18.36 6.64a9 9 0 11-12.73 0M12 2v10', perm: 'BLOCK_SERVERS' },
-        { name: 'People', href: '/management/people', icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m11-10a4 4 0 11-8 0 4 4 0 018 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zm-2 4v2', perm: 'MANAGE_RO_LINK' },
+    const navItems: Array<{ name: string; href: string; icon: LucideIcon; perm: string }> = [
+        { name: 'Overview', href: '/management', icon: LayoutDashboard, perm: 'RO_LINK_DASHBOARD' },
+        { name: 'Servers', href: '/management/servers', icon: Server, perm: 'MANAGE_SERVERS' },
+        { name: 'Job Apps', href: '/management/jobs', icon: BriefcaseBusiness, perm: 'POST_JOB_APPLICATION' },
+        { name: 'Updates', href: '/management/posts', icon: FileText, perm: 'POST_UPDATES' },
+        { name: 'DMs', href: '/management/dms', icon: MessageSquare, perm: 'MANAGE_RO_LINK' },
+        { name: 'Modules', href: '/management/modules', icon: Blocks, perm: 'MANAGE_MODULES' },
+        { name: 'Blocking', href: '/management/blocking', icon: OctagonX, perm: 'BLOCK_SERVERS' },
+        { name: 'People', href: '/management/people', icon: UsersRound, perm: 'MANAGE_RO_LINK' },
     ];
 
     const filteredNav = navItems.filter(item => perms.includes(item.perm) || perms.includes('MANAGE_RO_LINK'));
@@ -95,15 +96,14 @@ export default function ManagementLayout({
                         className="ml-auto rounded-lg border border-slate-800 p-2 text-slate-400 hover:text-white md:hidden"
                         aria-label="Close navigation"
                     >
-                        <svg className="h-4 w-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 6l12 12M18 6 6 18" />
-                        </svg>
+                        <X className="h-4 w-4" aria-hidden="true" />
                     </button>
                 </div>
 
                 <nav className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
                     {filteredNav.map((item) => {
                         const isActive = pathname === item.href || (item.href !== '/management' && pathname.startsWith(`${item.href}/`));
+                        const Icon = item.icon;
 
                         return (
                             <Link
@@ -114,9 +114,7 @@ export default function ManagementLayout({
                                     : 'text-slate-400 hover:text-white hover:bg-slate-800'
                                     }`}
                             >
-                                <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} />
-                                </svg>
+                                <Icon className="h-4 w-4" aria-hidden="true" />
                                 {item.name}
                             </Link>
                         );
@@ -125,9 +123,7 @@ export default function ManagementLayout({
 
                 <div className="p-4 border-t border-slate-800">
                     <Link href="/dashboard" className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-400 hover:text-white transition-all">
-                        <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
+                        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                         Exit Management
                     </Link>
                 </div>
@@ -145,9 +141,7 @@ export default function ManagementLayout({
                         className="rounded-xl border border-slate-800 bg-slate-900/60 p-2 text-slate-300 hover:text-white"
                         aria-label="Open navigation"
                     >
-                        <svg className="h-5 w-5" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M3 12h18M3 18h18" />
-                        </svg>
+                        <Menu className="h-5 w-5" aria-hidden="true" />
                     </button>
                 </header>
                 <div className="motion-page min-w-0 p-4 md:p-8">

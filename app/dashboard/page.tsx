@@ -4,6 +4,7 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from 'next/link';
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
+import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from "@/lib/discordMedia";
 import { LayoutDashboard, LogOut, MonitorPlay, Plus, ShieldAlert, Store } from "lucide-react";
 
 // SVGs
@@ -277,7 +278,7 @@ export default function Dashboard() {
                             </button>
                         </div>
                         <div className="relative group">
-                            <img src={session?.user?.image || ''} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm transition-transform group-hover:scale-105" />
+                            <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm transition-transform group-hover:scale-105" />
                             <button
                                 type="button"
                                 onClick={handleSignOut}
@@ -342,7 +343,7 @@ export default function Dashboard() {
                                     <div className="relative">
                                         {guild.icon ? (
                                             <img
-                                                src={`https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png`}
+                                                src={getDiscordGuildIconProxyUrl(guild.id, guild.icon)}
                                                 alt={guild.name}
                                                 className="w-16 h-16 rounded-xl shadow-lg relative z-10 border border-white/5"
                                             />

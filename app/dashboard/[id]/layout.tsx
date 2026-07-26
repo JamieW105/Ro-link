@@ -14,6 +14,7 @@ import {
 } from "@/lib/customDashboardSettings";
 import { useSession } from "next-auth/react";
 import { PermissionsProvider } from "@/context/PermissionsContext";
+import { getDiscordGuildIconProxyUrl } from "@/lib/discordMedia";
 
 interface VisibleGuild {
     id: string;
@@ -506,7 +507,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         || customDashboardInfo?.layout
         || DEFAULT_CUSTOM_DASHBOARD_LAYOUT;
     const customDashboardLogo = isCustomDashboardStyled
-        ? customDashboardMetadata?.logoUrl || (customDashboardInfo?.icon ? `https://cdn.discordapp.com/icons/${id}/${customDashboardInfo.icon}.png` : '/Media/Ro-LinkIcon.png')
+        ? customDashboardMetadata?.logoUrl || (customDashboardInfo?.icon ? getDiscordGuildIconProxyUrl(String(id), customDashboardInfo.icon) : '/Media/Ro-LinkIcon.png')
         : '/Media/Ro-LinkIcon.png';
     const customDashboardBrand = isCustomDashboardStyled
         ? customDashboardMetadata?.title || customDashboardInfo?.name || 'Ro-Link'

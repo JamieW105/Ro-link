@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react";
 import { usePermissions } from "@/context/PermissionsContext";
 import { normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
 import { normalizeLivePlayerList } from "@/lib/livePlayers";
+import { getDiscordGuildIconProxyUrl } from "@/lib/discordMedia";
 
 type IconProps = {
     className?: string;
@@ -217,7 +218,7 @@ function getDiscordIconUrl(guild?: VisibleGuild | null) {
         return '';
     }
 
-    return `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png?size=128`;
+    return getDiscordGuildIconProxyUrl(guild.id, guild.icon);
 }
 
 function maskSecret(value?: string | null) {
