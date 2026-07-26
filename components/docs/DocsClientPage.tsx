@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { isValidElement, useEffect, useMemo, useRef, useState, type ReactNode, type SVGProps } from 'react';
+import { Activity, AlertTriangle, BookOpen, Check, ChevronRight, Copy, ExternalLink, Globe2, KeyRound, Menu, Rocket, Search, Server, Settings, Shield, Terminal, Users, X } from 'lucide-react';
 
 type IconComponent = (props: SVGProps<SVGSVGElement>) => ReactNode;
 type DocCategory = 'Platform' | 'Operations' | 'Configuration' | 'Developer';
@@ -56,7 +57,7 @@ type DocSearchResult = DocSearchEntry & {
 
 const INSTALLER_PLUGIN_URL = 'https://create.roblox.com/store/asset/87859041511603/RoLink-installer';
 
-const Icons = {
+const LegacyIcons = {
     Book: (props: SVGProps<SVGSVGElement>) => (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -173,6 +174,27 @@ const Icons = {
             <line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
     ),
+} as const;
+
+const Icons = {
+    Book: BookOpen,
+    Rocket,
+    Shield,
+    Server,
+    Settings,
+    Key: KeyRound,
+    Terminal,
+    Activity,
+    Users,
+    Globe: Globe2,
+    Search,
+    ChevronRight,
+    ExternalLink,
+    Copy,
+    Check,
+    Menu,
+    X,
+    AlertTriangle,
 } as const;
 
 function cn(...classes: Array<string | false | null | undefined>) {
