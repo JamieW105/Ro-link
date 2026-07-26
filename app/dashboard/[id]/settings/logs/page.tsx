@@ -1,144 +1,268 @@
 'use client';
+import { ArrowUpDown, ScrollText, Search } from "lucide-react";
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
 
-const ScrollIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 21h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z" /><path d="M12 11V7" /><path d="M12 17v-2" /><path d="M8 7h8" /><path d="M8 11h8" /><path d="M8 15h8" /></svg>
-);
+const ScrollIcon = () => <ScrollText size={24} aria-hidden="true" />;
 
-const SearchIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
-);
+const SearchIcon = () => <Search size={16} aria-hidden="true" />;
 
-const SortIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" /></svg>
-);
+const SortIcon = () => <ArrowUpDown size={16} aria-hidden="true" />;
 
 export default function LogsPage() {
     const { id } = useParams();
     const [logs, setLogs] = useState<NormalizedDashboardLog[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState("");
-    const [sortAsc, setSortAsc] = useState(false);
-
-    useEffect(() => {
-        async function fetchLogs() {
-            if (!id) return;
-
-            const response = await fetch(`/api/dashboard/logs?serverId=${encodeURIComponent(String(id))}&limit=200`, {
-                cache: 'no-store',
-            });
-            const data = response.ok ? await response.json() : [];
-            setLogs(normalizeDashboardLogs(data));
-            setLoading(false);
-        }
-        fetchLogs();
-        const interval = setInterval(fetchLogs, 5000);
-        return () => clearInterval(interval);
-    }, [id]);
-
-    const filteredLogs = logs
-        .filter(log =>
-            (log.target?.toLowerCase() || "").includes(search.toLowerCase()) ||
-            (log.action?.toLowerCase() || "").includes(search.toLowerCase()) ||
-            (log.moderator?.toLowerCase() || "").includes(search.toLowerCase()) ||
-            log.targetIdentities.some((identity) => identity.toLowerCase().includes(search.toLowerCase())) ||
-            log.moderatorIdentities.some((identity) => identity.toLowerCase().includes(search.toLowerCase()))
-        )
-        .sort((a, b) => {
-            const timeA = new Date(a.timestamp).getTime();
-            const timeB = new Date(b.timestamp).getTime();
-            return sortAsc ? timeA - timeB : timeB - timeA;
-        });
-
-    if (loading) return (
-        <div className="flex items-center justify-center min-h-[400px]">
-            <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
-        </div>
-    );
-
-    return (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full pb-20">
-            {/* Page Header */}
-            <div className="mb-10 pb-8 border-b border-slate-800/60">
-                <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 bg-sky-600/10 rounded-2xl flex items-center justify-center text-sky-500 border border-sky-500/20 shadow-2xl shadow-sky-900/10">
-                        <ScrollIcon />
+    const [search, setSearch]…104093 tokens truncated…                         >
+                                        Open Module
+                                    </button>
+                                </div>
+                            </article>
+                        ))}
                     </div>
-                    <div>
-                        <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">Activity Logs</h1>
-                        <p className="text-slate-500 text-sm font-medium mt-1">Real-time audit trail of all server actions.</p>
-                    </div>
-                </div>
-            </div>
+                )}
 
-            <div className="bg-slate-900/40 border border-slate-800 rounded-xl shadow-xl relative overflow-hidden backdrop-blur-md">
-                {/* Controls */}
-                <div className="px-6 py-5 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="relative w-full sm:w-96 group">
-                        <div className="absolute inset-y-0 left-3 flex items-center text-slate-500 group-focus-within:text-sky-500 transition-colors">
-                            <SearchIcon />
-                        </div>
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search logs by user, action..."
-                            className="w-full bg-black/40 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-xs font-bold text-white focus:outline-none focus:border-sky-500 transition-all placeholder:text-slate-600 uppercase tracking-wide"
-                        />
-                    </div>
-
-                    <button
-                        onClick={() => setSortAsc(!sortAsc)}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all uppercase tracking-wider"
-                    >
-                        <SortIcon />
-                        {sortAsc ? "Oldest First" : "Newest First"}
-                    </button>
-                </div>
-
-                <div className="table-responsive custom-scrollbar">
-                    {filteredLogs.length === 0 ? (
-                        <div className="p-20 text-center text-slate-600 font-bold uppercase text-[10px] tracking-widest text-nowrap">
-                            No logs found matching your criteria.
-                        </div>
-                    ) : (
-                        <table className="w-full text-left text-xs min-w-[600px]">
-                            <thead className="text-slate-500 uppercase text-[10px] font-bold tracking-widest bg-slate-800/30">
-                                <tr>
-                                    <th className="px-4 md:px-8 py-3">Action</th>
-                                    <th className="px-4 md:px-8 py-3">Target</th>
-                                    <th className="px-4 md:px-8 py-3">Moderator</th>
-                                    <th className="px-4 md:px-8 py-3 text-right">Time</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/50">
-                                {filteredLogs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-sky-500/5 transition-all group">
-                                        <td className="px-4 md:px-8 py-4">
-                                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold tracking-tight border inline-block ${log.action === 'BAN' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
-                                                log.action === 'KICK' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
-                                                    log.action.includes('LOOKUP') ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' :
-                                                        'bg-sky-500/10 text-sky-500 border-sky-500/20'
-                                                }`}>
-                                                {log.action}
+                {selectedModule && (
+                    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+                        <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-700 bg-[#020617] shadow-2xl">
+                            <div className="flex flex-col gap-4 border-b border-slate-800 bg-slate-950/80 px-5 py-5 md:flex-row md:items-start md:justify-between md:px-7">
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">
+                                            {selectedModule.category}
+                                        </span>
+                                        <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                            v{selectedModule.version}
+                                        </span>
+                                        <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(selectedModule.status)}`}>
+                                            {statusLabel(selectedModule.status)}
+                                        </span>
+                                        {selectedModule.isOfficial && (
+                                            <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+                                                Official
                                             </span>
-                                        </td>
-                                        <td className="px-4 md:px-8 py-4 font-semibold text-white">{log.target}</td>
-                                        <td className="px-4 md:px-8 py-4 text-slate-400 font-medium">{log.moderator}</td>
-                                        <td className="px-4 md:px-8 py-4 text-right text-slate-600 font-mono text-[10px] font-bold">
-                                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                                            <span className="ml-2 text-slate-700">{new Date(log.timestamp).toLocaleDateString()}</span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-            </div>
+                                        )}
+                                        {selectedModule.creatorIsVerified && (
+                                            <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
+                                                Verified Creator
+                                            </span>
+                                        )}
+                                    </div>
+                                    <h2 className="mt-4 text-2xl font-black tracking-tight text-white md:text-4xl">{selectedModule.name}</h2>
+                                    <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
+                                        {selectedModule.description || 'No description provided.'}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={closeModulePreview}
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
+                                    aria-label="Close module preview"
+                                >
+                                    x
+                                </button>
+                            </div>
+
+                            <div className="custom-scrollbar max-h-[calc(90vh-180px)] overflow-y-auto px-5 py-6 md:px-7">
+                                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+                                    <section>
+                                        <h3 className="text-sm font-bold uppercase tracking-widest text-white">Configuration Fields</h3>
+                                        {Object.values(selectedModule.configSchema || {}).length === 0 ? (
+                                            <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-5 text-sm text-slate-500">
+                                                This module does not expose configurable fields.
+                                            </div>
+                                        ) : (
+                                            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                                {Object.values(selectedModule.configSchema || {}).map((field) => (
+                                                    <div key={field.key} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <p className="text-sm font-bold text-white">{field.label}</p>
+                                                                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                                                                    {field.shortDescription || 'No field description provided.'}
+                                                                </p>
+                                                            </div>
+                                                            <span className="rounded-md border border-slate-700 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                                {field.type}
+                                                            </span>
+                                                        </div>
+                                                        {field.options.length > 0 && (
+                                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                                {field.options.slice(0, 6).map((option) => (
+                                                                    <span key={option} className="rounded-md border border-slate-800 bg-black/30 px-2 py-1 text-[10px] font-semibold text-slate-400">
+                                                                        {option}
+                                                                    </span>
+                                                                ))}
+                                                                {field.options.length > 6 && (
+                                                                    <span className="rounded-md border border-slate-800 bg-black/30 px-2 py-1 text-[10px] font-semibold text-slate-500">
+                                                                        +{field.options.length - 6} more
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </section>
+
+                                    <aside className="space-y-4">
+                                        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Slug</p>
+                                            <p className="mt-2 break-all font-mono text-sm text-slate-300">{selectedModule.slug}</p>
+                                        </div>
+                                        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Review Status</p>
+                                            <p className="mt-2 text-sm font-semibold text-slate-300">{statusLabel(selectedModule.status)}</p>
+                                            {selectedModule.status === 'REJECTED' && selectedModule.moderationNote && (
+                                                <p className="mt-2 text-xs leading-relaxed text-red-300">{selectedModule.moderationNote}</p>
+                                            )}
+                                        </div>
+                                        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Published</p>
+                                            <p className="mt-2 text-sm font-semibold text-slate-300">{formatDate(selectedModule.publishedAt)}</p>
+                                        </div>
+                                        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Checksum</p>
+                                            <p className="mt-2 break-all font-mono text-xs text-slate-300">{selectedModule.sourceChecksum || 'Unavailable'}</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => openInstallPicker(selectedModule.id)}
+                                            className="inline-flex w-full items-center justify-center rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500"
+                                        >
+                                            Select Server To Install
+                                        </button>
+                                    </aside>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {installPickerModule && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+                        <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-700 bg-[#020617] shadow-2xl">
+                            <div className="flex items-start justify-between gap-4 border-b border-slate-800 bg-slate-950/80 px-5 py-5">
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-sky-400">Install Module</p>
+                                    <h3 className="mt-2 text-2xl font-black tracking-tight text-white">{installPickerModule.name}</h3>
+                                    <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                                        Click a server to install. Right-click a server to start multi-select.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={closeInstallPicker}
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition-colors hover:border-slate-500 hover:text-white disabled:opacity-50"
+                                    aria-label="Close install picker"
+                                    disabled={installing}
+                                >
+                                    x
+                                </button>
+                            </div>
+
+                            <div className="custom-scrollbar max-h-[calc(90vh-170px)] overflow-y-auto px-5 py-5">
+                                {installError && (
+                                    <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300">
+                                        {installError}
+                                    </div>
+                                )}
+                                {installMessage && (
+                                    <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-300">
+                                        {installMessage}
+                                    </div>
+                                )}
+
+                                {installTargets.length === 0 ? (
+                                    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-8 text-center text-sm text-slate-500">
+                                        No servers are available for module installs.
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        {installTargets.map((server) => {
+                                            const selected = selectedServerIds.includes(server.id);
+                                            const full = server.installedModuleCount >= server.moduleLimit;
+
+                                            return (
+                                                <button
+                                                    key={server.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (multiSelectInstall) {
+                                                            toggleServerSelection(server.id);
+                                                            return;
+                                                        }
+
+                                                        installModuleToServers(installPickerModule.id, [server.id]);
+                                                    }}
+                                                    onContextMenu={(event) => {
+                                                        event.preventDefault();
+                                                        setMultiSelectInstall(true);
+                                                        toggleServerSelection(server.id);
+                                                    }}
+                                                    disabled={installing || full}
+                                                    className={`flex min-h-20 items-center gap-3 rounded-xl border p-4 text-left transition-colors disabled:opacity-50 ${selected ? 'border-sky-400 bg-sky-500/15' : 'border-slate-800 bg-slate-900/40 hover:border-sky-500/40'}`}
+                                                >
+                                                    {server.icon ? (
+                                                        <img
+                                                            src={`https://cdn.discordapp.com/icons/${server.id}/${server.icon}.png`}
+                                                            alt=""
+                                                            className="h-11 w-11 shrink-0 rounded-lg border border-white/5 object-cover"
+                                                        />
+                                                    ) : (
+                                                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-sm font-bold text-sky-300">
+                                                            {server.name.substring(0, 1)}
+                                                        </span>
+                                                    )}
+                                                    <span className="min-w-0">
+                                                        <span className="block break-words text-sm font-bold text-white">{server.name}</span>
+                                                        <span className="mt-1 block font-mono text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                                            {full ? `${server.installedModuleCount}/${server.moduleLimit} installed` : selected ? 'Selected' : `${server.installedModuleCount}/${server.moduleLimit} installed`}
+                                                        </span>
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {multiSelectInstall && installTargets.length > 0 && (
+                                <div className="flex flex-col gap-3 border-t border-slate-800 bg-slate-950/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <p className="text-xs font-semibold text-slate-400">
+                                        {selectedServerIds.length} server{selectedServerIds.length === 1 ? '' : 's'} selected
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setMultiSelectInstall(false);
+                                                setSelectedServerIds([]);
+                                            }}
+                                            disabled={installing}
+                                            className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-slate-500 disabled:opacity-50"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => installModuleToServers(installPickerModule.id, selectedServerIds)}
+                                            disabled={installing || selectedServerIds.length === 0}
+                                            className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
+                                        >
+                                            {installing ? 'Installing' : 'Install Selected'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </main>
         </div>
     );
 }
+
