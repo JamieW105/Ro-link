@@ -309,6 +309,24 @@ select option {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* Keep the per-server dashboard's navigation and header icons clean and outline-only. */
+.custom-dashboard-shell:not([data-custom-dashboard-themed="true"])[data-dashboard-route="standard"] .dashboard-sidebar svg,
+.custom-dashboard-shell:not([data-custom-dashboard-themed="true"])[data-dashboard-route="standard"] .dashboard-topbar svg {
+  fill: none !important;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Live-panel actions use the same outline-only icon language as the server dashboard. */
+.live-panel svg {
+  fill: none !important;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .custom-dashboard-shell:not([data-custom-dashboard-themed="true"])[data-dashboard-route="standard"] .dashboard-sidebar nav p {
   color: #64748b !important;
   letter-spacing: 0.18em !important;

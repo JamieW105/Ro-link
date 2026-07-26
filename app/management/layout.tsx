@@ -96,7 +96,7 @@ export default function ManagementLayout({
                         className="ml-auto rounded-lg border border-slate-800 p-2 text-slate-400 hover:text-white md:hidden"
                         aria-label="Close navigation"
                     >
-                        <X className="h-4 w-4" aria-hidden="true" />
+                        <X className="h-4 w-4" fill="none" aria-hidden="true" />
                     </button>
                 </div>
 
@@ -114,7 +114,7 @@ export default function ManagementLayout({
                                     : 'text-slate-400 hover:text-white hover:bg-slate-800'
                                     }`}
                             >
-                                <Icon className="h-4 w-4" aria-hidden="true" />
+                                <Icon className="h-4 w-4" fill="none" aria-hidden="true" />
                                 {item.name}
                             </Link>
                         );
@@ -123,7 +123,7 @@ export default function ManagementLayout({
 
                 <div className="p-4 border-t border-slate-800">
                     <Link href="/dashboard" className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-400 hover:text-white transition-all">
-                        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                        <ArrowLeft className="h-4 w-4" fill="none" aria-hidden="true" />
                         Exit Management
                     </Link>
                 </div>
@@ -141,7 +141,7 @@ export default function ManagementLayout({
                         className="rounded-xl border border-slate-800 bg-slate-900/60 p-2 text-slate-300 hover:text-white"
                         aria-label="Open navigation"
                     >
-                        <Menu className="h-5 w-5" aria-hidden="true" />
+                        <Menu className="h-5 w-5" fill="none" aria-hidden="true" />
                     </button>
                 </header>
                 <div className="motion-page min-w-0 p-4 md:p-8">

@@ -2247,7 +2247,7 @@ export default function LivePanelPage() {
     }
 
     return (
-        <div className="fixed inset-0 flex flex-col overflow-hidden bg-[#020617] text-slate-200">
+        <div className="live-panel fixed inset-0 flex flex-col overflow-hidden bg-[#020617] text-slate-200">
             <header className="shrink-0 border-b border-slate-800 bg-slate-950/80 shadow-2xl shadow-black/20">
                 <div className="grid min-h-12 grid-cols-[1fr_auto_1fr] items-center border-b border-slate-800 bg-slate-900/70 px-4 py-2">
                     <div />

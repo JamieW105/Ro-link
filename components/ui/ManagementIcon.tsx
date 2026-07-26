@@ -17,5 +17,5 @@ const icons = {
 
 export function ManagementIcon({ name, ...props }: LucideProps & { name: keyof typeof icons }) {
     const Icon = icons[name];
-    return <Icon aria-hidden="true" {...props} />;
+    return <Icon aria-hidden="true" fill="none" {...props} />;
 }

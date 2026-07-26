@@ -49,7 +49,7 @@ export default function ManagementOverview() {
                     <div key={stat.label} className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 md:p-6">
                         <div className="flex items-center justify-between mb-4">
                             <div className={`p-2 rounded-lg bg-slate-800 ${stat.color}`}>
-                                <Icon className="h-5 w-5" aria-hidden="true" />
+                                <Icon className="h-5 w-5" fill="none" aria-hidden="true" />
                             </div>
                         </div>
                         <p className="text-slate-400 text-sm font-medium">{stat.label}</p>
