@@ -76,6 +76,8 @@ interface DashboardRole {
     can_lookup: boolean;
     can_manage_settings: boolean;
     can_manage_reports: boolean;
+    can_view_logs: boolean;
+    can_manage_staff_notes: boolean;
     allowed_misc_cmds: string[];
 }
 
@@ -84,6 +86,8 @@ type DashboardRoleBooleanField =
     | 'can_access_live_panel'
     | 'can_manage_settings'
     | 'can_manage_reports'
+    | 'can_view_logs'
+    | 'can_manage_staff_notes'
     | 'can_lookup'
     | 'can_kick'
     | 'can_ban'
@@ -95,6 +99,8 @@ const ROLE_PERMISSION_OPTIONS: Array<{ key: DashboardRoleBooleanField; label: st
     { key: 'can_access_live_panel', label: 'Live Panel' },
     { key: 'can_manage_settings', label: 'Manage Settings' },
     { key: 'can_manage_reports', label: 'Manage Reports' },
+    { key: 'can_view_logs', label: 'View Logs' },
+    { key: 'can_manage_staff_notes', label: 'Manage Staff Notes' },
     { key: 'can_lookup', label: 'Lookup Users' },
     { key: 'can_kick', label: 'Kick Users' },
     { key: 'can_ban', label: 'Ban Users' },
@@ -630,7 +636,9 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         mute: false,
                         lookup: false,
                         manage_settings: false,
-                        manage_reports: false
+                        manage_reports: false,
+                        view_logs: false,
+                        manage_staff_notes: false,
                     },
                     panelCmds: []
                 })
@@ -676,7 +684,9 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         mute: targetRole.can_mute,
                         lookup: targetRole.can_lookup,
                         manage_settings: targetRole.can_manage_settings,
-                        manage_reports: targetRole.can_manage_reports
+                        manage_reports: targetRole.can_manage_reports,
+                        view_logs: targetRole.can_view_logs,
+                        manage_staff_notes: targetRole.can_manage_staff_notes,
                     },
                     panelCmds: normalizeAdminPanelCommandList(targetRole.allowed_misc_cmds)
                 })
@@ -694,7 +704,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
         setDashboardRoles(dashboardRoles.filter(r => r.id !== roleId));
 
         try {
-            await fetch(`/api/settings/roles?id=${roleId}`, { method: 'DELETE' });
+            await fetch(`/api/settings/roles?id=${encodeURIComponent(roleId)}&serverId=${encodeURIComponent(String(id))}`, { method: 'DELETE' });
         } catch (e) {
             console.error("Failed to delete role", e);
         }

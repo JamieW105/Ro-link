@@ -22,6 +22,10 @@ interface Job {
     hasSubmitted?: boolean;
 }
 
+type LinkedAccount = {
+    roblox_id: string | number;
+};
+
 export default function ApplicationForm({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
     const params = use(paramsPromise);
     const { data: session, status } = useSession();
@@ -31,6 +35,8 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
+    const [linkedAccount, setLinkedAccount] = useState<LinkedAccount | null>(null);
+    const [linkedAccountLoading, setLinkedAccountLoading] = useState(true);
 
     useEffect(() => {
         fetch(`/api/careers/${params.id}`)
@@ -43,6 +49,34 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
             .catch(() => setLoading(false));
     }, [params.id]);
 
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadLinkedAccount() {
+            setLinkedAccountLoading(true);
+            try {
+                const response = await fetch('/api/verify/linked-account', { cache: 'no-store' });
+                const data = response.ok ? await response.json() as LinkedAccount | null : null;
+                if (!cancelled) {
+                    setLinkedAccount(data?.roblox_id ? data : null);
+                }
+            } finally {
+                if (!cancelled) setLinkedAccountLoading(false);
+            }
+        }
+
+        if (session?.user) {
+            loadLinkedAccount();
+        } else if (status !== 'loading') {
+            setLinkedAccount(null);
+            setLinkedAccountLoading(false);
+        }
+
+        return () => {
+            cancelled = true;
+        };
+    }, [session?.user, status]);
+
     const handleAnswer = (qId: string, val: any) => {
         setAnswers(prev => ({ ...prev, [qId]: val }));
     };
@@ -50,6 +84,10 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!session) return signIn('discord');
+        if (!linkedAccount?.roblox_id) {
+            alert('Link your Roblox account before submitting an application.');
+            return;
+        }
 
         setSubmitting(true);
         try {
@@ -215,6 +253,25 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
                             >
                                 Sign in with Discord to Submit
                             </button>
+                        ) : linkedAccountLoading ? (
+                            <button
+                                type="button"
+                                disabled
+                                className="bg-slate-700 text-slate-300 px-12 py-4 rounded-2xl font-bold text-lg w-full"
+                            >
+                                Checking Roblox account...
+                            </button>
+                        ) : !linkedAccount?.roblox_id ? (
+                            <div className="w-full rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 text-center">
+                                <p className="mb-4 text-sm font-medium text-amber-100">Link your Roblox account before submitting an application.</p>
+                                <button
+                                    type="button"
+                                    onClick={() => { window.location.href = `/api/roblox/auth?returnTo=${encodeURIComponent(`/careers/${params.id}`)}`; }}
+                                    className="bg-sky-600 hover:bg-sky-500 text-white px-8 py-3 rounded-xl font-bold transition-all"
+                                >
+                                    Link Roblox Account
+                                </button>
+                            </div>
                         ) : (
                             <button
                                 type="submit"

@@ -30,6 +30,8 @@ interface DashboardPermissions {
     can_mute: boolean;
     can_lookup: boolean;
     can_manage_reports: boolean;
+    can_view_logs: boolean;
+    can_manage_staff_notes: boolean;
     can_manage_settings: boolean;
     allowed_misc_cmds: string[];
     is_admin: boolean;
@@ -626,7 +628,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             label: "Logs",
             icon: <ScrollIcon />,
             href: `/dashboard/${id}/settings/logs`,
-            hide: !canManageDashboardSettings
+            hide: !userPermissions.is_admin && !userPermissions.can_view_logs
         },
     ].filter(item => !item.hide);
 

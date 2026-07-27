@@ -73,6 +73,14 @@ export function canManageReports(permissions: DashboardPermissions) {
     return permissions.is_admin || permissions.can_manage_reports;
 }
 
+export function canViewLogs(permissions: DashboardPermissions) {
+    return permissions.is_admin || permissions.can_view_logs;
+}
+
+export function canManageStaffNotes(permissions: DashboardPermissions) {
+    return permissions.is_admin || permissions.can_manage_staff_notes;
+}
+
 export function canLookup(permissions: DashboardPermissions) {
     return permissions.is_admin || permissions.can_lookup;
 }
