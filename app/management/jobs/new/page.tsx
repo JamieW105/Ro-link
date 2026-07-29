@@ -1,5 +1,17 @@
 'use client';
 
+import {
+    AlignLeft as LucideAlignLeft,
+    ArrowLeft as LucideArrowLeft,
+    CircleHelp as LucideCircleHelp,
+    Heading2 as LucideHeading2,
+    Info as LucideInfo,
+    ListChecks as LucideListChecks,
+    SquareCheckBig as LucideSquareCheckBig,
+    TextCursorInput as LucideTextCursorInput,
+    X as LucideX,
+} from 'lucide-react';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -89,7 +101,7 @@ export default function NewJobApplication() {
         <div className="max-w-4xl mx-auto pb-20">
             <header className="mb-12">
                 <Link href="/management/jobs" className="text-slate-500 hover:text-white text-sm font-medium flex items-center gap-2 mb-4 transition-colors">
-                    <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                    <LucideArrowLeft className="w-4 h-4" />
                     Back to Jobs
                 </Link>
                 <h1 className="text-4xl font-extrabold text-white tracking-tight">Create Job Application</h1>
@@ -101,7 +113,7 @@ export default function NewJobApplication() {
                 <section className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 space-y-6">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="w-8 h-8 rounded-lg bg-sky-500/10 flex items-center justify-center text-sky-400">
-                            <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <LucideInfo className="w-4 h-4" />
                         </div>
                         <h2 className="text-xl font-bold text-white">Application Details</h2>
                     </div>
@@ -166,7 +178,7 @@ export default function NewJobApplication() {
                     <div className="flex items-center justify-between">
                         <h2 className="text-xl font-bold text-white flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                                <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <LucideCircleHelp className="w-4 h-4" />
                             </div>
                             Form Questions
                         </h2>
@@ -180,7 +192,7 @@ export default function NewJobApplication() {
                                     onClick={() => removeQuestion(q.id)}
                                     className="absolute -top-2 -right-2 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
                                 >
-                                    <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    <LucideX className="w-4 h-4" />
                                 </button>
 
                                 <div className="flex items-center gap-2 mb-4">
@@ -239,19 +251,19 @@ export default function NewJobApplication() {
 
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mt-8">
                             {[
-                                { id: 'short_answer', label: 'Short Text', icon: 'M4 6h16M4 12h10M4 18h7' },
-                                { id: 'long_answer', label: 'Long Text', icon: 'M4 12h16M4 6h16M4 18h16' },
-                                { id: 'multi_choice', label: 'Multiple Choice', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
-                                { id: 'checkbox', label: 'Checkbox', icon: 'M5 13l4 4L19 7' },
-                                { id: 'section', label: 'Section Header', icon: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
-                            ].map(type => (
+                                { id: 'short_answer', label: 'Short Text', icon: LucideTextCursorInput },
+                                { id: 'long_answer', label: 'Long Text', icon: LucideAlignLeft },
+                                { id: 'multi_choice', label: 'Multiple Choice', icon: LucideListChecks },
+                                { id: 'checkbox', label: 'Checkbox', icon: LucideSquareCheckBig },
+                                { id: 'section', label: 'Section Header', icon: LucideHeading2 },
+                            ].map(({ icon: TypeIcon, ...type }) => (
                                 <button
                                     key={type.id}
                                     type="button"
                                     onClick={() => addQuestion(type.id as any)}
                                     className="bg-slate-900 border border-slate-800 hover:border-sky-500/50 p-4 rounded-2xl flex flex-col items-center gap-2 transition-all group"
                                 >
-                                    <svg className="w-5 h-5 text-slate-500 group-hover:text-sky-400 transition-colors" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={type.icon} /></svg>
+                                    <TypeIcon className="w-5 h-5 text-slate-500 group-hover:text-sky-400 transition-colors" />
                                     <span className="text-[10px] font-bold text-slate-500 group-hover:text-white uppercase tracking-widest text-center">{type.label}</span>
                                 </button>
                             ))}

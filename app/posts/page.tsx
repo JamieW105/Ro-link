@@ -1,5 +1,7 @@
 'use client';
 
+import { ArrowLeft as LucideArrowLeft, ChevronRight as LucideChevronRight } from 'lucide-react';
+
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -40,9 +42,7 @@ export default function PostsPage() {
             <div className="motion-page mx-auto max-w-6xl px-6 py-20 sm:px-8">
                 <header className="max-w-3xl">
                     <Link href="/" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.25em] text-sky-400 transition-colors hover:text-sky-300">
-                        <svg className="h-4 w-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
+                        <LucideArrowLeft className="h-4 w-4" />
                         Back to Home
                     </Link>
                     <p className="mt-10 text-xs font-bold uppercase tracking-[0.35em] text-sky-400">Ro-Link Updates</p>
@@ -126,9 +126,7 @@ export default function PostsPage() {
                                             className="inline-flex items-center gap-2 rounded-xl border border-sky-500/20 bg-sky-500/10 px-5 py-3 text-sm font-bold text-sky-300 transition-all hover:bg-sky-500/20"
                                         >
                                             Read Update
-                                            <svg className="h-4 w-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                                            </svg>
+                                            <LucideChevronRight className="h-4 w-4" />
                                         </Link>
                                     </div>
                                 </article>

@@ -1,5 +1,7 @@
 'use client';
 
+import { Activity as LucideActivity, ArrowRight as LucideArrowRight, Copy as LucideCopy, KeyRound as LucideKeyRound, Layers3 as LucideLayers3, Radio as LucideRadio, Server as LucideServer, ShieldCheck as LucideShieldCheck, TriangleAlert as LucideTriangleAlert } from 'lucide-react';
+
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -15,73 +17,39 @@ type IconProps = {
 };
 
 const ActivityIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M22 12h-4l-3 8L9 4l-3 8H2" />
-    </svg>
+    <LucideActivity className={className} strokeWidth="2.2" />
 );
 
 const ServerIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <rect width="20" height="8" x="2" y="2" rx="2" />
-        <rect width="20" height="8" x="2" y="14" rx="2" />
-        <path d="M6 6h.01" />
-        <path d="M6 18h.01" />
-    </svg>
+    <LucideServer className={className} strokeWidth="2.2" />
 );
 
 const ShieldIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
-        <path d="m9 12 2 2 4-4" />
-    </svg>
+    <LucideShieldCheck className={className} strokeWidth="2.2" />
 );
 
 const KeyIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="m21 2-2 2" />
-        <path d="m15 8 2 2" />
-        <path d="M7 14a5 5 0 1 1 7-7l7 7-3 3-2-2-2 2-2-2-1.4 1.4A5 5 0 0 1 7 14Z" />
-    </svg>
+    <LucideKeyRound className={className} strokeWidth="2.2" />
 );
 
 const RadioIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4.9 19.1a10 10 0 0 1 0-14.2" />
-        <path d="M7.8 16.2a6 6 0 0 1 0-8.5" />
-        <circle cx="12" cy="12" r="2" />
-        <path d="M16.2 7.8a6 6 0 0 1 0 8.5" />
-        <path d="M19.1 4.9a10 10 0 0 1 0 14.2" />
-    </svg>
+    <LucideRadio className={className} strokeWidth="2.2" />
 );
 
 const LayersIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="m12 2 9 5-9 5-9-5 9-5Z" />
-        <path d="m3 12 9 5 9-5" />
-        <path d="m3 17 9 5 9-5" />
-    </svg>
+    <LucideLayers3 className={className} strokeWidth="2.2" />
 );
 
 const AlertIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
-        <path d="M12 9v4" />
-        <path d="M12 17h.01" />
-    </svg>
+    <LucideTriangleAlert className={className} strokeWidth="2.2" />
 );
 
 const ArrowIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M5 12h14" />
-        <path d="m13 6 6 6-6 6" />
-    </svg>
+    <LucideArrowRight className={className} strokeWidth="2.3" />
 );
 
 const CopyIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <rect width="13" height="13" x="9" y="9" rx="2" />
-        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
+    <LucideCopy className={className} strokeWidth="2.2" />
 );
 
 interface VisibleGuild {

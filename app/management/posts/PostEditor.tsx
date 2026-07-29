@@ -1,5 +1,7 @@
 'use client';
 
+import { ArrowLeft as LucideArrowLeft } from 'lucide-react';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -208,7 +210,7 @@ export default function PostEditor({
         <div className="max-w-5xl mx-auto pb-20">
             <header className="mb-12">
                 <Link href="/management/posts" className="text-slate-500 hover:text-white text-sm font-medium flex items-center gap-2 mb-4 transition-colors">
-                    <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                    <LucideArrowLeft className="w-4 h-4" />
                     Back to Updates
                 </Link>
                 <h1 className="text-4xl font-extrabold text-white tracking-tight">{heading}</h1>

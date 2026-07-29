@@ -1,5 +1,7 @@
 'use client';
 
+import { Power as LucidePower, RefreshCw as LucideRefreshCw } from 'lucide-react';
+
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -32,19 +34,11 @@ function formatServerId(serverId: string) {
 }
 
 const RestartIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M21 12a9 9 0 0 1-9 9 8.6 8.6 0 0 1-6-2.4" />
-        <path d="M3 12a9 9 0 0 1 15-6.6" />
-        <path d="M18 2v4h-4" />
-        <path d="M6 22v-4h4" />
-    </svg>
+    <LucideRefreshCw width="17" height="17" strokeWidth="2.2" aria-hidden="true" />
 );
 
 const ShutdownIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M12 2v10" />
-        <path d="M18.4 6.6a9 9 0 1 1-12.8 0" />
-    </svg>
+    <LucidePower width="17" height="17" strokeWidth="2.2" aria-hidden="true" />
 );
 
 export default function ServersPage() {

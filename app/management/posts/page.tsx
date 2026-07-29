@@ -1,5 +1,7 @@
 'use client';
 
+import { Plus as LucidePlus } from 'lucide-react';
+
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -95,9 +97,7 @@ export default function ManagePostsPage() {
                     href="/management/posts/new"
                     className="inline-flex w-fit items-center gap-2 rounded-xl bg-sky-600 px-6 py-2.5 font-bold text-white shadow-lg shadow-sky-900/20 transition-all hover:bg-sky-500"
                 >
-                    <svg className="h-4 w-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
-                    </svg>
+                    <LucidePlus className="h-4 w-4" />
                     New Post
                 </Link>
             </header>

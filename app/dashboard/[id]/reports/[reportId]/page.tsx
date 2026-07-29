@@ -1,5 +1,7 @@
 'use client';
 
+import { ArrowLeft as LucideArrowLeft, ExternalLink as LucideExternalLink, Shield as LucideShield } from 'lucide-react';
+
 import { hasAdminPanelCommandAccess } from "@/lib/adminPanelCommands";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -10,10 +12,10 @@ import { normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRe
 
 // Icons
 const ChevronLeftIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+    <LucideArrowLeft width="16" height="16" strokeWidth="2" />
 );
 const ShieldIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" /></svg>
+    <LucideShield width="16" height="16" strokeWidth="2" />
 );
 
 export default function ReportDetailsPage() {
@@ -412,7 +414,7 @@ export default function ReportDetailsPage() {
                                     <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors">
                                         {/^\d+$/.test(report.reported_roblox_username) && !profiles?.roblox_id ? "Discord Profile" : "Roblox Profile"}
                                     </span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600 group-hover:text-white"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                                    <LucideExternalLink width="14" height="14" strokeWidth="2" className="text-slate-600 group-hover:text-white" />
                                 </a>
                                 {profiles?.discord_id ? (
                                     <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">

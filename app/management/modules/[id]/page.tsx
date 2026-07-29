@@ -1,5 +1,7 @@
 'use client';
 
+import { Check as LucideCheck, X as LucideX } from 'lucide-react';
+
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -94,17 +96,13 @@ function fieldDescription(field: ModuleConfigField) {
 
 function CheckIcon() {
     return (
-        <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M4.5 10.4 8.2 14l7.3-8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <LucideCheck aria-hidden="true" className="h-4 w-4" />
     );
 }
 
 function XIcon() {
     return (
-        <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-            <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-        </svg>
+        <LucideX aria-hidden="true" className="h-4 w-4" />
     );
 }
 

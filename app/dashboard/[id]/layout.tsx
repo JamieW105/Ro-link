@@ -1,5 +1,7 @@
 'use client';
 
+import { ArrowLeft as LucideArrowLeft, ChevronDown as LucideChevronDown, FileText as LucideFileText, Home as LucideHome, LayoutDashboard as LucideLayoutDashboard, Menu as LucideMenu, MonitorPlay as LucideMonitorPlay, Package as LucidePackage, Rss as LucideRss, Search as LucideSearch, Server as LucideServer, Settings as LucideSettings, Shield as LucideShield, ShieldCheck as LucideShieldCheck, TriangleAlert as LucideTriangleAlert, UserCheck as LucideUserCheck, WandSparkles as LucideWandSparkles, X as LucideX } from 'lucide-react';
+
 import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect, type CSSProperties } from "react";
@@ -72,111 +74,75 @@ type CustomDashboardPreview = {
 // --- PREMIUM SVG ICONS ---
 
 const HomeIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path fillRule="evenodd" d="m2.5 9.1 9.5-7 9.5 7a1.5 1.5 0 0 1-.9 2.7H20v8a2.2 2.2 0 0 1-2.2 2.2H6.2A2.2 2.2 0 0 1 4 19.8v-8h-.6a1.5 1.5 0 0 1-.9-2.7ZM8 20h2.5v-6h3v6H16v-6.5H8V20Z" />
-    </svg>
+    <LucideHome width="18" height="18" />
 );
 
 const ServersIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path fillRule="evenodd" d="M4 2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm0 13h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2Zm2-9h2v2H6V6Zm0 11h2v2H6v-2Z" />
-    </svg>
+    <LucideServer width="18" height="18" />
 );
 
 const LivePanelIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path fillRule="evenodd" d="M4 4.5A2.5 2.5 0 0 1 6.5 2h11A2.5 2.5 0 0 1 20 4.5v9a2.5 2.5 0 0 1-2.5 2.5h-4v3H16a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h2.5v-3h-4A2.5 2.5 0 0 1 4 13.5v-9ZM10 7v5l5-2.5L10 7Z" />
-    </svg>
+    <LucideMonitorPlay width="18" height="18" />
 );
 
 const MagicIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path d="m3 21 8.6-8.6 1.4 1.4L4.4 22.4 3 21Zm12-19 1.1 3.9L20 7l-3.9 1.1L15 12l-1.1-3.9L10 7l3.9-1.1L15 2Zm5 12 .7 2.3L23 17l-2.3.7L20 20l-.7-2.3L17 17l2.3-.7L20 14Z" />
-    </svg>
+    <LucideWandSparkles width="18" height="18" />
 );
 
 const BackIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-        <path d="m10.4 4.3 1.4 1.4L7.5 10H20v2H7.5l4.3 4.3-1.4 1.4L3.7 11l6.7-6.7Z" />
-    </svg>
+    <LucideArrowLeft width="16" height="16" />
 );
 
 const HamburgerIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-        <rect x="3" y="5" width="18" height="2.5" rx="1.25" /><rect x="3" y="10.75" width="18" height="2.5" rx="1.25" /><rect x="3" y="16.5" width="18" height="2.5" rx="1.25" />
-    </svg>
+    <LucideMenu width="20" height="20" />
 );
 
 const LookupIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path fillRule="evenodd" d="M10.8 3a7.8 7.8 0 1 0 4.8 13.95l4.72 4.73 1.42-1.42-4.73-4.72A7.8 7.8 0 0 0 10.8 3Zm0 2a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 0 1 0-11.6Z" />
-    </svg>
+    <LucideSearch width="18" height="18" />
 );
 
 const VerificationIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path fillRule="evenodd" d="M12 1.5 21 5v7c0 5.8-3.7 9.5-9 11.5C6.7 21.5 3 17.8 3 12V5l9-3.5Zm0 4L6 7.8V12c0 3.7 2.2 6.4 6 8 3.8-1.6 6-4.3 6-8V7.8L12 5.5Zm-1.3 10.2-3-3 1.6-1.6 1.4 1.4 3.8-3.8 1.6 1.6-5.4 5.4Z" />
-    </svg>
+    <LucideShieldCheck width="18" height="18" />
 );
 
 const ModulesIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path d="m12 2 9 5v10l-9 5-9-5V7l9-5Zm0 2.3L5.2 8 12 11.7 18.8 8 12 4.3Zm-7 5.5v6l6 3.33v-6L5 9.8Zm8 3.33v6L19 15.8v-6l-6 3.33Z" />
-    </svg>
+    <LucidePackage width="18" height="18" />
 );
 
 const ReportsIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path fillRule="evenodd" d="m10.26 3.7-8.6 14.35A2 2 0 0 0 3.38 21h17.24a2 2 0 0 0 1.72-2.95L13.74 3.7a2 2 0 0 0-3.48 0ZM11 9h2v5h-2V9Zm0 7h2v2h-2v-2Z" />
-    </svg>
+    <LucideTriangleAlert width="18" height="18" />
 );
 
 const ScrollIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path fillRule="evenodd" d="M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm2 4h8v2H8V6Zm0 4h8v2H8v-2Zm0 4h5v2H8v-2Z" />
-    </svg>
+    <LucideFileText width="18" height="18" />
 );
 
 const OverviewIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" />
-    </svg>
+    <LucideSettings width="18" height="18" strokeWidth="2" />
 );
 
 const RolesIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.87 0-7 2.24-7 5v3h14v-3c0-2.76-3.13-5-7-5Zm8-2.3-1.4-1.4-1.4 1.4 2.8 2.8 5-5-1.4-1.4-3.6 3.6Z" />
-    </svg>
+    <LucideUserCheck width="18" height="18" />
 );
 
 const CommandsIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path fillRule="evenodd" d="M3 4a1 1 0 0 1 1-1c9.39 0 17 7.61 17 17a1 1 0 1 1-2 0C19 11.72 12.28 5 4 5a1 1 0 0 1-1-1Zm0 7a1 1 0 0 1 1-1c5.52 0 10 4.48 10 10a1 1 0 1 1-2 0c0-4.42-3.58-8-8-8a1 1 0 0 1-1-1Zm1 6a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z" />
-    </svg>
+    <LucideRss width="18" height="18" />
 );
 
 const SettingsReportsIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path fillRule="evenodd" d="m10.26 3.7-8.6 14.35A2 2 0 0 0 3.38 21h17.24a2 2 0 0 0 1.72-2.95L13.74 3.7a2 2 0 0 0-3.48 0ZM11 9h2v5h-2V9Zm0 7h2v2h-2v-2Z" />
-    </svg>
+    <LucideTriangleAlert width="18" height="18" />
 );
 
 const DashboardIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path fillRule="evenodd" d="M4 3h16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 4v2h12V7H6Zm0 5v5h5v-5H6Zm7 0v2h5v-2h-5Zm0 3v2h5v-2h-5Z" />
-    </svg>
+    <LucideLayoutDashboard width="18" height="18" />
 );
 
 const ShieldIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2 21 5v7c0 5.8-3.7 9.5-9 11.5C6.7 21.5 3 17.8 3 12V5l9-3Z" />
-    </svg>
+    <LucideShield width="18" height="18" />
 );
 
 const CloseIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-        <path d="m6.7 5.3 5.3 5.3 5.3-5.3 1.4 1.4-5.3 5.3 5.3 5.3-1.4 1.4-5.3-5.3-5.3 5.3-1.4-1.4 5.3-5.3-5.3-5.3 1.4-1.4Z" />
-    </svg>
+    <LucideX width="20" height="20" />
 );
 
 export default function ServerLayout({ children }: { children: React.ReactNode }) {
@@ -976,7 +942,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                         : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/40 border-transparent'
                                     }`}
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+                                    <LucideSettings width="18" height="18" strokeWidth="2" />
                                 </button>
                             )}
                         </div>
@@ -1090,7 +1056,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                 <div className="relative group h-full flex items-center">
                                     <button className="flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white transition-colors py-2">
                                         Utility
-                                        <svg className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-transform duration-200 group-hover:rotate-180" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="m19 9-7 7-7-7"/></svg>
+                                        <LucideChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-transform duration-200 group-hover:rotate-180" strokeWidth="2.5" />
                                     </button>
                                     <div className="absolute top-[80%] left-0 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto bg-[#090d16]/95 border border-slate-800/80 backdrop-blur-xl rounded-xl p-2 min-w-[200px] shadow-2xl transition-all duration-200 z-[99] translate-y-2 group-hover:translate-y-0">
                                         {utilityItems.map((item) => {
@@ -1118,7 +1084,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                     <div className="relative group h-full flex items-center">
                                         <button className="flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white transition-colors py-2">
                                             Moderation
-                                            <svg className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-transform duration-200 group-hover:rotate-180" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="m19 9-7 7-7-7"/></svg>
+                                            <LucideChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-transform duration-200 group-hover:rotate-180" strokeWidth="2.5" />
                                         </button>
                                         <div className="absolute top-[80%] left-0 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto bg-[#090d16]/95 border border-slate-800/80 backdrop-blur-xl rounded-xl p-2 min-w-[200px] shadow-2xl transition-all duration-200 z-[99] translate-y-2 group-hover:translate-y-0">
                                             {moderationItems.map((item) => {
@@ -1147,7 +1113,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                     <div className="relative group h-full flex items-center">
                                         <button className="flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white transition-colors py-2">
                                             Settings
-                                            <svg className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-transform duration-200 group-hover:rotate-180" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="m19 9-7 7-7-7"/></svg>
+                                            <LucideChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-transform duration-200 group-hover:rotate-180" strokeWidth="2.5" />
                                         </button>
                                         <div className="absolute top-[80%] left-0 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto bg-[#090d16]/95 border border-slate-800/80 backdrop-blur-xl rounded-xl p-2 min-w-[200px] shadow-2xl transition-all duration-200 z-[99] translate-y-2 group-hover:translate-y-0">
                                             {settingItems.map((item) => {
@@ -1190,7 +1156,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                 onClick={() => setIsDrawerMenuOpen(true)}
                                 className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/60 border border-slate-850 backdrop-blur-md text-xs font-bold text-slate-300 hover:text-white hover:border-sky-500/30 transition-all mr-4"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                                <LucideMenu width="16" height="16" strokeWidth="2.5" />
                                 Navigation Menu
                             </button>
                         )}
