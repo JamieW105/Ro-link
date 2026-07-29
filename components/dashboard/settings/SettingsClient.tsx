@@ -54,6 +54,7 @@ interface DashboardRole {
     can_manage_settings: boolean;
     can_manage_reports: boolean;
     can_view_logs: boolean;
+    can_view_runtime_logs: boolean;
     can_manage_staff_notes: boolean;
     allowed_misc_cmds: string[];
 }
@@ -64,6 +65,7 @@ type DashboardRoleBooleanField =
     | 'can_manage_settings'
     | 'can_manage_reports'
     | 'can_view_logs'
+    | 'can_view_runtime_logs'
     | 'can_manage_staff_notes'
     | 'can_lookup'
     | 'can_kick'
@@ -76,7 +78,8 @@ const ROLE_PERMISSION_OPTIONS: Array<{ key: DashboardRoleBooleanField; label: st
     { key: 'can_access_live_panel', label: 'Live Panel' },
     { key: 'can_manage_settings', label: 'Manage Settings' },
     { key: 'can_manage_reports', label: 'Manage Reports' },
-    { key: 'can_view_logs', label: 'View Logs' },
+    { key: 'can_view_logs', label: 'View /cmds Logs' },
+    { key: 'can_view_runtime_logs', label: 'View In-Game Console Logs' },
     { key: 'can_manage_staff_notes', label: 'Manage Staff Notes' },
     { key: 'can_lookup', label: 'Lookup Users' },
     { key: 'can_kick', label: 'Kick Users' },
@@ -615,6 +618,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         manage_settings: false,
                         manage_reports: false,
                         view_logs: false,
+                        view_runtime_logs: false,
                         manage_staff_notes: false,
                     },
                     panelCmds: []
@@ -663,6 +667,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         manage_settings: targetRole.can_manage_settings,
                         manage_reports: targetRole.can_manage_reports,
                         view_logs: targetRole.can_view_logs,
+                        view_runtime_logs: targetRole.can_view_runtime_logs,
                         manage_staff_notes: targetRole.can_manage_staff_notes,
                     },
                     panelCmds: normalizeAdminPanelCommandList(targetRole.allowed_misc_cmds)

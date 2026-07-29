@@ -74,6 +74,7 @@ export async function POST(req: Request) {
             can_manage_settings: permissions.manage_settings === true,
             can_manage_reports: permissions.manage_reports === true,
             can_view_logs: permissions.view_logs === true,
+            can_view_runtime_logs: permissions.view_runtime_logs === true,
             can_manage_staff_notes: permissions.manage_staff_notes === true,
             allowed_misc_cmds: normalizedPanelCommands
         }, { onConflict: 'server_id, discord_role_id' }) // Constraint name might be needed or handled automatically if standard UNIQUE INDEX exists

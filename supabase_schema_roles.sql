@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.dashboard_roles (
     can_manage_settings BOOLEAN DEFAULT FALSE,
     can_manage_reports BOOLEAN DEFAULT FALSE,
     can_view_logs BOOLEAN DEFAULT FALSE,
+    can_view_runtime_logs BOOLEAN DEFAULT FALSE,
     can_manage_staff_notes BOOLEAN DEFAULT FALSE,
     
     -- Roblox Admin Panel Commands
@@ -35,4 +36,5 @@ ALTER TABLE public.dashboard_roles
 
 ALTER TABLE public.dashboard_roles
     ADD COLUMN IF NOT EXISTS can_view_logs BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS can_view_runtime_logs BOOLEAN DEFAULT FALSE,
     ADD COLUMN IF NOT EXISTS can_manage_staff_notes BOOLEAN DEFAULT FALSE;

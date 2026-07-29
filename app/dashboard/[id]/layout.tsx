@@ -33,6 +33,7 @@ interface DashboardPermissions {
     can_lookup: boolean;
     can_manage_reports: boolean;
     can_view_logs: boolean;
+    can_view_runtime_logs: boolean;
     can_manage_staff_notes: boolean;
     can_manage_settings: boolean;
     allowed_misc_cmds: string[];
@@ -591,7 +592,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             hide: !canManageDashboardSettings || !hasCustomDashboardSetup
         },
         {
-            label: "Logs",
+            label: "/cmds Logs",
             icon: <ScrollIcon />,
             href: `/dashboard/${id}/settings/logs`,
             hide: !userPermissions.is_admin && !userPermissions.can_view_logs

@@ -821,6 +821,8 @@ export default function LivePanelPage() {
     const [runtimeLogs, setRuntimeLogs] = useState<RuntimeLogRecord[]>([]);
     const [runtimeLogsLoading, setRuntimeLogsLoading] = useState(false);
     const canManageReports = perms.is_admin || perms.can_manage_reports;
+    const canViewCommandLogs = perms.is_admin || perms.can_view_logs;
+    const canViewRuntimeLogs = perms.is_admin || perms.can_view_runtime_logs;
 
     const clearSelectedProfile = useCallback(() => {
         setSelectedProfileUser(null);
@@ -1442,6 +1444,11 @@ export default function LivePanelPage() {
     }
 
     async function loadUserLogs(user: LivePanelUser, profile?: DashboardUserProfile | null) {
+        if (!canViewCommandLogs) {
+            setProfileLogs([]);
+            return;
+        }
+
         setProfileLogsLoading(true);
         try {
             const identities = [
@@ -1581,6 +1588,12 @@ export default function LivePanelPage() {
     }
 
     async function openRuntimeLogs(jobId: string, user: LivePanelUser | null = null, isRefresh = false) {
+        if (!canViewRuntimeLogs) {
+            setContextMenu(null);
+            setNotice({ type: 'error', text: 'You do not have permission to view in-game console logs.' });
+            return;
+        }
+
         if (!isRefresh) {
             setContextMenu(null);
             setRuntimeLogTarget({ jobId, user });
@@ -3139,13 +3152,15 @@ export default function LivePanelPage() {
                     {contextMenu.user ? (
                         <>
                             <p className="truncate px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500">@{contextMenu.user.username}</p>
-                            <button type="button" onClick={() => openRuntimeLogs(contextMenu.jobId, contextMenu.user)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-sky-200 hover:bg-sky-500/10">View user&apos;s client logs</button>
+                            {canViewRuntimeLogs && <button type="button" onClick={() => openRuntimeLogs(contextMenu.jobId, contextMenu.user)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-sky-200 hover:bg-sky-500/10">View user&apos;s client logs</button>}
                             <button type="button" onClick={() => openPlayerMessage(contextMenu.user!)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-200 hover:bg-slate-800">Message</button>
                             {canUseDashboardCommand(perms, 'KICK') && <button type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('KICK', contextMenu.user!); }} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-amber-300 hover:bg-amber-500/10">Kick</button>}
                             {canUseDashboardCommand(perms, 'BAN') && <button type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('BAN', contextMenu.user!); }} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-red-300 hover:bg-red-500/10">Ban</button>}
                         </>
                     ) : (
-                        <button type="button" onClick={() => openRuntimeLogs(contextMenu.jobId)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-sky-200 hover:bg-sky-500/10">View server logs</button>
+                        canViewRuntimeLogs
+                            ? <button type="button" onClick={() => openRuntimeLogs(contextMenu.jobId)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-sky-200 hover:bg-sky-500/10">View server logs</button>
+                            : <p className="px-3 py-2.5 text-xs font-semibold text-slate-500">No console log access</p>
                     )}
                 </div>
             )}

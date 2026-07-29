@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080b0f">
+  <meta name="description" content="Explore Ro-Link features for Roblox server visibility, moderation, player identity, staff permissions, reports, and setup.">
+  <title>Features — Ro-Link</title>
+  <link rel="stylesheet" href="rolink-concept.css?v=2">
+  <script defer src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav shell" aria-label="Primary navigation">
+      <a class="brand" href="landing-redesign.html" aria-label="Ro-Link home">
+        <span class="brand-mark">
+          <img src="public/Media/Ro-LinkIcon.png" alt="" width="25" height="25">
+        </span>
+        <span>Ro-Link</span>
+      </a>
+
+      <ul class="nav-links" id="primary-links">
+        <li><a class="nav-link" href="landing-redesign.html">Overview</a></li>
+        <li><a class="nav-link" href="#top" aria-current="page">Features</a></li>
+        <li><a class="nav-link" href="landing-redesign.html#setup">Setup</a></li>
+        <li>
+          <details class="help-menu">
+            <summary>
+              Help
+              <iconify-icon icon="lucide:chevron-down" aria-hidden="true"></iconify-icon>
+            </summary>
+            <div class="help-popover">
+              <a href="https://discord.gg/C3n4nAwYMw" target="_blank" rel="noopener noreferrer">
+                <iconify-icon icon="lucide:message-circle" aria-hidden="true"></iconify-icon>
+                Support server
+              </a>
+              <a href="reports.html">
+                <iconify-icon icon="lucide:flag" aria-hidden="true"></iconify-icon>
+                Reports
+              </a>
+              <a href="careers.html">
+                <iconify-icon icon="lucide:briefcase-business" aria-hidden="true"></iconify-icon>
+                Careers
+              </a>
+              <a href="/docs">
+                <iconify-icon icon="lucide:book-open" aria-hidden="true"></iconify-icon>
+                Documentation
+              </a>
+              <a href="posts.html">
+                <iconify-icon icon="lucide:newspaper" aria-hidden="true"></iconify-icon>
+                Posts
+              </a>
+            </div>
+          </details>
+        </li>
+        <li class="mobile-actions">
+          <a class="button button-secondary" href="/auth/signin?callbackUrl=%2Fdashboard">Sign in</a>
+          <a class="button button-primary" href="https://discord.com/api/oauth2/authorize?client_id=1466340007940722750&amp;permissions=402672646&amp;scope=bot%20applications.commands" target="_blank" rel="noopener noreferrer">Install</a>
+        </li>
+      </ul>
+
+      <div class="nav-actions">
+        <a class="sign-in" href="/auth/signin?callbackUrl=%2Fdashboard">Sign in</a>
+        <a class="button button-primary" href="https://discord.com/api/oauth2/authorize?client_id=1466340007940722750&amp;permissions=402672646&amp;scope=bot%20applications.commands" target="_blank" rel="noopener noreferrer">Install Ro-Link</a>
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-links" aria-label="Open navigation menu">
+          <iconify-icon class="menu-icon" icon="lucide:menu" aria-hidden="true"></iconify-icon>
+          <iconify-icon class="close-icon" icon="lucide:x" aria-hidden="true"></iconify-icon>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="features-hero" aria-labelledby="features-title">
+      <div class="features-hero-inner shell">
+        <div>
+          <p class="eyebrow">Ro-Link features</p>
+          <h1 class="features-title" id="features-title">The tools behind <span>live game management.</span></h1>
+        </div>
+        <p class="features-intro">
+          Ro-Link connects Discord staff workflows to Roblox operations. This page explains what each part does and where it fits into day-to-day community management.
+        </p>
+      </div>
+    </section>
+
+    <div class="features-layout shell">
+      <aside class="feature-index">
+        <h2>On this page</h2>
+        <nav aria-label="Feature sections">
+          <a href="#servers">Live servers</a>
+          <a href="#moderation">Moderation</a>
+          <a href="#identity">Player identity</a>
+          <a href="#permissions">Staff access</a>
+          <a href="#reports">Reports</a>
+          <a href="#setup-tools">Setup tools</a>
+        </nav>
+      </aside>
+
+      <div class="feature-list">
+        <section class="feature-detail" id="servers" aria-labelledby="servers-title">
+          <span class="feature-number">01</span>
+          <h2 id="servers-title">Live server visibility</h2>
+          <div class="feature-detail-copy">
+            <p>Give staff a shared view of active Roblox servers without asking players for server details or switching between separate admin tools.</p>
+            <ul>
+              <li>View active server sessions</li>
+              <li>Check player presence and counts</li>
+              <li>Review live server information from the dashboard</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="feature-detail" id="moderation" aria-labelledby="moderation-title">
+          <span class="feature-number">02</span>
+          <h2 id="moderation-title">Discord moderation controls</h2>
+          <div class="feature-detail-copy">
+            <p>Keep supported game-management actions close to the conversation where staff receive reports and coordinate responses.</p>
+            <ul>
+              <li>Run supported moderation actions from Discord</li>
+              <li>Use slash commands with clear staff permissions</li>
+              <li>Act without sharing Roblox owner credentials</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="feature-detail" id="identity" aria-labelledby="identity-title">
+          <span class="feature-number">03</span>
+          <h2 id="identity-title">Linked player identity</h2>
+          <div class="feature-detail-copy">
+            <p>Connect Discord members with their Roblox accounts so staff know which player they are helping, reviewing, or moderating.</p>
+            <ul>
+              <li>Link Discord and Roblox accounts</li>
+              <li>Verify a member before protected submissions</li>
+              <li>Use linked identity during staff review</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="feature-detail" id="permissions" aria-labelledby="permissions-title">
+          <span class="feature-number">04</span>
+          <h2 id="permissions-title">Role-based staff access</h2>
+          <div class="feature-detail-copy">
+            <p>Assign access according to staff responsibilities instead of giving every moderator the same level of control.</p>
+            <ul>
+              <li>Map dashboard roles to Discord staff</li>
+              <li>Control access to logs and staff notes</li>
+              <li>Restrict management tools to trusted roles</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="feature-detail" id="reports" aria-labelledby="reports-title">
+          <span class="feature-number">05</span>
+          <h2 id="reports-title">Reports and staff context</h2>
+          <div class="feature-detail-copy">
+            <p>Keep community reports, linked player details, and internal staff context together so reviews are easier to follow.</p>
+            <ul>
+              <li>Accept reports through the public report flow</li>
+              <li>Review submissions with linked account context</li>
+              <li>Keep staff-only notes behind permissions</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="feature-detail" id="setup-tools" aria-labelledby="setup-tools-title">
+          <span class="feature-number">06</span>
+          <h2 id="setup-tools-title">Guided Roblox setup</h2>
+          <div class="feature-detail-copy">
+            <p>Connect the Discord bot, web dashboard, and Roblox experience through a guided setup rather than wiring each part together manually.</p>
+            <ul>
+              <li>Connect through the Roblox Studio plugin</li>
+              <li>Register the experience with Ro-Link</li>
+              <li>Use the documentation for setup and troubleshooting</li>
+            </ul>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <section class="compact-cta shell" aria-labelledby="features-cta-title">
+      <div>
+        <h2 id="features-cta-title">Ready to set up Ro-Link?</h2>
+        <p>Install the bot, then follow the guided connection flow.</p>
+      </div>
+      <a class="button button-primary" href="https://discord.com/api/oauth2/authorize?client_id=1466340007940722750&amp;permissions=402672646&amp;scope=bot%20applications.commands" target="_blank" rel="noopener noreferrer">Install Ro-Link</a>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner shell">
+      <span>© <span id="year">2026</span> Core Engine Solutions Management Group</span>
+      <div class="footer-links">
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="https://status.rolink.cloud" target="_blank" rel="noopener noreferrer">Status</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="rolink-concept.js"></script>
+</body>
+</html>

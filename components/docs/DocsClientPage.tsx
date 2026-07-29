@@ -1935,6 +1935,9 @@ export default function DocsClientPage() {
                         type="button"
                         onClick={() => setMobileMenuOpen((current) => !current)}
                         className="rounded-xl border border-white/10 bg-white/[0.03] p-2 text-slate-300 lg:hidden"
+                        aria-label={mobileMenuOpen ? 'Close documentation navigation' : 'Open documentation navigation'}
+                        aria-expanded={mobileMenuOpen}
+                        aria-controls="docs-sidebar-navigation"
                     >
                         {mobileMenuOpen ? <Icons.X className="h-5 w-5" /> : <Icons.Menu className="h-5 w-5" />}
                     </button>
@@ -2007,13 +2010,15 @@ export default function DocsClientPage() {
 
             <div className="relative flex h-[calc(100vh-4rem)]">
                 <aside
+                    id="docs-sidebar-navigation"
+                    aria-label="Documentation navigation"
                     className={cn(
-                        'absolute inset-y-0 left-0 z-30 flex w-[280px] shrink-0 flex-col overflow-hidden border-r border-white/8 bg-[#181818]/98 px-5 py-8 backdrop-blur-xl transition-transform duration-300 lg:static lg:z-auto',
+                        'custom-scrollbar absolute inset-y-0 left-0 z-30 flex w-[280px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-white/8 bg-[#181818]/98 px-5 py-8 backdrop-blur-xl transition-transform duration-300 lg:static lg:z-auto',
                         mobileMenuOpen ? 'translate-x-0' : '-translate-x-full',
                         'lg:translate-x-0',
                     )}
                 >
-                    <div className="space-y-8">
+                    <nav className="space-y-8" aria-label="Documentation pages">
                         {categoryOrder.map((category) => {
                             const pages = docsPages.filter((page) => page.category === category);
                             if (pages.length === 0) return null;
@@ -2031,7 +2036,7 @@ export default function DocsClientPage() {
                                 </div>
                             );
                         })}
-                    </div>
+                    </nav>
 
                 </aside>
 

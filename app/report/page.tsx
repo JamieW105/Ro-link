@@ -1,11 +1,12 @@
 'use client';
 
-import { Check as LucideCheck, Send as LucideSend, Shield as LucideShield } from 'lucide-react';
-
+import { Check, LockKeyhole, Send, ShieldAlert } from 'lucide-react';
 import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { DiscordIcon as DiscordBrandIcon } from '@/components/ui/DiscordIcon';
+
+import { PublicFooter } from '@/components/public/PublicFooter';
+import { DiscordIcon } from '@/components/ui/DiscordIcon';
 
 type TargetKind = 'user' | 'server' | 'game';
 type UserPlatform = 'roblox' | 'discord';
@@ -24,43 +25,9 @@ type LinkedAccount = {
 
 const targetOptions: Array<{ value: TargetKind; label: string; description: string }> = [
     { value: 'user', label: 'User', description: 'Roblox or Discord account' },
-    { value: 'server', label: 'Server', description: 'Discord server' },
+    { value: 'server', label: 'Server', description: 'Discord community server' },
     { value: 'game', label: 'Game', description: 'Roblox experience' },
 ];
-
-function cn(...classes: Array<string | false | null | undefined>) {
-    return classes.filter(Boolean).join(' ');
-}
-
-function ShieldIcon() {
-    return (
-        <LucideShield aria-hidden="true" className="h-5 w-5" strokeWidth="2" />
-    );
-}
-
-function SendIcon() {
-    return (
-        <LucideSend aria-hidden="true" className="h-4 w-4" strokeWidth="2" />
-    );
-}
-
-function CheckIcon() {
-    return (
-        <LucideCheck aria-hidden="true" className="h-4 w-4" strokeWidth="2.3" />
-    );
-}
-
-function DiscordIcon() {
-    return (
-        <DiscordBrandIcon aria-hidden="true" className="h-4 w-4" />
-    );
-}
-
-function RobloxIcon() {
-    return (
-        <Image src="/Media/Roblox.png" alt="" width={18} height={18} className="h-4 w-4 object-contain" />
-    );
-}
 
 export default function ReportPage() {
     const { data: session, status } = useSession();
@@ -81,19 +48,15 @@ export default function ReportPage() {
         async function loadLinkedAccount() {
             setLinkedAccountLoading(true);
             setLinkedAccount(null);
-
             try {
                 const response = await fetch('/api/verify/linked-account', { cache: 'no-store' });
                 if (cancelled) return;
-
                 if (response.ok) {
                     const data = await response.json() as LinkedAccount | null;
                     setLinkedAccount(data?.roblox_id ? data : null);
                 }
             } finally {
-                if (!cancelled) {
-                    setLinkedAccountLoading(false);
-                }
+                if (!cancelled) setLinkedAccountLoading(false);
             }
         }
 
@@ -120,23 +83,14 @@ export default function ReportPage() {
         if (targetKind === 'server') return '123456789012345678';
         return userPlatform === 'roblox' ? '123456789' : '123456789012345678';
     }, [targetKind, userPlatform]);
-    const selectedTargetName = useMemo(() => {
-        if (targetKind === 'game') return 'Roblox Game';
-        if (targetKind === 'server') return 'Discord Server';
-        return userPlatform === 'roblox' ? 'Roblox User' : 'Discord User';
-    }, [targetKind, userPlatform]);
+
     const evidenceCount = useMemo(() => (
-        evidenceLinks
-            .split(/[\s,]+/g)
-            .map((link) => link.trim())
-            .filter(Boolean)
-            .length
+        evidenceLinks.split(/[\s,]+/g).map((link) => link.trim()).filter(Boolean).length
     ), [evidenceLinks]);
 
     const formVisible = Boolean(session?.user && linkedAccount?.roblox_id);
     const authLoading = status === 'loading' || (Boolean(session?.user) && linkedAccountLoading);
     const disabled = submitting || authLoading || !formVisible;
-    const linkedRobloxUsername = formVisible ? linkedAccount?.roblox_username : null;
 
     function handleDiscordSignIn() {
         signIn('discord', { callbackUrl: '/report' });
@@ -153,7 +107,6 @@ export default function ReportPage() {
             handleDiscordSignIn();
             return;
         }
-
         if (!linkedAccount?.roblox_id) {
             setResult({ error: 'Link your Roblox account before submitting a report.' });
             return;
@@ -161,7 +114,6 @@ export default function ReportPage() {
 
         setSubmitting(true);
         setResult(null);
-
         try {
             const response = await fetch('/api/public-reports', {
                 method: 'POST',
@@ -175,7 +127,6 @@ export default function ReportPage() {
                 }),
             });
             const data = await response.json().catch(() => ({})) as SubmitResult;
-
             if (!response.ok) {
                 setResult({ error: data.error || `Report submission failed (${response.status}).` });
                 return;
@@ -193,233 +144,178 @@ export default function ReportPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-200 selection:bg-sky-500/30">
-            <main className="mx-auto grid max-w-6xl gap-8 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_340px]">
-                <section className="rounded-lg border border-slate-800 bg-slate-950/70">
-                    <div className="border-b border-slate-800 px-5 py-5 sm:px-7">
-                        <div className="flex items-center gap-3">
-                            <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-amber-400/20 bg-amber-400/10 text-amber-300">
-                                <ShieldIcon />
-                            </span>
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-[0.22em] text-amber-300">Public Report</p>
-                                <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">Report a risky user, server, or game</h1>
-                            </div>
+        <>
+            <main className="rl-public-page" id="top">
+                <section className="rl-utility-hero" aria-labelledby="report-title">
+                    <div className="rl-utility-hero-inner rl-shell">
+                        <div>
+                            <p className="rl-eyebrow">Public reports</p>
+                            <h1 className="rl-utility-title" id="report-title">Send the right details <span>to the right team.</span></h1>
                         </div>
+                        <p className="rl-utility-intro">
+                            Report a Roblox user, Discord server, or Roblox game. A verified Discord and linked Roblox account are required before submission.
+                        </p>
                     </div>
-
-                    {!formVisible ? (
-                        <div className="space-y-5 p-5 sm:p-7">
-                            {authLoading ? (
-                                <div className="rounded-lg border border-slate-800 bg-slate-950 px-5 py-8 text-center">
-                                    <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-sky-500 border-t-transparent" />
-                                    <p className="mt-4 text-sm font-semibold text-slate-300">Checking your account verification...</p>
-                                </div>
-                            ) : !session ? (
-                                <div className="rounded-lg border border-slate-800 bg-slate-950 px-5 py-6">
-                                    <div className="flex items-start gap-4">
-                                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#5865F2]/25 bg-[#5865F2]/10 text-[#AAB2FF]">
-                                            <DiscordIcon />
-                                        </span>
-                                        <div className="min-w-0">
-                                            <h2 className="text-lg font-bold text-white">Sign in to submit a report</h2>
-                                            <p className="mt-2 text-sm leading-6 text-slate-400">
-                                                Public reports require a Discord sign-in before you can link and verify your Roblox account.
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleDiscordSignIn}
-                                        className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#5865F2] px-5 text-sm font-bold text-white transition hover:bg-[#4752C4] sm:w-auto"
-                                    >
-                                        <DiscordIcon />
-                                        Sign In With Discord
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="rounded-lg border border-slate-800 bg-slate-950 px-5 py-6">
-                                    <div className="flex items-start gap-4">
-                                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white text-black">
-                                            <RobloxIcon />
-                                        </span>
-                                        <div className="min-w-0">
-                                            <h2 className="text-lg font-bold text-white">Link your Roblox account</h2>
-                                            <p className="mt-2 text-sm leading-6 text-slate-400">
-                                                Reports can only be submitted from verified Ro-Link users. Link your Roblox account here, then the report form will unlock automatically.
-                                            </p>
-                                            <p className="mt-3 text-xs font-semibold text-slate-500">
-                                                Signed in as {session.user?.name || 'Discord user'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleRobloxLink}
-                                        disabled={linkingRoblox}
-                                        className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-white px-5 text-sm font-black uppercase tracking-wider text-black transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-70 sm:w-auto"
-                                    >
-                                        {linkingRoblox ? (
-                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />
-                                        ) : (
-                                            <RobloxIcon />
-                                        )}
-                                        {linkingRoblox ? 'Opening Roblox...' : 'Link Roblox Account'}
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                    <form onSubmit={handleSubmit} className="space-y-6 p-5 sm:p-7">
-                        <div>
-                            <label className="mb-3 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Target</label>
-                            <div className="grid gap-3 sm:grid-cols-3">
-                                {targetOptions.map((option) => (
-                                    <button
-                                        key={option.value}
-                                        type="button"
-                                        onClick={() => setTargetKind(option.value)}
-                                        className={cn(
-                                            'rounded-lg border px-4 py-3 text-left transition',
-                                            targetKind === option.value
-                                                ? 'border-sky-400/40 bg-sky-500/10 text-white'
-                                                : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-white',
-                                        )}
-                                    >
-                                        <span className="block text-sm font-bold">{option.label}</span>
-                                        <span className="mt-1 block text-xs text-slate-500">{option.description}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {targetKind === 'user' && (
-                            <div>
-                                <label className="mb-3 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">User Platform</label>
-                                <div className="grid max-w-md grid-cols-2 gap-2 rounded-lg border border-slate-800 bg-slate-950 p-1">
-                                    {(['roblox', 'discord'] as UserPlatform[]).map((platform) => (
-                                        <button
-                                            key={platform}
-                                            type="button"
-                                            onClick={() => setUserPlatform(platform)}
-                                            className={cn(
-                                                'rounded-md px-4 py-2 text-sm font-bold capitalize transition',
-                                                userPlatform === platform
-                                                    ? 'bg-sky-600 text-white'
-                                                    : 'text-slate-500 hover:text-slate-200',
-                                            )}
-                                        >
-                                            {platform}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        <div>
-                            <label htmlFor="target-id" className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                                {targetLabel}
-                            </label>
-                            <input
-                                id="target-id"
-                                type="text"
-                                inputMode="numeric"
-                                value={targetId}
-                                onChange={(event) => setTargetId(event.target.value)}
-                                placeholder={targetPlaceholder}
-                                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 font-mono text-sm text-white outline-none transition focus:border-sky-500"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="reason" className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Reason</label>
-                            <textarea
-                                id="reason"
-                                value={reason}
-                                onChange={(event) => setReason(event.target.value)}
-                                placeholder="What happened, where it happened, and why staff should review it."
-                                className="min-h-36 w-full resize-y rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-sky-500"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="evidence" className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Evidence Links</label>
-                            <textarea
-                                id="evidence"
-                                value={evidenceLinks}
-                                onChange={(event) => setEvidenceLinks(event.target.value)}
-                                placeholder="https://cdn.discordapp.com/attachments/..."
-                                className="min-h-28 w-full resize-y rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 font-mono text-sm leading-6 text-white outline-none transition placeholder:text-slate-600 focus:border-sky-500"
-                                required
-                            />
-                        </div>
-
-                        {result?.error && (
-                            <div className="rounded-lg border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-100">
-                                {result.error}
-                            </div>
-                        )}
-
-                        {result?.reportId && !result.error && (
-                            <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-                                <div className="flex items-start gap-2">
-                                    <CheckIcon />
-                                    <div className="min-w-0">
-                                        <p className="font-bold">Report submitted</p>
-                                        <p className="mt-1 break-all font-mono text-xs text-emerald-200">{result.reportId}</p>
-                                        {result.threadUrl && (
-                                            <a href={result.threadUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-bold uppercase tracking-wider text-emerald-200 hover:text-white">
-                                                Open Forum Thread
-                                            </a>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="flex flex-col gap-3 border-t border-slate-800 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                            <p className="text-xs text-slate-500">
-                                {`Signed in as ${session?.user?.name || 'Discord user'} · Roblox linked${linkedRobloxUsername ? ` as ${linkedRobloxUsername}` : ''}`}
-                            </p>
-                            <button
-                                type="submit"
-                                disabled={disabled || !targetId.trim() || !reason.trim() || !evidenceLinks.trim()}
-                                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-sky-600 px-5 text-sm font-bold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                <SendIcon />
-                                {submitting ? 'Submitting...' : 'Submit Report'}
-                            </button>
-                        </div>
-                    </form>
-                    )}
                 </section>
 
-                <aside className="space-y-4">
-                    <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-5">
-                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Submission</p>
-                        <div className="mt-4 space-y-4 text-sm">
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">Type</p>
-                                <p className="mt-1 font-semibold text-white">{selectedTargetName}</p>
+                <section className="rl-utility-main rl-shell">
+                    <div className="rl-utility-grid">
+                        <section className="rl-surface" aria-labelledby="new-report-title">
+                            <div className="rl-surface-header">
+                                <div>
+                                    <h2 id="new-report-title">New report</h2>
+                                    <p>Include enough context and direct evidence for staff review.</p>
+                                </div>
+                                <span className="rl-surface-icon"><ShieldAlert aria-hidden="true" /></span>
                             </div>
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">Target ID</p>
-                                <p className="mt-1 break-all font-mono text-slate-300">{targetId || 'Pending'}</p>
+
+                            {!formVisible ? (
+                                <div className="rl-surface-body">
+                                    {authLoading ? (
+                                        <div className="rl-notice">
+                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+                                            <div><strong>Checking verification</strong>Confirming your Discord and Roblox account connection.</div>
+                                        </div>
+                                    ) : !session ? (
+                                        <div className="rl-notice">
+                                            <DiscordIcon aria-hidden="true" width="16" height="16" />
+                                            <div>
+                                                <strong>Sign in to submit a report</strong>
+                                                Public reports require a Discord sign-in before you can link and verify your Roblox account.
+                                                <button className="rl-button rl-button-primary mt-4" type="button" onClick={handleDiscordSignIn}>Sign in with Discord</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="rl-notice">
+                                            <Image src="/Media/Roblox.png" alt="" width={16} height={16} />
+                                            <div>
+                                                <strong>Link your Roblox account</strong>
+                                                Reports can only be submitted by verified Ro-Link users.
+                                                <button className="rl-button rl-button-primary mt-4" type="button" onClick={handleRobloxLink} disabled={linkingRoblox}>
+                                                    {linkingRoblox ? 'Opening Roblox…' : 'Link Roblox account'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <form className="rl-surface-body" onSubmit={handleSubmit}>
+                                    <div className="rl-form-section">
+                                        <span className="rl-field-label">Target type</span>
+                                        <div className="rl-choice-row" role="group" aria-label="Report target type">
+                                            {targetOptions.map((option) => (
+                                                <button
+                                                    className="rl-choice"
+                                                    key={option.value}
+                                                    type="button"
+                                                    aria-pressed={targetKind === option.value}
+                                                    onClick={() => setTargetKind(option.value)}
+                                                >
+                                                    <strong>{option.label}</strong>
+                                                    <span>{option.description}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="rl-form-section rl-field-row">
+                                        <div>
+                                            <label className="rl-field-label" htmlFor="report-platform">Platform</label>
+                                            <select
+                                                className="rl-select"
+                                                id="report-platform"
+                                                value={userPlatform}
+                                                disabled={targetKind !== 'user'}
+                                                onChange={(event) => setUserPlatform(event.target.value as UserPlatform)}
+                                            >
+                                                <option value="roblox">Roblox</option>
+                                                <option value="discord">Discord</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="rl-field-label" htmlFor="report-target-id">{targetLabel}</label>
+                                            <input
+                                                className="rl-field"
+                                                id="report-target-id"
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={targetId}
+                                                onChange={(event) => setTargetId(event.target.value)}
+                                                placeholder={targetPlaceholder}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="rl-form-section">
+                                        <label className="rl-field-label" htmlFor="report-reason">What happened?</label>
+                                        <textarea
+                                            className="rl-textarea"
+                                            id="report-reason"
+                                            value={reason}
+                                            onChange={(event) => setReason(event.target.value)}
+                                            placeholder="Explain what happened, where it happened, and why staff should review it."
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="rl-form-section">
+                                        <label className="rl-field-label" htmlFor="report-evidence">Evidence links</label>
+                                        <textarea
+                                            className="rl-textarea"
+                                            id="report-evidence"
+                                            value={evidenceLinks}
+                                            onChange={(event) => setEvidenceLinks(event.target.value)}
+                                            placeholder="Add direct image, video, or message links. Separate multiple links with spaces or new lines."
+                                            required
+                                        />
+                                        <p className="rl-field-hint">Only include material relevant to this report.</p>
+                                    </div>
+
+                                    {result?.error && <div className="rl-feedback rl-feedback-error">{result.error}</div>}
+                                    {result?.reportId && !result.error && (
+                                        <div className="rl-feedback rl-feedback-success">
+                                            <strong>Report submitted</strong>
+                                            <div>{result.reportId}</div>
+                                            {result.threadUrl && <a href={result.threadUrl} target="_blank" rel="noreferrer">Open forum thread</a>}
+                                        </div>
+                                    )}
+
+                                    <div className="rl-form-footer">
+                                        <p>
+                                            Signed in as {session?.user?.name || 'Discord user'} · {evidenceCount} evidence link{evidenceCount === 1 ? '' : 's'}
+                                        </p>
+                                        <button
+                                            className="rl-button rl-button-primary"
+                                            type="submit"
+                                            disabled={disabled || !targetId.trim() || !reason.trim() || !evidenceLinks.trim()}
+                                        >
+                                            <Send aria-hidden="true" width={14} height={14} />
+                                            {submitting ? 'Submitting…' : 'Submit report'}
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
+                        </section>
+
+                        <aside className="rl-aside-stack">
+                            <div className="rl-surface rl-aside-panel">
+                                <h2>Before submitting</h2>
+                                <ul className="rl-aside-list">
+                                    <li><Check aria-hidden="true" /><span>Sign in with Discord.</span></li>
+                                    <li><Check aria-hidden="true" /><span>Link your Roblox account.</span></li>
+                                    <li><Check aria-hidden="true" /><span>Use direct evidence links.</span></li>
+                                </ul>
                             </div>
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">Evidence</p>
-                                <p className="mt-1 font-semibold text-slate-300">{evidenceCount} link{evidenceCount === 1 ? '' : 's'}</p>
+                            <div className="rl-notice">
+                                <LockKeyhole aria-hidden="true" />
+                                <div><strong>Verified submissions</strong>Reports are accepted only from users with both accounts connected.</div>
                             </div>
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-600">Reporter</p>
-                                <p className="mt-1 break-words font-semibold text-slate-300">{session?.user?.name || 'Not signed in'}</p>
-                            </div>
-                        </div>
+                        </aside>
                     </div>
-                </aside>
+                </section>
             </main>
-        </div>
+            <PublicFooter />
+        </>
     );
 }

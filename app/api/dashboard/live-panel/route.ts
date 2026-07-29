@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { enrichLogRecordsWithLinkedUsers, expandLinkedLogTargets } from '@/lib/logIdentity';
 import { collectModulePanelCommandsFromLiveServers } from '@/lib/modulePanelCommands';
 import { buildPlayerPresenceEvents, PLAYER_PRESENCE_RETENTION_MS, type PlayerPresenceActivity } from '@/lib/playerPresence';
-import { canAccessLivePanel, canManageReports, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
+import { canAccessLivePanel, canManageReports, canViewCommandLogs, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 function parseLimit(value: string | null, fallback: number, max: number) {
@@ -119,6 +119,7 @@ export async function GET(req: NextRequest) {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const playerActivitySince = new Date(Date.now() - PLAYER_PRESENCE_RETENTION_MS).toISOString();
     const canViewReports = canManageReports(access.permissions);
+    const canViewLogs = canViewCommandLogs(access.permissions);
 
     const createLogsQuery = () => client
         .from('logs')
@@ -142,16 +143,18 @@ export async function GET(req: NextRequest) {
             .eq('server_id', serverId)
             .gte('updated_at', fiveMinutesAgo)
             .order('updated_at', { ascending: false }),
-        target
-            ? Promise.all([
-                hasLinkedTargets
-                    ? createLogsQuery().in('target', linkedTargets)
-                    : createLogsQuery().ilike('target', `%${target}%`),
-                hasLinkedTargets
-                    ? createLogsQuery().in('moderator', linkedTargets)
-                    : createLogsQuery().ilike('moderator', `%${target}%`),
-            ])
-            : createLogsQuery(),
+        canViewLogs
+            ? target
+                ? Promise.all([
+                    hasLinkedTargets
+                        ? createLogsQuery().in('target', linkedTargets)
+                        : createLogsQuery().ilike('target', `%${target}%`),
+                    hasLinkedTargets
+                        ? createLogsQuery().in('moderator', linkedTargets)
+                        : createLogsQuery().ilike('moderator', `%${target}%`),
+                ])
+                : createLogsQuery()
+            : Promise.resolve({ data: [], error: null }),
         canViewReports
             ? client
                 .from('reports')

@@ -9,7 +9,7 @@ const PUBLIC_ROUTE_PREFIXES = [
     '/careers',
     '/custom-dashboard',
     '/dgsu',
-    '/docs',
+    '/features',
     '/posts',
     '/privacy',
     '/report',

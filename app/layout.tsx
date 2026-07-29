@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./public-theme.css";
 import NextAuthProvider from "./providers";
 import { PublicHeaderGate } from "@/components/public/PublicHeaderGate";
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { canViewLogs, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
+import { canViewRuntimeLogs, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 function parseLimit(value: string | null) {
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Live server job ID required' }, { status: 400 });
     }
 
-    const access = await requireDashboardAccess(serverId, canViewLogs);
+    const access = await requireDashboardAccess(serverId, canViewRuntimeLogs);
     if ('error' in access) {
         return access.error;
     }
