@@ -2,7 +2,6 @@
 
 import { Check as LucideCheck, Send as LucideSend, Shield as LucideShield } from 'lucide-react';
 
-import Link from 'next/link';
 import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
@@ -195,32 +194,6 @@ export default function ReportPage() {
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200 selection:bg-sky-500/30">
-            <header className="border-b border-slate-800 bg-[#020617]/90 backdrop-blur">
-                <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-                    <Link href="/" className="flex items-center gap-3">
-                        <Image src="/Media/Ro-LinkIcon.png" alt="Ro-Link" width={32} height={32} className="rounded-lg object-contain" />
-                        <span className="text-lg font-bold text-white">Ro-Link</span>
-                    </Link>
-                    <nav className="hidden items-center gap-5 md:flex">
-                        <Link href="/posts" className="text-sm font-semibold text-slate-400 transition-colors hover:text-white">Updates</Link>
-                        <Link href="/docs" className="text-sm font-semibold text-slate-400 transition-colors hover:text-white">Docs</Link>
-                        <Link href="/careers" className="text-sm font-semibold text-slate-400 transition-colors hover:text-white">Careers</Link>
-                        <Link href="/report" className="text-sm font-semibold text-sky-300">Report</Link>
-                        {session ? (
-                            <Link href="/dashboard" className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-sky-500">Dashboard</Link>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={handleDiscordSignIn}
-                                className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-sky-500"
-                            >
-                                Sign In
-                            </button>
-                        )}
-                    </nav>
-                </div>
-            </header>
-
             <main className="mx-auto grid max-w-6xl gap-8 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_340px]">
                 <section className="rounded-lg border border-slate-800 bg-slate-950/70">
                     <div className="border-b border-slate-800 px-5 py-5 sm:px-7">

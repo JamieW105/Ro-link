@@ -4,7 +4,6 @@ import { ArrowRight as LucideArrowRight } from 'lucide-react';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSession, signIn } from 'next-auth/react';
 
 interface Job {
     id: string;
@@ -17,7 +16,6 @@ interface Job {
 }
 
 export default function CareersPage() {
-    const { data: session } = useSession();
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -50,25 +48,6 @@ export default function CareersPage() {
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200">
-            {/* Navbar */}
-            <nav className="sticky top-0 z-50 bg-[#020617]/80 backdrop-blur-md border-b border-slate-800">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <Link href="/" className="flex items-center gap-3">
-                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 rounded-lg" />
-                        <span className="text-xl font-bold tracking-tight text-white">Ro-Link Careers</span>
-                    </Link>
-                    <div className="flex items-center gap-6">
-                        <Link href="/" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">Home</Link>
-                        <Link href="/report" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">Report</Link>
-                        {session ? (
-                            <Link href="/dashboard" className="bg-sky-600 px-5 py-2 rounded-lg text-xs font-bold text-white hover:bg-sky-500 transition-all">Dashboard</Link>
-                        ) : (
-                            <button onClick={() => signIn('discord')} className="bg-sky-600 px-5 py-2 rounded-lg text-xs font-bold text-white hover:bg-sky-500 transition-all">Join Us</button>
-                        )}
-                    </div>
-                </div>
-            </nav>
-
             {/* Hero */}
             <header className="motion-page py-20 px-6 max-w-7xl mx-auto">
                 <div className="max-w-3xl">

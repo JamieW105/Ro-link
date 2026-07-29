@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import NextAuthProvider from "./providers";
+import { PublicHeaderGate } from "@/components/public/PublicHeaderGate";
 
 export const metadata: Metadata = {
   title: "Ro-Link | Connect Discord to Roblox",
@@ -42,6 +43,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <NextAuthProvider>
+          <PublicHeaderGate />
           {children}
         </NextAuthProvider>
       </body>

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft as LucideArrowLeft, Check as LucideCheck } from 'lucide-react';
+import { Check as LucideCheck } from 'lucide-react';
 
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
@@ -145,21 +145,6 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200 pb-32">
-            <nav className="sticky top-0 z-50 bg-[#020617]/80 backdrop-blur-md border-b border-slate-800">
-                <div className="max-w-4xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <Link href="/careers" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
-                        <LucideArrowLeft className="w-4 h-4" />
-                        Back
-                    </Link>
-                    <div className="flex flex-col items-end">
-                        <span className="font-bold text-white truncate max-w-[200px]">{job.title}</span>
-                        {session?.user && (
-                            <span className="text-[10px] text-slate-500 font-medium">Submitting an application for {session.user.name}</span>
-                        )}
-                    </div>
-                </div>
-            </nav>
-
             <main className="max-w-3xl mx-auto px-6 mt-12">
                 <header className="mb-12 bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-10 rounded-3xl shadow-2xl">
                     <div className="flex items-center justify-between mb-2">

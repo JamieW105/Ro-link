@@ -1907,7 +1907,7 @@ export default function DocsClientPage() {
 
     return (
         <div className="min-h-screen bg-[#181818] text-slate-100 selection:bg-sky-400/20">
-            <header className="fixed inset-x-0 top-0 z-40 border-b border-white/8 bg-[#181818]/92 backdrop-blur-xl">
+            <header className="sticky top-0 z-40 border-b border-white/8 bg-[#181818]/92 backdrop-blur-xl">
                 <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
                     <Link href="/" className="flex items-center gap-3">
                         <div className="rounded-xl border border-sky-500/25 bg-sky-500/10 p-2 text-sky-300">
@@ -2005,10 +2005,10 @@ export default function DocsClientPage() {
                 </div>
             )}
 
-            <div className="pt-16">
+            <div className="relative flex h-[calc(100vh-4rem)]">
                 <aside
                     className={cn(
-                        'fixed bottom-0 left-0 top-16 z-30 flex w-[280px] flex-col overflow-hidden border-r border-white/8 bg-[#181818]/98 px-5 py-8 backdrop-blur-xl transition-transform duration-300',
+                        'absolute inset-y-0 left-0 z-30 flex w-[280px] shrink-0 flex-col overflow-hidden border-r border-white/8 bg-[#181818]/98 px-5 py-8 backdrop-blur-xl transition-transform duration-300 lg:static lg:z-auto',
                         mobileMenuOpen ? 'translate-x-0' : '-translate-x-full',
                         'lg:translate-x-0',
                     )}
@@ -2037,7 +2037,7 @@ export default function DocsClientPage() {
 
                 {mobileMenuOpen && <button type="button" aria-label="Close navigation" onClick={() => setMobileMenuOpen(false)} className="fixed inset-0 z-20 bg-black/50 lg:hidden" />}
 
-                <aside className="fixed bottom-0 right-0 top-16 hidden w-[270px] overflow-hidden border-l border-white/8 bg-[#181818] px-7 py-10 2xl:block">
+                <aside className="order-3 hidden h-full w-[270px] shrink-0 overflow-hidden border-l border-white/8 bg-[#181818] px-7 py-10 2xl:block">
                     <nav className="space-y-1">
                         {activePage.toc.map((item) => (
                             <button
@@ -2055,7 +2055,7 @@ export default function DocsClientPage() {
                     </nav>
                 </aside>
 
-                <main ref={mainContentRef} className="custom-scrollbar h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain lg:pl-[280px] 2xl:pr-[270px]">
+                <main ref={mainContentRef} className="custom-scrollbar order-2 h-full min-w-0 flex-1 overflow-y-auto overscroll-contain">
                     <div className="mx-auto max-w-[1080px] px-6 py-10 sm:px-10">
                         <div className="flex flex-col gap-6 border-b border-white/8 pb-10 sm:flex-row sm:items-start sm:justify-between">
                             <div className="max-w-3xl">
