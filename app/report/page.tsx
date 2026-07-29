@@ -1,11 +1,12 @@
 'use client';
 
-import { Check as LucideCheck, MessageCircle as LucideMessageCircle, Send as LucideSend, Shield as LucideShield } from 'lucide-react';
+import { Check as LucideCheck, Send as LucideSend, Shield as LucideShield } from 'lucide-react';
 
 import Link from 'next/link';
 import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { DiscordIcon as DiscordBrandIcon } from '@/components/ui/DiscordIcon';
 
 type TargetKind = 'user' | 'server' | 'game';
 type UserPlatform = 'roblox' | 'discord';
@@ -52,7 +53,7 @@ function CheckIcon() {
 
 function DiscordIcon() {
     return (
-        <LucideMessageCircle aria-hidden="true" className="h-4 w-4" />
+        <DiscordBrandIcon aria-hidden="true" className="h-4 w-4" />
     );
 }
 

@@ -1,12 +1,13 @@
 'use client';
 
-import { BarChart3 as LucideBarChart3, Check as LucideCheck, Menu as LucideMenu, MessageCircle as LucideMessageCircle, Server as LucideServer, Shield as LucideShield, Users as LucideUsers, X as LucideX, Zap as LucideZap } from 'lucide-react';
+import { BarChart3 as LucideBarChart3, Check as LucideCheck, Menu as LucideMenu, Server as LucideServer, Shield as LucideShield, Users as LucideUsers, X as LucideX, Zap as LucideZap } from 'lucide-react';
 
 import Link from 'next/link';
 import { signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { DEFAULT_ROLINK_VERSION } from "@/lib/updatePosts";
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
+import { DiscordIcon as DiscordBrandIcon } from "@/components/ui/DiscordIcon";
 
 const SUPPORT_DISCORD_URL = "https://discord.gg/C3n4nAwYMw";
 const STATUS_PAGE_URL = "https://status.rolink.cloud";
@@ -36,7 +37,7 @@ const CheckIcon = () => (
 );
 
 const DiscordIcon = () => (
-  <LucideMessageCircle width="18" height="18" />
+  <DiscordBrandIcon width="18" height="18" aria-hidden="true" />
 );
 
 export default function Home() {

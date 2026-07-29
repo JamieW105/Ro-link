@@ -1,11 +1,10 @@
 'use client';
 
-import { MessageCircle as LucideMessageCircle } from 'lucide-react';
-
 import { useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 
 import { DGSU_BAN_AUTH_ERROR, DGSU_BAN_ERROR_MESSAGE } from '@/lib/dgsuBanConstants';
+import { DiscordIcon as DiscordBrandIcon } from '@/components/ui/DiscordIcon';
 
 type SignInClientProps = {
     callbackUrl: string;
@@ -54,7 +53,7 @@ function getCanonicalAuthOrigin(callbackUrl: string) {
 
 function DiscordIcon() {
     return (
-        <LucideMessageCircle aria-hidden="true" className="h-5 w-5" />
+        <DiscordBrandIcon aria-hidden="true" className="h-5 w-5" />
     );
 }
 
