@@ -1046,10 +1046,14 @@
   color: var(--rl-muted);
 }
 
-.rl-data-row:hover .rl-data-row-action {
+a.rl-data-row:hover .rl-data-row-action {
   border-color: rgba(20, 156, 255, 0.42);
   color: var(--rl-blue);
   background: var(--rl-blue-soft);
+}
+
+.rl-data-row--closed {
+  color: var(--rl-muted);
 }
 
 .rl-data-row-action svg {

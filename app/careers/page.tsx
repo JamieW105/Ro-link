@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, BriefcaseBusiness, Search, Tag } from 'lucide-react';
+import { ArrowRight, BriefcaseBusiness, Lock, Search, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -96,19 +96,40 @@ export default function CareersPage() {
                         </div>
                     ) : (
                         <div className="rl-data-list">
-                            {filtered.map((job) => (
-                                <Link className="rl-data-row" href={`/careers/${job.id}`} key={job.id}>
-                                    <div>
-                                        <div className="rl-data-row-meta">
-                                            <span><BriefcaseBusiness aria-hidden="true" /> Open position</span>
-                                            {(job.tags || []).map((tagName) => <span key={tagName}><Tag aria-hidden="true" />{tagName}</span>)}
+                            {filtered.map((job) => {
+                                const rowContent = (
+                                    <>
+                                        <div>
+                                            <div className="rl-data-row-meta">
+                                                <span>
+                                                    {job.status === 'OPEN'
+                                                        ? <BriefcaseBusiness aria-hidden="true" />
+                                                        : <Lock aria-hidden="true" />}
+                                                    {job.status === 'OPEN' ? 'Open position' : 'Closed'}
+                                                </span>
+                                                {(job.tags || []).map((tagName) => <span key={tagName}><Tag aria-hidden="true" />{tagName}</span>)}
+                                            </div>
+                                            <h2>{job.title}</h2>
+                                            <p>{job.description}</p>
                                         </div>
-                                        <h2>{job.title}</h2>
-                                        <p>{job.description}</p>
+                                        <span className="rl-data-row-action">
+                                            {job.status === 'OPEN'
+                                                ? <ArrowRight aria-hidden="true" />
+                                                : <Lock aria-hidden="true" />}
+                                        </span>
+                                    </>
+                                );
+
+                                return job.status === 'OPEN' ? (
+                                    <Link className="rl-data-row" href={`/careers/${job.id}`} key={job.id}>
+                                        {rowContent}
+                                    </Link>
+                                ) : (
+                                    <div className="rl-data-row rl-data-row--closed" key={job.id}>
+                                        {rowContent}
                                     </div>
-                                    <span className="rl-data-row-action"><ArrowRight aria-hidden="true" /></span>
-                                </Link>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </section>
