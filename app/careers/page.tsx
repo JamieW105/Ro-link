@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { PublicFooter } from '@/components/public/PublicFooter';
+import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 
 interface Job {
     id: string;
@@ -44,7 +45,8 @@ export default function CareersPage() {
     return (
         <>
             <main className="rl-public-page" id="top">
-                <section className="rl-utility-hero rl-utility-hero--careers" aria-labelledby="careers-title">
+                <section className="rl-utility-hero" aria-labelledby="careers-title">
+                    <PublicHeroBackdrop />
                     <div className="rl-utility-hero-inner rl-shell">
                         <div>
                             <p className="rl-eyebrow">Careers</p>

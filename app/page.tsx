@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect } from 'react';
 
 import { PublicFooter } from '@/components/public/PublicFooter';
+import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 import { getDiscordBotInviteUrl } from '@/lib/discordInvite';
 
 const coreFeatures = [
@@ -81,6 +82,7 @@ export default function Home() {
         <>
             <main className="rl-public-page" id="top">
                 <section className="rl-landing-hero" aria-labelledby="home-title">
+                    <PublicHeroBackdrop />
                     <div className="rl-shell">
                         <div className="rl-hero-content">
                             <p className="rl-eyebrow">Roblox game management</p>

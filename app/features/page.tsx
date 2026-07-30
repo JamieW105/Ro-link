@@ -1,4 +1,5 @@
 import { PublicFooter } from '@/components/public/PublicFooter';
+import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 import { getDiscordBotInviteUrl } from '@/lib/discordInvite';
 
 const features = [
@@ -51,6 +52,7 @@ export default function FeaturesPage() {
         <>
             <main className="rl-public-page" id="top">
                 <section className="rl-features-hero" aria-labelledby="features-title">
+                    <PublicHeroBackdrop />
                     <div className="rl-features-hero-inner rl-shell">
                         <div>
                             <p className="rl-eyebrow">Ro-Link features</p>

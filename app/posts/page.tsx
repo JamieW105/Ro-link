@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { PublicFooter } from '@/components/public/PublicFooter';
+import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 import type { UpdatePostRecord } from '@/lib/updatePosts';
 
 function formatPostDate(value: string | null) {
@@ -42,6 +43,7 @@ export default function PostsPage() {
         <>
             <main className="rl-public-page" id="top">
                 <section className="rl-utility-hero" aria-labelledby="posts-title">
+                    <PublicHeroBackdrop />
                     <div className="rl-utility-hero-inner rl-shell">
                         <div>
                             <p className="rl-eyebrow">Product updates</p>

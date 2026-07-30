@@ -6,6 +6,7 @@ import { signIn, useSession } from 'next-auth/react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { PublicFooter } from '@/components/public/PublicFooter';
+import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 import { DiscordIcon } from '@/components/ui/DiscordIcon';
 
 type TargetKind = 'user' | 'server' | 'game';
@@ -285,6 +286,7 @@ export default function ReportPage() {
         <>
             <main className="rl-public-page" id="top">
                 <section className="rl-utility-hero" aria-labelledby="report-title">
+                    <PublicHeroBackdrop />
                     <div className="rl-utility-hero-inner rl-shell">
                         <div>
                             <p className="rl-eyebrow">{workflow === 'report' ? 'Public reports' : 'Ro-Link appeals'}</p>

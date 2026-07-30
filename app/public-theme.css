@@ -262,7 +262,6 @@
 
 /* Landing */
 .rl-landing-hero {
-  --rl-hero-image: url("/Media/hero-police.webp");
   position: relative;
   min-height: 560px;
   padding: 136px 0 122px;
@@ -273,18 +272,61 @@
     linear-gradient(110deg, rgba(20, 156, 255, 0.035), transparent 44%);
 }
 
-.rl-landing-hero::before,
-.rl-features-hero::before,
-.rl-utility-hero--careers::before {
+.rl-hero-backdrop,
+.rl-hero-backdrop span,
+.rl-hero-backdrop::after {
   position: absolute;
   inset: 0;
-  background-image:
-    linear-gradient(90deg, rgba(8, 11, 15, 0.97) 0%, rgba(8, 11, 15, 0.91) 43%, rgba(8, 11, 15, 0.66) 100%),
-    linear-gradient(180deg, rgba(8, 11, 15, 0.2), rgba(8, 11, 15, 0.7)),
-    var(--rl-hero-image);
+}
+
+.rl-hero-backdrop {
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.rl-hero-backdrop span {
   background-position: center;
   background-size: cover;
+  opacity: 0;
+  animation: rl-hero-scene 18s ease-in-out infinite;
+}
+
+.rl-hero-backdrop span:nth-child(1) {
+  background-image: url("/Media/hero-police.webp");
+}
+
+.rl-hero-backdrop span:nth-child(2) {
+  background-image: url("/Media/hero-airport.webp");
+  animation-delay: -12s;
+}
+
+.rl-hero-backdrop span:nth-child(3) {
+  background-image: url("/Media/hero-community.webp");
+  animation-delay: -6s;
+}
+
+.rl-hero-backdrop::after {
+  background-image:
+    linear-gradient(90deg, rgba(8, 11, 15, 0.97) 0%, rgba(8, 11, 15, 0.91) 43%, rgba(8, 11, 15, 0.66) 100%),
+    linear-gradient(180deg, rgba(8, 11, 15, 0.2), rgba(8, 11, 15, 0.7));
   content: "";
+}
+
+@keyframes rl-hero-scene {
+  0%,
+  27% {
+    opacity: 1;
+  }
+
+  33%,
+  94% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }
 
 .rl-landing-hero::after {
@@ -533,12 +575,7 @@
 }
 
 .rl-features-hero {
-  --rl-hero-image: url("/Media/hero-airport.webp");
   padding: 108px 0 68px;
-}
-
-.rl-utility-hero--careers {
-  --rl-hero-image: url("/Media/hero-community.webp");
 }
 
 .rl-features-hero-inner,
@@ -1438,6 +1475,10 @@ a.rl-data-row:hover .rl-data-row-action {
     display: none;
   }
 
+  .rl-hero-backdrop span {
+    background-position: 58% center;
+  }
+
   .rl-hero-title {
     font-size: clamp(2.55rem, 13vw, 3.25rem);
   }
@@ -1547,7 +1588,12 @@ a.rl-data-row:hover .rl-data-row-action {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .rl-hero-backdrop span,
   .rl-loading-line::after {
     animation: none;
+  }
+
+  .rl-hero-backdrop span:first-child {
+    opacity: 1;
   }
 }

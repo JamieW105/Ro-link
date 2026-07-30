@@ -15,6 +15,7 @@ import { signIn, useSession } from 'next-auth/react';
 import { use, useEffect, useState } from 'react';
 
 import { PublicFooter } from '@/components/public/PublicFooter';
+import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 import { DiscordIcon } from '@/components/ui/DiscordIcon';
 
 interface Question {
@@ -157,6 +158,7 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
             <>
                 <main className="rl-public-page">
                     <section className="rl-utility-hero" aria-labelledby="application-error-title">
+                        <PublicHeroBackdrop />
                         <div className="rl-utility-hero-inner rl-shell">
                             <div>
                                 <p className="rl-eyebrow">Careers</p>
@@ -181,6 +183,7 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
             <>
                 <main className="rl-public-page" id="top">
                     <section className="rl-utility-hero" aria-labelledby="application-submitted-title">
+                        <PublicHeroBackdrop />
                         <div className="rl-utility-hero-inner rl-shell">
                             <div>
                                 <p className="rl-eyebrow">Application received</p>
@@ -224,6 +227,7 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
         <>
             <main className="rl-public-page" id="top">
                 <section className="rl-utility-hero" aria-labelledby="application-title">
+                    <PublicHeroBackdrop />
                     <div className="rl-utility-hero-inner rl-shell">
                         <div>
                             <p className="rl-eyebrow">Careers application</p>
