@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, LockKeyhole, Send, ShieldAlert } from 'lucide-react';
+import { Check, ExternalLink, Gavel, LockKeyhole, Send, ShieldAlert } from 'lucide-react';
 import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
@@ -23,6 +23,32 @@ type LinkedAccount = {
     roblox_username: string | null;
 };
 
+type AppealOption = {
+    key: string;
+    targetLabel: string;
+    reason: string;
+    moderatedAt: string | null;
+    originalForumUrl: string | null;
+};
+
+type AppealContext = {
+    linked: boolean;
+    identity: {
+        discordId: string;
+        discordName: string | null;
+        robloxId: string;
+        robloxUsername: string | null;
+    };
+    options: AppealOption[];
+    error?: string;
+};
+
+type AppealResult = {
+    appealId?: string;
+    threadUrl?: string;
+    error?: string;
+};
+
 const targetOptions: Array<{ value: TargetKind; label: string; description: string }> = [
     { value: 'user', label: 'User', description: 'Roblox or Discord account' },
     { value: 'server', label: 'Server', description: 'Discord community server' },
@@ -41,6 +67,13 @@ export default function ReportPage() {
     const [evidenceLinks, setEvidenceLinks] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [result, setResult] = useState<SubmitResult | null>(null);
+    const [appealContext, setAppealContext] = useState<AppealContext | null>(null);
+    const [appealLoading, setAppealLoading] = useState(true);
+    const [moderationKey, setModerationKey] = useState('');
+    const [appealReason, setAppealReason] = useState('');
+    const [appealEvidence, setAppealEvidence] = useState('');
+    const [appealSubmitting, setAppealSubmitting] = useState(false);
+    const [appealResult, setAppealResult] = useState<AppealResult | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -65,6 +98,48 @@ export default function ReportPage() {
         } else if (status !== 'loading') {
             setLinkedAccount(null);
             setLinkedAccountLoading(false);
+        }
+
+        return () => {
+            cancelled = true;
+        };
+    }, [session?.user, status]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadAppeals() {
+            setAppealLoading(true);
+            setAppealContext(null);
+            try {
+                const response = await fetch('/api/moderation-appeals', { cache: 'no-store' });
+                const data = await response.json().catch(() => ({})) as AppealContext;
+                if (cancelled) return;
+                if (response.ok) {
+                    setAppealContext(data);
+                    setModerationKey((current) => (
+                        data.options.some((option) => option.key === current)
+                            ? current
+                            : data.options[0]?.key || ''
+                    ));
+                } else {
+                    setAppealContext({ ...data, linked: false, options: [], identity: data.identity || {
+                        discordId: '',
+                        discordName: null,
+                        robloxId: '',
+                        robloxUsername: null,
+                    } });
+                }
+            } finally {
+                if (!cancelled) setAppealLoading(false);
+            }
+        }
+
+        if (session?.user) {
+            loadAppeals();
+        } else if (status !== 'loading') {
+            setAppealContext(null);
+            setAppealLoading(false);
         }
 
         return () => {
@@ -99,6 +174,15 @@ export default function ReportPage() {
     function handleRobloxLink() {
         setLinkingRoblox(true);
         window.location.href = '/api/roblox/auth?returnTo=/report';
+    }
+
+    function handleAppealSignIn() {
+        signIn('discord', { callbackUrl: '/report#appeal' });
+    }
+
+    function handleAppealRobloxLink() {
+        setLinkingRoblox(true);
+        window.location.href = '/api/roblox/auth?returnTo=/report#appeal';
     }
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -140,6 +224,40 @@ export default function ReportPage() {
             setResult({ error: 'Report submission failed.' });
         } finally {
             setSubmitting(false);
+        }
+    }
+
+    async function handleAppealSubmit(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        if (!session?.user) {
+            handleAppealSignIn();
+            return;
+        }
+
+        setAppealSubmitting(true);
+        setAppealResult(null);
+        try {
+            const response = await fetch('/api/moderation-appeals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    moderationKey,
+                    reason: appealReason,
+                    evidenceLinks: appealEvidence,
+                }),
+            });
+            const data = await response.json().catch(() => ({})) as AppealResult;
+            if (!response.ok) {
+                setAppealResult({ error: data.error || `Appeal submission failed (${response.status}).` });
+                return;
+            }
+            setAppealResult(data);
+            setAppealReason('');
+            setAppealEvidence('');
+        } catch {
+            setAppealResult({ error: 'Appeal submission failed.' });
+        } finally {
+            setAppealSubmitting(false);
         }
     }
 
@@ -310,6 +428,164 @@ export default function ReportPage() {
                             <div className="rl-notice">
                                 <LockKeyhole aria-hidden="true" />
                                 <div><strong>Verified submissions</strong>Reports are accepted only from users with both accounts connected.</div>
+                            </div>
+                        </aside>
+                    </div>
+
+                    <div className="rl-utility-grid mt-8" id="appeal">
+                        <section className="rl-surface" aria-labelledby="appeal-title">
+                            <div className="rl-surface-header">
+                                <div>
+                                    <p className="rl-eyebrow">Ro-Link appeals</p>
+                                    <h2 id="appeal-title">Appeal a moderation action</h2>
+                                    <p>Select the exact user, server, or game moderation attached to your verified accounts.</p>
+                                </div>
+                                <span className="rl-surface-icon"><Gavel aria-hidden="true" /></span>
+                            </div>
+
+                            {appealLoading || status === 'loading' ? (
+                                <div className="rl-surface-body">
+                                    <div className="rl-notice">
+                                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+                                        <div><strong>Loading moderation history</strong>Checking bans associated with your Discord, Roblox, servers, and games.</div>
+                                    </div>
+                                </div>
+                            ) : !session?.user ? (
+                                <div className="rl-surface-body">
+                                    <div className="rl-notice">
+                                        <DiscordIcon aria-hidden="true" width="16" height="16" />
+                                        <div>
+                                            <strong>Sign in to appeal</strong>
+                                            Appeals require your Discord identity so Ro-Link can show only moderation associated with you.
+                                            <button className="rl-button rl-button-primary mt-4" type="button" onClick={handleAppealSignIn}>Sign in with Discord</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : appealContext?.error ? (
+                                <div className="rl-surface-body">
+                                    <div className="rl-feedback rl-feedback-error">{appealContext.error}</div>
+                                </div>
+                            ) : !appealContext?.linked ? (
+                                <div className="rl-surface-body">
+                                    <div className="rl-notice">
+                                        <Image src="/Media/Roblox.png" alt="" width={16} height={16} />
+                                        <div>
+                                            <strong>Link your Roblox account to continue</strong>
+                                            A linked Roblox account is required to verify your identity and load appealable moderation.
+                                            <button className="rl-button rl-button-primary mt-4" type="button" onClick={handleAppealRobloxLink} disabled={linkingRoblox}>
+                                                {linkingRoblox ? 'Opening Roblox…' : 'Link Roblox account'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : appealContext.options.length === 0 ? (
+                                <div className="rl-surface-body">
+                                    <div className="rl-notice">
+                                        <Check aria-hidden="true" />
+                                        <div><strong>No appealable moderation found</strong>There are no active Ro-Link bans associated with your verified user, owned Discord servers, or connected Roblox games.</div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <form className="rl-surface-body" onSubmit={handleAppealSubmit}>
+                                    <div className="rl-form-section">
+                                        <label className="rl-field-label" htmlFor="appeal-moderation">Moderation action</label>
+                                        <select
+                                            className="rl-select"
+                                            id="appeal-moderation"
+                                            value={moderationKey}
+                                            onChange={(event) => setModerationKey(event.target.value)}
+                                            required
+                                        >
+                                            {appealContext.options.map((option) => (
+                                                <option value={option.key} key={option.key}>
+                                                    {option.targetLabel}{option.moderatedAt ? ` · ${new Date(option.moderatedAt).toLocaleDateString()}` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {appealContext.options.find((option) => option.key === moderationKey) && (
+                                            <div className="rl-notice mt-4">
+                                                <Gavel aria-hidden="true" />
+                                                <div>
+                                                    <strong>Original moderation reason</strong>
+                                                    {appealContext.options.find((option) => option.key === moderationKey)?.reason}
+                                                    {appealContext.options.find((option) => option.key === moderationKey)?.originalForumUrl && (
+                                                        <a
+                                                            className="mt-2 inline-flex items-center gap-1 text-sky-400"
+                                                            href={appealContext.options.find((option) => option.key === moderationKey)?.originalForumUrl || '#'}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                        >
+                                                            Open original forum post <ExternalLink aria-hidden="true" width={13} height={13} />
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="rl-form-section">
+                                        <label className="rl-field-label" htmlFor="appeal-reason">Why should this moderation be reviewed?</label>
+                                        <textarea
+                                            className="rl-textarea"
+                                            id="appeal-reason"
+                                            value={appealReason}
+                                            onChange={(event) => setAppealReason(event.target.value)}
+                                            placeholder="Explain clearly why the moderation should be changed, including any relevant context."
+                                            minLength={20}
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="rl-form-section">
+                                        <label className="rl-field-label" htmlFor="appeal-evidence">Additional evidence links <span className="text-slate-500">(optional)</span></label>
+                                        <textarea
+                                            className="rl-textarea"
+                                            id="appeal-evidence"
+                                            value={appealEvidence}
+                                            onChange={(event) => setAppealEvidence(event.target.value)}
+                                            placeholder="Add image, video, or message links. Separate multiple links with spaces or new lines."
+                                        />
+                                    </div>
+
+                                    {appealResult?.error && <div className="rl-feedback rl-feedback-error">{appealResult.error}</div>}
+                                    {appealResult?.appealId && !appealResult.error && (
+                                        <div className="rl-feedback rl-feedback-success">
+                                            <strong>Appeal submitted</strong>
+                                            <div>{appealResult.appealId}</div>
+                                            {appealResult.threadUrl && <a href={appealResult.threadUrl} target="_blank" rel="noreferrer">Open appeal forum post</a>}
+                                        </div>
+                                    )}
+
+                                    <div className="rl-form-footer">
+                                        <p>
+                                            {appealContext.identity.robloxUsername || `Roblox ${appealContext.identity.robloxId}`} · {session.user.name || 'Discord user'}
+                                        </p>
+                                        <button
+                                            className="rl-button rl-button-primary"
+                                            type="submit"
+                                            disabled={appealSubmitting || !moderationKey || appealReason.trim().length < 20}
+                                        >
+                                            <Send aria-hidden="true" width={14} height={14} />
+                                            {appealSubmitting ? 'Submitting…' : 'Submit appeal'}
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
+                        </section>
+
+                        <aside className="rl-aside-stack">
+                            <div className="rl-surface rl-aside-panel">
+                                <h2>Appeal requirements</h2>
+                                <ul className="rl-aside-list">
+                                    <li><Check aria-hidden="true" /><span>Use your signed-in Discord account.</span></li>
+                                    <li><Check aria-hidden="true" /><span>Keep your Roblox account linked.</span></li>
+                                    <li><Check aria-hidden="true" /><span>Select the exact moderation action.</span></li>
+                                    <li><Check aria-hidden="true" /><span>Explain why staff should review it.</span></li>
+                                </ul>
+                            </div>
+                            <div className="rl-notice">
+                                <LockKeyhole aria-hidden="true" />
+                                <div><strong>Identity protected</strong>The form only lists moderation tied to your verified identity, owned servers, and connected games.</div>
                             </div>
                         </aside>
                     </div>

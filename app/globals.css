@@ -25,6 +25,129 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.rl-site-banners {
+  position: relative;
+  z-index: 35;
+  background: #080b0f;
+}
+
+.rl-site-banner {
+  --banner-accent: #149cff;
+  --banner-soft: rgba(20, 156, 255, 0.1);
+  --banner-line: rgba(20, 156, 255, 0.28);
+  border-bottom: 1px solid var(--banner-line);
+  color: #f2f5f8;
+  background:
+    linear-gradient(90deg, var(--banner-soft), transparent 42%),
+    #0b0f14;
+}
+
+.rl-site-banner[data-tone="success"] {
+  --banner-accent: #34d399;
+  --banner-soft: rgba(52, 211, 153, 0.09);
+  --banner-line: rgba(52, 211, 153, 0.25);
+}
+
+.rl-site-banner[data-tone="warning"] {
+  --banner-accent: #fbbf24;
+  --banner-soft: rgba(251, 191, 36, 0.09);
+  --banner-line: rgba(251, 191, 36, 0.25);
+}
+
+.rl-site-banner[data-tone="critical"] {
+  --banner-accent: #fb7185;
+  --banner-soft: rgba(251, 113, 133, 0.09);
+  --banner-line: rgba(251, 113, 133, 0.26);
+}
+
+.rl-site-banner-inner {
+  display: grid;
+  width: min(calc(100% - 48px), 1180px);
+  min-height: 58px;
+  margin-inline: auto;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding-block: 10px;
+}
+
+.rl-site-banner-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--banner-line);
+  border-radius: 7px;
+  color: var(--banner-accent);
+  background: var(--banner-soft);
+}
+
+.rl-site-banner-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.rl-site-banner-copy {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.76rem;
+}
+
+.rl-site-banner-copy strong {
+  flex: none;
+  color: #fff;
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+}
+
+.rl-site-banner-copy span {
+  color: #a8b1bd;
+  line-height: 1.45;
+}
+
+.rl-site-banner-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 9px;
+  border-radius: 5px;
+  color: var(--banner-accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.rl-site-banner-link:hover {
+  background: var(--banner-soft);
+}
+
+.rl-site-banner-link svg {
+  width: 13px;
+  height: 13px;
+}
+
+@media (max-width: 640px) {
+  .rl-site-banner-inner {
+    width: min(calc(100% - 28px), 1180px);
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    padding-block: 12px;
+  }
+
+  .rl-site-banner-copy {
+    display: grid;
+    gap: 2px;
+  }
+
+  .rl-site-banner-link {
+    grid-column: 2;
+    width: max-content;
+    padding-left: 0;
+  }
+}
+
 /* App icon language: compact, rounded and weighty like the solid reference set. */
 svg[stroke="currentColor"] {
   stroke-width: 2.4;

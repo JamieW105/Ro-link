@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from "react";
-import { ArrowLeft, Blocks, BriefcaseBusiness, FileText, LayoutDashboard, Menu, MessageSquare, OctagonX, Server, UsersRound, X, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Blocks, BriefcaseBusiness, FileText, LayoutDashboard, Megaphone, Menu, MessageSquare, OctagonX, Server, UsersRound, X, type LucideIcon } from "lucide-react";
 
 export default function ManagementLayout({
     children,
@@ -69,6 +69,7 @@ export default function ManagementLayout({
         { name: 'Servers', href: '/management/servers', icon: Server, perm: 'MANAGE_SERVERS' },
         { name: 'Job Apps', href: '/management/jobs', icon: BriefcaseBusiness, perm: 'POST_JOB_APPLICATION' },
         { name: 'Updates', href: '/management/posts', icon: FileText, perm: 'POST_UPDATES' },
+        { name: 'Site Banners', href: '/management/site-banners', icon: Megaphone, perm: 'MANAGE_RO_LINK' },
         { name: 'DMs', href: '/management/dms', icon: MessageSquare, perm: 'MANAGE_RO_LINK' },
         { name: 'Modules', href: '/management/modules', icon: Blocks, perm: 'MANAGE_MODULES' },
         { name: 'Blocking', href: '/management/blocking', icon: OctagonX, perm: 'BLOCK_SERVERS' },

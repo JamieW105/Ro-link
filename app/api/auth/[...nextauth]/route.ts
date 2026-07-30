@@ -11,6 +11,7 @@ type TokenShape = {
     accessToken?: string
     refreshToken?: string
     accessTokenExpires?: number
+    dgsuBanned?: boolean
     error?: string
     errorCode?: string
     errorDescription?: string
@@ -133,39 +134,6 @@ export const authOptions: AuthOptions = {
         }
         : undefined,
     callbacks: {
-        async signIn({ user, account }) {
-            const discordUserId = String(user?.id || account?.providerAccountId || "").trim()
-            const discordAccessToken = typeof account?.access_token === "string"
-                ? account.access_token
-                : undefined
-
-            if (!discordUserId) {
-                return true
-            }
-
-            try {
-                const ban = await findDgsuBanForDiscordLogin(getSupabaseAdmin(), {
-                    discordUserId,
-                    discordAccessToken,
-                })
-
-                if (ban) {
-                    console.warn("[AUTH] DGSU banned account attempted sign in", {
-                        discordUserId,
-                        banTargetType: ban.target_type,
-                        banTargetId: ban.target_id,
-                    })
-                    return `/auth/signin?error=${encodeURIComponent(DGSU_BAN_AUTH_ERROR)}`
-                }
-            } catch (error) {
-                console.error("[AUTH] DGSU login check failed", {
-                    discordUserId,
-                    error: error instanceof Error ? error.message : error,
-                })
-            }
-
-            return true
-        },
         async jwt({ token, account }: { token: TokenShape; account?: DiscordAccount }) {
             if (account) {
                 token.accessToken = account.access_token
@@ -173,8 +141,32 @@ export const authOptions: AuthOptions = {
                 token.accessTokenExpires = account.expires_at
                     ? account.expires_at * 1000
                     : Date.now() + Number(account.expires_in || 0) * 1000
+                token.dgsuBanned = false
                 token.error = undefined
                 token.errorCode = undefined
+
+                const discordUserId = String(token.sub || "").trim()
+                if (discordUserId) {
+                    try {
+                        const ban = await findDgsuBanForDiscordLogin(getSupabaseAdmin(), {
+                            discordUserId,
+                            discordAccessToken: account.access_token,
+                        })
+                        token.dgsuBanned = Boolean(ban)
+                        if (ban) {
+                            console.warn("[AUTH] DGSU banned account signed in for appeal access", {
+                                discordUserId,
+                                banTargetType: ban.target_type,
+                                banTargetId: ban.target_id,
+                            })
+                        }
+                    } catch (error) {
+                        console.error("[AUTH] DGSU login check failed", {
+                            discordUserId,
+                            error: error instanceof Error ? error.message : error,
+                        })
+                    }
+                }
                 return token
             }
 
@@ -201,13 +193,12 @@ export const authOptions: AuthOptions = {
                         discordUserId: token.sub,
                     })
 
-                    if (ban) {
+                    if (ban || token.dgsuBanned) {
                         console.warn("[AUTH] Existing session belongs to DGSU banned account", {
                             discordUserId: token.sub,
-                            banTargetType: ban.target_type,
-                            banTargetId: ban.target_id,
+                            banTargetType: ban?.target_type,
+                            banTargetId: ban?.target_id,
                         })
-                        session.accessToken = undefined
                         session.error = DGSU_BAN_AUTH_ERROR
                     }
                 } catch (error) {

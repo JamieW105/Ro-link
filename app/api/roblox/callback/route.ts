@@ -120,6 +120,19 @@ export async function GET(req: Request) {
         const robloxUsername = userData.preferred_username || userData.nickname || userData.name;
         const discordId = session.user?.id || '';
 
+        // Keep the verified identity on record even when either side is banned.
+        // The account remains restricted, but the appeal form can prove the
+        // Roblox identity and show only moderation owned by this user.
+        const { error: identityError } = await db
+            .from('verified_users')
+            .upsert({
+                discord_id: discordId,
+                roblox_id: robloxId,
+                roblox_username: robloxUsername,
+                updated_at: new Date()
+            });
+        if (identityError) throw identityError;
+
         const dgsuBan = await findDgsuBanForUser(db, {
             discordUserId: discordId,
             robloxUserId: robloxId,
@@ -149,19 +162,7 @@ export async function GET(req: Request) {
             }));
         }
 
-        // 3. Store in Database
-        const { error: dbError } = await db
-            .from('verified_users')
-            .upsert({
-                discord_id: discordId,
-                roblox_id: robloxId,
-                roblox_username: robloxUsername,
-                updated_at: new Date()
-            });
-
-        if (dbError) throw dbError;
-
-        // 4. Update roles for existing servers
+        // 3. Update roles for existing servers
         const discordToken = process.env.DISCORD_TOKEN;
         const accessToken = session.accessToken;
 

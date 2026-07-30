@@ -1,4 +1,9 @@
 import { Metadata } from "next";
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { DGSU_BAN_AUTH_ERROR } from "@/lib/dgsuBanConstants";
 
 export const metadata: Metadata = {
     title: "Dashboard | Ro-Link",
@@ -17,10 +22,15 @@ export const metadata: Metadata = {
     },
 };
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const session = await getServerSession(authOptions);
+    if (session?.error === DGSU_BAN_AUTH_ERROR) {
+        redirect("/report#appeal");
+    }
+
     return <>{children}</>;
 }

@@ -3,6 +3,8 @@ import "./globals.css";
 import "./public-theme.css";
 import NextAuthProvider from "./providers";
 import { PublicHeaderGate } from "@/components/public/PublicHeaderGate";
+import { SiteBannerGate } from "@/components/SiteBannerGate";
+import { DgsuAppealRedirect } from "@/components/DgsuAppealRedirect";
 
 export const metadata: Metadata = {
   title: "Ro-Link | Connect Discord to Roblox",
@@ -44,7 +46,9 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <NextAuthProvider>
+          <DgsuAppealRedirect />
           <PublicHeaderGate />
+          <SiteBannerGate />
           {children}
         </NextAuthProvider>
       </body>
