@@ -721,6 +721,11 @@
   gap: 70px;
 }
 
+.rl-post-detail-hero-inner {
+  position: relative;
+  z-index: 1;
+}
+
 .rl-utility-title {
   font-size: clamp(2.35rem, 4.6vw, 3.65rem);
 }

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { use, useEffect, useState } from 'react';
 
 import AutoLinkText from '@/components/AutoLinkText';
+import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 import type { UpdatePostRecord } from '@/lib/updatePosts';
 
 function formatPostDate(value: string | null) {
@@ -96,8 +97,10 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
 
     return (
         <div className="min-h-screen bg-[#020617] text-slate-200">
-            <div className="mx-auto max-w-5xl px-6 py-20 sm:px-8">
-                <header className="max-w-4xl">
+            <section className="rl-utility-hero" aria-labelledby="post-title">
+                <PublicHeroBackdrop />
+                <div className="rl-post-detail-hero-inner rl-shell">
+                    <header className="max-w-4xl">
                     <Link href="/posts" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.25em] text-sky-400 transition-colors hover:text-sky-300">
                         <LucideArrowLeft className="h-4 w-4" />
                         Back to Updates
@@ -124,15 +127,18 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
                         )}
                     </div>
 
-                    <h1 className="mt-5 text-4xl font-black tracking-tight text-white sm:text-5xl">{post.title}</h1>
+                    <h1 className="mt-5 text-4xl font-black tracking-tight text-white sm:text-5xl" id="post-title">{post.title}</h1>
                     <AutoLinkText
                         as="p"
                         text={post.description}
                         preserveLineBreaks
                         className="mt-5 text-base leading-relaxed text-slate-400 sm:text-lg"
                     />
-                </header>
+                    </header>
+                </div>
+            </section>
 
+            <div className="mx-auto max-w-5xl px-6 py-14 sm:px-8">
                 <div className="mt-14 space-y-8">
                     {post.major_features.length > 0 && (
                         <section className="rounded-3xl border border-slate-800 bg-slate-900/50 p-7">

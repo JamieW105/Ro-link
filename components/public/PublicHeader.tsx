@@ -10,7 +10,7 @@ import {
     Newspaper,
     X,
 } from 'lucide-react';
-import { signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -34,7 +34,9 @@ function isActivePath(pathname: string, href: string) {
 
 export function PublicHeader() {
     const pathname = usePathname();
+    const { status } = useSession();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const isSignedIn = status === 'authenticated';
 
     useEffect(() => {
         setIsMenuOpen(false);
@@ -83,13 +85,21 @@ export function PublicHeader() {
                         </details>
                     </li>
                     <li className="rl-mobile-actions">
-                        <button className="rl-button" type="button" onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}>Sign in</button>
+                        {isSignedIn ? (
+                            <Link className="rl-button" href="/dashboard">Dashboard</Link>
+                        ) : (
+                            <button className="rl-button" type="button" onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}>Sign in</button>
+                        )}
                         <a className="rl-button rl-button-primary" href={getDiscordBotInviteUrl()} target="_blank" rel="noopener noreferrer">Install</a>
                     </li>
                 </ul>
 
                 <div className="rl-nav-actions">
-                    <button className="rl-sign-in" type="button" onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}>Sign in</button>
+                    {isSignedIn ? (
+                        <Link className="rl-sign-in" href="/dashboard">Dashboard</Link>
+                    ) : (
+                        <button className="rl-sign-in" type="button" onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}>Sign in</button>
+                    )}
                     <a className="rl-button rl-button-primary" href={getDiscordBotInviteUrl()} target="_blank" rel="noopener noreferrer">Install Ro-Link</a>
                     <button
                         className="rl-menu-toggle"
