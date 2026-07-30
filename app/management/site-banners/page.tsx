@@ -2,6 +2,7 @@
 
 import { CalendarClock, ExternalLink, Megaphone, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import {
     SITE_BANNER_PLACEMENTS,
@@ -240,13 +241,19 @@ export default function SiteBannersPage() {
                 </div>
             )}
 
-            {formOpen && (
-                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <form onSubmit={saveBanner} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-700 bg-[#080d18] p-5 shadow-2xl md:p-7">
+            {formOpen && createPortal(
+                <div className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+                    <form
+                        onSubmit={saveBanner}
+                        className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-2xl border border-slate-700 bg-[#080d18] p-5 shadow-2xl md:p-7"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="site-banner-dialog-title"
+                    >
                         <div className="flex items-start justify-between gap-4">
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-sky-400">{editingId ? 'Edit notice' : 'New notice'}</p>
-                                <h2 className="mt-1 text-xl font-bold text-white">{editingId ? 'Update site banner' : 'Create site banner'}</h2>
+                                <h2 id="site-banner-dialog-title" className="mt-1 text-xl font-bold text-white">{editingId ? 'Update site banner' : 'Create site banner'}</h2>
                             </div>
                             <button type="button" onClick={() => setFormOpen(false)} className="rounded-lg border border-slate-700 p-2 text-slate-400 hover:text-white" aria-label="Close">
                                 <X className="h-4 w-4" aria-hidden="true" />
@@ -320,7 +327,8 @@ export default function SiteBannersPage() {
                             </button>
                         </div>
                     </form>
-                </div>
+                </div>,
+                document.body,
             )}
         </div>
     );

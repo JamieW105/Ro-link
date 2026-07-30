@@ -262,6 +262,7 @@
 
 /* Landing */
 .rl-landing-hero {
+  --rl-hero-image: url("/Media/hero-police.webp");
   position: relative;
   min-height: 560px;
   padding: 136px 0 122px;
@@ -270,6 +271,20 @@
   background:
     radial-gradient(circle at 79% 38%, rgba(20, 156, 255, 0.08), transparent 24%),
     linear-gradient(110deg, rgba(20, 156, 255, 0.035), transparent 44%);
+}
+
+.rl-landing-hero::before,
+.rl-features-hero::before,
+.rl-utility-hero--careers::before {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, rgba(8, 11, 15, 0.97) 0%, rgba(8, 11, 15, 0.91) 43%, rgba(8, 11, 15, 0.66) 100%),
+    linear-gradient(180deg, rgba(8, 11, 15, 0.2), rgba(8, 11, 15, 0.7)),
+    var(--rl-hero-image);
+  background-position: center;
+  background-size: cover;
+  content: "";
 }
 
 .rl-landing-hero::after {
@@ -511,16 +526,25 @@
 /* Feature and utility page heroes */
 .rl-features-hero,
 .rl-utility-hero {
+  position: relative;
+  overflow: hidden;
   border-bottom: 1px solid var(--rl-line);
   background: linear-gradient(110deg, rgba(20, 156, 255, 0.045), transparent 42%);
 }
 
 .rl-features-hero {
+  --rl-hero-image: url("/Media/hero-airport.webp");
   padding: 108px 0 68px;
+}
+
+.rl-utility-hero--careers {
+  --rl-hero-image: url("/Media/hero-community.webp");
 }
 
 .rl-features-hero-inner,
 .rl-utility-hero-inner {
+  position: relative;
+  z-index: 1;
   display: grid;
   align-items: end;
   justify-content: space-between;
