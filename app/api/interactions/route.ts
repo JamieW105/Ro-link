@@ -4692,12 +4692,12 @@ function RoLink:CreateModuleUi(moduleInfo, target, sourceOrTree, props)
 				local ok, result = pcall(sourceOrTree, { Player = player, PlayerGui = playerGui, Module = latestModuleInfo, Config = latestModuleInfo and latestModuleInfo.configSchema or {}, Settings = latestModuleInfo and latestModuleInfo.settings or {} }, player, props or {})
 				results[player.Name] = ok and attachUiResult(playerGui, moduleInfo, result) or tostring(result)
 			elseif type(sourceOrTree) == "string" and type(loadstring) == "function" then
-				local chunk, loadError = loadstring(sourceOrTree)
-				if chunk then
+				local compileOk, chunk, loadError = pcall(loadstring, sourceOrTree)
+				if compileOk and chunk then
 					local ok, result = pcall(chunk, { Player = player, PlayerGui = playerGui, Module = latestModuleInfo, Config = latestModuleInfo and latestModuleInfo.configSchema or {}, Settings = latestModuleInfo and latestModuleInfo.settings or {} }, player, props or {})
 					results[player.Name] = ok and attachUiResult(playerGui, moduleInfo, result) or tostring(result)
 				else
-					results[player.Name] = tostring(loadError)
+					results[player.Name] = tostring(compileOk and loadError or chunk)
 				end
 			else
 				results[player.Name] = "CreateUI expects source code, a function, or a UI tree table."
@@ -4983,8 +4983,11 @@ end
 
 function RoLink:LoadModules()
 	local loader = loadstring
-	if type(loader) ~= "function" then
-		warn("[Ro-Link] Add-on modules require ServerScriptService.LoadStringEnabled.")
+	local probeOk, probeChunk = pcall(function()
+		return loader("return true")
+	end)
+	if type(loader) ~= "function" or not probeOk or type(probeChunk) ~= "function" then
+		warn("[Ro-Link] Dynamic add-on source is unavailable in this experience; built-in website commands remain enabled.")
 		return
 	end
 
@@ -5038,9 +5041,9 @@ function RoLink:LoadModules()
 					end
 				end
 
-				local chunk, loadError = loader(source)
-				if not chunk then
-					warn("[Ro-Link] Failed to load module " .. moduleKey .. ": " .. tostring(loadError))
+				local compileOk, chunk, loadError = pcall(loader, source)
+				if not compileOk or not chunk then
+					warn("[Ro-Link] Failed to load module " .. moduleKey .. ": " .. tostring(compileOk and loadError or chunk))
 				else
 					local runOk, exported = pcall(chunk)
 					if not runOk then

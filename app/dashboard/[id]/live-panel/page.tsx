@@ -5,7 +5,7 @@ import { Ban as LucideBan, Clock3 as LucideClock3, FileText as LucideFileText, L
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { usePermissions } from '@/context/PermissionsContext';
 import {
@@ -773,6 +773,7 @@ export default function LivePanelPage() {
     const [serverName, setServerName] = useState('Live Server');
     const [placeId, setPlaceId] = useState<string | null>(null);
     const [liveServers, setLiveServers] = useState<LiveServerRecord[]>([]);
+    const liveServersRefreshPending = useRef(false);
     const [playerActivity, setPlayerActivity] = useState<PlayerPresenceActivity[]>([]);
     const [logs, setLogs] = useState<NormalizedDashboardLog[]>([]);
     const [pendingReports, setPendingReports] = useState<PendingReport[]>([]);
@@ -881,6 +882,27 @@ export default function LivePanelPage() {
         }
     }, [guildId]);
 
+    const refreshLiveServers = useCallback(async () => {
+        if (!guildId || liveServersRefreshPending.current) return;
+
+        liveServersRefreshPending.current = true;
+        try {
+            const response = await fetch(`/api/dashboard/live-servers?serverId=${encodeURIComponent(guildId)}`, {
+                cache: 'no-store',
+            });
+            const payload = await response.json().catch(() => ([])) as LiveServerRecord[] | { error?: string };
+
+            if (response.ok && Array.isArray(payload)) {
+                setLiveServers(payload);
+            }
+        } catch {
+            // The full panel refresh handles user-facing errors. Keep this fast
+            // server-list refresh silent so a brief network issue does not flash.
+        } finally {
+            liveServersRefreshPending.current = false;
+        }
+    }, [guildId]);
+
     const loadPanelReports = useCallback(async (status: ReportStatusFilter = 'PENDING') => {
         if (!guildId || !canManageReports) {
             setPanelReports([]);
@@ -958,6 +980,25 @@ export default function LivePanelPage() {
         const interval = window.setInterval(() => loadPanel(false), 7000);
         return () => window.clearInterval(interval);
     }, [loadPanel]);
+
+    useEffect(() => {
+        const refreshWhenVisible = () => {
+            if (document.visibilityState === 'visible') {
+                refreshLiveServers();
+            }
+        };
+
+        refreshLiveServers();
+        const interval = window.setInterval(refreshLiveServers, 2000);
+        window.addEventListener('focus', refreshLiveServers);
+        document.addEventListener('visibilitychange', refreshWhenVisible);
+
+        return () => {
+            window.clearInterval(interval);
+            window.removeEventListener('focus', refreshLiveServers);
+            document.removeEventListener('visibilitychange', refreshWhenVisible);
+        };
+    }, [refreshLiveServers]);
 
     useEffect(() => {
         if (!canManageReports || rightPaneMode !== 'reports') {
