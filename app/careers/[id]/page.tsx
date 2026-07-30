@@ -1,11 +1,21 @@
 'use client';
 
-import { Check as LucideCheck } from 'lucide-react';
-
-import { useEffect, useState, use } from 'react';
-import { useRouter } from 'next/navigation';
+import {
+    ArrowLeft,
+    BriefcaseBusiness,
+    Check,
+    CircleCheck,
+    Clock3,
+    LockKeyhole,
+    Send,
+} from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { useSession, signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
+import { use, useEffect, useState } from 'react';
+
+import { PublicFooter } from '@/components/public/PublicFooter';
+import { DiscordIcon } from '@/components/ui/DiscordIcon';
 
 interface Question {
     id: string;
@@ -31,24 +41,26 @@ type LinkedAccount = {
 export default function ApplicationForm({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
     const params = use(paramsPromise);
     const { data: session, status } = useSession();
-    const router = useRouter();
     const [job, setJob] = useState<Job | null>(null);
-    const [answers, setAnswers] = useState<Record<string, any>>({});
+    const [answers, setAnswers] = useState<Record<string, string | boolean>>({});
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState("");
+    const [linkingRoblox, setLinkingRoblox] = useState(false);
+    const [error, setError] = useState('');
+    const [submitError, setSubmitError] = useState('');
+    const [submittedNow, setSubmittedNow] = useState(false);
     const [linkedAccount, setLinkedAccount] = useState<LinkedAccount | null>(null);
     const [linkedAccountLoading, setLinkedAccountLoading] = useState(true);
 
     useEffect(() => {
         fetch(`/api/careers/${params.id}`)
-            .then(res => res.json())
-            .then(data => {
+            .then((response) => response.json())
+            .then((data) => {
                 if (data.error) setError(data.error);
                 else setJob(data);
-                setLoading(false);
             })
-            .catch(() => setLoading(false));
+            .catch(() => setError('Unable to load this application.'))
+            .finally(() => setLoading(false));
     }, [params.id]);
 
     useEffect(() => {
@@ -59,9 +71,7 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
             try {
                 const response = await fetch('/api/verify/linked-account', { cache: 'no-store' });
                 const data = response.ok ? await response.json() as LinkedAccount | null : null;
-                if (!cancelled) {
-                    setLinkedAccount(data?.roblox_id ? data : null);
-                }
+                if (!cancelled) setLinkedAccount(data?.roblox_id ? data : null);
             } finally {
                 if (!cancelled) setLinkedAccountLoading(false);
             }
@@ -79,201 +89,296 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
         };
     }, [session?.user, status]);
 
-    const handleAnswer = (qId: string, val: any) => {
-        setAnswers(prev => ({ ...prev, [qId]: val }));
-    };
+    function handleAnswer(questionId: string, value: string | boolean) {
+        setAnswers((current) => ({ ...current, [questionId]: value }));
+    }
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!session) return signIn('discord');
+    function handleDiscordSignIn() {
+        signIn('discord', { callbackUrl: `/careers/${params.id}` });
+    }
+
+    function handleRobloxLink() {
+        setLinkingRoblox(true);
+        window.location.href = `/api/roblox/auth?returnTo=${encodeURIComponent(`/careers/${params.id}`)}`;
+    }
+
+    async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        setSubmitError('');
+
+        if (!session) {
+            handleDiscordSignIn();
+            return;
+        }
         if (!linkedAccount?.roblox_id) {
-            alert('Link your Roblox account before submitting an application.');
+            setSubmitError('Link your Roblox account before submitting an application.');
             return;
         }
 
         setSubmitting(true);
         try {
-            const res = await fetch(`/api/careers/${params.id}/submit`, {
+            const response = await fetch(`/api/careers/${params.id}/submit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ answers })
+                body: JSON.stringify({ answers }),
             });
-            const data = await res.json();
-            if (res.ok) {
-                alert("Application submitted successfully! Check your Discord DMs for confirmation.");
-                router.push('/careers');
-            } else {
-                alert(data.error || "Failed to submit application.");
+            const data = await response.json().catch(() => ({})) as { error?: string };
+
+            if (!response.ok) {
+                setSubmitError(data.error || `Application submission failed (${response.status}).`);
+                return;
             }
-        } catch (err) {
-            alert("Error submitting application.");
+
+            setSubmittedNow(true);
+            setJob((current) => current ? { ...current, hasSubmitted: true } : current);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch {
+            setSubmitError('Application submission failed. Please try again.');
         } finally {
             setSubmitting(false);
         }
-    };
+    }
 
-    if (loading) return (
-        <div className="min-h-screen bg-[#020617] flex items-center justify-center">
-            <div className="w-10 h-10 border-2 border-sky-600 border-t-transparent rounded-full animate-spin"></div>
-        </div>
-    );
+    if (loading) {
+        return (
+            <>
+                <main className="rl-public-page">
+                    <section className="rl-utility-main rl-shell" aria-label="Loading application">
+                        <div className="rl-loading-line" />
+                    </section>
+                </main>
+                <PublicFooter />
+            </>
+        );
+    }
 
-    if (error || !job) return (
-        <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-white">
-            <h1 className="text-2xl font-bold mb-4">{error || "Application not found"}</h1>
-            <Link href="/careers" className="text-sky-400 hover:underline">Back to Careers</Link>
-        </div>
-    );
+    if (error || !job) {
+        return (
+            <>
+                <main className="rl-public-page">
+                    <section className="rl-utility-hero" aria-labelledby="application-error-title">
+                        <div className="rl-utility-hero-inner rl-shell">
+                            <div>
+                                <p className="rl-eyebrow">Careers</p>
+                                <h1 className="rl-utility-title" id="application-error-title">
+                                    This application is <span>not available.</span>
+                                </h1>
+                            </div>
+                            <p className="rl-utility-intro">{error || 'The requested position could not be found.'}</p>
+                        </div>
+                    </section>
+                    <section className="rl-utility-main rl-shell">
+                        <Link className="rl-button" href="/careers"><ArrowLeft aria-hidden="true" />Back to careers</Link>
+                    </section>
+                </main>
+                <PublicFooter />
+            </>
+        );
+    }
 
-    if (job.hasSubmitted) return (
-        <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-white px-6">
-            <div className="bg-slate-900 border border-slate-800 p-12 rounded-3xl max-w-lg text-center shadow-2xl">
-                <div className="w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <LucideCheck className="w-10 h-10" />
-                </div>
-                <h1 className="text-3xl font-bold mb-2">Already Submitted</h1>
-                <p className="text-slate-400 mb-8 leading-relaxed">
-                    You have already submitted an application for the <span className="text-white font-bold">{job.title}</span> position.
-                    Please wait for our team to review your request.
-                </p>
-                <Link href="/careers" className="bg-sky-600 hover:bg-sky-500 text-white px-8 py-3 rounded-xl font-bold transition-all inline-block">
-                    Return to Careers
-                </Link>
-            </div>
-        </div>
-    );
+    if (job.hasSubmitted) {
+        return (
+            <>
+                <main className="rl-public-page" id="top">
+                    <section className="rl-utility-hero" aria-labelledby="application-submitted-title">
+                        <div className="rl-utility-hero-inner rl-shell">
+                            <div>
+                                <p className="rl-eyebrow">Application received</p>
+                                <h1 className="rl-utility-title" id="application-submitted-title">
+                                    Your application is <span>with our team.</span>
+                                </h1>
+                            </div>
+                            <p className="rl-utility-intro">
+                                {submittedNow
+                                    ? 'Your application was submitted successfully. Check your Discord DMs for confirmation.'
+                                    : 'You have already applied for this position. There is nothing else you need to submit.'}
+                            </p>
+                        </div>
+                    </section>
+
+                    <section className="rl-utility-main rl-shell">
+                        <div className="rl-application-status rl-surface">
+                            <span className="rl-application-status-icon"><CircleCheck aria-hidden="true" /></span>
+                            <p className="rl-eyebrow">Submission complete</p>
+                            <h2>{job.title}</h2>
+                            <p>
+                                Our team will review your answers and contact you through Discord if your application moves forward.
+                            </p>
+                            <div className="rl-application-status-actions">
+                                <Link className="rl-button rl-button-primary" href="/careers">
+                                    <ArrowLeft aria-hidden="true" />Return to careers
+                                </Link>
+                            </div>
+                        </div>
+                    </section>
+                </main>
+                <PublicFooter />
+            </>
+        );
+    }
+
+    const authLoading = status === 'loading' || (Boolean(session?.user) && linkedAccountLoading);
+    const canSubmit = Boolean(session?.user && linkedAccount?.roblox_id);
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-200 pb-32">
-            <main className="max-w-3xl mx-auto px-6 mt-12">
-                <header className="mb-12 bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-10 rounded-3xl shadow-2xl">
-                    <div className="flex items-center justify-between mb-2">
-                        <h1 className="text-4xl font-extrabold text-white tracking-tight">{job.title}</h1>
-                        <div className="bg-sky-500/10 text-sky-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-sky-500/20">Now Hiring</div>
-                    </div>
-                    <div className="space-y-6">
+        <>
+            <main className="rl-public-page" id="top">
+                <section className="rl-utility-hero" aria-labelledby="application-title">
+                    <div className="rl-utility-hero-inner rl-shell">
                         <div>
-                            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Position Description</h3>
-                            <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{job.description}</p>
+                            <p className="rl-eyebrow">Careers application</p>
+                            <h1 className="rl-utility-title" id="application-title">
+                                Apply for <span>{job.title}.</span>
+                            </h1>
                         </div>
-                        {job.requirements && (
-                            <div>
-                                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Expectations & Requirements</h3>
-                                <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{job.requirements}</p>
-                            </div>
-                        )}
-                    </div>
-                </header>
-
-                <form onSubmit={handleSubmit} className="space-y-8">
-                    {job.questions.map((q, idx) => (
-                        <div key={q.id} className={q.type === 'section' ? "pt-8 mb-4 border-t border-slate-800" : "bg-slate-900/40 border border-slate-800 rounded-2xl p-8"}>
-                            {q.type === 'section' ? (
-                                <h2 className="text-xl font-bold text-white">{q.label}</h2>
-                            ) : (
-                                <>
-                                    <label className="block text-lg font-bold text-white mb-2">
-                                        {q.label}
-                                        {q.required && <span className="text-red-500 ml-1">*</span>}
-                                    </label>
-
-                                    {q.type === 'short_answer' && (
-                                        <input
-                                            type="text"
-                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-sky-500 transition-all"
-                                            required={q.required}
-                                            value={answers[q.id] || ""}
-                                            onChange={(e) => handleAnswer(q.id, e.target.value)}
-                                        />
-                                    )}
-
-                                    {q.type === 'long_answer' && (
-                                        <textarea
-                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white focus:outline-none focus:border-sky-500 h-40 resize-none transition-all"
-                                            required={q.required}
-                                            value={answers[q.id] || ""}
-                                            onChange={(e) => handleAnswer(q.id, e.target.value)}
-                                        />
-                                    )}
-
-                                    {q.type === 'multi_choice' && (
-                                        <div className="space-y-3 mt-4">
-                                            {q.options?.map(opt => (
-                                                <label key={opt} className="flex items-center gap-3 p-4 bg-slate-950/50 border border-slate-800 rounded-xl cursor-pointer hover:border-slate-600 transition-all">
-                                                    <input
-                                                        type="radio"
-                                                        name={q.id}
-                                                        className="w-4 h-4 text-sky-600 bg-slate-900 border-slate-800 focus:ring-sky-600"
-                                                        required={q.required}
-                                                        checked={answers[q.id] === opt}
-                                                        onChange={() => handleAnswer(q.id, opt)}
-                                                    />
-                                                    <span className="text-slate-300 font-medium">{opt}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {q.type === 'checkbox' && (
-                                        <label className="flex items-center gap-3 p-4 bg-slate-950/50 border border-slate-800 rounded-xl cursor-pointer hover:border-slate-600 transition-all mt-4">
-                                            <input
-                                                type="checkbox"
-                                                className="w-5 h-5 rounded border-slate-800 bg-slate-900 text-sky-600 focus:ring-sky-600"
-                                                required={q.required}
-                                                checked={!!answers[q.id]}
-                                                onChange={(e) => handleAnswer(q.id, e.target.checked)}
-                                            />
-                                            <span className="text-slate-300 font-medium">I agree to the above terms.</span>
-                                        </label>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    ))}
-
-                    <div className="pt-12 flex flex-col items-center gap-6">
-                        {status === 'unauthenticated' ? (
-                            <button
-                                type="button"
-                                onClick={() => signIn('discord')}
-                                className="bg-sky-600 hover:bg-sky-500 text-white px-12 py-4 rounded-2xl font-bold text-lg transition-all shadow-xl shadow-sky-900/40 w-full"
-                            >
-                                Sign in with Discord to Submit
-                            </button>
-                        ) : linkedAccountLoading ? (
-                            <button
-                                type="button"
-                                disabled
-                                className="bg-slate-700 text-slate-300 px-12 py-4 rounded-2xl font-bold text-lg w-full"
-                            >
-                                Checking Roblox account...
-                            </button>
-                        ) : !linkedAccount?.roblox_id ? (
-                            <div className="w-full rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 text-center">
-                                <p className="mb-4 text-sm font-medium text-amber-100">Link your Roblox account before submitting an application.</p>
-                                <button
-                                    type="button"
-                                    onClick={() => { window.location.href = `/api/roblox/auth?returnTo=${encodeURIComponent(`/careers/${params.id}`)}`; }}
-                                    className="bg-sky-600 hover:bg-sky-500 text-white px-8 py-3 rounded-xl font-bold transition-all"
-                                >
-                                    Link Roblox Account
-                                </button>
-                            </div>
-                        ) : (
-                            <button
-                                type="submit"
-                                disabled={submitting}
-                                className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-12 py-4 rounded-2xl font-bold text-lg transition-all shadow-xl shadow-emerald-900/40 w-full"
-                            >
-                                {submitting ? "Submitting Application..." : "Submit Application"}
-                            </button>
-                        )}
-                        <p className="text-slate-500 text-[10px] text-center max-w-md uppercase tracking-widest font-bold">
-                            Submission logged for {session?.user?.name || "Guest"}
+                        <p className="rl-utility-intro">
+                            Tell us about your experience and why you are interested in the role. A signed-in Discord account and linked Roblox account are required.
                         </p>
                     </div>
-                </form>
+                </section>
+
+                <section className="rl-utility-main rl-shell">
+                    <Link className="rl-back-link" href="/careers"><ArrowLeft aria-hidden="true" />All positions</Link>
+
+                    <div className="rl-utility-grid">
+                        <section className="rl-surface" aria-labelledby="application-form-title">
+                            <div className="rl-surface-header">
+                                <div>
+                                    <h2 id="application-form-title">Application form</h2>
+                                    <p>Required questions are marked with an asterisk.</p>
+                                </div>
+                                <span className="rl-surface-icon"><BriefcaseBusiness aria-hidden="true" /></span>
+                            </div>
+
+                            <form className="rl-surface-body" onSubmit={handleSubmit}>
+                                <div className="rl-application-summary">
+                                    <span>Open position</span>
+                                    <h2>{job.title}</h2>
+                                    <p className="whitespace-pre-wrap">{job.description}</p>
+                                    {job.requirements && (
+                                        <div className="rl-application-requirements">
+                                            <strong>Expectations and requirements</strong>
+                                            <p className="whitespace-pre-wrap">{job.requirements}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {job.questions.map((question) => (
+                                    question.type === 'section' ? (
+                                        <div className="rl-application-section" key={question.id}>
+                                            <h2>{question.label}</h2>
+                                        </div>
+                                    ) : (
+                                        <div className="rl-form-section" key={question.id}>
+                                            <label className="rl-field-label" htmlFor={`application-${question.id}`}>
+                                                {question.label}{question.required && <span aria-hidden="true"> *</span>}
+                                            </label>
+
+                                            {question.type === 'short_answer' && (
+                                                <input
+                                                    className="rl-field"
+                                                    id={`application-${question.id}`}
+                                                    type="text"
+                                                    required={question.required}
+                                                    value={String(answers[question.id] || '')}
+                                                    onChange={(event) => handleAnswer(question.id, event.target.value)}
+                                                />
+                                            )}
+
+                                            {question.type === 'long_answer' && (
+                                                <textarea
+                                                    className="rl-textarea rl-application-textarea"
+                                                    id={`application-${question.id}`}
+                                                    required={question.required}
+                                                    value={String(answers[question.id] || '')}
+                                                    onChange={(event) => handleAnswer(question.id, event.target.value)}
+                                                />
+                                            )}
+
+                                            {question.type === 'multi_choice' && (
+                                                <div className="rl-option-list" id={`application-${question.id}`}>
+                                                    {question.options?.map((option) => (
+                                                        <label className="rl-option" key={option}>
+                                                            <input
+                                                                type="radio"
+                                                                name={question.id}
+                                                                required={question.required}
+                                                                checked={answers[question.id] === option}
+                                                                onChange={() => handleAnswer(question.id, option)}
+                                                            />
+                                                            <span>{option}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {question.type === 'checkbox' && (
+                                                <label className="rl-option" id={`application-${question.id}`}>
+                                                    <input
+                                                        type="checkbox"
+                                                        required={question.required}
+                                                        checked={Boolean(answers[question.id])}
+                                                        onChange={(event) => handleAnswer(question.id, event.target.checked)}
+                                                    />
+                                                    <span>I agree to the above terms.</span>
+                                                </label>
+                                            )}
+                                        </div>
+                                    )
+                                ))}
+
+                                {submitError && <div className="rl-feedback rl-feedback-error">{submitError}</div>}
+
+                                <div className="rl-form-footer rl-application-footer">
+                                    <p>
+                                        {canSubmit
+                                            ? `Submitting as ${session?.user?.name || 'Discord user'}`
+                                            : 'Verify both accounts to submit.'}
+                                    </p>
+
+                                    {authLoading ? (
+                                        <button className="rl-button" type="button" disabled>Checking verification…</button>
+                                    ) : !session?.user ? (
+                                        <button className="rl-button rl-button-primary" type="button" onClick={handleDiscordSignIn}>
+                                            <DiscordIcon aria-hidden="true" width="15" height="15" />Sign in with Discord
+                                        </button>
+                                    ) : !linkedAccount?.roblox_id ? (
+                                        <button className="rl-button rl-button-primary" type="button" onClick={handleRobloxLink} disabled={linkingRoblox}>
+                                            <Image src="/Media/Roblox.png" alt="" width={15} height={15} />
+                                            {linkingRoblox ? 'Opening Roblox…' : 'Link Roblox account'}
+                                        </button>
+                                    ) : (
+                                        <button className="rl-button rl-button-primary" type="submit" disabled={submitting}>
+                                            <Send aria-hidden="true" />
+                                            {submitting ? 'Submitting…' : 'Submit application'}
+                                        </button>
+                                    )}
+                                </div>
+                            </form>
+                        </section>
+
+                        <aside className="rl-aside-stack">
+                            <div className="rl-surface rl-aside-panel">
+                                <h2>Before submitting</h2>
+                                <ul className="rl-aside-list">
+                                    <li><Check aria-hidden="true" /><span>Answer every required question.</span></li>
+                                    <li><Check aria-hidden="true" /><span>Use an account you can access on Discord.</span></li>
+                                    <li><Check aria-hidden="true" /><span>Review your answers before sending.</span></li>
+                                </ul>
+                            </div>
+                            <div className="rl-notice">
+                                <LockKeyhole aria-hidden="true" />
+                                <div><strong>Verified applications</strong>Applications require connected Discord and Roblox accounts.</div>
+                            </div>
+                            <div className="rl-notice">
+                                <Clock3 aria-hidden="true" />
+                                <div><strong>After you apply</strong>Watch your Discord DMs for confirmation and any follow-up from the team.</div>
+                            </div>
+                        </aside>
+                    </div>
+                </section>
             </main>
-        </div>
+            <PublicFooter />
+        </>
     );
 }
