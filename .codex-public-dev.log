@@ -100,3 +100,8 @@ https://next-auth.js.org/warnings#debug_enabled
 ✓ Compiled in 3.1s
  GET / 200 in 1016ms (next.js: 105ms, proxy.ts: 18ms, application-code: 893ms)
  GET /api/custom-dashboard/resolve?hostname=localhost 200 in 317ms (next.js: 230ms, proxy.ts: 19ms, application-code: 68ms)
+ GET /api/auth/session 200 in 185ms (next.js: 124ms, proxy.ts: 27ms, application-code: 34ms)
+ GET /docs 200 in 404ms (next.js: 16ms, proxy.ts: 10ms, application-code: 378ms)
+ GET / 200 in 248ms (next.js: 19ms, proxy.ts: 17ms, application-code: 211ms)
+ GET /features 200 in 719ms (next.js: 67ms, proxy.ts: 12ms, application-code: 639ms)
+ GET /posts 200 in 303ms (next.js: 60ms, proxy.ts: 13ms, application-code: 230ms)
