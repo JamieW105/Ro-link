@@ -10,6 +10,7 @@ import { DiscordIcon } from '@/components/ui/DiscordIcon';
 
 type TargetKind = 'user' | 'server' | 'game';
 type UserPlatform = 'roblox' | 'discord';
+type Workflow = 'report' | 'appeal';
 
 type SubmitResult = {
     reportId?: string;
@@ -57,6 +58,7 @@ const targetOptions: Array<{ value: TargetKind; label: string; description: stri
 
 export default function ReportPage() {
     const { data: session, status } = useSession();
+    const [workflow, setWorkflow] = useState<Workflow>('report');
     const [linkedAccount, setLinkedAccount] = useState<LinkedAccount | null>(null);
     const [linkedAccountLoading, setLinkedAccountLoading] = useState(true);
     const [linkingRoblox, setLinkingRoblox] = useState(false);
@@ -74,6 +76,16 @@ export default function ReportPage() {
     const [appealEvidence, setAppealEvidence] = useState('');
     const [appealSubmitting, setAppealSubmitting] = useState(false);
     const [appealResult, setAppealResult] = useState<AppealResult | null>(null);
+
+    useEffect(() => {
+        function syncWorkflowFromHash() {
+            setWorkflow(window.location.hash.toLowerCase() === '#appeal' ? 'appeal' : 'report');
+        }
+
+        syncWorkflowFromHash();
+        window.addEventListener('hashchange', syncWorkflowFromHash);
+        return () => window.removeEventListener('hashchange', syncWorkflowFromHash);
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -185,6 +197,14 @@ export default function ReportPage() {
         window.location.href = '/api/roblox/auth?returnTo=/report#appeal';
     }
 
+    function selectWorkflow(nextWorkflow: Workflow) {
+        setWorkflow(nextWorkflow);
+        const nextUrl = nextWorkflow === 'appeal'
+            ? `${window.location.pathname}${window.location.search}#appeal`
+            : `${window.location.pathname}${window.location.search}`;
+        window.history.replaceState(null, '', nextUrl);
+    }
+
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!session) {
@@ -267,16 +287,42 @@ export default function ReportPage() {
                 <section className="rl-utility-hero" aria-labelledby="report-title">
                     <div className="rl-utility-hero-inner rl-shell">
                         <div>
-                            <p className="rl-eyebrow">Public reports</p>
-                            <h1 className="rl-utility-title" id="report-title">Send the right details <span>to the right team.</span></h1>
+                            <p className="rl-eyebrow">{workflow === 'report' ? 'Public reports' : 'Ro-Link appeals'}</p>
+                            <h1 className="rl-utility-title" id="report-title">
+                                {workflow === 'report' ? <>Send the right details <span>to the right team.</span></> : <>Ask for a fair <span>moderation review.</span></>}
+                            </h1>
                         </div>
                         <p className="rl-utility-intro">
-                            Report a Roblox user, Discord server, or Roblox game. A verified Discord and linked Roblox account are required before submission.
+                            {workflow === 'report'
+                                ? 'Report a Roblox user, Discord server, or Roblox game. A verified Discord and linked Roblox account are required before submission.'
+                                : 'Appeal an exact Ro-Link moderation action associated with your verified user, server, or game.'}
                         </p>
                     </div>
                 </section>
 
                 <section className="rl-utility-main rl-shell">
+                    <div className="rl-choice-row mb-8" role="group" aria-label="Choose reports or appeals">
+                        <button
+                            className="rl-choice"
+                            type="button"
+                            aria-pressed={workflow === 'report'}
+                            onClick={() => selectWorkflow('report')}
+                        >
+                            <strong>Report</strong>
+                            <span>Submit a new public report</span>
+                        </button>
+                        <button
+                            className="rl-choice"
+                            type="button"
+                            aria-pressed={workflow === 'appeal'}
+                            onClick={() => selectWorkflow('appeal')}
+                        >
+                            <strong>Appeal</strong>
+                            <span>Appeal a Ro-Link moderation</span>
+                        </button>
+                    </div>
+
+                    {workflow === 'report' ? (
                     <div className="rl-utility-grid">
                         <section className="rl-surface" aria-labelledby="new-report-title">
                             <div className="rl-surface-header">
@@ -431,8 +477,8 @@ export default function ReportPage() {
                             </div>
                         </aside>
                     </div>
-
-                    <div className="rl-utility-grid mt-8" id="appeal">
+                    ) : (
+                    <div className="rl-utility-grid" id="appeal">
                         <section className="rl-surface" aria-labelledby="appeal-title">
                             <div className="rl-surface-header">
                                 <div>
@@ -589,6 +635,7 @@ export default function ReportPage() {
                             </div>
                         </aside>
                     </div>
+                    )}
                 </section>
             </main>
             <PublicFooter />
