@@ -2,29 +2,22 @@
 
 import Link from 'next/link';
 
+import { PublicPolicyPage, PublicPolicySection } from '@/components/public/PublicPolicyPage';
+
 const SUPPORT_URL = 'https://discord.gg/C3n4nAwYMw';
 
 function Section({ number, title, children }: { number: string; title: string; children: React.ReactNode }) {
-    return (
-        <section>
-            <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">{number}. {title}</h2>
-            <div className="space-y-4">{children}</div>
-        </section>
-    );
+    return <PublicPolicySection number={number} title={title}>{children}</PublicPolicySection>;
 }
 
 export default function TermsPage() {
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-300 font-sans selection:bg-sky-500/30">
-            <div className="max-w-4xl mx-auto px-6 py-20">
-                <Link href="/" className="text-sky-500 font-bold text-xs uppercase tracking-widest hover:text-sky-400 transition-colors mb-12 inline-block">
-                    ← Back to Home
-                </Link>
-
-                <h1 className="text-5xl font-black text-white mb-4 tracking-tight uppercase italic">Terms of Service</h1>
-                <p className="text-slate-500 text-sm font-bold uppercase tracking-[0.3em] mb-12">Last updated: July 27, 2026</p>
-
-                <div className="space-y-12 leading-relaxed">
+        <PublicPolicyPage
+            eyebrow="Legal"
+            title="Terms of Service"
+            meta="Last updated: July 27, 2026"
+            intro="The agreement governing your access to Ro-Link, its Discord and Roblox integrations, and related services."
+        >
                     <Section number="1" title="Agreement and Provider">
                         <p>These Terms of Service (&ldquo;Terms&rdquo;) are an agreement between you and Ro-Link Management Services (&ldquo;Ro-Link,&rdquo; &ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;). They govern your use of the Ro-Link website, Discord bot, dashboard, Roblox integration, APIs, plugins, module marketplace, and related services (collectively, the &ldquo;Services&rdquo;).</p>
                         <p>By using the Services, inviting the bot, linking an account, connecting a server or Roblox experience, submitting a module, or otherwise accessing the Services, you agree to these Terms, our <Link href="/privacy" className="text-sky-400 hover:text-sky-300 font-bold">Privacy Policy</Link>, and our <Link href="/dgsu" className="text-sky-400 hover:text-sky-300 font-bold">DGSU Policy</Link>. If you do not agree, do not use the Services.</p>
@@ -91,12 +84,6 @@ export default function TermsPage() {
                         <p>Formal notices, legal notices, privacy requests, and support requests to Ro-Link must be submitted through the <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="text-sky-400 hover:text-sky-300 font-bold">Ro-Link Support Server</a>. Notices from Ro-Link may be provided through the Services, dashboard, Discord, or another reasonable method.</p>
                         <p>If any provision of these Terms is unenforceable, the remaining provisions remain in effect. Our failure to enforce a provision is not a waiver. You may not assign these Terms without our consent; we may assign them as part of a reorganisation, merger, or transfer of the Services. These Terms are the entire agreement between you and Ro-Link regarding the Services.</p>
                     </Section>
-                </div>
-
-                <footer className="mt-20 pt-10 border-t border-slate-800 text-[10px] text-slate-600 font-bold uppercase tracking-widest text-center">
-                    © 2026 Ro-Link Management Services · Not affiliated with Roblox or Discord
-                </footer>
-            </div>
-        </div>
+        </PublicPolicyPage>
     );
 }

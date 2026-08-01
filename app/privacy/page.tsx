@@ -2,29 +2,22 @@
 
 import Link from 'next/link';
 
+import { PublicPolicyPage, PublicPolicySection } from '@/components/public/PublicPolicyPage';
+
 const SUPPORT_URL = 'https://discord.gg/C3n4nAwYMw';
 
 function Section({ number, title, children }: { number: string; title: string; children: React.ReactNode }) {
-    return (
-        <section>
-            <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">{number}. {title}</h2>
-            <div className="space-y-4">{children}</div>
-        </section>
-    );
+    return <PublicPolicySection number={number} title={title}>{children}</PublicPolicySection>;
 }
 
 export default function PrivacyPage() {
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-300 font-sans selection:bg-sky-500/30">
-            <div className="max-w-4xl mx-auto px-6 py-20">
-                <Link href="/" className="text-sky-500 font-bold text-xs uppercase tracking-widest hover:text-sky-400 transition-colors mb-12 inline-block">
-                    ← Back to Home
-                </Link>
-
-                <h1 className="text-5xl font-black text-white mb-4 tracking-tight uppercase italic">Privacy Policy</h1>
-                <p className="text-slate-500 text-sm font-bold uppercase tracking-[0.3em] mb-12">Effective date: July 27, 2026</p>
-
-                <div className="space-y-12 leading-relaxed">
+        <PublicPolicyPage
+            eyebrow="Privacy"
+            title="Privacy Policy"
+            meta="Effective date: July 27, 2026"
+            intro="How Ro-Link collects, uses, stores, and protects information across its website, Discord bot, Roblox integration, and related services."
+        >
                     <Section number="1" title="Who We Are and Scope">
                         <p>Ro-Link Management Services (&ldquo;Ro-Link,&rdquo; &ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) operates the Ro-Link website, Discord bot, dashboard, Roblox integration, APIs, plugins, and module marketplace (collectively, the &ldquo;Services&rdquo;).</p>
                         <p>This notice explains how we handle personal information when you use the Services. It does not govern Discord, Roblox, Vercel, or Supabase&apos;s independent processing; their own notices apply to their platforms.</p>
@@ -99,12 +92,6 @@ export default function PrivacyPage() {
                         <p>We may update this notice to reflect changes to our Services or legal obligations. We will post the revised version here and update the effective date.</p>
                         <p>For privacy requests, questions, or formal privacy notices, contact Ro-Link through the <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="text-sky-400 hover:text-sky-300 font-bold">Ro-Link Support Server</a>.</p>
                     </Section>
-                </div>
-
-                <footer className="mt-20 pt-10 border-t border-slate-800 text-[10px] text-slate-600 font-bold uppercase tracking-widest text-center">
-                    © 2026 Ro-Link Management Services
-                </footer>
-            </div>
-        </div>
+        </PublicPolicyPage>
     );
 }

@@ -1,11 +1,12 @@
 'use client';
 
-import { ArrowLeft as LucideArrowLeft } from 'lucide-react';
+import { ArrowLeft, CalendarDays, PackageOpen } from 'lucide-react';
 
 import Link from 'next/link';
 import { use, useEffect, useState } from 'react';
 
 import AutoLinkText from '@/components/AutoLinkText';
+import { PublicFooter } from '@/components/public/PublicFooter';
 import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 import type { UpdatePostRecord } from '@/lib/updatePosts';
 
@@ -33,13 +34,12 @@ function SectionList({
     }
 
     return (
-        <section className="rounded-3xl border border-slate-800 bg-slate-900/50 p-7">
-            <h2 className="text-2xl font-bold text-white">{title}</h2>
-            <ul className="mt-5 space-y-3">
+        <section className="rl-post-section">
+            <h2>{title}</h2>
+            <ul className="rl-post-list">
                 {items.map((item, index) => (
-                    <li key={`${title}-${index}`} className="flex gap-3 text-sm leading-relaxed text-slate-300">
-                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
-                        <AutoLinkText text={item} preserveLineBreaks className="min-w-0" />
+                    <li key={`${title}-${index}`}>
+                        <AutoLinkText text={item} preserveLineBreaks />
                     </li>
                 ))}
             </ul>
@@ -72,94 +72,74 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
 
     if (loading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-[#020617] text-slate-200">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-600 border-t-transparent" />
-            </div>
+            <main className="rl-public-page rl-post-status" aria-label="Loading update">
+                <div className="rl-loading-line" />
+            </main>
         );
     }
 
     if (error || !post) {
         return (
-            <div className="min-h-screen bg-[#020617] px-6 py-20 text-slate-200">
-                <div className="mx-auto max-w-3xl rounded-3xl border border-red-500/20 bg-red-500/10 px-8 py-12 text-center">
-                    <h1 className="text-3xl font-bold text-white">Update not found</h1>
-                    <p className="mt-4 text-sm leading-relaxed text-red-100">{error || 'This update post could not be loaded.'}</p>
-                    <Link
-                        href="/posts"
-                        className="mt-8 inline-flex rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-white transition-all hover:bg-white/10"
-                    >
-                        Back to Updates
-                    </Link>
-                </div>
-            </div>
+            <>
+                <main className="rl-public-page">
+                    <section className="rl-utility-main rl-shell">
+                        <div className="rl-empty-state rl-post-not-found">
+                            <strong>Update not found</strong>
+                            <span>{error || 'This update post could not be loaded.'}</span>
+                            <Link href="/posts" className="rl-button">Back to updates</Link>
+                        </div>
+                    </section>
+                </main>
+                <PublicFooter />
+            </>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-200">
-            <section className="rl-utility-hero" aria-labelledby="post-title">
-                <PublicHeroBackdrop />
-                <div className="rl-post-detail-hero-inner rl-shell">
-                    <header className="max-w-4xl">
-                    <Link href="/posts" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.25em] text-sky-400 transition-colors hover:text-sky-300">
-                        <LucideArrowLeft className="h-4 w-4" />
-                        Back to Updates
-                    </Link>
+        <>
+            <main className="rl-public-page" id="top">
+                <section className="rl-utility-hero" aria-labelledby="post-title">
+                    <PublicHeroBackdrop />
+                    <div className="rl-post-detail-hero-inner rl-shell">
+                        <Link href="/posts" className="rl-back-link">
+                            <ArrowLeft aria-hidden="true" />All updates
+                        </Link>
 
-                    <div className="mt-10 flex flex-wrap gap-2">
-                        {post.rolink_version && (
-                            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
-                                Ro-Link {post.rolink_version}
-                            </span>
-                        )}
-                        {post.plugin_version && (
-                            <span className="rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-violet-300">
-                                Plugin {post.plugin_version}
-                            </span>
-                        )}
-                        <span className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-300">
-                            Published {formatPostDate(post.published_at)}
-                        </span>
-                        {post.major_features.length > 0 && (
-                            <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-sky-300">
-                                {post.major_features.length} major feature{post.major_features.length === 1 ? '' : 's'}
-                            </span>
-                        )}
+                        <p className="rl-eyebrow">Product update</p>
+                        <h1 className="rl-post-detail-title" id="post-title">{post.title}</h1>
+                        <AutoLinkText as="p" text={post.description} preserveLineBreaks className="rl-post-detail-intro" />
+
+                        <div className="rl-post-detail-meta">
+                            <span><CalendarDays aria-hidden="true" />Published {formatPostDate(post.published_at)}</span>
+                            {post.rolink_version && <span><PackageOpen aria-hidden="true" />Ro-Link {post.rolink_version}</span>}
+                            {post.plugin_version && <span>Plugin {post.plugin_version}</span>}
+                            {post.major_features.length > 0 && (
+                                <span>{post.major_features.length} major feature{post.major_features.length === 1 ? '' : 's'}</span>
+                            )}
+                        </div>
                     </div>
+                </section>
 
-                    <h1 className="mt-5 text-4xl font-black tracking-tight text-white sm:text-5xl" id="post-title">{post.title}</h1>
-                    <AutoLinkText
-                        as="p"
-                        text={post.description}
-                        preserveLineBreaks
-                        className="mt-5 text-base leading-relaxed text-slate-400 sm:text-lg"
-                    />
-                    </header>
-                </div>
-            </section>
-
-            <div className="mx-auto max-w-5xl px-6 py-14 sm:px-8">
-                <div className="mt-14 space-y-8">
+                <section className="rl-post-detail-main rl-shell">
+                    <div className="rl-post-sections">
                     {post.major_features.length > 0 && (
-                        <section className="rounded-3xl border border-slate-800 bg-slate-900/50 p-7">
-                            <h2 className="text-2xl font-bold text-white">Major Features</h2>
-                            <div className="mt-6 space-y-6">
+                        <section className="rl-post-section">
+                            <h2>Major Features</h2>
+                            <div className="rl-post-feature-list">
                                 {post.major_features.map((feature, featureIndex) => (
-                                    <article key={`${feature.title}-${featureIndex}`} className="rounded-3xl border border-slate-800 bg-slate-950/40 p-6">
-                                        <h3 className="text-xl font-bold text-white">{feature.title}</h3>
+                                    <article key={`${feature.title}-${featureIndex}`} className="rl-post-feature">
+                                        <h3>{feature.title}</h3>
                                         {feature.description && (
                                             <AutoLinkText
                                                 as="p"
                                                 text={feature.description}
                                                 preserveLineBreaks
-                                                className="mt-3 text-sm leading-relaxed text-slate-400"
                                             />
                                         )}
-                                        <ul className="mt-5 space-y-3">
+                                        <ul className="rl-post-list">
                                             {feature.subFeatures.map((subFeature, subFeatureIndex) => (
-                                                <li key={`${feature.title}-${subFeatureIndex}`} className="flex gap-3 text-sm leading-relaxed text-slate-300">
-                                                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
-                                                    <AutoLinkText text={subFeature} preserveLineBreaks className="min-w-0" />
+                                                <li key={`${feature.title}-${subFeatureIndex}`}>
+                                                    <AutoLinkText text={subFeature} preserveLineBreaks />
                                                 </li>
                                             ))}
                                         </ul>
@@ -172,8 +152,10 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
                     <SectionList title="Minor Updates" items={post.minor_updates} />
                     <SectionList title="QOL Updates" items={post.qol_updates} />
                     <SectionList title="Bug Fixes" items={post.bug_fixes} />
-                </div>
-            </div>
-        </div>
+                    </div>
+                </section>
+            </main>
+            <PublicFooter />
+        </>
     );
 }

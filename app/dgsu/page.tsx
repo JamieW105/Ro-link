@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { PublicPolicyPage, PublicPolicySection, PublicPolicySubSection } from '@/components/public/PublicPolicyPage';
 
 function PolicySection({
     number,
@@ -11,14 +11,7 @@ function PolicySection({
     title: string;
     children: React.ReactNode;
 }) {
-    return (
-        <section>
-            <h2 className="text-xl font-bold text-white mb-4 uppercase tracking-wider border-l-4 border-sky-600 pl-4">
-                {number}. {title}
-            </h2>
-            <div className="space-y-4 text-slate-400 leading-relaxed">{children}</div>
-        </section>
-    );
+    return <PublicPolicySection number={number} title={title}>{children}</PublicPolicySection>;
 }
 
 function SubSection({
@@ -28,34 +21,17 @@ function SubSection({
     title: string;
     children: React.ReactNode;
 }) {
-    return (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/35 p-5">
-            <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-sky-300">{title}</h3>
-            <div className="mt-3 space-y-3 text-sm leading-7 text-slate-400">{children}</div>
-        </div>
-    );
+    return <PublicPolicySubSection title={title}>{children}</PublicPolicySubSection>;
 }
 
 export default function DgsuPolicyPage() {
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-300 font-sans selection:bg-sky-500/30">
-            <div className="max-w-4xl mx-auto px-6 py-20">
-                <Link href="/" className="text-sky-500 font-bold text-xs uppercase tracking-widest hover:text-sky-400 transition-colors mb-12 inline-block">
-                    Back to Home
-                </Link>
-
-                <p className="text-sky-400 text-xs font-bold uppercase tracking-[0.35em] mb-4">Binding Policy</p>
-                <h1 className="text-5xl font-black text-white mb-4 tracking-tight uppercase italic">
-                    DGSU Policy
-                </h1>
-                <p className="text-slate-500 text-sm font-bold uppercase tracking-[0.3em] mb-6">
-                    Dangerous Game, Server, or User - Effective Date: July 4, 2026
-                </p>
-                <p className="text-lg leading-8 text-slate-400 mb-12">
-                    This policy defines what Ro-Link may classify as a Dangerous Game, Server, or User, also called a DGSU. It is part of the Ro-Link Terms of Service and applies to Roblox games, Discord servers, Roblox accounts, Discord accounts, and connected communities that use or interact with Ro-Link.
-                </p>
-
-                <div className="space-y-12 leading-relaxed">
+        <PublicPolicyPage
+            eyebrow="Binding policy"
+            title="DGSU Policy"
+            meta="Dangerous Game, Server, or User · Effective date: July 4, 2026"
+            intro="How Ro-Link identifies and responds to games, servers, users, and connected communities that may present a safety or abuse risk."
+        >
                     <PolicySection number="1" title="Binding Effect">
                         <p>
                             This DGSU Policy is incorporated into the Ro-Link Terms of Service. By using Ro-Link, inviting the bot, connecting a Roblox game, signing in to the dashboard, submitting a report, or interacting with Ro-Link services, you agree that Ro-Link staff may apply this policy when reviewing risk, abuse, and safety concerns.
@@ -178,12 +154,6 @@ export default function DgsuPolicyPage() {
                             Ro-Link may update this policy at any time. Continued use of Ro-Link after an update means the updated policy applies to your use of the service.
                         </p>
                     </PolicySection>
-                </div>
-
-                <footer className="mt-20 pt-10 border-t border-slate-800 text-[10px] text-slate-600 font-bold uppercase tracking-widest text-center">
-                    &copy; 2026 Ro-Link Global Integration &bull; Binding Safety Policy
-                </footer>
-            </div>
-        </div>
+        </PublicPolicyPage>
     );
 }

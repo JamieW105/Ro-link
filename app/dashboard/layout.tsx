@@ -8,6 +8,10 @@ import { DGSU_BAN_AUTH_ERROR } from "@/lib/dgsuBanConstants";
 export const metadata: Metadata = {
     title: "Dashboard | Ro-Link",
     description: "Sign in to your Ro-Link dashboard to manage your Roblox servers and communities.",
+    robots: {
+        index: false,
+        follow: false,
+    },
     openGraph: {
         title: "Dashboard | Ro-Link",
         description: "Access your Ro-Link dashboard. Securely manage and moderate your Roblox game servers from Discord.",
