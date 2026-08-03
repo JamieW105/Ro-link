@@ -635,6 +635,10 @@
   box-shadow: 0 18px 60px rgba(4, 96, 165, 0.13);
 }
 
+.rl-pricing-card-unavailable {
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
 .rl-pricing-badge {
   align-self: flex-start;
   margin-bottom: 24px;
@@ -647,6 +651,12 @@
   font-weight: 760;
   letter-spacing: 0.09em;
   text-transform: uppercase;
+}
+
+.rl-pricing-badge-unavailable {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--rl-muted);
 }
 
 .rl-pricing-card h2 {
@@ -710,6 +720,14 @@
 .rl-pricing-card .rl-button {
   width: 100%;
   margin-top: auto;
+}
+
+.rl-pricing-button-disabled {
+  cursor: not-allowed;
+  border-color: var(--rl-line-strong);
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--rl-muted);
+  pointer-events: none;
 }
 
 .rl-features-hero-inner,

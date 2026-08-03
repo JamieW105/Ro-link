@@ -10,6 +10,7 @@ export type PricingPlan = {
     ctaLabel: string;
     ctaUrl: string;
     featured: boolean;
+    available: boolean;
     enabled: boolean;
 };
 
@@ -55,6 +56,7 @@ export const defaultPricingContent: PricingPageContent = {
             ctaLabel: 'Install Ro-Link',
             ctaUrl: '/auth/signin?callbackUrl=/dashboard',
             featured: false,
+            available: true,
             enabled: true,
         },
         {
@@ -67,6 +69,7 @@ export const defaultPricingContent: PricingPageContent = {
             ctaLabel: 'View features',
             ctaUrl: '/features',
             featured: true,
+            available: true,
             enabled: true,
         },
     ],
@@ -128,6 +131,7 @@ export function sanitizePricingContent(value: unknown): PricingPageContent | { e
             ctaLabel: text(plan.ctaLabel, 60),
             ctaUrl: safeUrl(plan.ctaUrl),
             featured: plan.featured === true,
+            available: plan.available !== false,
             enabled: plan.enabled !== false,
         };
     });

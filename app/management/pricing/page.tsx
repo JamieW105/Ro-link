@@ -15,6 +15,7 @@ const newPlan = (): PricingPlan => ({
     ctaLabel: 'Get started',
     ctaUrl: '/dashboard',
     featured: false,
+    available: true,
     enabled: true,
 });
 
@@ -120,6 +121,7 @@ export default function ManagePricingPage() {
                             <EditorField label="Features (one per line)" value={plan.features.join('\n')} multiline onChange={(value) => updatePlan(index, { features: value.split('\n') })} />
                             <div className="grid content-start gap-3 sm:pt-7">
                                 <Toggle label="Visible on pricing page" checked={plan.enabled} onChange={(enabled) => updatePlan(index, { enabled })} />
+                                <Toggle label="Available for selection" checked={plan.available} onChange={(available) => updatePlan(index, { available })} />
                                 <Toggle label="Show as recommended" checked={plan.featured} onChange={(featured) => updatePlan(index, { featured })} />
                             </div>
                         </div>
