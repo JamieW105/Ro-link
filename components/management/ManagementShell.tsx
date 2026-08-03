@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from "react";
-import { ArrowLeft, Blocks, BriefcaseBusiness, FileText, LayoutDashboard, Megaphone, Menu, MessageSquare, OctagonX, Server, UsersRound, X, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Blocks, BriefcaseBusiness, CircleDollarSign, FileText, LayoutDashboard, ListChecks, Megaphone, Menu, MessageSquare, OctagonX, Server, UsersRound, X, type LucideIcon } from "lucide-react";
 
 export default function ManagementLayout({
     children,
@@ -70,6 +70,8 @@ export default function ManagementLayout({
         { name: 'Job Apps', href: '/management/jobs', icon: BriefcaseBusiness, perm: 'POST_JOB_APPLICATION' },
         { name: 'Updates', href: '/management/posts', icon: FileText, perm: 'POST_UPDATES' },
         { name: 'Site Banners', href: '/management/site-banners', icon: Megaphone, perm: 'MANAGE_RO_LINK' },
+        { name: 'Pricing Page', href: '/management/pricing', icon: CircleDollarSign, perm: 'MANAGE_RO_LINK' },
+        { name: 'Features Page', href: '/management/features', icon: ListChecks, perm: 'MANAGE_RO_LINK' },
         { name: 'DMs', href: '/management/dms', icon: MessageSquare, perm: 'MANAGE_RO_LINK' },
         { name: 'Modules', href: '/management/modules', icon: Blocks, perm: 'MANAGE_MODULES' },
         { name: 'Blocking', href: '/management/blocking', icon: OctagonX, perm: 'BLOCK_SERVERS' },

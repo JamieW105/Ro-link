@@ -60,6 +60,9 @@ export function PublicHeader() {
                         <Link className="rl-nav-link" href="/features" aria-current={isActivePath(pathname, '/features') ? 'page' : undefined}>Features</Link>
                     </li>
                     <li>
+                        <Link className="rl-nav-link" href="/pricing" aria-current={isActivePath(pathname, '/pricing') ? 'page' : undefined}>Pricing</Link>
+                    </li>
+                    <li>
                         <Link className="rl-nav-link" href="/#setup">Setup</Link>
                     </li>
                     <li>

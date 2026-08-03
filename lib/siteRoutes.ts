@@ -6,6 +6,7 @@ export const PUBLIC_ROUTE_PREFIXES = [
     '/docs',
     '/features',
     '/posts',
+    '/pricing',
     '/privacy',
     '/report',
     '/terms',
