@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, Check, Link2, LockKeyhole, RefreshCw } from 'lucide-react';
+import { Check, Link2, LockKeyhole, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
@@ -169,7 +169,7 @@ export default function VerifyPage() {
 
                                             <div className="rl-verify-account-row">
                                                 <span className="rl-verify-platform-icon">
-                                                    <Box aria-hidden="true" />
+                                                    <Image className="rl-verify-roblox-mark" src="/Media/Roblox.png" alt="" width={16} height={16} />
                                                 </span>
                                                 <div className="rl-verify-account-copy">
                                                     <strong>Roblox</strong>
@@ -191,7 +191,7 @@ export default function VerifyPage() {
                                                 {loading ? (
                                                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" aria-hidden="true" />
                                                 ) : (
-                                                    <Box aria-hidden="true" width={15} height={15} />
+                                                    <Image className="rl-verify-roblox-mark" src="/Media/Roblox.png" alt="" width={15} height={15} />
                                                 )}
                                                 {loading ? 'Redirecting…' : 'Continue with Roblox'}
                                             </button>
