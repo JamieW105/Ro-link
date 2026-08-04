@@ -36,7 +36,10 @@ export default async function FeaturesPage() {
                         {features.map((feature, index) => (
                             <section className="rl-feature-detail" id={feature.id} key={feature.id} aria-labelledby={`${feature.id}-title`}>
                                 <span className="rl-feature-number">{String(index + 1).padStart(2, '0')}</span>
-                                <h2 id={`${feature.id}-title`}>{feature.title}</h2>
+                                <div className="rl-feature-heading">
+                                    <h2 id={`${feature.id}-title`}>{feature.title}</h2>
+                                    {feature.comingSoon && <span className="rl-coming-soon-badge">Coming soon</span>}
+                                </div>
                                 <div className="rl-feature-detail-copy">
                                     <p>{feature.description}</p>
                                     <ul>

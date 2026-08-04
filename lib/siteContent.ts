@@ -11,6 +11,7 @@ export type PricingPlan = {
     ctaUrl: string;
     featured: boolean;
     available: boolean;
+    comingSoon: boolean;
     enabled: boolean;
 };
 
@@ -27,6 +28,7 @@ export type FeatureSection = {
     title: string;
     description: string;
     items: string[];
+    comingSoon: boolean;
     enabled: boolean;
 };
 
@@ -57,6 +59,7 @@ export const defaultPricingContent: PricingPageContent = {
             ctaUrl: '/auth/signin?callbackUrl=/dashboard',
             featured: false,
             available: true,
+            comingSoon: false,
             enabled: true,
         },
         {
@@ -70,6 +73,7 @@ export const defaultPricingContent: PricingPageContent = {
             ctaUrl: '/features',
             featured: true,
             available: true,
+            comingSoon: true,
             enabled: true,
         },
     ],
@@ -81,12 +85,12 @@ export const defaultFeaturesContent: FeaturesPageContent = {
     highlightedTitle: 'live game management.',
     intro: 'Ro-Link connects Discord staff workflows to Roblox operations. See what each part does and where it fits into day-to-day community management.',
     sections: [
-        { id: 'servers', title: 'Live server visibility', description: 'Give staff a shared view of active Roblox servers without asking players for server details or switching between separate admin tools.', items: ['View active server sessions', 'Check player presence and counts', 'Review live server information from the dashboard'], enabled: true },
-        { id: 'moderation', title: 'Discord moderation controls', description: 'Keep supported game-management actions close to the conversation where staff receive reports and coordinate responses.', items: ['Run supported moderation actions from Discord', 'Use slash commands with clear staff permissions', 'Act without sharing Roblox owner credentials'], enabled: true },
-        { id: 'identity', title: 'Linked player identity', description: 'Connect Discord members with their Roblox accounts so staff know which player they are helping, reviewing, or moderating.', items: ['Link Discord and Roblox accounts', 'Verify a member before protected submissions', 'Use linked identity during staff review'], enabled: true },
-        { id: 'permissions', title: 'Role-based staff access', description: 'Assign access according to staff responsibilities instead of giving every moderator the same level of control.', items: ['Map dashboard roles to Discord staff', 'Control access to logs and staff notes', 'Restrict management tools to trusted roles'], enabled: true },
-        { id: 'reports', title: 'Reports and staff context', description: 'Keep community reports, linked player details, and internal staff context together so reviews are easier to follow.', items: ['Accept reports through the public report flow', 'Review submissions with linked account context', 'Keep staff-only notes behind permissions'], enabled: true },
-        { id: 'setup-tools', title: 'Guided Roblox setup', description: 'Connect the Discord bot, web dashboard, and Roblox experience through a guided setup rather than wiring each part together manually.', items: ['Connect through the Roblox Studio plugin', 'Register the experience with Ro-Link', 'Use the documentation for setup and troubleshooting'], enabled: true },
+        { id: 'servers', title: 'Live server visibility', description: 'Give staff a shared view of active Roblox servers without asking players for server details or switching between separate admin tools.', items: ['View active server sessions', 'Check player presence and counts', 'Review live server information from the dashboard'], comingSoon: false, enabled: true },
+        { id: 'moderation', title: 'Discord moderation controls', description: 'Keep supported game-management actions close to the conversation where staff receive reports and coordinate responses.', items: ['Run supported moderation actions from Discord', 'Use slash commands with clear staff permissions', 'Act without sharing Roblox owner credentials'], comingSoon: false, enabled: true },
+        { id: 'identity', title: 'Linked player identity', description: 'Connect Discord members with their Roblox accounts so staff know which player they are helping, reviewing, or moderating.', items: ['Link Discord and Roblox accounts', 'Verify a member before protected submissions', 'Use linked identity during staff review'], comingSoon: false, enabled: true },
+        { id: 'permissions', title: 'Role-based staff access', description: 'Assign access according to staff responsibilities instead of giving every moderator the same level of control.', items: ['Map dashboard roles to Discord staff', 'Control access to logs and staff notes', 'Restrict management tools to trusted roles'], comingSoon: false, enabled: true },
+        { id: 'reports', title: 'Reports and staff context', description: 'Keep community reports, linked player details, and internal staff context together so reviews are easier to follow.', items: ['Accept reports through the public report flow', 'Review submissions with linked account context', 'Keep staff-only notes behind permissions'], comingSoon: false, enabled: true },
+        { id: 'setup-tools', title: 'Guided Roblox setup', description: 'Connect the Discord bot, web dashboard, and Roblox experience through a guided setup rather than wiring each part together manually.', items: ['Connect through the Roblox Studio plugin', 'Register the experience with Ro-Link', 'Use the documentation for setup and troubleshooting'], comingSoon: false, enabled: true },
     ],
 };
 
@@ -132,6 +136,7 @@ export function sanitizePricingContent(value: unknown): PricingPageContent | { e
             ctaUrl: safeUrl(plan.ctaUrl),
             featured: plan.featured === true,
             available: plan.available !== false,
+            comingSoon: plan.comingSoon === true,
             enabled: plan.enabled !== false,
         };
     });
@@ -158,6 +163,7 @@ export function sanitizeFeaturesContent(value: unknown): FeaturesPageContent | {
             title: text(section.title, 100),
             description: text(section.description, 500),
             items: list(section.items),
+            comingSoon: section.comingSoon === true,
             enabled: section.enabled !== false,
         };
     });

@@ -16,6 +16,7 @@ const newPlan = (): PricingPlan => ({
     ctaUrl: '/dashboard',
     featured: false,
     available: true,
+    comingSoon: false,
     enabled: true,
 });
 
@@ -122,6 +123,7 @@ export default function ManagePricingPage() {
                             <div className="grid content-start gap-3 sm:pt-7">
                                 <Toggle label="Visible on pricing page" checked={plan.enabled} onChange={(enabled) => updatePlan(index, { enabled })} />
                                 <Toggle label="Available for selection" checked={plan.available} onChange={(available) => updatePlan(index, { available })} />
+                                <Toggle label="Coming soon (disables selection)" checked={plan.comingSoon} onChange={(comingSoon) => updatePlan(index, { comingSoon })} />
                                 <Toggle label="Show as recommended" checked={plan.featured} onChange={(featured) => updatePlan(index, { featured })} />
                             </div>
                         </div>

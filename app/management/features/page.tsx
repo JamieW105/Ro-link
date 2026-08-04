@@ -10,6 +10,7 @@ const newFeature = (): FeatureSection => ({
     title: 'New feature',
     description: 'Explain how this feature helps a community or staff team.',
     items: ['First capability'],
+    comingSoon: false,
     enabled: true,
 });
 
@@ -107,7 +108,10 @@ export default function ManageFeaturesPage() {
                         </div>
                         <div className="mt-5 grid gap-4 sm:grid-cols-2">
                             <EditorField label="Feature title" value={feature.title} maxLength={100} onChange={(title) => updateFeature(index, { title })} />
-                            <label className="flex items-center gap-3 self-end rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm font-semibold text-slate-300"><input type="checkbox" checked={feature.enabled} onChange={(event) => updateFeature(index, { enabled: event.target.checked })} className="h-4 w-4 accent-sky-500" />Visible on features page</label>
+                            <div className="grid content-end gap-3">
+                                <Toggle label="Visible on features page" checked={feature.enabled} onChange={(enabled) => updateFeature(index, { enabled })} />
+                                <Toggle label="Show as coming soon" checked={feature.comingSoon} onChange={(comingSoon) => updateFeature(index, { comingSoon })} />
+                            </div>
                             <EditorField label="Description" value={feature.description} maxLength={500} multiline onChange={(description) => updateFeature(index, { description })} />
                             <EditorField label="Bullet points (one per line)" value={feature.items.join('\n')} multiline onChange={(value) => updateFeature(index, { items: value.split('\n') })} />
                         </div>
@@ -121,6 +125,10 @@ export default function ManageFeaturesPage() {
 function EditorField({ label, value, onChange, multiline = false, maxLength }: { label: string; value: string; onChange: (value: string) => void; multiline?: boolean; maxLength?: number }) {
     const classes = 'rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-sky-500';
     return <label className="grid gap-2 text-sm font-semibold text-slate-300">{label}{multiline ? <textarea rows={4} value={value} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} className={`${classes} resize-y`} /> : <input value={value} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} className={classes} />}</label>;
+}
+
+function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+    return <label className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm font-semibold text-slate-300"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-sky-500" />{label}</label>;
 }
 
 function IconButton({ label, onClick, disabled, danger, children }: { label: string; onClick: () => void; disabled?: boolean; danger?: boolean; children: React.ReactNode }) {

@@ -28,16 +28,16 @@ export default async function PricingPage() {
                         const external = /^https?:\/\//.test(plan.ctaUrl);
                         const button = <>{plan.ctaLabel}</>;
                         return (
-                            <article className={`rl-pricing-card${plan.featured && plan.available ? ' rl-pricing-card-featured' : ''}${!plan.available ? ' rl-pricing-card-unavailable' : ''}`} key={plan.id}>
-                                {!plan.available ? <span className="rl-pricing-badge rl-pricing-badge-unavailable">Unavailable</span> : plan.featured && <span className="rl-pricing-badge">Recommended</span>}
+                            <article className={`rl-pricing-card${plan.featured && plan.available && !plan.comingSoon ? ' rl-pricing-card-featured' : ''}${!plan.available || plan.comingSoon ? ' rl-pricing-card-unavailable' : ''}`} key={plan.id}>
+                                {plan.comingSoon ? <span className="rl-pricing-badge rl-pricing-badge-coming-soon">Coming soon</span> : !plan.available ? <span className="rl-pricing-badge rl-pricing-badge-unavailable">Unavailable</span> : plan.featured && <span className="rl-pricing-badge">Recommended</span>}
                                 <h2>{plan.name}</h2>
                                 <div className="rl-pricing-price"><strong>{plan.price}</strong>{plan.cadence && <span>{plan.cadence}</span>}</div>
                                 <p>{plan.description}</p>
                                 <ul>
                                     {plan.features.map((feature) => <li key={feature}><Check aria-hidden="true" />{feature}</li>)}
                                 </ul>
-                                {!plan.available ? (
-                                    <span className="rl-button rl-pricing-button-disabled" aria-disabled="true">Unavailable</span>
+                                {!plan.available || plan.comingSoon ? (
+                                    <span className="rl-button rl-pricing-button-disabled" aria-disabled="true">{plan.comingSoon ? 'Coming soon' : 'Unavailable'}</span>
                                 ) : external ? (
                                     <a className="rl-button rl-button-primary" href={plan.ctaUrl} target="_blank" rel="noopener noreferrer">{button}</a>
                                 ) : (

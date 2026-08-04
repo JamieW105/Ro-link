@@ -659,6 +659,13 @@
   color: var(--rl-muted);
 }
 
+.rl-pricing-badge-coming-soon,
+.rl-coming-soon-badge {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.09);
+  color: #fbbf24;
+}
+
 .rl-pricing-card h2 {
   margin: 0;
   font-size: 1.25rem;
@@ -831,6 +838,22 @@
   font-size: clamp(1.35rem, 2.5vw, 1.9rem);
   letter-spacing: -0.035em;
   line-height: 1.15;
+}
+
+.rl-feature-heading {
+  align-self: start;
+}
+
+.rl-coming-soon-badge {
+  display: inline-flex;
+  margin-top: 12px;
+  padding: 5px 9px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 760;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
 }
 
 .rl-feature-detail-copy p {
