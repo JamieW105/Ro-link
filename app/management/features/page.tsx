@@ -1,21 +1,15 @@
 'use client';
 
-import { ArrowDown, ArrowUp, ListChecks, Plus, Save, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ArrowDown, ArrowUp, Clock3, Eye, EyeOff, ListChecks, Pencil, Plus, Save, Search, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 
-import { defaultFeaturesContent, type FeaturesPageContent, type FeatureSection } from '@/lib/siteContent';
-
-const newFeature = (): FeatureSection => ({
-    id: `feature-${Date.now()}`,
-    title: 'New feature',
-    description: 'Explain how this feature helps a community or staff team.',
-    items: ['First capability'],
-    comingSoon: false,
-    enabled: true,
-});
+import { EditorField, LoadingState, StatusMessage } from '@/app/management/SiteContentFields';
+import { defaultFeaturesContent, type FeaturesPageContent } from '@/lib/siteContent';
 
 export default function ManageFeaturesPage() {
     const [content, setContent] = useState<FeaturesPageContent>(defaultFeaturesContent);
+    const [query, setQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
@@ -31,16 +25,24 @@ export default function ManageFeaturesPage() {
             .finally(() => setLoading(false));
     }, []);
 
-    function updateFeature(index: number, changes: Partial<FeatureSection>) {
-        setContent((current) => ({ ...current, sections: current.sections.map((feature, featureIndex) => featureIndex === index ? { ...feature, ...changes } : feature) }));
-    }
+    const filteredFeatures = useMemo(() => {
+        const normalized = query.trim().toLowerCase();
+        if (!normalized) return content.sections;
+        return content.sections.filter((feature) => [feature.title, feature.description, ...feature.items].join(' ').toLowerCase().includes(normalized));
+    }, [content.sections, query]);
 
-    function moveFeature(index: number, direction: -1 | 1) {
+    function moveFeature(id: string, direction: -1 | 1) {
+        const index = content.sections.findIndex((feature) => feature.id === id);
         const target = index + direction;
-        if (target < 0 || target >= content.sections.length) return;
+        if (index < 0 || target < 0 || target >= content.sections.length) return;
         const sections = [...content.sections];
         [sections[index], sections[target]] = [sections[target], sections[index]];
         setContent({ ...content, sections });
+    }
+
+    function deleteFeature(id: string, title: string) {
+        if (!confirm(`Delete “${title}”? Save the page to confirm this change.`)) return;
+        setContent({ ...content, sections: content.sections.filter((feature) => feature.id !== id) });
     }
 
     async function save() {
@@ -63,7 +65,7 @@ export default function ManageFeaturesPage() {
         }
     }
 
-    if (loading) return <div className="flex min-h-56 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-600 border-t-transparent" /></div>;
+    if (loading) return <LoadingState />;
 
     return (
         <div className="space-y-6 md:space-y-8">
@@ -71,14 +73,15 @@ export default function ManageFeaturesPage() {
                 <div>
                     <p className="text-xs font-bold uppercase tracking-[0.22em] text-sky-400">Public content</p>
                     <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-white md:text-3xl">Features Page</h1>
-                    <p className="mt-1 text-slate-400">Edit the introduction and manage every feature shown publicly.</p>
+                    <p className="mt-1 text-slate-400">Manage the public introduction and individual feature pages.</p>
                 </div>
-                <button onClick={() => void save()} disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-500 disabled:opacity-50">
-                    <Save className="h-4 w-4" aria-hidden="true" />{saving ? 'Saving…' : 'Save page'}
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                    <button onClick={() => void save()} disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50"><Save className="h-4 w-4" />{saving ? 'Saving…' : 'Save page'}</button>
+                    <Link href="/management/features/new" className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-500"><Plus className="h-4 w-4" />Create feature</Link>
+                </div>
             </header>
 
-            {message && <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${message.type === 'error' ? 'border-red-500/25 bg-red-500/10 text-red-200' : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'}`}>{message.text}</div>}
+            <StatusMessage message={message} />
 
             <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 md:p-6">
                 <h2 className="font-bold text-white">Page introduction</h2>
@@ -90,47 +93,52 @@ export default function ManageFeaturesPage() {
                 </div>
             </section>
 
-            <div className="flex items-center justify-between gap-4">
-                <div><h2 className="text-xl font-bold text-white">Feature sections</h2><p className="text-sm text-slate-400">{content.sections.length} total</p></div>
-                <button onClick={() => setContent({ ...content, sections: [...content.sections, newFeature()] })} className="inline-flex items-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-2.5 text-sm font-bold text-sky-300 hover:bg-sky-500/20"><Plus className="h-4 w-4" />Add feature</button>
-            </div>
+            <section className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div><h2 className="text-xl font-bold text-white">Features</h2><p className="text-sm text-slate-400">{query ? `${filteredFeatures.length} of ${content.sections.length}` : content.sections.length} total</p></div>
+                    <label className="relative block w-full sm:max-w-sm">
+                        <span className="sr-only">Search features</span>
+                        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search features…" className="w-full rounded-xl border border-slate-700 bg-slate-950 py-2.5 pl-10 pr-4 text-sm text-white outline-none placeholder:text-slate-500 focus:border-sky-500" />
+                    </label>
+                </div>
 
-            <div className="grid gap-5">
-                {content.sections.map((feature, index) => (
-                    <section key={feature.id} className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 md:p-6">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-3"><span className="rounded-lg bg-sky-500/10 p-2 text-sky-400"><ListChecks className="h-5 w-5" /></span><div><span className="block text-xs font-bold text-slate-500">{String(index + 1).padStart(2, '0')}</span><strong className="text-white">{feature.title || `Feature ${index + 1}`}</strong></div></div>
-                            <div className="flex gap-2">
-                                <IconButton label="Move up" disabled={index === 0} onClick={() => moveFeature(index, -1)}><ArrowUp className="h-4 w-4" /></IconButton>
-                                <IconButton label="Move down" disabled={index === content.sections.length - 1} onClick={() => moveFeature(index, 1)}><ArrowDown className="h-4 w-4" /></IconButton>
-                                <IconButton label="Delete feature" danger onClick={() => confirm(`Delete “${feature.title}”?`) && setContent({ ...content, sections: content.sections.filter((_, featureIndex) => featureIndex !== index) })}><Trash2 className="h-4 w-4" /></IconButton>
-                            </div>
-                        </div>
-                        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                            <EditorField label="Feature title" value={feature.title} maxLength={100} onChange={(title) => updateFeature(index, { title })} />
-                            <div className="grid content-end gap-3">
-                                <Toggle label="Visible on features page" checked={feature.enabled} onChange={(enabled) => updateFeature(index, { enabled })} />
-                                <Toggle label="Show as coming soon" checked={feature.comingSoon} onChange={(comingSoon) => updateFeature(index, { comingSoon })} />
-                            </div>
-                            <EditorField label="Description" value={feature.description} maxLength={500} multiline onChange={(description) => updateFeature(index, { description })} />
-                            <EditorField label="Bullet points (one per line)" value={feature.items.join('\n')} multiline onChange={(value) => updateFeature(index, { items: value.split('\n') })} />
-                        </div>
-                    </section>
-                ))}
-            </div>
+                {filteredFeatures.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-800 py-12 text-center text-sm text-slate-500">No features match “{query}”.</div>
+                ) : (
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        {filteredFeatures.map((feature) => {
+                            const index = content.sections.findIndex((item) => item.id === feature.id);
+                            return (
+                                <article key={feature.id} className="group flex min-h-40 flex-col rounded-xl border border-slate-800 bg-slate-900/50 p-4 transition-colors hover:border-slate-700">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex min-w-0 items-center gap-2.5"><span className="rounded-lg bg-sky-500/10 p-1.5 text-sky-400"><ListChecks className="h-4 w-4" /></span><div className="min-w-0"><span className="block text-[10px] font-bold text-slate-600">{String(index + 1).padStart(2, '0')}</span><h3 className="truncate text-sm font-bold text-white">{feature.title}</h3></div></div>
+                                        <div className="flex shrink-0 items-center gap-1">
+                                            <IconButton label="Move up" disabled={index === 0 || Boolean(query)} onClick={() => moveFeature(feature.id, -1)}><ArrowUp /></IconButton>
+                                            <IconButton label="Move down" disabled={index === content.sections.length - 1 || Boolean(query)} onClick={() => moveFeature(feature.id, 1)}><ArrowDown /></IconButton>
+                                        </div>
+                                    </div>
+                                    <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-slate-400">{feature.description}</p>
+                                    <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 ${feature.enabled ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>{feature.enabled ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}{feature.enabled ? 'Visible' : 'Hidden'}</span>
+                                        {feature.comingSoon && <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-amber-300"><Clock3 className="h-3 w-3" />Coming soon</span>}
+                                        <span className="rounded-full border border-slate-700 px-2 py-1 text-slate-400">{feature.items.length} points</span>
+                                    </div>
+                                    <div className="mt-auto flex items-center justify-end gap-1 border-t border-slate-800 pt-3">
+                                        <Link href={`/management/features/${encodeURIComponent(feature.id)}/edit`} aria-label={`Edit ${feature.title}`} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold text-sky-300 hover:bg-sky-500/10"><Pencil className="h-3.5 w-3.5" />Edit</Link>
+                                        <button type="button" onClick={() => deleteFeature(feature.id, feature.title)} aria-label={`Delete ${feature.title}`} className="rounded-lg p-1.5 text-slate-500 hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /></button>
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+                )}
+                {query && <p className="text-xs text-slate-500">Clear the search to reorder features.</p>}
+            </section>
         </div>
     );
 }
 
-function EditorField({ label, value, onChange, multiline = false, maxLength }: { label: string; value: string; onChange: (value: string) => void; multiline?: boolean; maxLength?: number }) {
-    const classes = 'rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-sky-500';
-    return <label className="grid gap-2 text-sm font-semibold text-slate-300">{label}{multiline ? <textarea rows={4} value={value} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} className={`${classes} resize-y`} /> : <input value={value} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} className={classes} />}</label>;
-}
-
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-    return <label className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm font-semibold text-slate-300"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-sky-500" />{label}</label>;
-}
-
-function IconButton({ label, onClick, disabled, danger, children }: { label: string; onClick: () => void; disabled?: boolean; danger?: boolean; children: React.ReactNode }) {
-    return <button type="button" aria-label={label} title={label} disabled={disabled} onClick={onClick} className={`rounded-lg border p-2 disabled:opacity-30 ${danger ? 'border-red-500/20 text-red-300 hover:bg-red-500/10' : 'border-slate-700 text-slate-400 hover:text-white'}`}>{children}</button>;
+function IconButton({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+    return <button type="button" aria-label={label} title={label} disabled={disabled} onClick={onClick} className="rounded-md border border-slate-800 p-1 text-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-25 [&_svg]:h-3 [&_svg]:w-3">{children}</button>;
 }
