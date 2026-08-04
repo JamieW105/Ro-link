@@ -88,7 +88,7 @@ export default function VerifyPage() {
                             <div className="rl-surface-header">
                                 <div>
                                     <h2 id="connection-title">Account connection</h2>
-                                    <p>Complete both steps to verify your Ro-Link identity.</p>
+                                    <p>Connect Discord and Roblox to verify your Ro-Link identity.</p>
                                 </div>
                                 <span className="rl-surface-icon"><Link2 aria-hidden="true" /></span>
                             </div>
@@ -143,14 +143,57 @@ export default function VerifyPage() {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="rl-notice">
-                                        <Box aria-hidden="true" />
-                                        <div>
-                                            <strong>Link your Roblox account</strong>
-                                            You are signed in with Discord. Finish verification by choosing your Roblox identity.
-                                            <button className="rl-button rl-button-primary mt-4" type="button" onClick={handleRobloxLink} disabled={loading}>
-                                                <Box aria-hidden="true" width={15} height={15} />
-                                                {loading ? 'Opening Roblox…' : 'Link Roblox account'}
+                                    <div className="rl-verify-unlinked">
+                                        <div className="rl-verify-progress-heading">
+                                            <div>
+                                                <span className="rl-field-label">Verification progress</span>
+                                                <h3>One step left</h3>
+                                                <p>Choose the Roblox account you want connected to your Discord identity.</p>
+                                            </div>
+                                            <span className="rl-verify-progress-count">1 of 2 connected</span>
+                                        </div>
+
+                                        <div className="rl-verify-account-list">
+                                            <div className="rl-verify-account-row rl-verify-account-row-complete">
+                                                <span className="rl-verify-platform-icon">
+                                                    <DiscordIcon aria-hidden="true" width="18" height="18" />
+                                                </span>
+                                                <div className="rl-verify-account-copy">
+                                                    <strong>Discord</strong>
+                                                    <span>{session.user?.name || 'Signed in'}</span>
+                                                </div>
+                                                <span className="rl-verify-account-state rl-verify-account-state-complete">
+                                                    <Check aria-hidden="true" /> Connected
+                                                </span>
+                                            </div>
+
+                                            <div className="rl-verify-account-row">
+                                                <span className="rl-verify-platform-icon">
+                                                    <Box aria-hidden="true" />
+                                                </span>
+                                                <div className="rl-verify-account-copy">
+                                                    <strong>Roblox</strong>
+                                                    <span>No account connected</span>
+                                                </div>
+                                                <span className="rl-verify-account-state">Required</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="rl-verify-unlinked-footer">
+                                            <p>You’ll continue to Roblox to securely authorize your account.</p>
+                                            <button
+                                                className="rl-button rl-button-primary"
+                                                type="button"
+                                                onClick={handleRobloxLink}
+                                                disabled={loading}
+                                                aria-busy={loading}
+                                            >
+                                                {loading ? (
+                                                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" aria-hidden="true" />
+                                                ) : (
+                                                    <Box aria-hidden="true" width={15} height={15} />
+                                                )}
+                                                {loading ? 'Redirecting…' : 'Continue with Roblox'}
                                             </button>
                                         </div>
                                     </div>
