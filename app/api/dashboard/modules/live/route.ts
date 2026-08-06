@@ -14,7 +14,6 @@ interface CustomModuleLiveRow {
     slug?: string | null;
     name?: string | null;
     enabled?: boolean | null;
-    status?: string | null;
     config_schema?: unknown;
 }
 
@@ -45,7 +44,7 @@ async function requireServerAccess(serverId: string) {
 async function getInstalledModuleForLiveAction(serverId: string, moduleId: string, userId: string) {
     const { data: customModule, error: customError } = await supabase
         .from('server_custom_modules')
-        .select('id, slug, name, enabled, status, config_schema')
+        .select('id, slug, name, enabled, config_schema')
         .eq('server_id', serverId)
         .eq('id', moduleId)
         .maybeSingle<CustomModuleLiveRow>();
@@ -55,7 +54,7 @@ async function getInstalledModuleForLiveAction(serverId: string, moduleId: strin
     }
 
     if (customModule) {
-        if (customModule.enabled === false || customModule.status !== 'READY') {
+        if (customModule.enabled === false) {
             return { error: 'This custom module is not enabled.' };
         }
 

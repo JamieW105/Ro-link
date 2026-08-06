@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 
-import { getServerByApiKey, isDgsuGameAdminAccessError } from '@/lib/gameAdmin';
-import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
-import { normalizeAddonModule, normalizeServerCustomModule, obfuscateModuleSourceForStudio, parseModuleConfigSettings, parseStoredModuleConfigSchema } from '@/lib/modules';
+import { getServerByApiKey } from '@/lib/gameAdmin';
+import { normalizeAddonModule, normalizeServerCustomModule, parseModuleConfigSettings, parseStoredModuleConfigSchema } from '@/lib/modules';
 import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
 
@@ -96,8 +95,7 @@ export async function GET(req: Request) {
             .from('server_custom_modules')
             .select(customModuleSelect)
             .eq('server_id', server.id)
-            .eq('enabled', true)
-            .eq('status', 'READY'),
+            .eq('enabled', true),
     ]);
 
     if (error) {
@@ -135,7 +133,7 @@ export async function GET(req: Request) {
 
             return {
                 ...normalized,
-                ...(configOnly ? {} : { sourceCode: obfuscateModuleSourceForStudio(String(normalized.sourceCode || '')) }),
+                ...(configOnly ? {} : { sourceCode: String(normalized.sourceCode || '') }),
                 settings: parseModuleConfigSettings(row.settings, configSchema),
             };
         })
@@ -145,13 +143,13 @@ export async function GET(req: Request) {
         .map((row) => {
             const configSchema = parseStoredModuleConfigSchema(row.config_schema);
             const normalized = normalizeServerCustomModule(row as unknown as Record<string, unknown>, !configOnly);
-            if (!normalized || normalized.status !== 'READY' || !normalized.enabled) {
+            if (!normalized || !normalized.enabled) {
                 return null;
             }
 
             return {
                 ...normalized,
-                ...(configOnly ? {} : { sourceCode: obfuscateModuleSourceForStudio(String(normalized.sourceCode || '')) }),
+                ...(configOnly ? {} : { sourceCode: String(normalized.sourceCode || '') }),
                 settings: parseModuleConfigSettings(row.settings, configSchema),
             };
         })

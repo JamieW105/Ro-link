@@ -243,7 +243,7 @@ export default function DashboardModulesPage() {
                     <div>
                         <h2 className="text-lg font-bold text-white">Server Custom Module</h2>
                         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
-                            Upload Luau directly to this server. Auto checks run immediately; failed uploads stay disabled until re-uploaded.
+                            Upload Luau directly to this server without submitting it to the module marketplace.
                         </p>
                     </div>
                     {customUploadTarget && (
@@ -359,7 +359,7 @@ export default function DashboardModulesPage() {
                                                     .filter((result) => result.status === 'fail')
                                                     .slice(0, 2)
                                                     .map((result) => `${result.title}: ${result.details.join(' ')}`)
-                                                    .join(' ') || 'Auto checks failed. Re-upload this module before enabling it in game.'}
+                                                    .join(' ') || 'Re-upload this module before enabling it in game.'}
                                             </div>
                                         )}
                                     </div>
@@ -479,7 +479,7 @@ export default function DashboardModulesPage() {
                                         {(selectedModule.reviewResults || [])
                                             .filter((result) => result.status === 'fail')
                                             .map((result) => `${result.title}: ${result.details.join(' ')}`)
-                                            .join(' ') || 'Auto checks failed. Re-upload this module before enabling it in game.'}
+                                            .join(' ') || 'Re-upload this module before enabling it in game.'}
                                     </div>
                                 )}
                             </div>

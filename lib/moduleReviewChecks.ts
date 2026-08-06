@@ -72,6 +72,8 @@ const DANGEROUS_CODE_PATTERNS = [
     { pattern: /\bRequestAsync\s*\(/i, detail: 'Uses RequestAsync for external HTTP requests.' },
     { pattern: /\bHttpService\s*:\s*PostAsync\s*\(/i, detail: 'Posts data through HttpService.' },
     { pattern: /\bHttpService\s*:\s*GetAsync\s*\(/i, detail: 'Fetches data through HttpService.' },
+    { pattern: /\bInsertService\b/i, detail: 'References InsertService for runtime asset insertion.' },
+    { pattern: /\bLoadAsset\s*\(/i, detail: 'Loads an external Roblox asset at runtime.' },
     { pattern: /\brequire\s*\(\s*\d{5,}\s*\)/i, detail: 'Requires an external Roblox asset by numeric ID.' },
     { pattern: /\bgetfenv\s*\(/i, detail: 'Reads or manipulates the Lua environment.' },
     { pattern: /\bsetfenv\s*\(/i, detail: 'Mutates the Lua environment.' },

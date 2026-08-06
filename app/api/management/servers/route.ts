@@ -67,6 +67,8 @@ export async function GET() {
             }
         });
 
+        merged.sort((a, b) => Number(b.is_setup) - Number(a.is_setup));
+
         return NextResponse.json(merged);
     } catch (error: any) {
         console.error("[Management/Servers] Error:", error);

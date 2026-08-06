@@ -30,6 +30,22 @@ interface DiscordMessage {
         id?: string;
         bot?: boolean;
     };
+    embeds?: DiscordEmbed[];
+}
+
+interface DiscordEmbed {
+    title?: string;
+    description?: string;
+    fields?: Array<{
+        name?: string;
+        value?: string;
+    }>;
+    footer?: {
+        text?: string;
+    };
+    author?: {
+        name?: string;
+    };
 }
 
 interface RuleIssue {
@@ -51,13 +67,10 @@ interface RulePattern {
 }
 
 const MAX_SERVERS = Number(process.env.SERVER_RULE_CHECK_MAX_SERVERS || 50);
-const MAX_CHANNELS_PER_SERVER = Number(process.env.SERVER_RULE_CHECK_MAX_CHANNELS || 4);
-const MAX_MESSAGES_PER_CHANNEL = Number(process.env.SERVER_RULE_CHECK_MAX_MESSAGES || 15);
+const MESSAGES_PER_CHANNEL = 30;
 const MAX_ISSUES_PER_SERVER = 8;
 const MAX_TRANSLATIONS_PER_SCAN = Number(process.env.SERVER_RULE_CHECK_MAX_TRANSLATIONS || 30);
 const TRANSLATION_BASE_URL = (process.env.TRANSLATION_API_BASE_URL || 'https://lingva.ml').replace(/\/+$/, '');
-
-const CHANNEL_PRIORITY = ['rules', 'general', 'chat', 'announcements', 'main', 'lobby'];
 
 const RULE_PATTERNS: RulePattern[] = [
     {
@@ -214,8 +227,7 @@ async function scanGuild(
         const channels = Array.isArray(rawChannels)
             ? rawChannels
                 .filter((channel) => channel.type === 0 || channel.type === 5)
-                .sort(compareChannels)
-                .slice(0, Math.max(1, MAX_CHANNELS_PER_SERVER))
+                .sort(compareChannelsByName)
             : [];
 
         if (channels.length === 0) {
@@ -223,47 +235,43 @@ async function scanGuild(
         }
 
         for (const channel of channels) {
-            if (issues.length >= MAX_ISSUES_PER_SERVER) break;
-
             try {
                 const messages = await rest.get(Routes.channelMessages(channel.id), {
-                    query: new URLSearchParams({ limit: String(MAX_MESSAGES_PER_CHANNEL) }),
+                    query: new URLSearchParams({ limit: String(MESSAGES_PER_CHANNEL) }),
                 }) as DiscordMessage[];
 
                 for (const message of Array.isArray(messages) ? messages : []) {
-                    if (issues.length >= MAX_ISSUES_PER_SERVER) break;
                     if (message.author?.bot) continue;
 
-                    const content = normalizeContent(message.content || '');
-                    if (!content) continue;
+                    const reviewText = getMessageReviewText(message);
+                    if (!reviewText) continue;
 
                     checkedMessages += 1;
                     let translatedText: string | undefined;
 
-                    if (shouldTranslateForReview(content) && getTranslationCount() < MAX_TRANSLATIONS_PER_SCAN) {
-                        translatedText = await translateToEnglish(content);
-                        if (translatedText && translatedText !== content) {
+                    if (shouldTranslateForReview(reviewText) && getTranslationCount() < MAX_TRANSLATIONS_PER_SCAN) {
+                        translatedText = await translateToEnglish(reviewText);
+                        if (translatedText && translatedText !== reviewText) {
                             translatedMessages += 1;
                             incrementTranslationCount();
                         }
                     }
 
                     const messageIssues = [
-                        ...findRuleIssues(content, 'message'),
+                        ...findRuleIssues(reviewText, 'message'),
                         ...(translatedText ? findRuleIssues(translatedText, 'message') : []),
                     ];
 
                     for (const issue of messageIssues) {
                         issues.push({
                             ...issue,
-                            evidence: content,
-                            translatedEvidence: translatedText && translatedText !== content ? translatedText : undefined,
+                            evidence: truncate(reviewText, 240),
+                            translatedEvidence: translatedText && translatedText !== reviewText ? translatedText : undefined,
                             channelName: channel.name || channel.id,
                             messageUrl: `https://discord.com/channels/${guild.id}/${channel.id}/${message.id}`,
                             authorId: message.author?.id,
                             messageCreatedAt: message.timestamp,
                         });
-                        if (issues.length >= MAX_ISSUES_PER_SERVER) break;
                     }
                 }
             } catch (channelError) {
@@ -302,14 +310,26 @@ async function scanGuild(
     };
 }
 
-function compareChannels(a: DiscordChannel, b: DiscordChannel) {
-    return channelScore(a) - channelScore(b);
+function compareChannelsByName(a: DiscordChannel, b: DiscordChannel) {
+    return (a.name || a.id).localeCompare(b.name || b.id);
 }
 
-function channelScore(channel: DiscordChannel) {
-    const name = (channel.name || '').toLowerCase();
-    const priorityIndex = CHANNEL_PRIORITY.findIndex((term) => name.includes(term));
-    return priorityIndex === -1 ? CHANNEL_PRIORITY.length : priorityIndex;
+function getMessageReviewText(message: DiscordMessage) {
+    const parts = [message.content || ''];
+
+    for (const embed of message.embeds || []) {
+        parts.push(embed.title || '');
+        parts.push(embed.description || '');
+        parts.push(embed.author?.name || '');
+        parts.push(embed.footer?.text || '');
+
+        for (const field of embed.fields || []) {
+            parts.push(field.name || '');
+            parts.push(field.value || '');
+        }
+    }
+
+    return normalizeContent(parts.filter(Boolean).join(' '));
 }
 
 function findRuleIssues(text: string, location: RuleIssue['location']): RuleIssue[] {
@@ -319,6 +339,10 @@ function findRuleIssues(text: string, location: RuleIssue['location']): RuleIssu
 
     for (const rule of RULE_PATTERNS) {
         if (rule.patterns.some((pattern) => pattern.test(normalized))) {
+            if (location === 'message' && isBenignPolicyStatement(normalized, rule.rule)) {
+                continue;
+            }
+
             matches.push({
                 rule: rule.rule,
                 severity: rule.severity,
@@ -329,6 +353,54 @@ function findRuleIssues(text: string, location: RuleIssue['location']): RuleIssu
     }
 
     return matches;
+}
+
+function isBenignPolicyStatement(text: string, ruleName: string) {
+    const normalized = text.toLowerCase();
+    if (ruleName === 'Adult or explicit server content') {
+        return hasNearbyProhibition(normalized, /\b(?:nsfw|18\+|adult\s+only|porn|nudes|onlyfans|explicit|sex(?:ual)?(?:\s+content)?)\b/i);
+    }
+
+    if (ruleName === 'Robux or Nitro scam language') {
+        return hasNearbyProhibition(normalized, /\b(?:scam|free\s+(?:robux|nitro)|claim\s+(?:your\s+)?(?:robux|nitro|reward|gift)|(?:robux|nitro)\s+(?:generator|giveaway|drop)|verify\s+(?:to\s+)?(?:claim|get|receive))\b/i);
+    }
+
+    if (ruleName === 'Phishing or account theft indicators') {
+        return hasNearbyProhibition(normalized, /\b(?:phishing|token\s*grabber|cookie\s*logger|account\s*stealer|password|2fa|auth\s*code)\b/i);
+    }
+
+    if (ruleName === 'Raid or harassment coordination') {
+        return hasNearbyProhibition(normalized, /\b(?:raid|nuke|mass\s*ping|mass\s*dm|dox|doxx|swat|spam|flood)\b/i);
+    }
+
+    if (ruleName === 'Malware or exploit distribution') {
+        return hasNearbyProhibition(normalized, /\b(?:malware|rat|remote\s+access\s+trojan|stealer|executor|exploit|exe|scr|bat|ps1)\b/i);
+    }
+
+    return false;
+}
+
+function hasNearbyProhibition(text: string, termPattern: RegExp) {
+    const termRegex = new RegExp(termPattern.source, termPattern.flags.includes('i') ? 'gi' : 'g');
+    const prohibitionPattern = /\b(?:no|not|never|do\s*not|don't|dont|disallow(?:ed)?|forbid(?:den)?|prohibit(?:ed)?|ban(?:ned)?|not\s+allowed|against\s+(?:the\s+)?rules|zero\s+tolerance|keep\s+(?:it\s+)?sfw)\b/i;
+    const consequencePattern = /\b(?:will|may|can)\s+(?:result\s+in|lead\s+to|get\s+you)\s+(?:a\s+)?ban\b/i;
+    let match: RegExpExecArray | null;
+
+    while ((match = termRegex.exec(text)) !== null) {
+        const before = text.slice(Math.max(0, match.index - 60), match.index);
+        const after = text.slice(match.index + match[0].length, match.index + match[0].length + 80);
+        const context = `${before} ${after}`;
+
+        if (prohibitionPattern.test(context) || consequencePattern.test(context)) {
+            return true;
+        }
+
+        if (match[0].length === 0) {
+            termRegex.lastIndex += 1;
+        }
+    }
+
+    return false;
 }
 
 function dedupeIssues(issues: RuleIssue[]) {
