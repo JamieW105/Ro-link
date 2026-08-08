@@ -152,7 +152,11 @@ function isSiteTestingPublicPath(pathname: string) {
         || pathname === '/api/roblox/poll'
         || pathname === '/api/roblox/message'
         || pathname === '/plugin/connect'
-        || pathname === '/api/plugin/session/authorize'
+        // Studio cannot carry a browser/NextAuth session. These endpoints use
+        // one-time pairing details or scoped bearer credentials in their route
+        // handlers, so they must reach those handlers on the testing domain.
+        || pathname.startsWith('/api/plugin/session/')
+        || pathname.startsWith('/api/plugin/modules/ide/')
         || pathname.startsWith('/_next')
         || pathname.startsWith('/Media')
         || pathname === '/favicon.ico'

@@ -110,6 +110,7 @@ export default function ModuleIdeClient() {
     const [activeTab, setActiveTab] = useState('');
     const [drafts, setDraftsState] = useState<Record<string, Draft>>({});
     const draftsRef = useRef<Record<string, Draft>>({});
+    const saveOperationsRef = useRef<Map<string, Promise<boolean>>>(new Map());
     const [expanded, setExpanded] = useState<Set<string>>(new Set(['Server', 'Client', 'Shared', 'UI']));
     const [selectedFileId, setSelectedFileId] = useState('');
     const [fileSearch, setFileSearch] = useState('');
@@ -147,18 +148,14 @@ export default function ModuleIdeClient() {
     const studioScriptRef = useRef(studioScript);
 
     const setProject = useCallback((next: ProjectResponse | null | ((current: ProjectResponse | null) => ProjectResponse | null)) => {
-        setProjectState((current) => {
-            const value = typeof next === 'function' ? next(current) : next;
-            projectRef.current = value;
-            return value;
-        });
+        const value = typeof next === 'function' ? next(projectRef.current) : next;
+        projectRef.current = value;
+        setProjectState(value);
     }, []);
     const setDrafts = useCallback((next: Record<string, Draft> | ((current: Record<string, Draft>) => Record<string, Draft>)) => {
-        setDraftsState((current) => {
-            const value = typeof next === 'function' ? next(current) : next;
-            draftsRef.current = value;
-            return value;
-        });
+        const value = typeof next === 'function' ? next(draftsRef.current) : next;
+        draftsRef.current = value;
+        setDraftsState(value);
     }, []);
     useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
     useEffect(() => { tabsRef.current = tabs; }, [tabs]);
@@ -268,11 +265,11 @@ export default function ModuleIdeClient() {
         return () => window.removeEventListener('beforeunload', protect);
     }, [hasDirty]);
 
-    const saveProjectFile = useCallback(async (fileId: string) => {
+    const saveProjectFileOnce = useCallback(async (fileId: string) => {
         const currentProject = projectRef.current;
         const file = currentProject?.files.find((item) => item.id === fileId);
         const draft = draftsRef.current[fileId];
-        if (!currentProject || !file || !draft?.dirty || draft.status === 'saving') return true;
+        if (!currentProject || !file || !draft?.dirty) return true;
         const value = draft.value;
         setDrafts((current) => ({ ...current, [fileId]: { ...current[fileId], status: 'saving' } }));
         try {
@@ -312,6 +309,27 @@ export default function ModuleIdeClient() {
             return false;
         }
     }, [loadModules, log, moduleId, setDrafts, setProject]);
+
+    const saveProjectFile = useCallback((fileId: string) => {
+        const activeSave = saveOperationsRef.current.get(fileId);
+        if (activeSave) return activeSave;
+
+        const operation = (async () => {
+            // Keep one request per file in flight. If the user types while that
+            // request is running, save the newer value with the revision returned
+            // by the first request instead of sending two stale revisions at once.
+            while (draftsRef.current[fileId]?.dirty) {
+                if (!await saveProjectFileOnce(fileId)) return false;
+            }
+            return true;
+        })();
+
+        saveOperationsRef.current.set(fileId, operation);
+        void operation.finally(() => {
+            if (saveOperationsRef.current.get(fileId) === operation) saveOperationsRef.current.delete(fileId);
+        });
+        return operation;
+    }, [saveProjectFileOnce]);
 
     const saveAll = useCallback(async () => {
         for (const [id, draft] of Object.entries(draftsRef.current)) if (draft.dirty && !await saveProjectFile(id)) return false;

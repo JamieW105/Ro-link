@@ -15,9 +15,9 @@ local Selection = game:GetService("Selection")
 local ServerScriptService = game:GetService("ServerScriptService")
 local StarterPlayer = game:GetService("StarterPlayer")
 
-local PLUGIN_VERSION = "1.2.0"
+local PLUGIN_VERSION = "1.2.1"
 local PROTOCOL_VERSION = 1
-local DEFAULT_BASE_URL = "https://rolink.cloud"
+local DEFAULT_BASE_URL = "https://rolink.site"
 local TOOLBAR_ICON = "rbxassetid://80325173339413"
 local ACCOUNT_POLL_SECONDS = 2.5
 local BRIDGE_POLL_SECONDS = 1.25
@@ -166,8 +166,14 @@ type BridgeEvent = {
 	payload: { [string]: any }?,
 }
 
+local savedBaseUrl = tostring(plugin:GetSetting("RoLinkModuleIDEBaseUrl") or "")
+if savedBaseUrl == "" or savedBaseUrl == "https://rolink.cloud" then
+	savedBaseUrl = DEFAULT_BASE_URL
+	plugin:SetSetting("RoLinkModuleIDEBaseUrl", savedBaseUrl)
+end
+
 local state = {
-	apiBaseUrl = plugin:GetSetting("RoLinkModuleIDEBaseUrl") or DEFAULT_BASE_URL,
+	apiBaseUrl = savedBaseUrl,
 	accountToken = plugin:GetSetting("RoLinkModuleIDEAccountToken") or "",
 	bridgeCredential = plugin:GetSetting("RoLinkModuleIDEBridgeCredential") or "",
 	bridgeSessionId = plugin:GetSetting("RoLinkModuleIDEBridgeSessionId") or "",
