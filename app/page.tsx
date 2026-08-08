@@ -2,7 +2,7 @@
 
 import { ArrowRight, Check, Server, ShieldCheck, UserRoundCheck } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { PublicFooter } from '@/components/public/PublicFooter';
 import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
@@ -48,6 +48,12 @@ const setupSteps = [
 ];
 
 export default function Home() {
+    const [stats, setStats] = useState<{
+        guildCount: number | null;
+        commandCount: number | null;
+        latency: number | null;
+    }>({ guildCount: null, commandCount: null, latency: null });
+
     useEffect(() => {
         let cancelled = false;
 
@@ -77,6 +83,44 @@ export default function Home() {
             cancelled = true;
         };
     }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function fetchStats() {
+            const startedAt = performance.now();
+
+            try {
+                const response = await fetch('/api/stats', { cache: 'no-store' });
+
+                if (!response.ok) throw new Error(`Stats request failed with ${response.status}`);
+
+                const data = await response.json() as { guild_count?: number; command_count?: number };
+                if (cancelled) return;
+
+                setStats({
+                    guildCount: data.guild_count ?? 0,
+                    commandCount: data.command_count ?? 0,
+                    latency: Math.round(performance.now() - startedAt),
+                });
+            } catch (error) {
+                console.error('Failed to load public stats', error);
+                if (!cancelled) {
+                    setStats((current) => ({ ...current, latency: null }));
+                }
+            }
+        }
+
+        void fetchStats();
+        const interval = window.setInterval(fetchStats, 10_000);
+
+        return () => {
+            cancelled = true;
+            window.clearInterval(interval);
+        };
+    }, []);
+
+    const formatStat = (value: number | null) => value === null ? '—' : value.toLocaleString();
 
     return (
         <>
@@ -120,6 +164,21 @@ export default function Home() {
                             </article>
                         ))}
                     </div>
+                </section>
+
+                <section className="rl-stats-strip rl-shell" aria-label="Ro-Link live statistics">
+                    <article className="rl-stat-item">
+                        <strong>{formatStat(stats.guildCount)}</strong>
+                        <span>Servers using Ro-Link</span>
+                    </article>
+                    <article className="rl-stat-item">
+                        <strong>{formatStat(stats.commandCount)}</strong>
+                        <span>All-time commands run</span>
+                    </article>
+                    <article className="rl-stat-item">
+                        <strong>{stats.latency === null ? '—' : `${stats.latency} ms`}</strong>
+                        <span>Latency</span>
+                    </article>
                 </section>
 
                 <section className="rl-setup-section rl-shell" id="setup" aria-labelledby="setup-title">
