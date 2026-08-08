@@ -224,9 +224,11 @@ export default function ModuleIdeClient() {
         if (typeof preferences.bottomHeight === 'number') setBottomHeight(Math.min(360, Math.max(120, preferences.bottomHeight)));
         if (typeof preferences.rightVisible === 'boolean') setRightVisible(preferences.rightVisible);
         void loadModules().then((rows) => {
-            const queryId = new URLSearchParams(window.location.search).get('module');
+            const query = new URLSearchParams(window.location.search);
+            const queryId = query.get('module');
             const savedId = localStorage.getItem('rolink-module-ide-last-module');
             setModuleId([queryId, savedId].find((id) => id && rows.some((row) => row.id === id)) || rows[0]?.id || '');
+            if (query.get('new') === '1') setCreateModuleOpen(true);
         }).catch((reason) => setError(reason.message));
     }, [loadModules]);
     useEffect(() => {
