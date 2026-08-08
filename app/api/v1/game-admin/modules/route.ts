@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
-import { getServerByApiKey } from '@/lib/gameAdmin';
+import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
+import { getServerByApiKey, isDgsuGameAdminAccessError } from '@/lib/gameAdmin';
 import { normalizeAddonModule, normalizeServerCustomModule, parseModuleConfigSettings, parseStoredModuleConfigSchema } from '@/lib/modules';
 import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
