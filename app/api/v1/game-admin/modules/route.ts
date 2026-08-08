@@ -5,6 +5,7 @@ import { getServerByApiKey, isDgsuGameAdminAccessError } from '@/lib/gameAdmin';
 import { normalizeAddonModule, normalizeServerCustomModule, parseModuleConfigSettings, parseStoredModuleConfigSchema } from '@/lib/modules';
 import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,16 @@ interface ServerCustomModuleRow {
     id: string;
     config_schema?: unknown;
     settings?: unknown;
+}
+
+interface ModuleProjectVersionRow {
+    module_id: string;
+    version: string;
+    project_revision: number;
+    format_version: number;
+    package_hash: string;
+    package: Record<string, unknown>;
+    created_at: string;
 }
 
 export async function GET(req: Request) {
@@ -113,6 +124,29 @@ export async function GET(req: Request) {
     const addonRows = (data || []) as unknown as ServerAddonModuleRow[];
     const customModuleRows = (customModuleStorageMissing ? [] : customRows || []) as unknown as ServerCustomModuleRow[];
 
+    const latestProjectVersionByModule = new Map<string, ModuleProjectVersionRow>();
+    if (!configOnly) {
+        const moduleIds = addonRows.map((row) => {
+            const moduleRow = Array.isArray(row.module) ? row.module[0] : row.module;
+            return String(moduleRow?.id || '');
+        }).filter(Boolean);
+        if (moduleIds.length) {
+            const projectVersions = await getSupabaseAdmin()
+                .from('addon_module_versions')
+                .select('module_id, version, project_revision, format_version, package_hash, package, created_at')
+                .in('module_id', moduleIds)
+                .order('created_at', { ascending: false });
+            const versionStorageMissing = projectVersions.error
+                && /addon_module_versions|schema cache|could not find the table/i.test(projectVersions.error.message || '');
+            if (projectVersions.error && !versionStorageMissing) {
+                return NextResponse.json({ error: projectVersions.error.message }, { status: 500 });
+            }
+            for (const row of (projectVersions.data || []) as ModuleProjectVersionRow[]) {
+                if (!latestProjectVersionByModule.has(row.module_id)) latestProjectVersionByModule.set(row.module_id, row);
+            }
+        }
+    }
+
     const staffDiscordIds = await getRoLinkStaffDiscordIds();
 
     const marketplaceModules = addonRows
@@ -135,6 +169,15 @@ export async function GET(req: Request) {
             return {
                 ...normalized,
                 ...(configOnly ? {} : { sourceCode: String(normalized.sourceCode || '') }),
+                ...(!configOnly && latestProjectVersionByModule.has(normalized.id) ? (() => {
+                    const projectVersion = latestProjectVersionByModule.get(normalized.id)!;
+                    return {
+                        projectPackage: projectVersion.package,
+                        projectPackageHash: projectVersion.package_hash,
+                        projectFormatVersion: projectVersion.format_version,
+                        projectRevision: projectVersion.project_revision,
+                    };
+                })() : {}),
                 settings: parseModuleConfigSettings(row.settings, configSchema),
             };
         })

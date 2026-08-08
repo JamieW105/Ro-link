@@ -371,6 +371,12 @@ export default function CreatorModulesPage() {
                     </Link>
                     <div className="flex items-center gap-2">
                         <Link
+                            href="/dashboard/modules/ide"
+                            className="rounded-lg border border-sky-500/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10 hover:text-white"
+                        >
+                            Module IDE
+                        </Link>
+                        <Link
                             href="/dashboard/marketplace"
                             className="rounded-lg border border-slate-700/80 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
                         >
@@ -544,6 +550,14 @@ export default function CreatorModulesPage() {
                                     </p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:max-w-md lg:justify-end">
+                                    {selectedModule && (
+                                        <Link
+                                            href={`/dashboard/modules/ide?module=${encodeURIComponent(selectedModule.id)}`}
+                                            className="rounded-lg border border-sky-500/40 px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10 hover:text-white"
+                                        >
+                                            Open in IDE
+                                        </Link>
+                                    )}
                                     <button
                                         type="button"
                                         onClick={() => saveModule('DRAFT')}
@@ -658,7 +672,7 @@ export default function CreatorModulesPage() {
                                 <div className="flex items-center justify-between gap-3 border-b border-slate-800 bg-[#020617]/35 px-5 py-4">
                                     <div>
                                         <label className="block text-sm font-bold text-white">Source Code</label>
-                                        <p className="mt-1 text-xs text-slate-500">Paste Luau source or upload a `.lua`, `.luau`, or `.txt` file.</p>
+                                        <p className="mt-1 text-xs text-slate-500">Legacy single-script editing remains available. Use the Module IDE for multi-file server, client, shared, UI, and remote projects.</p>
                                     </div>
                                     <span className="shrink-0 font-mono text-xs text-slate-500">{form.sourceCode.length.toLocaleString()} chars</span>
                                 </div>

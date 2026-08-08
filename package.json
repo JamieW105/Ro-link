@@ -6,17 +6,21 @@
     "dev": "concurrently \"next dev\" \"node scripts/bot.js\"",
     "build": "next build",
     "typecheck": "tsc --noEmit",
+    "test:module-ide": "tsx --test scripts/module-ide.test.ts",
+    "sync:roblox-api": "node scripts/sync-roblox-api.mjs",
     "start": "concurrently \"next start\" \"node scripts/bot.js\"",
     "lint": "eslint",
     "bot": "node scripts/bot.js"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "@supabase/supabase-js": "^2.93.2",
     "crypto-js": "^4.2.0",
     "discord-api-types": "^0.38.37",
     "discord.js": "14.26.4",
     "dotenv": "^17.2.3",
     "lucide-react": "^1.27.0",
+    "monaco-editor": "^0.53.0",
     "next": "16.2.10",
     "next-auth": "^4.24.14",
     "react": "19.2.3",
@@ -34,6 +38,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
+    "tsx": "^4.23.11",
     "typescript": "^5"
   }
 }

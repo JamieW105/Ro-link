@@ -1,0 +1,163 @@
+-- Ro-Link Module Project v2 and Studio IDE bridge
+-- Apply after supabase_schema_modules.sql and supabase_schema_studio_plugin.sql.
+
+CREATE TABLE IF NOT EXISTS public.addon_module_projects (
+    module_id UUID PRIMARY KEY REFERENCES public.addon_modules(id) ON DELETE CASCADE,
+    format_version INTEGER NOT NULL DEFAULT 2 CHECK (format_version >= 2),
+    revision BIGINT NOT NULL DEFAULT 1 CHECK (revision > 0),
+    manifest JSONB NOT NULL DEFAULT '{}'::jsonb,
+    required_runtime_version TEXT NOT NULL DEFAULT '2.2.0',
+    published_revision BIGINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.addon_module_files (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    module_id UUID NOT NULL REFERENCES public.addon_module_projects(module_id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN (
+        'folder', 'server_script', 'client_script', 'shared_module',
+        'ui', 'manifest'
+    )),
+    source_code TEXT,
+    ui_tree JSONB,
+    revision BIGINT NOT NULL DEFAULT 1 CHECK (revision > 0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (module_id, path),
+    CHECK (char_length(path) BETWEEN 1 AND 512),
+    CHECK (char_length(name) BETWEEN 1 AND 128)
+);
+
+CREATE OR REPLACE FUNCTION public.bump_module_project_revision(
+    project_module_id UUID,
+    expected_revision BIGINT DEFAULT NULL
+)
+RETURNS BIGINT AS $$
+DECLARE
+    next_revision BIGINT;
+BEGIN
+    UPDATE public.addon_module_projects
+    SET revision = revision + 1,
+        updated_at = NOW()
+    WHERE module_id = project_module_id
+      AND (expected_revision IS NULL OR revision = expected_revision)
+    RETURNING revision INTO next_revision;
+    RETURN next_revision;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+REVOKE ALL ON FUNCTION public.bump_module_project_revision(UUID, BIGINT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.bump_module_project_revision(UUID, BIGINT) TO service_role;
+
+CREATE INDEX IF NOT EXISTS idx_addon_module_files_module_path
+    ON public.addon_module_files(module_id, path);
+
+CREATE TABLE IF NOT EXISTS public.addon_module_remotes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    module_id UUID NOT NULL REFERENCES public.addon_module_projects(module_id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    remote_type TEXT NOT NULL CHECK (remote_type IN ('event', 'function')),
+    direction TEXT NOT NULL DEFAULT 'bidirectional' CHECK (direction IN ('client_to_server', 'server_to_client', 'bidirectional')),
+    schema JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (module_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS public.addon_module_versions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    module_id UUID NOT NULL REFERENCES public.addon_modules(id) ON DELETE CASCADE,
+    version TEXT NOT NULL,
+    project_revision BIGINT NOT NULL,
+    format_version INTEGER NOT NULL DEFAULT 2,
+    package JSONB NOT NULL,
+    package_hash TEXT NOT NULL,
+    published_by_discord_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (module_id, version),
+    UNIQUE (module_id, project_revision)
+);
+
+CREATE INDEX IF NOT EXISTS idx_addon_module_versions_module_created
+    ON public.addon_module_versions(module_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.module_studio_pairings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    module_id UUID NOT NULL REFERENCES public.addon_modules(id) ON DELETE CASCADE,
+    discord_user_id TEXT NOT NULL,
+    code_hash TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_module_studio_pairings_expiry
+    ON public.module_studio_pairings(expires_at);
+
+CREATE TABLE IF NOT EXISTS public.module_studio_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    module_id UUID NOT NULL REFERENCES public.addon_modules(id) ON DELETE CASCADE,
+    discord_user_id TEXT NOT NULL,
+    plugin_session_id UUID REFERENCES public.studio_plugin_sessions(id) ON DELETE SET NULL,
+    credential_hash TEXT NOT NULL UNIQUE,
+    protocol_version INTEGER NOT NULL DEFAULT 1,
+    place_id TEXT NOT NULL DEFAULT '',
+    universe_id TEXT NOT NULL DEFAULT '',
+    place_name TEXT NOT NULL DEFAULT '',
+    last_studio_cursor BIGINT NOT NULL DEFAULT 0,
+    last_browser_cursor BIGINT NOT NULL DEFAULT 0,
+    connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_module_studio_sessions_module_active
+    ON public.module_studio_sessions(module_id, last_seen_at DESC)
+    WHERE revoked_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS public.module_studio_events (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    session_id UUID NOT NULL REFERENCES public.module_studio_sessions(id) ON DELETE CASCADE,
+    direction TEXT NOT NULL CHECK (direction IN ('to_browser', 'to_studio')),
+    message_type TEXT NOT NULL,
+    request_id TEXT,
+    revision TEXT,
+    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_module_studio_events_poll
+    ON public.module_studio_events(session_id, direction, id);
+
+-- Every IDE operation is mediated by authenticated Next.js routes or scoped
+-- Studio credentials. Browser clients never receive direct table access.
+ALTER TABLE public.addon_module_projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.addon_module_files ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.addon_module_remotes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.addon_module_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.module_studio_pairings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.module_studio_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.module_studio_events ENABLE ROW LEVEL SECURITY;
+
+-- Event queues are ephemeral. This function is safe to call from scheduled cleanup.
+CREATE OR REPLACE FUNCTION public.cleanup_module_studio_bridge()
+RETURNS void AS $$
+BEGIN
+    DELETE FROM public.module_studio_events
+    WHERE created_at < NOW() - INTERVAL '24 hours';
+
+    DELETE FROM public.module_studio_pairings
+    WHERE expires_at < NOW() - INTERVAL '1 hour';
+
+    UPDATE public.module_studio_sessions
+    SET revoked_at = COALESCE(revoked_at, NOW())
+    WHERE expires_at < NOW() AND revoked_at IS NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+REVOKE ALL ON FUNCTION public.cleanup_module_studio_bridge() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.cleanup_module_studio_bridge() TO service_role;

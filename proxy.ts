@@ -244,6 +244,13 @@ function getApiRateLimitRule(pathname: string, method: string): { name: string; 
         };
     }
 
+    if (pathname.startsWith('/api/plugin/modules/ide/')) {
+        return {
+            name: 'plugin-module-ide',
+            rule: { limit: 180, windowMs: 60_000, blockMs: 2 * 60_000 },
+        };
+    }
+
     if (pathname.startsWith('/api/plugin/session')) {
         return {
             name: 'plugin-session',

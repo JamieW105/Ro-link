@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { isValidElement, useEffect, useMemo, useRef, useState, type ReactNode, type SVGProps } from 'react';
 import { Activity, AlertTriangle, BookOpen, Check, ChevronRight, Copy, ExternalLink, Globe2, KeyRound, Menu, Rocket, Search, Server, Settings, Shield, Terminal, Users, X } from 'lucide-react';
 
+import { moduleApiMetadata } from '@/lib/moduleApiMetadata';
+
 type IconComponent = (props: SVGProps<SVGSVGElement>) => ReactNode;
 type DocCategory = 'Platform' | 'Operations' | 'Configuration' | 'Developer';
 
@@ -446,29 +448,11 @@ const commandGroups = [
     },
 ] as const;
 
-const moduleDeveloperFunctions = [
-    ['Module', 'table', 'Published marketplace module metadata for the currently running module.'],
-    ['Config', 'table', 'Parsed CONFIG schema declared at the top of the uploaded module source.'],
-    ['Settings', 'table', 'Per-server settings configured from the dashboard module install page.'],
-    ['Services', 'table', 'Whitelisted Roblox services such as Players, HttpService, ReplicatedStorage, RunService, Workspace, Lighting, MessagingService, and ServerScriptService.'],
-    ['RegisterCommand(commandName, handler)', 'function', 'Adds a custom command handler. Handlers receive command payload, context, and args.'],
-    ['RegisterPanelCommand(definition, handler)', 'function', 'Registers a module command and exposes it in the in-game Cmds panel with title, description, target, and field metadata.'],
-    ['OnAdminPanelOpened(handler)', 'function', 'Runs when an authorized user opens the in-game admin panel. Handler receives player, payload, and context.'],
-    ['OnCommandBarOpened(handler)', 'function', 'Runs when an authorized user opens the in-game command bar. Handler receives player, payload, and context.'],
-    ['SendBotMessage(target, user, channelId, content)', 'function', 'Sends a Discord bot message through Ro-Link after validating the server, channel, or member target.'],
-    ['GetDiscordChannels()', 'function', 'Returns sendable Discord channels for the current server.'],
-    ['GetUserData(user)', 'function', 'Returns Roblox user data, server role rank, and linked Discord user/member data when the user is linked.'],
-    ['GetReports(options)', 'function', 'Reads reports for the current server. options can include status, limit, target, or reporter.'],
-    ['GetReport(reportId)', 'function', 'Reads one report from the current server.'],
-    ['CreateReport(body)', 'function', 'Creates a pending report and snapshots the reporter and reported player live servers with join links.'],
-    ['UpdateReport(reportId, updates)', 'function', 'Edits report status, notes, target, reason, or moderator fields for the current server.'],
-    ['CreateUI(target, functionOrTree, props)', 'function', 'Creates Roblox UI for one player, all players, or a target list. Installed modules should pass a function or UI tree table.'],
-    ['_G.RoLinkModuleUI.Bind(guiObject, handler, options)', 'function', 'Binds client UI input from CreateUI instances back to server-side module code.'],
-    ['FindPlayer(target)', 'function', 'Finds one live Roblox player by Player instance, username, or UserId.'],
-    ['GetPlayers()', 'function', 'Returns the current live Players list.'],
-    ['Notify(target, message, success)', 'function', 'Shows admin-panel feedback where the Studio package exposes the feedback remote.'],
-    ['Log(...)', 'function', 'Prints a namespaced marketplace module log line.'],
-] as const;
+const moduleDeveloperFunctions = moduleApiMetadata.map((entry) => [
+    entry.signature.replace(/^context\./, ''),
+    entry.kind === 'field' ? 'table' : 'function',
+    entry.description,
+] as const);
 
 const docsPages: DocPage[] = [
     {
@@ -1081,15 +1065,16 @@ const docsPages: DocPage[] = [
         category: 'Developer',
         eyebrow: 'Module Runtime',
         title: 'Module Developer API',
-        summary: 'Use this page to understand what a Ro-Link module file looks like, how dashboard settings reach Roblox, and which context helpers are available for commands, reports, Discord messages, user data, and player UI.',
+        summary: 'Build Module Project v2 workspaces in the browser IDE, pair Roblox Studio, and use the typed runtime context for commands, reports, Discord messages, user data, UI, client code, and remotes.',
         icon: Icons.Terminal,
         stats: [
             { label: 'Runtime object', value: 'context' },
-            { label: 'Upload surface', value: 'Management portal' },
-            { label: 'Loaded by', value: 'Roblox admin panel' },
+            { label: 'Authoring surface', value: 'Browser Module IDE' },
+            { label: 'Project format', value: 'Module Project v2' },
         ],
         toc: [
             { id: 'module-api-overview', title: 'How modules work' },
+            { id: 'module-api-project-v2', title: 'Browser IDE and Studio' },
             { id: 'module-api-config', title: 'Configuration' },
             { id: 'module-api-live-inputs', title: 'Live input dropdowns' },
             { id: 'module-api-functions', title: 'Context functions' },
@@ -1103,6 +1088,24 @@ const docsPages: DocPage[] = [
         ],
         content: (
             <div className="space-y-6">
+                <SectionCard
+                    id="module-api-project-v2"
+                    eyebrow="Module Project v2"
+                    title="Build in the browser, synchronize with Studio"
+                    description="Open the Module IDE from the Creator Dashboard. Projects keep independent Server, Client, Shared, UI, Remotes, and module.json data with file-level draft revisions. Connect Studio with the one-time code shown by the IDE, then use the standalone Ro-Link Module IDE plugin to browse live instances, edit Studio scripts safely, import selected UI, or sync the validated project into the place."
+                >
+                    <InfoGrid
+                        items={[
+                            { meta: 'Browser', title: 'Multi-file Luau workspace', description: 'Monaco provides Luau highlighting, Roblox and Ro-Link completions, diagnostics, tabs, search, quick open, formatting, and debounced revision-aware draft saves.' },
+                            { meta: 'Studio', title: 'Scoped pairing', description: 'Pairing codes are one-time and expire quickly. The plugin receives a module-scoped credential and never receives the website session or database keys.' },
+                            { meta: 'Runtime', title: 'Deterministic v2 package', description: 'Publish validates scripts, entrypoints, UI, and remotes, stores an immutable package hash, and keeps legacy server source delivery for existing installs.' },
+                        ]}
+                    />
+                    <div className="mt-5 flex flex-wrap gap-3">
+                        <Link href="/dashboard/modules/ide" className="rounded-lg bg-sky-600 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-white hover:bg-sky-500">Open Module IDE</Link>
+                        <span className="rounded-lg border border-slate-700 px-4 py-2.5 text-xs text-slate-400">Studio HTTP requests must be enabled for pairing and sync.</span>
+                    </div>
+                </SectionCard>
                 <SectionCard
                     id="module-api-overview"
                     eyebrow="Structure"
