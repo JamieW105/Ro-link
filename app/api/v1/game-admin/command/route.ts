@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 
 import { ADMIN_PANEL_COMMAND_IDS, normalizeAdminPanelCommand } from '@/lib/adminPanelCommands';
 import { buildDeliveryArgs, resolveDeliveryTargets, trimString, type CommandArgs } from '@/lib/commandDelivery';
-import { getServerByApiKey } from '@/lib/gameAdmin';
+import { getServerByApiKey, isDgsuGameAdminAccessError } from '@/lib/gameAdmin';
+import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
 import { logAction } from '@/lib/logger';
 import { collectModulePanelCommandsFromLiveServers } from '@/lib/modulePanelCommands';
 import { sendRobloxMessage } from '@/lib/roblox';
@@ -14,7 +15,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Missing API Key' }, { status: 401 });
     }
 
-    const server = await getServerByApiKey(apiKey);
+    let server;
+    try {
+        server = await getServerByApiKey(apiKey);
+    } catch (error) {
+        if (isDgsuGameAdminAccessError(error)) {
+            return NextResponse.json({ error: DGSU_BAN_ERROR_MESSAGE, code: 'dgsu_ban', message: DGSU_BAN_ERROR_MESSAGE }, { status: DGSU_BAN_ERROR_STATUS });
+        }
+        throw error;
+    }
+
     if (!server) {
         return NextResponse.json({ error: 'Invalid API Key' }, { status: 403 });
     }

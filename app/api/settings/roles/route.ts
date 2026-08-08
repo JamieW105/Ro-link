@@ -1,15 +1,21 @@
 
 import { NextResponse } from 'next/server';
 import { normalizeAdminPanelCommandList } from '@/lib/adminPanelCommands';
+import { canManageSettings, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
 import { supabase } from '@/lib/supabase';
 
 // GET ALL ROLES FOR A SERVER
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
-    const serverId = searchParams.get('serverId');
+    const serverId = trimString(searchParams.get('serverId'));
 
     if (!serverId) {
         return NextResponse.json({ error: 'Server ID required' }, { status: 400 });
+    }
+
+    const access = await requireDashboardAccess(serverId, canManageSettings);
+    if ('error' in access) {
+        return access.error;
     }
 
     const { data, error } = await supabase
@@ -45,6 +51,11 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    const access = await requireDashboardAccess(trimString(serverId), canManageSettings);
+    if ('error' in access) {
+        return access.error;
+    }
+
     const normalizedPanelCommands = normalizeAdminPanelCommandList(panelCmds ?? miscCmds);
 
     const { data, error } = await supabase
@@ -62,6 +73,9 @@ export async function POST(req: Request) {
             can_lookup: permissions.lookup === true,
             can_manage_settings: permissions.manage_settings === true,
             can_manage_reports: permissions.manage_reports === true,
+            can_view_logs: permissions.view_logs === true,
+            can_view_runtime_logs: permissions.view_runtime_logs === true,
+            can_manage_staff_notes: permissions.manage_staff_notes === true,
             allowed_misc_cmds: normalizedPanelCommands
         }, { onConflict: 'server_id, discord_role_id' }) // Constraint name might be needed or handled automatically if standard UNIQUE INDEX exists
         .select()
@@ -81,15 +95,22 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id'); // Dashboard Role ID (UUID)
+    const serverId = trimString(searchParams.get('serverId'));
 
-    if (!id) {
-        return NextResponse.json({ error: 'ID required' }, { status: 400 });
+    if (!id || !serverId) {
+        return NextResponse.json({ error: 'Role and server ID required' }, { status: 400 });
+    }
+
+    const access = await requireDashboardAccess(serverId, canManageSettings);
+    if ('error' in access) {
+        return access.error;
     }
 
     const { error } = await supabase
         .from('dashboard_roles')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('server_id', serverId);
 
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });

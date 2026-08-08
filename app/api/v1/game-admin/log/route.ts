@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
-import { getServerByApiKey } from '@/lib/gameAdmin';
+import { getServerByApiKey, isDgsuGameAdminAccessError } from '@/lib/gameAdmin';
+import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
 import { logAction } from '@/lib/logger';
 import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 
@@ -18,7 +19,16 @@ export async function POST(req: Request) {
         }, { status: 401 });
     }
 
-    const server = await getServerByApiKey(auth.key);
+    let server;
+    try {
+        server = await getServerByApiKey(auth.key);
+    } catch (error) {
+        if (isDgsuGameAdminAccessError(error)) {
+            return NextResponse.json({ error: DGSU_BAN_ERROR_MESSAGE, code: 'dgsu_ban', message: DGSU_BAN_ERROR_MESSAGE }, { status: DGSU_BAN_ERROR_STATUS });
+        }
+        throw error;
+    }
+
     if (!server) {
         console.warn('[RoLinkAPI][GameAdminLog] Invalid API key', { auth: authDebug });
         return NextResponse.json({

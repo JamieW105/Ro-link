@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 import { findServerByKeyWithDiagnostics } from '@/lib/serverAuth';
+import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
 
 export async function GET(req: Request) {
     const auth = readServerApiKeyDetails(req);
@@ -33,6 +34,19 @@ export async function GET(req: Request) {
             auth: authDebug,
             lookupError: lookup.error,
         });
+        if (lookup.error === 'dgsu_ban') {
+            return NextResponse.json({
+                error: DGSU_BAN_ERROR_MESSAGE,
+                code: 'dgsu_ban',
+                message: DGSU_BAN_ERROR_MESSAGE,
+                auth: authDebug,
+                lookup: {
+                    matchedBy: lookup.matchedBy,
+                    error: lookup.error,
+                },
+            }, { status: DGSU_BAN_ERROR_STATUS });
+        }
+
         return NextResponse.json({
             error: 'Invalid API Key',
             code: 'invalid_api_key',

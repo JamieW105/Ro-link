@@ -1,8 +1,11 @@
 'use client';
 
+import { LogOut as LucideLogOut, ShieldAlert as LucideShieldAlert } from 'lucide-react';
+
 import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 
 type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
 
@@ -50,7 +53,7 @@ type SessionUserWithId = {
 };
 
 const LogOutIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>
+    <LucideLogOut width="14" height="14" strokeWidth="2" />
 );
 
 function formatDate(value: string | null) {
@@ -251,7 +254,7 @@ export default function DashboardMarketplacePage() {
         return (
             <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-6 text-center">
                 <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center mb-6 text-slate-400 border border-slate-700 shadow-xl">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                    <LucideShieldAlert width="32" height="32" strokeWidth="2" />
                 </div>
                 <h1 className="text-2xl font-bold mb-2 tracking-tight">Access Denied</h1>
                 <p className="text-slate-400 mb-8 max-w-sm text-sm">Please authenticate with Discord to browse marketplace modules.</p>
@@ -290,7 +293,7 @@ export default function DashboardMarketplacePage() {
                                 Sign Out
                             </button>
                         </div>
-                        <img src={session?.user?.image || ''} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm" />
+                        <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm" />
                     </div>
                 </div>
             </nav>
@@ -576,7 +579,7 @@ export default function DashboardMarketplacePage() {
                                                 >
                                                     {server.icon ? (
                                                         <img
-                                                            src={`https://cdn.discordapp.com/icons/${server.id}/${server.icon}.png`}
+                                                            src={getDiscordGuildIconProxyUrl(server.id, server.icon)}
                                                             alt=""
                                                             className="h-11 w-11 shrink-0 rounded-lg border border-white/5 object-cover"
                                                         />

@@ -3,32 +3,16 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { Check, Copy, ExternalLink, KeyRound, RefreshCw, Search, ShieldAlert } from "lucide-react";
 
 const INSTALLER_PLUGIN_URL = "https://create.roblox.com/store/asset/87859041511603/RoLink-installer";
 
-const SearchIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
-);
-
-const CheckIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-);
-
-const KeyIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="7.5" cy="15.5" r="5.5" /><path d="m21 2-9.6 9.6" /><path d="m15.5 7.5 3 3l2 2" /></svg>
-);
-
-const CopyIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-);
-
-const ExternalLinkIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
-);
-
-const RefreshIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
-);
+const SearchIcon = () => <Search size={20} aria-hidden="true" />;
+const CheckIcon = () => <Check size={20} strokeWidth={3} aria-hidden="true" />;
+const KeyIcon = () => <KeyRound size={16} aria-hidden="true" />;
+const CopyIcon = () => <Copy size={14} aria-hidden="true" />;
+const ExternalLinkIcon = () => <ExternalLink size={14} aria-hidden="true" />;
+const RefreshIcon = () => <RefreshCw size={14} aria-hidden="true" />;
 
 const setupSteps = [
     "Install the RoLink installer plugin from the Roblox Creator Store.",
@@ -156,7 +140,7 @@ export default function DashboardSetupPage() {
         return (
             <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
                 <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center mb-6 text-slate-400 border border-slate-700 shadow-xl">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                    <ShieldAlert size={32} aria-hidden="true" />
                 </div>
                 <h1 className="text-2xl font-bold mb-2 tracking-tight">Access Denied</h1>
                 <p className="text-slate-400 mb-8 max-w-sm text-sm">You have read-only access to this dashboard. You cannot modify server configuration.</p>

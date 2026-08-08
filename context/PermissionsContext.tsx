@@ -13,6 +13,9 @@ interface Permissions {
     can_lookup: boolean;
     can_manage_settings: boolean;
     can_manage_reports: boolean;
+    can_view_logs: boolean;
+    can_view_runtime_logs: boolean;
+    can_manage_staff_notes: boolean;
     allowed_misc_cmds: string[];
     is_admin: boolean;
 }

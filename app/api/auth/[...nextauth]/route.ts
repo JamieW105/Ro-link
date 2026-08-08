@@ -2,11 +2,16 @@ import NextAuth from "next-auth"
 import type { AuthOptions, Session } from "next-auth"
 import DiscordProvider from "next-auth/providers/discord"
 import { getSharedDashboardCookieDomain, isAllowedDashboardUrl } from "@/lib/customDashboardDomains"
+import { DGSU_BAN_AUTH_ERROR } from "@/lib/dgsuBanConstants"
+import { findDgsuBanForDiscordLogin, findDgsuBanForUser } from "@/lib/dgsuBans"
+import { getDiscordOAuthConfig } from "@/lib/discordOAuthConfig"
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin"
 
 type TokenShape = {
     accessToken?: string
     refreshToken?: string
     accessTokenExpires?: number
+    dgsuBanned?: boolean
     error?: string
     errorCode?: string
     errorDescription?: string
@@ -23,6 +28,7 @@ type DiscordAccount = {
 const cookieDomain = getSharedDashboardCookieDomain()
 const secureCookies = process.env.NODE_ENV === "production"
     || Boolean(process.env.NEXTAUTH_URL?.startsWith("https://"))
+const discordOAuthConfig = getDiscordOAuthConfig()
 
 async function refreshDiscordAccessToken(token: TokenShape) {
     if (!token.refreshToken) {
@@ -43,8 +49,8 @@ async function refreshDiscordAccessToken(token: TokenShape) {
                 "Content-Type": "application/x-www-form-urlencoded",
             },
             body: new URLSearchParams({
-                client_id: process.env.DISCORD_CLIENT_ID!,
-                client_secret: process.env.DISCORD_CLIENT_SECRET!,
+                client_id: discordOAuthConfig.clientId,
+                client_secret: discordOAuthConfig.clientSecret,
                 grant_type: "refresh_token",
                 refresh_token: token.refreshToken,
             }),
@@ -105,8 +111,8 @@ async function refreshDiscordAccessToken(token: TokenShape) {
 export const authOptions: AuthOptions = {
     providers: [
         DiscordProvider({
-            clientId: process.env.DISCORD_CLIENT_ID!,
-            clientSecret: process.env.DISCORD_CLIENT_SECRET!,
+            clientId: discordOAuthConfig.clientId,
+            clientSecret: discordOAuthConfig.clientSecret,
             authorization: { params: { scope: 'identify guilds' } },
         }),
     ],
@@ -135,8 +141,32 @@ export const authOptions: AuthOptions = {
                 token.accessTokenExpires = account.expires_at
                     ? account.expires_at * 1000
                     : Date.now() + Number(account.expires_in || 0) * 1000
+                token.dgsuBanned = false
                 token.error = undefined
                 token.errorCode = undefined
+
+                const discordUserId = String(token.sub || "").trim()
+                if (discordUserId) {
+                    try {
+                        const ban = await findDgsuBanForDiscordLogin(getSupabaseAdmin(), {
+                            discordUserId,
+                            discordAccessToken: account.access_token,
+                        })
+                        token.dgsuBanned = Boolean(ban)
+                        if (ban) {
+                            console.warn("[AUTH] DGSU banned account signed in for appeal access", {
+                                discordUserId,
+                                banTargetType: ban.target_type,
+                                banTargetId: ban.target_id,
+                            })
+                        }
+                    } catch (error) {
+                        console.error("[AUTH] DGSU login check failed", {
+                            discordUserId,
+                            error: error instanceof Error ? error.message : error,
+                        })
+                    }
+                }
                 return token
             }
 
@@ -156,6 +186,29 @@ export const authOptions: AuthOptions = {
             if (session.user) {
                 session.user.id = token.sub
             }
+
+            if (token.sub) {
+                try {
+                    const ban = await findDgsuBanForUser(getSupabaseAdmin(), {
+                        discordUserId: token.sub,
+                    })
+
+                    if (ban || token.dgsuBanned) {
+                        console.warn("[AUTH] Existing session belongs to DGSU banned account", {
+                            discordUserId: token.sub,
+                            banTargetType: ban?.target_type,
+                            banTargetId: ban?.target_id,
+                        })
+                        session.error = DGSU_BAN_AUTH_ERROR
+                    }
+                } catch (error) {
+                    console.error("[AUTH] DGSU session check failed", {
+                        discordUserId: token.sub,
+                        error: error instanceof Error ? error.message : error,
+                    })
+                }
+            }
+
             return session
         },
         async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {

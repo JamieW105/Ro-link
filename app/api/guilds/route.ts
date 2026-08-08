@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import type { Session } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { listVisibleGuildsForDiscordSession } from '@/lib/dashboardGuilds';
+import { DGSU_BAN_AUTH_ERROR, DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,10 @@ export async function GET(req: Request) {
     }
 
     const session = await getServerSession(authOptions) as SessionWithDiscord | null;
+
+    if (session?.error === DGSU_BAN_AUTH_ERROR) {
+        return NextResponse.json({ error: DGSU_BAN_ERROR_MESSAGE }, { status: DGSU_BAN_ERROR_STATUS });
+    }
 
     if (!session || !session.accessToken || session.error || !session.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

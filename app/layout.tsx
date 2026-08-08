@@ -1,13 +1,20 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./public-theme.css";
 import NextAuthProvider from "./providers";
+import { PublicHeaderGate } from "@/components/public/PublicHeaderGate";
+import { SiteBannerGate } from "@/components/SiteBannerGate";
+import { DgsuAppealRedirect } from "@/components/DgsuAppealRedirect";
+import { getSiteUrl, SITE_DESCRIPTION } from "@/lib/seo";
 
 export const metadata: Metadata = {
+  metadataBase: getSiteUrl(),
   title: "Ro-Link | Connect Discord to Roblox",
-  description: "The ultimate platform for bridging Discord and Roblox. High-performance moderation tool with real-time analytics.",
+  description: SITE_DESCRIPTION,
+  alternates: { canonical: "/" },
   openGraph: {
     title: "Ro-Link | Connect Discord to Roblox",
-    description: "The ultimate platform for bridging Discord and Roblox. High-performance moderation tool with real-time analytics.",
+    description: SITE_DESCRIPTION,
     url: "https://rolink.cloud",
     siteName: "Ro-Link",
     images: [
@@ -24,7 +31,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary",
     title: "Ro-Link | Connect Discord to Roblox",
-    description: "The ultimate platform for bridging Discord and Roblox. High-performance moderation tool with real-time analytics, live moderation from discord and 24/7 hosting.",
+    description: SITE_DESCRIPTION,
     images: ["/Media/preview.png"],
   },
 };
@@ -42,6 +49,9 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <NextAuthProvider>
+          <DgsuAppealRedirect />
+          <PublicHeaderGate />
+          <SiteBannerGate />
           {children}
         </NextAuthProvider>
       </body>

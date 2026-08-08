@@ -1,6 +1,7 @@
 import type { Session } from 'next-auth';
 import { getToken } from 'next-auth/jwt';
 
+import { DGSU_BAN_AUTH_ERROR, DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
 import { authorizeStudioPluginSession, StudioPluginError } from '@/lib/studioPlugin';
 
 type SessionWithDiscord = Session & {
@@ -28,6 +29,10 @@ export async function authorizeStudioPluginFromBrowserSession(options: {
 
     if (!sessionId || !code) {
         return { kind: 'missing_params' };
+    }
+
+    if (session?.error === DGSU_BAN_AUTH_ERROR) {
+        return { kind: 'error', message: DGSU_BAN_ERROR_MESSAGE, status: DGSU_BAN_ERROR_STATUS };
     }
 
     if (!session?.user?.id || !session.accessToken || session.error) {

@@ -1,30 +1,19 @@
 'use client';
 
+import { BriefcaseBusiness as LucideBriefcaseBusiness } from 'lucide-react';
+
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from 'next/link';
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
+import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from "@/lib/discordMedia";
+import { LayoutDashboard, LogOut, MonitorPlay, Plus, ShieldAlert, Store } from "lucide-react";
 
-// SVGs
-const LogOutIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>
-);
-
-const PlusIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-);
-
-const SettingsIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
-);
-
-const MarketplaceIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="m12 2 7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4Z" /><path d="M9 11h6" /><path d="M9 15h4" /></svg>
-);
-
-const LivePanelIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" /><path d="M8 21h8" /><path d="M12 16v5" /><path d="m10 8 4 2-4 2Z" /></svg>
-);
+const LogOutIcon = () => <LogOut size={14} aria-hidden="true" />;
+const PlusIcon = () => <Plus size={14} strokeWidth={2.5} aria-hidden="true" />;
+const SettingsIcon = () => <LayoutDashboard size={15} aria-hidden="true" />;
+const MarketplaceIcon = () => <Store size={15} aria-hidden="true" />;
+const LivePanelIcon = () => <MonitorPlay size={15} aria-hidden="true" />;
 
 function ActionTooltip({ label }: { label: string }) {
     return (
@@ -228,7 +217,7 @@ export default function Dashboard() {
         return (
             <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-6 text-center">
                 <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center mb-6 text-slate-400 border border-slate-700 shadow-xl">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                    <ShieldAlert size={32} aria-hidden="true" />
                 </div>
                 <h1 className="text-2xl font-bold mb-2 tracking-tight">Access Denied</h1>
                 <p className="text-slate-400 mb-8 max-w-sm text-sm">Please authenticate with Discord to manage your community servers.</p>
@@ -258,7 +247,7 @@ export default function Dashboard() {
                                 href="/management"
                                 className="hidden md:flex items-center gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-sky-900/20"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M9 3v18" /><path d="M3 9h18" /></svg>
+                                <LucideBriefcaseBusiness width="14" height="14" strokeWidth="2.5" />
                                 Management
                             </Link>
                         )}
@@ -270,7 +259,7 @@ export default function Dashboard() {
                             </button>
                         </div>
                         <div className="relative group">
-                            <img src={session?.user?.image || ''} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm transition-transform group-hover:scale-105" />
+                            <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm transition-transform group-hover:scale-105" />
                             <button
                                 type="button"
                                 onClick={handleSignOut}
@@ -335,7 +324,7 @@ export default function Dashboard() {
                                     <div className="relative">
                                         {guild.icon ? (
                                             <img
-                                                src={`https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png`}
+                                                src={getDiscordGuildIconProxyUrl(guild.id, guild.icon)}
                                                 alt={guild.name}
                                                 className="w-16 h-16 rounded-xl shadow-lg relative z-10 border border-white/5"
                                             />

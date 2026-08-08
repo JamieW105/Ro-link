@@ -10,7 +10,17 @@ import {
     listVisibleGuildsForDiscordSession,
     type VisibleDashboardGuild,
 } from './dashboardGuilds';
+import {
+    banUserForDgsuGameAttempt,
+    DGSU_BAN_ERROR_MESSAGE,
+    DGSU_BAN_ERROR_STATUS,
+    findDgsuBanForDiscordLogin,
+    findDgsuBanForRobloxGame,
+    findDgsuBanForTargets,
+    findDgsuBanForUser,
+} from './dgsuBans';
 import { findBlockedServer, getBlockedServerMessage } from './blockedServers';
+import { getDiscordOAuthConfig } from './discordOAuthConfig';
 import { supabase } from './supabase';
 
 const PLUGIN_SESSION_TTL_MS = 60 * 60 * 1000;
@@ -253,14 +263,16 @@ async function refreshDiscordTokenState(tokenState: DiscordTokenState) {
         throw new StudioPluginError('Discord sign-in expired. Sign in with Discord again to reconnect Studio.', 401);
     }
 
+    const discordOAuthConfig = getDiscordOAuthConfig();
+
     const response = await fetch('https://discord.com/api/oauth2/token', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-            client_id: process.env.DISCORD_CLIENT_ID || '',
-            client_secret: process.env.DISCORD_CLIENT_SECRET || '',
+            client_id: discordOAuthConfig.clientId,
+            client_secret: discordOAuthConfig.clientSecret,
             grant_type: 'refresh_token',
             refresh_token: tokenState.refreshToken,
         }),
@@ -506,6 +518,14 @@ export async function authorizeStudioPluginSession(sessionId: string, code: stri
         throw new StudioPluginError('Plugin session was not found or expired.', 404);
     }
 
+    const userBan = await findDgsuBanForDiscordLogin(client, {
+        discordUserId,
+        discordAccessToken: discordTokenState.accessToken,
+    });
+    if (userBan) {
+        throw new StudioPluginError(DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS);
+    }
+
     const pluginToken = existing.plugin_token || generatePluginToken();
     const tokenExpiresAt = new Date(Date.now() + PLUGIN_TOKEN_TTL_MS).toISOString();
 
@@ -603,6 +623,11 @@ export async function getStudioPluginServers(req: Request, session: StudioPlugin
         const client = getSupabaseAdmin();
         const baseUrl = buildPublicBaseUrl(req);
         const url = new URL(req.url);
+        const userBan = await findDgsuBanForUser(client, { discordUserId: session.discord_user_id || '' });
+        if (userBan) {
+            throw new StudioPluginError(DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS);
+        }
+
         const refreshList = url.searchParams.get('refresh') === '1' || url.searchParams.get('refresh') === 'true';
         const manageableGuilds = await resolveManageableGuildsForSession(session, refreshList ? 'refresh' : 'prefer_snapshot');
         const guildIds = manageableGuilds.map((guild) => guild.id);
@@ -702,6 +727,31 @@ export async function installStudioPluginServer(req: Request, session: StudioPlu
     const blocked = await findBlockedServer(client, input.serverId);
     if (blocked) {
         throw new StudioPluginError(getBlockedServerMessage(blocked), 403);
+    }
+
+    const userBan = await findDgsuBanForUser(client, { discordUserId: session.discord_user_id || '' });
+    if (userBan) {
+        throw new StudioPluginError(DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS);
+    }
+
+    const serverBan = await findDgsuBanForTargets(client, [{ type: 'DISCORD_SERVER', targetId: input.serverId }]);
+    if (serverBan) {
+        throw new StudioPluginError(DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS);
+    }
+
+    const gameBan = await findDgsuBanForRobloxGame(client, {
+        placeId: input.placeId,
+        universeId: input.universeId,
+    });
+    if (gameBan.ban) {
+        await banUserForDgsuGameAttempt(client, {
+            discordUserId: session.discord_user_id || '',
+            serverId: input.serverId,
+            placeId: input.placeId,
+            universeId: gameBan.universeId || input.universeId,
+            sourceBan: gameBan.ban,
+        });
+        throw new StudioPluginError(DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS);
     }
 
     const { data: existing } = await client

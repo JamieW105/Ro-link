@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { supabase } from "@/lib/supabase";
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function POST(
     req: NextRequest,
@@ -15,6 +16,23 @@ export async function POST(
     const { answers } = await req.json();
 
     try {
+        // A linked Roblox identity is required for every application, including
+        // direct API requests that do not pass through the form.
+        const { data: verifiedUser, error: verifiedUserError } = await getSupabaseAdmin()
+            .from('verified_users')
+            .select('roblox_id')
+            .eq('discord_id', userId)
+            .maybeSingle();
+
+        if (verifiedUserError) throw verifiedUserError;
+
+        if (!String(verifiedUser?.roblox_id || '').trim()) {
+            return NextResponse.json(
+                { error: 'Link your Roblox account before submitting an application.' },
+                { status: 403 },
+            );
+        }
+
         // 1. Check if already submitted
         const { data: existing } = await supabase
             .from('job_submissions')

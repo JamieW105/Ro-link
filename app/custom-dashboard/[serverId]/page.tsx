@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { getDiscordGuildIconProxyUrl } from '@/lib/discordMedia';
 import {
     DEFAULT_CUSTOM_DASHBOARD_THEME,
     getCustomDashboardTheme,
@@ -86,7 +87,7 @@ export default function CustomDashboardLandingPage() {
     const theme = getCustomDashboardTheme(dashboard?.theme || DEFAULT_CUSTOM_DASHBOARD_THEME);
     const iconUrl = dashboard?.metadata?.logoUrl
         || (dashboard?.icon
-        ? `https://cdn.discordapp.com/icons/${dashboard.id}/${dashboard.icon}.png`
+        ? getDiscordGuildIconProxyUrl(dashboard.id, dashboard.icon)
             : '/Media/Ro-LinkIcon.png');
     const description = dashboard?.metadata?.description
         || 'Use Discord to continue. Ro-Link will check whether your account has permission to access this dashboard.';

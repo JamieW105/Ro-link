@@ -1,5 +1,7 @@
 'use client';
 
+import { Info as LucideInfo, Radar as LucideRadar, Search as LucideSearch, Shield as LucideShield, User as LucideUser } from 'lucide-react';
+
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { canUseDashboardCommand, getAdminPanelCommandDefinition, MODERATION_COMMAND_IDS } from "@/lib/adminPanelCommands";
@@ -36,23 +38,23 @@ interface StaffNote {
 
 // SVGs
 const SearchIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+    <LucideSearch width="18" height="18" strokeWidth="2" />
 );
 
 const UserIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+    <LucideUser width="18" height="18" strokeWidth="2" />
 );
 
 const ShieldIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+    <LucideShield width="16" height="16" strokeWidth="2" />
 );
 
 const InfoIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+    <LucideInfo width="16" height="16" strokeWidth="2" />
 );
 
 const LiveIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" fill="currentColor" /></svg>
+    <LucideRadar width="12" height="12" strokeWidth="3" className="animate-pulse" />
 );
 
 function PlayerLookupFallback() {

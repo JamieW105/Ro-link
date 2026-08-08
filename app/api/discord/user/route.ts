@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getDiscordAvatarProxyUrl, getDiscordDefaultAvatarProxyUrl } from '@/lib/discordMedia';
 
 type DiscordUser = {
     id: string;
@@ -18,7 +19,7 @@ function getDefaultAvatarUrl(user: DiscordUser) {
         ? discriminator % 5
         : Number((BigInt(user.id) >> 22n) % 6n);
 
-    return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
+    return getDiscordDefaultAvatarProxyUrl(index);
 }
 
 export async function GET(req: Request) {
@@ -60,8 +61,7 @@ export async function GET(req: Request) {
 
         let avatarUrl = getDefaultAvatarUrl(user);
         if (user.avatar) {
-            const extension = user.avatar.startsWith('a_') ? 'gif' : 'png';
-            avatarUrl = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${extension}?size=512`;
+            avatarUrl = getDiscordAvatarProxyUrl(user.id, user.avatar, 512);
         }
 
         return NextResponse.json({

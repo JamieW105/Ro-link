@@ -271,7 +271,7 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: error.message }, { status: 500 });
             }
 
-            const module = normalizeServerCustomModule(data as Record<string, unknown>, false);
+            const customModule = normalizeServerCustomModule(data as Record<string, unknown>, false);
 
             return NextResponse.json({
                 success: true,

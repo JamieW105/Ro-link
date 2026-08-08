@@ -15,7 +15,7 @@ function summarizeKey(key: string | null) {
 
 export type ServerApiKeyDetails = {
     key: string | null;
-    source: 'x-api-key' | 'authorization-bearer' | 'authorization-raw' | 'query' | 'body' | 'missing';
+    source: 'x-api-key' | 'authorization-bearer' | 'authorization-raw' | 'missing';
     hasXApiKey: boolean;
     hasAuthorization: boolean;
     queryKeyNames: string[];
@@ -25,7 +25,7 @@ export type ServerApiKeyDetails = {
     } | null;
 };
 
-export function readServerApiKeyDetails(req: Request, bodyKey?: unknown): ServerApiKeyDetails {
+export function readServerApiKeyDetails(req: Request, _bodyKey?: unknown): ServerApiKeyDetails {
     const directApiKey = trimString(req.headers.get('x-api-key'));
     const authorizationHeader = trimString(req.headers.get('authorization'));
     const url = new URL(req.url);
@@ -66,31 +66,8 @@ export function readServerApiKeyDetails(req: Request, bodyKey?: unknown): Server
         };
     }
 
-    for (const name of queryCandidates) {
-        const queryKey = trimString(url.searchParams.get(name));
-        if (queryKey) {
-            return {
-                key: queryKey,
-                source: 'query',
-                hasXApiKey: false,
-                hasAuthorization: authorizationHeader !== '',
-                queryKeyNames,
-                summary: summarizeKey(queryKey),
-            };
-        }
-    }
-
-    const parsedBodyKey = trimString(bodyKey);
-    if (parsedBodyKey) {
-        return {
-            key: parsedBodyKey,
-            source: 'body',
-            hasXApiKey: false,
-            hasAuthorization: authorizationHeader !== '',
-            queryKeyNames,
-            summary: summarizeKey(parsedBodyKey),
-        };
-    }
+    // Never accept secrets in URLs or request bodies: both are commonly
+    // retained by browser, CDN, proxy, and application logs.
 
     return {
         key: null,

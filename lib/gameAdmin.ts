@@ -2,7 +2,8 @@ import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
 import { normalizeAdminPanelCommandList } from './adminPanelCommands';
-import { findServerByKey } from './serverAuth';
+import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from './dgsuBanConstants';
+import { findServerByKeyWithDiagnostics } from './serverAuth';
 import { supabase } from './supabase';
 
 export interface DashboardPermissions {
@@ -15,6 +16,9 @@ export interface DashboardPermissions {
     can_lookup: boolean;
     can_manage_settings: boolean;
     can_manage_reports: boolean;
+    can_view_logs: boolean;
+    can_view_runtime_logs: boolean;
+    can_manage_staff_notes: boolean;
     allowed_misc_cmds: string[];
     is_admin: boolean;
 }
@@ -58,6 +62,9 @@ interface DashboardRoleRecord {
     can_lookup?: boolean | null;
     can_manage_settings?: boolean | null;
     can_manage_reports?: boolean | null;
+    can_view_logs?: boolean | null;
+    can_view_runtime_logs?: boolean | null;
+    can_manage_staff_notes?: boolean | null;
     allowed_misc_cmds?: string[] | null;
 }
 
@@ -86,6 +93,20 @@ const rest = process.env.DISCORD_TOKEN
     ? new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN)
     : null;
 
+export class DgsuGameAdminAccessError extends Error {
+    status: number;
+
+    constructor() {
+        super(DGSU_BAN_ERROR_MESSAGE);
+        this.name = 'DgsuGameAdminAccessError';
+        this.status = DGSU_BAN_ERROR_STATUS;
+    }
+}
+
+export function isDgsuGameAdminAccessError(error: unknown): error is DgsuGameAdminAccessError {
+    return error instanceof DgsuGameAdminAccessError;
+}
+
 export function emptyDashboardPermissions(): DashboardPermissions {
     return {
         can_access_dashboard: false,
@@ -97,6 +118,9 @@ export function emptyDashboardPermissions(): DashboardPermissions {
         can_lookup: false,
         can_manage_settings: false,
         can_manage_reports: false,
+        can_view_logs: false,
+        can_view_runtime_logs: false,
+        can_manage_staff_notes: false,
         allowed_misc_cmds: [],
         is_admin: false,
     };
@@ -112,6 +136,9 @@ function hasPanelAccess(perms: DashboardPermissions) {
         || perms.can_lookup
         || perms.can_manage_settings
         || perms.can_manage_reports
+        || perms.can_view_logs
+        || perms.can_view_runtime_logs
+        || perms.can_manage_staff_notes
         || perms.allowed_misc_cmds.length > 0;
 }
 
@@ -166,6 +193,9 @@ export function aggregateDashboardPermissions(isAdmin: boolean, dashboardRoles: 
             can_lookup: true,
             can_manage_settings: true,
             can_manage_reports: true,
+            can_view_logs: true,
+            can_view_runtime_logs: true,
+            can_manage_staff_notes: true,
             allowed_misc_cmds: ['*'],
             is_admin: true,
         } satisfies DashboardPermissions;
@@ -183,6 +213,9 @@ export function aggregateDashboardPermissions(isAdmin: boolean, dashboardRoles: 
         if (role.can_lookup) finalPerms.can_lookup = true;
         if (role.can_manage_settings) finalPerms.can_manage_settings = true;
         if (role.can_manage_reports) finalPerms.can_manage_reports = true;
+        if (role.can_view_logs) finalPerms.can_view_logs = true;
+        if (role.can_view_runtime_logs) finalPerms.can_view_runtime_logs = true;
+        if (role.can_manage_staff_notes) finalPerms.can_manage_staff_notes = true;
 
         for (const command of normalizeAdminPanelCommandList(role.allowed_misc_cmds)) {
             if (!finalPerms.allowed_misc_cmds.includes(command)) {
@@ -219,14 +252,20 @@ export async function resolveDashboardUserPermissions(serverId: string, discordU
 }
 
 export async function getServerByApiKey(apiKey: string) {
-    const server = await findServerByKey<GameAdminServerRecord>(
+    const lookup = await findServerByKeyWithDiagnostics<GameAdminServerRecord>(
         'id, admin_cmds_enabled, misc_cmds_enabled, enforce_moderation_role_hierarchy, place_id, universe_id',
         apiKey,
     );
+    if (lookup.error === 'dgsu_ban') {
+        throw new DgsuGameAdminAccessError();
+    }
+
+    const server = lookup.server;
     if (!server) {
         console.warn('[RoLinkAPI][GameAdmin] Server key lookup returned no server', {
             keyPrefix: String(apiKey || '').slice(0, 6),
             keyLength: String(apiKey || '').length,
+            lookupError: lookup.error,
         });
     }
     return server;

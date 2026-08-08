@@ -31,7 +31,16 @@ export async function GET(req: Request) {
     const requestedModuleId = String(url.searchParams.get('moduleId') || url.searchParams.get('id') || '').trim();
     const requestedModuleSlug = String(url.searchParams.get('moduleSlug') || url.searchParams.get('slug') || '').trim();
 
-    const server = await getServerByApiKey(apiKey);
+    let server;
+    try {
+        server = await getServerByApiKey(apiKey);
+    } catch (error) {
+        if (isDgsuGameAdminAccessError(error)) {
+            return NextResponse.json({ error: DGSU_BAN_ERROR_MESSAGE, code: 'dgsu_ban', message: DGSU_BAN_ERROR_MESSAGE }, { status: DGSU_BAN_ERROR_STATUS });
+        }
+        throw error;
+    }
+
     if (!server) {
         return NextResponse.json({ error: 'Invalid API Key' }, { status: 403 });
     }

@@ -13,6 +13,14 @@ CREATE TABLE IF NOT EXISTS public.reports (
     resolved_at TIMESTAMP WITH TIME ZONE
 );
 
+-- Store a point-in-time Roblox presence snapshot for every report. These IDs
+-- are Roblox Job IDs; server_id above remains the Ro-Link Discord server ID.
+ALTER TABLE public.reports
+    ADD COLUMN IF NOT EXISTS reporter_live_server_id TEXT,
+    ADD COLUMN IF NOT EXISTS reporter_join_url TEXT,
+    ADD COLUMN IF NOT EXISTS reported_live_server_id TEXT,
+    ADD COLUMN IF NOT EXISTS reported_join_url TEXT;
+
 -- Add settings columns to servers table if not exist
 DO $$
 BEGIN

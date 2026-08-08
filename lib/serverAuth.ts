@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { findBlockedServer } from './blockedServers';
+import { findDgsuBanForTargets } from './dgsuBans';
 import { consumeRateLimit, getRateLimitBlock } from './rateLimit';
 
 export type ServerKeyLookupResult<T> = {
@@ -23,17 +24,43 @@ function fingerprintKey(value: string) {
     return (hash >>> 0).toString(36);
 }
 
+function ensureSelectColumns(selectClause: string, requiredColumns: string[]) {
+    const trimmedSelect = selectClause.trim();
+    if (trimmedSelect === '*') {
+        return selectClause;
+    }
+
+    const existingColumns = new Set(
+        selectClause
+            .split(',')
+            .map((column) => column.trim())
+            .filter(Boolean),
+    );
+    const missingColumns = requiredColumns.filter((column) => !existingColumns.has(column));
+    return missingColumns.length > 0
+        ? `${missingColumns.join(', ')}, ${selectClause}`
+        : selectClause;
+}
+
+async function findDgsuBanForServerRecord(serverRecord: { id?: unknown; place_id?: unknown; universe_id?: unknown }) {
+    const serverId = String(serverRecord.id ?? '').trim();
+    const placeId = String(serverRecord.place_id ?? '').trim();
+    const universeId = String(serverRecord.universe_id ?? '').trim();
+
+    return findDgsuBanForTargets(supabase, [
+        { type: 'DISCORD_SERVER', targetId: serverId },
+        { type: 'ROBLOX_GAME', targetId: placeId },
+        { type: 'ROBLOX_GAME', targetId: universeId },
+    ]);
+}
+
 export async function findServerByKeyWithDiagnostics<T>(
     selectClause: string,
     rawKey: string,
 ): Promise<ServerKeyLookupResult<T>> {
     const apiKey = String(rawKey ?? '').trim();
     const failedKeyRateLimitKey = apiKey ? `server-auth:failed-key:${fingerprintKey(apiKey)}` : null;
-    const selectWithId = selectClause
-        .split(',')
-        .some((column) => column.trim() === 'id')
-        ? selectClause
-        : `id, ${selectClause}`;
+    const selectWithId = ensureSelectColumns(selectClause, ['id', 'place_id', 'universe_id']);
 
     if (!apiKey) {
         return {
@@ -70,6 +97,14 @@ export async function findServerByKeyWithDiagnostics<T>(
             };
         }
 
+        if (await findDgsuBanForServerRecord(primaryLookup.data)) {
+            return {
+                server: null,
+                matchedBy: 'api_key',
+                error: 'dgsu_ban',
+            };
+        }
+
         return {
             server: primaryLookup.data,
             matchedBy: 'api_key',
@@ -97,6 +132,14 @@ export async function findServerByKeyWithDiagnostics<T>(
                 server: null,
                 matchedBy: 'open_cloud_key',
                 error: 'server_blocked',
+            };
+        }
+
+        if (await findDgsuBanForServerRecord(fallbackLookup.data)) {
+            return {
+                server: null,
+                matchedBy: 'open_cloud_key',
+                error: 'dgsu_ban',
             };
         }
 

@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS public.dashboard_roles (
     can_lookup BOOLEAN DEFAULT FALSE,
     can_manage_settings BOOLEAN DEFAULT FALSE,
     can_manage_reports BOOLEAN DEFAULT FALSE,
+    can_view_logs BOOLEAN DEFAULT FALSE,
+    can_view_runtime_logs BOOLEAN DEFAULT FALSE,
+    can_manage_staff_notes BOOLEAN DEFAULT FALSE,
     
     -- Roblox Admin Panel Commands
     allowed_misc_cmds TEXT[] DEFAULT '{}', -- Stores in-game admin command ids, e.g. ['KICK', 'HEAL'] or ['*'] for all
@@ -30,3 +33,8 @@ CREATE INDEX IF NOT EXISTS idx_dashboard_roles_server ON public.dashboard_roles(
 
 ALTER TABLE public.dashboard_roles
     ADD COLUMN IF NOT EXISTS can_access_live_panel BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE public.dashboard_roles
+    ADD COLUMN IF NOT EXISTS can_view_logs BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS can_view_runtime_logs BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS can_manage_staff_notes BOOLEAN DEFAULT FALSE;

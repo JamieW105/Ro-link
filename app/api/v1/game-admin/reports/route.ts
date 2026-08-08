@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 
-import { getServerByApiKey } from '@/lib/gameAdmin';
+import { getServerByApiKey, isDgsuGameAdminAccessError } from '@/lib/gameAdmin';
+import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
+import { resolveReportServerContext } from '@/lib/reportServerContext';
 import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -27,7 +29,21 @@ async function requireReportApiAccess(req: Request, bodyKey?: unknown) {
         };
     }
 
-    const server = await getServerByApiKey(auth.key);
+    let server;
+    try {
+        server = await getServerByApiKey(auth.key);
+    } catch (error) {
+        if (isDgsuGameAdminAccessError(error)) {
+            return {
+                error: NextResponse.json(
+                    { error: DGSU_BAN_ERROR_MESSAGE, code: 'dgsu_ban', message: DGSU_BAN_ERROR_MESSAGE },
+                    { status: DGSU_BAN_ERROR_STATUS },
+                ),
+            };
+        }
+        throw error;
+    }
+
     if (!server) {
         return { error: NextResponse.json({ error: 'Invalid API Key' }, { status: 403 }) };
     }
@@ -98,12 +114,22 @@ export async function POST(req: Request) {
 
     const reporterDiscordId = trimString(body.reporterDiscordId ?? body.reporter_discord_id ?? body.discordId, 120);
     const reporterRobloxUsername = trimString(body.reporterRobloxUsername ?? body.reporter_roblox_username, 120) || null;
+    const reporterLiveServerId = trimString(body.reporterLiveServerId ?? body.reporter_live_server_id ?? body.jobId ?? body.job_id, 200);
     const reportedRobloxUsername = trimString(body.reportedRobloxUsername ?? body.reported_roblox_username ?? body.target, 120);
     const reason = trimString(body.reason ?? body.message, 2000);
 
     if (!reportedRobloxUsername || !reason) {
         return NextResponse.json({ error: 'reportedRobloxUsername and reason are required.' }, { status: 400 });
     }
+
+    const liveServerContext = await resolveReportServerContext({
+        serverId: access.server.id,
+        placeId: access.server.place_id,
+        reporterDiscordId,
+        reporterRobloxUsername,
+        reporterLiveServerId,
+        reportedRobloxUsername,
+    });
 
     const { data, error } = await getSupabaseAdmin()
         .from('reports')
@@ -114,6 +140,7 @@ export async function POST(req: Request) {
             reported_roblox_username: reportedRobloxUsername,
             reason,
             status: 'PENDING',
+            ...liveServerContext,
         })
         .select('*')
         .single();

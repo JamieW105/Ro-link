@@ -4,6 +4,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { canAccessDashboardOrLivePanel, canManageSettings, requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { findBlockedServer, getBlockedServerMessage } from '@/lib/blockedServers';
+import {
+    banUserForDgsuGameAttempt,
+    DGSU_BAN_ERROR_MESSAGE,
+    DGSU_BAN_ERROR_STATUS,
+    findDgsuBanForRobloxGame,
+} from '@/lib/dgsuBans';
 
 const READ_COLUMNS = [
     'id',
@@ -93,6 +99,23 @@ export async function POST(req: NextRequest) {
     };
 
     const client = getSupabaseAdmin();
+    const gameBan = await findDgsuBanForRobloxGame(client, {
+        placeId: row.place_id,
+        universeId: row.universe_id,
+    });
+
+    if (gameBan.ban) {
+        await banUserForDgsuGameAttempt(client, {
+            discordUserId: access.userId,
+            serverId,
+            placeId: row.place_id,
+            universeId: gameBan.universeId || row.universe_id,
+            sourceBan: gameBan.ban,
+        });
+
+        return NextResponse.json({ error: DGSU_BAN_ERROR_MESSAGE }, { status: DGSU_BAN_ERROR_STATUS });
+    }
+
     const { data, error } = await client
         .from('servers')
         .upsert(row)

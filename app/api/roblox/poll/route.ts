@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { findServerByKeyWithDiagnostics } from '@/lib/serverAuth';
+import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
 import { normalizeModulePanelCommandDefinition } from '@/lib/modulePanelCommands';
 import type { AdminPanelCommandDefinition } from '@/lib/adminPanelCommands';
+import { buildPlayerPresenceEvents, PLAYER_PRESENCE_RETENTION_MS } from '@/lib/playerPresence';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 
@@ -14,9 +16,15 @@ interface QueuedCommand {
 
 let supportsModulePanelCommandsColumn = true;
 let modulePanelCommandsColumnRetryAt = 0;
+let supportsPlayerPresenceEventsTable = true;
+let playerPresenceEventsTableRetryAt = 0;
 
 function trimString(value: unknown) {
     return String(value ?? '').trim();
+}
+
+function createPollTraceId() {
+    return `poll-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function getCommandTargetJobId(command: QueuedCommand) {
@@ -34,6 +42,172 @@ function normalizeModulePanelCommandPayload(value: unknown) {
         .map(normalizeModulePanelCommandDefinition)
         .filter((command): command is AdminPanelCommandDefinition => Boolean(command))
         .slice(0, 100);
+}
+
+interface LiveServerRoster {
+    id?: unknown;
+    players?: unknown;
+}
+
+function isMissingPlayerPresenceEventsTable(error: { code?: string } | null) {
+    return error?.code === '42P01' || error?.code === 'PGRST205';
+}
+
+async function getPreviousLiveServerPlayers(
+    client: ReturnType<typeof getSupabaseAdmin>,
+    jobId: string,
+) {
+    const { data, error } = await client
+        .from('live_servers')
+        .select('players')
+        .eq('id', jobId)
+        .maybeSingle();
+
+    if (error) {
+        console.warn('[RoLinkAPI][Poll] Could not load the previous player roster for presence tracking.', {
+            jobId,
+            code: error.code,
+            message: error.message,
+        });
+        return [];
+    }
+
+    return data?.players || [];
+}
+
+async function recordPlayerPresenceEvents({
+    client,
+    previousPlayers,
+    currentPlayers,
+    serverId,
+    jobId,
+}: {
+    client: ReturnType<typeof getSupabaseAdmin>;
+    previousPlayers: unknown;
+    currentPlayers: unknown;
+    serverId: string;
+    jobId: string;
+}) {
+    const events = buildPlayerPresenceEvents({
+        previousPlayers,
+        currentPlayers,
+        serverId,
+        jobId,
+    });
+
+    if (events.length === 0) {
+        return;
+    }
+
+    const now = Date.now();
+    if (!supportsPlayerPresenceEventsTable && now < playerPresenceEventsTableRetryAt) {
+        return;
+    }
+
+    const { error } = await client
+        .from('player_presence_events')
+        .insert(events);
+
+    if (!error) {
+        supportsPlayerPresenceEventsTable = true;
+        playerPresenceEventsTableRetryAt = 0;
+        return;
+    }
+
+    if (isMissingPlayerPresenceEventsTable(error)) {
+        supportsPlayerPresenceEventsTable = false;
+        playerPresenceEventsTableRetryAt = now + 60 * 1000;
+        console.warn('[RoLinkAPI][Poll] player_presence_events is missing; player join/leave history is disabled until the schema is migrated.', {
+            code: error.code,
+            message: error.message,
+            migration: 'Run supabase_schema_player_presence.sql.',
+        });
+        return;
+    }
+
+    console.warn('[RoLinkAPI][Poll] Failed to store player presence events.', {
+        code: error.code,
+        message: error.message,
+    });
+}
+
+async function cleanupPlayerPresenceEvents(client: ReturnType<typeof getSupabaseAdmin>, serverId: string) {
+    const now = Date.now();
+    if (!supportsPlayerPresenceEventsTable && now < playerPresenceEventsTableRetryAt) {
+        return;
+    }
+
+    const expiry = new Date(now - PLAYER_PRESENCE_RETENTION_MS).toISOString();
+    const { error } = await client
+        .from('player_presence_events')
+        .delete()
+        .eq('server_id', serverId)
+        .lt('occurred_at', expiry);
+
+    if (!error) {
+        supportsPlayerPresenceEventsTable = true;
+        playerPresenceEventsTableRetryAt = 0;
+        return;
+    }
+
+    if (isMissingPlayerPresenceEventsTable(error)) {
+        supportsPlayerPresenceEventsTable = false;
+        playerPresenceEventsTableRetryAt = now + 60 * 1000;
+        return;
+    }
+
+    console.warn('[RoLinkAPI][Poll] Failed to clean expired player presence events.', {
+        code: error.code,
+        message: error.message,
+    });
+}
+
+async function removeStaleLiveServers(
+    client: ReturnType<typeof getSupabaseAdmin>,
+    serverId: string,
+    staleTime: string,
+) {
+    const { data: staleServers, error: staleQueryError } = await client
+        .from('live_servers')
+        .select('id, players')
+        .eq('server_id', serverId)
+        .lt('updated_at', staleTime);
+
+    if (staleQueryError) {
+        throw staleQueryError;
+    }
+
+    const staleServerRosters = (staleServers || []) as LiveServerRoster[];
+    const staleIds = staleServerRosters
+        .map((liveServer) => trimString(liveServer.id))
+        .filter(Boolean);
+
+    if (staleIds.length === 0) {
+        return;
+    }
+
+    const { data: deletedServers, error: deleteError } = await client
+        .from('live_servers')
+        .delete()
+        .eq('server_id', serverId)
+        .lt('updated_at', staleTime)
+        .in('id', staleIds)
+        .select('id');
+
+    if (deleteError) {
+        throw deleteError;
+    }
+
+    const deletedIds = new Set(((deletedServers || []) as LiveServerRoster[]).map((liveServer) => trimString(liveServer.id)));
+    await Promise.all(staleServerRosters
+        .filter((liveServer) => deletedIds.has(trimString(liveServer.id)))
+        .map((liveServer) => recordPlayerPresenceEvents({
+            client,
+            previousPlayers: liveServer.players,
+            currentPlayers: [],
+            serverId,
+            jobId: trimString(liveServer.id),
+        })));
 }
 
 async function upsertLiveServer({
@@ -120,14 +294,25 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+    const traceId = createPollTraceId();
+    const startedAt = Date.now();
     try {
         const body = await req.json().catch(() => ({}));
         const { jobId, playerCount, players, status } = body;
         const modulePanelCommands = normalizeModulePanelCommandPayload(body.modulePanelCommands ?? body.module_panel_commands);
         const auth = readServerApiKeyDetails(req, body.apiKey ?? body.key ?? body.serverKey ?? body.securityKey);
         const authDebug = describeServerApiKeyDetails(auth);
+        console.info('[RoLinkAPI][Poll] Request received', {
+            traceId,
+            jobId: trimString(jobId) || null,
+            status: trimString(status) || 'ACTIVE',
+            playerCount: Number.isFinite(Number(playerCount)) ? Number(playerCount) : null,
+            rosterCount: Array.isArray(players) ? players.length : null,
+            moduleCommandCount: modulePanelCommands.length,
+            auth: authDebug,
+        });
         if (!auth.key) {
-            console.warn('[RoLinkAPI][Poll] Missing API key', { auth: authDebug });
+            console.warn('[RoLinkAPI][Poll] Missing API key', { traceId, auth: authDebug });
             return NextResponse.json({
                 error: 'Missing API Key',
                 code: 'missing_api_key',
@@ -150,9 +335,23 @@ export async function POST(req: Request) {
         const server = lookup.server;
         if (!server) {
             console.warn('[RoLinkAPI][Poll] Invalid API key', {
+                traceId,
                 auth: authDebug,
                 lookupError: lookup.error,
             });
+            if (lookup.error === 'dgsu_ban') {
+                return NextResponse.json({
+                    error: DGSU_BAN_ERROR_MESSAGE,
+                    code: 'dgsu_ban',
+                    message: DGSU_BAN_ERROR_MESSAGE,
+                    auth: authDebug,
+                    lookup: {
+                        matchedBy: lookup.matchedBy,
+                        error: lookup.error,
+                    },
+                }, { status: DGSU_BAN_ERROR_STATUS });
+            }
+
             return NextResponse.json({
                 error: 'Invalid API Key',
                 code: 'invalid_api_key',
@@ -167,6 +366,7 @@ export async function POST(req: Request) {
 
         if (lookup.matchedBy !== 'api_key') {
             console.warn('[RoLinkAPI][Poll] Accepted fallback server key', {
+                traceId,
                 auth: authDebug,
                 matchedBy: lookup.matchedBy,
                 serverId: server.id,
@@ -174,9 +374,15 @@ export async function POST(req: Request) {
         }
 
         const db = getSupabaseAdmin();
+        console.info('[RoLinkAPI][Poll] Server key accepted', {
+            traceId,
+            serverId: server.id,
+            matchedBy: lookup.matchedBy,
+        });
 
         // 2. Handle Shutdown (Explicit via status or implicit via 0 players)
         if (jobId) {
+            const previousPlayers = await getPreviousLiveServerPlayers(db, jobId);
             if (status === 'SHUTDOWN' || playerCount === 0) {
                 // Immediate removal
                 const { error: deleteError } = await db
@@ -186,7 +392,20 @@ export async function POST(req: Request) {
 
                 if (deleteError) throw deleteError;
 
-                console.log(`[POLL] Server ${jobId} removed (Status: ${status || '0 Players'}).`);
+                await recordPlayerPresenceEvents({
+                    client: db,
+                    previousPlayers,
+                    currentPlayers: [],
+                    serverId: server.id,
+                    jobId,
+                });
+
+                console.info('[RoLinkAPI][Poll] Live server removed', {
+                    traceId,
+                    serverId: server.id,
+                    jobId,
+                    status: status || '0 Players',
+                });
             } else {
                 // Normal update
                 await upsertLiveServer({
@@ -197,17 +416,28 @@ export async function POST(req: Request) {
                     players,
                     modulePanelCommands,
                 });
+
+                await recordPlayerPresenceEvents({
+                    client: db,
+                    previousPlayers,
+                    currentPlayers: players,
+                    serverId: server.id,
+                    jobId,
+                });
+
+                console.info('[RoLinkAPI][Poll] Live server heartbeat stored', {
+                    traceId,
+                    serverId: server.id,
+                    jobId,
+                    playerCount: Number(playerCount) || 0,
+                    rosterCount: Array.isArray(players) ? players.length : 0,
+                });
             }
 
             // Periodic Cleanup: Remove any servers that haven't polled in 2 minutes
             const staleTime = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-            const { error: cleanupError } = await db
-                .from('live_servers')
-                .delete()
-                .eq('server_id', server.id)
-                .lt('updated_at', staleTime);
-
-            if (cleanupError) throw cleanupError;
+            await removeStaleLiveServers(db, server.id, staleTime);
+            await cleanupPlayerPresenceEvents(db, server.id);
         }
 
         // 3. Fetch Pending Commands
@@ -236,6 +466,14 @@ export async function POST(req: Request) {
             if (updateError) throw updateError;
         }
 
+        console.info('[RoLinkAPI][Poll] Request complete', {
+            traceId,
+            serverId: server.id,
+            jobId: trimString(jobId) || null,
+            commandCount: relevantCommands.length,
+            durationMs: Date.now() - startedAt,
+        });
+
         return NextResponse.json({
             commands: relevantCommands,
             settings: {
@@ -246,7 +484,11 @@ export async function POST(req: Request) {
         });
 
     } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        console.error('[RoLinkAPI][Poll] Request failed', {
+            traceId,
+            durationMs: Date.now() - startedAt,
+            error: error instanceof Error ? error.message : String(error),
+        });
+        return NextResponse.json({ error: 'Internal Server Error', traceId }, { status: 500 });
     }
 }

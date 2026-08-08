@@ -1,0 +1,107 @@
+▲ Next.js 16.2.10 (Turbopack)
+- Local:         http://localhost:4178
+- Network:       http://192.168.56.1:4178
+✓ Ready in 3.1s
+
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:4178". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET / 200 in 5.4s (next.js: 1391ms, proxy.ts: 1529ms, application-code: 2.5s)
+ GET / 200 in 232ms (next.js: 19ms, proxy.ts: 25ms, application-code: 188ms)
+⚠ Blocked cross-origin request to Next.js dev resource /_next/webpack-hmr from "127.0.0.1".
+Cross-origin access to Next.js dev resources is blocked by default for safety.
+
+To allow this host in development, add it to "allowedDevOrigins" in next.config.js and restart the dev server:
+
+// next.config.js
+module.exports = {
+  allowedDevOrigins: ['127.0.0.1'],
+}
+
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+○ Compiling /features ...
+ GET /features 200 in 4.0s (next.js: 3.6s, proxy.ts: 19ms, application-code: 432ms)
+ GET /features 200 in 301ms (next.js: 17ms, proxy.ts: 18ms, application-code: 266ms)
+ GET /features 200 in 1399ms (next.js: 129ms, proxy.ts: 33ms, application-code: 1237ms)
+ GET /report 200 in 1726ms (next.js: 597ms, proxy.ts: 18ms, application-code: 1112ms)
+○ Compiling /careers ...
+ GET /careers 200 in 16.1s (next.js: 15.4s, proxy.ts: 12ms, application-code: 700ms)
+○ Compiling /posts ...
+ GET /posts 200 in 4.8s (next.js: 4.2s, proxy.ts: 32ms, application-code: 561ms)
+✓ Finished filesystem cache database compaction in 10.7s
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:4178". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /features 200 in 3.1s (next.js: 884ms, proxy.ts: 819ms, application-code: 1392ms)
+ GET /reports 404 in 2.4s (next.js: 715ms, proxy.ts: 32ms, application-code: 1663ms)
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:4178". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /report 200 in 1918ms (next.js: 374ms, proxy.ts: 14ms, application-code: 1530ms)
+[next-auth][warn][NEXTAUTH_URL] 
+https://next-auth.js.org/warnings#nextauth_url
+[next-auth][warn][NO_SECRET] 
+https://next-auth.js.org/warnings#no_secret
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+ GET /api/auth/session 200 in 12.9s (next.js: 12.5s, proxy.ts: 14ms, application-code: 419ms)
+✓ Compiled in 3.2s
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:4178". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /features 200 in 1382ms (next.js: 612ms, proxy.ts: 421ms, application-code: 349ms)
+ GET /docs 200 in 1288ms (next.js: 302ms, proxy.ts: 13ms, application-code: 973ms)
+[next-auth][warn][NEXTAUTH_URL] 
+https://next-auth.js.org/warnings#nextauth_url
+[next-auth][warn][NO_SECRET] 
+https://next-auth.js.org/warnings#no_secret
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+ GET /api/auth/session 200 in 778ms (next.js: 469ms, proxy.ts: 178ms, application-code: 131ms)
+ GET /docs 200 in 2.1s (next.js: 50ms, proxy.ts: 48ms, application-code: 2.0s)
+ GET /features 200 in 1688ms (next.js: 95ms, proxy.ts: 87ms, application-code: 1506ms)
+ GET /api/auth/session 200 in 64ms (next.js: 19ms, proxy.ts: 14ms, application-code: 30ms)
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:4178". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /report 200 in 1450ms (next.js: 500ms, proxy.ts: 12ms, application-code: 938ms)
+ GET /api/auth/session 200 in 85ms (next.js: 29ms, proxy.ts: 11ms, application-code: 45ms)
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:4178". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /posts 200 in 2.7s (next.js: 1105ms, proxy.ts: 13ms, application-code: 1585ms)
+ GET /api/auth/session 200 in 323ms (next.js: 42ms, proxy.ts: 18ms, application-code: 263ms)
+ GET /api/posts 500 in 410ms (next.js: 256ms, proxy.ts: 18ms, application-code: 136ms)
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:4178". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /careers 200 in 1690ms (next.js: 461ms, proxy.ts: 12ms, application-code: 1218ms)
+ GET /api/auth/session 200 in 126ms (next.js: 54ms, proxy.ts: 28ms, application-code: 44ms)
+ GET /api/careers 500 in 1683ms (next.js: 1603ms, proxy.ts: 28ms, application-code: 52ms)
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:4178". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET / 200 in 1910ms (next.js: 538ms, proxy.ts: 11ms, application-code: 1361ms)
+ GET /api/custom-dashboard/resolve?hostname=localhost 200 in 222ms (next.js: 147ms, proxy.ts: 14ms, application-code: 61ms)
+ GET /api/auth/session 200 in 128ms (next.js: 71ms, proxy.ts: 35ms, application-code: 23ms)
+ GET / 200 in 410ms (next.js: 14ms, proxy.ts: 12ms, application-code: 385ms)
+ GET /api/custom-dashboard/resolve?hostname=localhost 200 in 100ms (next.js: 46ms, proxy.ts: 19ms, application-code: 34ms)
+ GET /api/auth/session 200 in 176ms (next.js: 68ms, proxy.ts: 82ms, application-code: 26ms)
+ GET /features 200 in 914ms (next.js: 30ms, proxy.ts: 15ms, application-code: 869ms)
+ GET /api/auth/session 200 in 487ms (next.js: 212ms, proxy.ts: 69ms, application-code: 205ms)
+ GET /report 200 in 748ms (next.js: 17ms, proxy.ts: 13ms, application-code: 717ms)
+ GET /api/auth/session 200 in 118ms (next.js: 61ms, proxy.ts: 16ms, application-code: 41ms)
+ GET /careers 200 in 462ms (next.js: 15ms, proxy.ts: 15ms, application-code: 432ms)
+ GET /docs 200 in 302ms (next.js: 14ms, proxy.ts: 16ms, application-code: 271ms)
+ POST /api/auth/_log 200 in 260ms (next.js: 140ms, proxy.ts: 44ms, application-code: 76ms)
+ GET /posts 200 in 793ms (next.js: 74ms, proxy.ts: 27ms, application-code: 692ms)
+ GET /api/posts 500 in 340ms (next.js: 43ms, proxy.ts: 25ms, application-code: 272ms)
+ GET /api/auth/session 200 in 516ms (next.js: 120ms, proxy.ts: 29ms, application-code: 367ms)
+ GET /docs 200 in 424ms (next.js: 23ms, proxy.ts: 12ms, application-code: 389ms)
+ GET /api/auth/session 200 in 97ms (next.js: 43ms, proxy.ts: 11ms, application-code: 43ms)
+ GET /docs 200 in 574ms (next.js: 13ms, proxy.ts: 16ms, application-code: 545ms)
+ GET /api/auth/session 200 in 85ms (next.js: 29ms, proxy.ts: 14ms, application-code: 42ms)
+ GET /docs 200 in 287ms (next.js: 11ms, proxy.ts: 13ms, application-code: 263ms)
+✓ Compiled in 5.8s
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:4178". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+ GET /docs 200 in 1693ms (next.js: 841ms, proxy.ts: 479ms, application-code: 373ms)
+ GET /docs 200 in 1779ms (next.js: 69ms, proxy.ts: 27ms, application-code: 1683ms)
+[next-auth][warn][NEXTAUTH_URL] 
+https://next-auth.js.org/warnings#nextauth_url
+[next-auth][warn][NO_SECRET] 
+https://next-auth.js.org/warnings#no_secret
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+ GET /api/auth/session 200 in 882ms (next.js: 456ms, proxy.ts: 12ms, application-code: 414ms)
+✓ Compiled in 3.1s
+ GET / 200 in 1016ms (next.js: 105ms, proxy.ts: 18ms, application-code: 893ms)
+ GET /api/custom-dashboard/resolve?hostname=localhost 200 in 317ms (next.js: 230ms, proxy.ts: 19ms, application-code: 68ms)
+ GET /api/auth/session 200 in 185ms (next.js: 124ms, proxy.ts: 27ms, application-code: 34ms)
+ GET /docs 200 in 404ms (next.js: 16ms, proxy.ts: 10ms, application-code: 378ms)
+ GET / 200 in 248ms (next.js: 19ms, proxy.ts: 17ms, application-code: 211ms)
+ GET /features 200 in 719ms (next.js: 67ms, proxy.ts: 12ms, application-code: 639ms)
+ GET /posts 200 in 303ms (next.js: 60ms, proxy.ts: 13ms, application-code: 230ms)

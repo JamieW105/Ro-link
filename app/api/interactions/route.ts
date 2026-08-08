@@ -3,17 +3,31 @@ import nacl from 'tweetnacl';
 import { supabase } from '@/lib/supabase';
 import { sendRobloxMessage } from '@/lib/roblox';
 import { findBlockedServer, getBlockedServerMessage } from '@/lib/blockedServers';
+import {
+    banUserForDgsuGameAttempt,
+    DGSU_BAN_ERROR_MESSAGE,
+    findDgsuBanForRobloxGame,
+    findDgsuBanForTargets,
+    findDgsuBanForUser,
+} from '@/lib/dgsuBans';
 import { logAction } from '@/lib/logger';
 import { buildDeliveryArgs, resolveDeliveryTargets, type CommandArgs } from '@/lib/commandDelivery';
 import { findLivePlayer, normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { resolveReportServerContext } from '@/lib/reportServerContext';
 import {
     buildStaffActionModerationComponents,
     buildStaffBlockServerComponents,
     parseStaffBlockServerCustomId,
     parseStaffVoidModerationCustomId,
 } from '@/lib/staffActionComponents';
+import {
+    markPublicReportThreadModerated,
+    parsePublicReportActionCustomId,
+    type PublicReportAction,
+    type PublicReportRecord,
+} from '@/lib/publicReportForumNotifications';
 import { closeStaffActionForumThread } from '@/lib/staffForumNotifications';
 import { fetchStaffModerationAction, voidStaffModerationAction } from '@/lib/staffModerationActions';
 import discordCommands from '@/lib/discordCommands.json';
@@ -44,6 +58,11 @@ async function verifyDiscordRequest(request: Request) {
 
     if (!signature || !timestamp || !publicKey) {
         console.error('Missing: ', { signature: !!signature, timestamp: !!timestamp, key: !!publicKey });
+        return { isValid: false };
+    }
+
+    const timestampSeconds = Number(timestamp);
+    if (!Number.isFinite(timestampSeconds) || Math.abs(Date.now() - timestampSeconds * 1000) > 5 * 60 * 1000) {
         return { isValid: false };
     }
 
@@ -1813,6 +1832,124 @@ function buildReportChannelComponents(reportId: string, target: string, mode: Re
     }];
 }
 
+const PUBLIC_REPORT_ACTION_MODAL_PREFIX = 'public_report_action_modal';
+
+function buildPublicReportActionModalCustomId(action: PublicReportAction, reportId: string) {
+    return [
+        PUBLIC_REPORT_ACTION_MODAL_PREFIX,
+        action,
+        encodeURIComponent(String(reportId ?? '').trim()),
+    ].join('|');
+}
+
+function parsePublicReportActionModalCustomId(customId: string) {
+    const [prefix, action = '', encodedReportId = ''] = String(customId ?? '').split('|');
+    if (prefix !== PUBLIC_REPORT_ACTION_MODAL_PREFIX) return null;
+    if (action !== 'ban' && action !== 'void') return null;
+
+    const reportId = decodeURIComponent(encodedReportId).trim();
+    if (!reportId) return null;
+
+    return { action, reportId } satisfies { action: PublicReportAction; reportId: string };
+}
+
+function publicReportActionLabel(action: PublicReportAction) {
+    return action === 'ban' ? 'Ban Target' : 'Void Report';
+}
+
+async function canRunPublicReportAction(userId: string, action: PublicReportAction) {
+    if (action === 'ban') {
+        return await hasGlobalManagementPermission(userId, 'BLOCK_SERVERS');
+    }
+
+    return await hasGlobalManagementPermission(userId, 'MANAGE_SERVERS')
+        || await hasGlobalManagementPermission(userId, 'BLOCK_SERVERS');
+}
+
+async function applyPublicReportAction(input: {
+    action: PublicReportAction;
+    reportId: string;
+    reason: string;
+    moderatorDiscordId: string;
+    fallbackThreadId?: string | null;
+}) {
+    const client = getSupabaseAdmin();
+    const reason = String(input.reason ?? '').trim().slice(0, 2000);
+    if (reason.length < 3) {
+        throw new Error('A reason is required.');
+    }
+
+    const { data: reportData, error: fetchError } = await client
+        .from('public_reports')
+        .select('*')
+        .eq('id', input.reportId)
+        .maybeSingle();
+
+    if (fetchError) {
+        throw new Error(fetchError.message);
+    }
+
+    if (!reportData) {
+        throw new Error('Public report not found.');
+    }
+
+    const report = reportData as PublicReportRecord & { status?: string | null };
+    const currentStatus = String(report.status ?? 'OPEN').trim().toUpperCase();
+    if (currentStatus === 'RESOLVED' || currentStatus === 'DISMISSED') {
+        throw new Error('This public report has already been moderated.');
+    }
+
+    const now = new Date().toISOString();
+    if (input.action === 'ban') {
+        const { error: banError } = await client
+            .from('dgsu_bans')
+            .upsert({
+                target_type: report.target_type,
+                target_id: report.target_id,
+                reason,
+                source_public_report_id: report.id,
+                banned_by: input.moderatorDiscordId,
+                metadata: {
+                    source: 'public_report_quick_action',
+                    publicReportId: report.id,
+                },
+                updated_at: now,
+            }, { onConflict: 'target_type,target_id' });
+
+        if (banError) {
+            throw new Error(banError.message);
+        }
+    }
+
+    const { data: updatedReport, error: updateError } = await client
+        .from('public_reports')
+        .update({
+            status: input.action === 'ban' ? 'RESOLVED' : 'DISMISSED',
+            moderation_action: input.action === 'ban' ? 'BAN' : 'VOID',
+            moderation_reason: reason,
+            moderated_by: input.moderatorDiscordId,
+            moderated_at: now,
+            updated_at: now,
+        })
+        .eq('id', report.id)
+        .select('*')
+        .single();
+
+    if (updateError) {
+        throw new Error(updateError.message);
+    }
+
+    const threadId = String(report.discord_thread_id || input.fallbackThreadId || '').trim();
+    if (threadId) {
+        await markPublicReportThreadModerated({
+            threadId,
+            targetType: report.target_type,
+        });
+    }
+
+    return updatedReport as PublicReportRecord & { status?: string | null };
+}
+
 async function findPendingReportIdByTarget(serverId: string, target: string) {
     const client = getSupabaseAdmin();
     const { data, error } = await client
@@ -1900,6 +2037,16 @@ export async function POST(req: Request) {
         const userId = user?.id ?? '';
         const userTag = user ? `${user.username}${user.discriminator !== '0' ? '#' + user.discriminator : ''}` : 'Unknown';
         const logActor = userId ? `<@${userId}>` : userTag;
+
+        if (userId) {
+            const dgsuUserBan = await findDgsuBanForUser(supabase, { discordUserId: userId });
+            if (dgsuUserBan) {
+                return NextResponse.json({
+                    type: 4,
+                    data: { content: DGSU_BAN_ERROR_MESSAGE, flags: 64 }
+                });
+            }
+        }
 
         // Helper to check permissions against RBAC
         async function checkPermission(permissionKey: string) {
@@ -2027,6 +2174,14 @@ export async function POST(req: Request) {
                 }
 
                 // Check if already setup
+                const serverBan = await findDgsuBanForTargets(supabase, [{ type: 'DISCORD_SERVER', targetId: guild_id }]);
+                if (serverBan) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: DGSU_BAN_ERROR_MESSAGE, flags: 64 }
+                    });
+                }
+
                 const { data: existingServer } = await supabase
                     .from('servers')
                     .select('*')
@@ -2958,6 +3113,38 @@ export async function POST(req: Request) {
                 }
             }
 
+            const publicReportAction = parsePublicReportActionCustomId(cid);
+            if (publicReportAction) {
+                if (!(await canRunPublicReportAction(userId, publicReportAction.action))) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: 'You do not have permission to moderate public reports.', flags: 64 }
+                    });
+                }
+
+                const actionLabel = publicReportActionLabel(publicReportAction.action);
+                return NextResponse.json({
+                    type: 9,
+                    data: {
+                        title: actionLabel,
+                        custom_id: buildPublicReportActionModalCustomId(publicReportAction.action, publicReportAction.reportId),
+                        components: [{
+                            type: 1,
+                            components: [{
+                                type: 4,
+                                custom_id: 'reason',
+                                label: 'Reason',
+                                style: 2,
+                                min_length: 3,
+                                max_length: 1000,
+                                placeholder: `Reason for ${actionLabel.toLowerCase()}`,
+                                required: true
+                            }]
+                        }]
+                    }
+                });
+            }
+
             // Public Button: Report Form
             if (cid === 'report_open') {
                 return NextResponse.json({
@@ -3664,6 +3851,41 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: 'Missing modal custom_id' }, { status: 400 });
             }
 
+            const publicReportModalAction = parsePublicReportActionModalCustomId(custom_id);
+            if (publicReportModalAction) {
+                if (!(await canRunPublicReportAction(userId, publicReportModalAction.action))) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: 'You do not have permission to moderate public reports.', flags: 64 }
+                    });
+                }
+
+                const reason = getModalField(modalComponents, 'reason');
+                try {
+                    const report = await applyPublicReportAction({
+                        action: publicReportModalAction.action,
+                        reportId: publicReportModalAction.reportId,
+                        reason,
+                        moderatorDiscordId: userId,
+                        fallbackThreadId: interaction.channel_id,
+                    });
+                    const actionLabel = publicReportActionLabel(publicReportModalAction.action);
+
+                    return NextResponse.json({
+                        type: 4,
+                        data: {
+                            content: `${actionLabel} completed for public report \`${report.id}\`.`,
+                            flags: 64
+                        }
+                    });
+                } catch (error) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: `Error: ${getErrorMessage(error, 'Failed to moderate public report.')}`, flags: 64 }
+                    });
+                }
+            }
+
             if (custom_id.startsWith('staff_note_modal|')) {
                 const hasLookupPerms = await checkPermission('can_lookup');
                 if (!hasLookupPerms) {
@@ -3844,17 +4066,30 @@ export async function POST(req: Request) {
             if (custom_id === 'report_submit') {
                 const targetInput = getModalField(modalComponents, 'target_input');
                 const reason = getModalField(modalComponents, 'reason');
+                const reporterDiscordId = member?.user?.id || interactionUser?.id;
 
                 // 1. Save to Database
                 const reportClient = getSupabaseAdmin();
+                const { data: server } = await reportClient
+                    .from('servers')
+                    .select('reports_channel_id, place_id')
+                    .eq('id', guild_id)
+                    .single();
+                const liveServerContext = await resolveReportServerContext({
+                    serverId: guild_id,
+                    placeId: server?.place_id,
+                    reporterDiscordId,
+                    reportedRobloxUsername: targetInput,
+                });
                 const { data: createdReport, error: dbError } = await reportClient.from('reports').insert([{
                     server_id: guild_id,
-                    reporter_discord_id: member?.user?.id || interactionUser?.id,
+                    reporter_discord_id: reporterDiscordId,
                     reporter_roblox_username: null,
                     reported_roblox_username: targetInput,
                     reason: reason,
-                    status: 'PENDING'
-                }]).select('id').single();
+                    status: 'PENDING',
+                    ...liveServerContext,
+                }]).select('id, reporter_live_server_id, reporter_join_url, reported_live_server_id, reported_join_url').single();
 
                 if (dbError) {
                     console.error('Report DB Error:', dbError);
@@ -3871,14 +4106,7 @@ export async function POST(req: Request) {
                         data: { content: `Error: Failed to create the report record. Please try again later.`, flags: 64 }
                     });
                 }
-
                 // 2. Send Notification to Channel (if configured)
-                const { data: server } = await reportClient
-                    .from('servers')
-                    .select('reports_channel_id')
-                    .eq('id', guild_id)
-                    .single();
-
                 let reportForwardWarning = '';
 
                 if (server?.reports_channel_id) {
@@ -3909,6 +4137,12 @@ export async function POST(req: Request) {
                                 fields: [
                                     { name: 'Reported User', value: `\`${targetInput}\``, inline: true },
                                     { name: 'Reporter', value: `<@${member?.user?.id || interactionUser?.id}>`, inline: true },
+                                    ...(createdReport.reporter_live_server_id
+                                        ? [{ name: 'Reporter Server', value: `\`${createdReport.reporter_live_server_id}\`\n${createdReport.reporter_join_url ? `[Join server](${createdReport.reporter_join_url})` : 'Join link unavailable'}`, inline: false }]
+                                        : []),
+                                    ...(createdReport.reported_live_server_id
+                                        ? [{ name: 'Reported User Server', value: `\`${createdReport.reported_live_server_id}\`\n${createdReport.reported_join_url ? `[Join server](${createdReport.reported_join_url})` : 'Join link unavailable'}`, inline: false }]
+                                        : []),
                                     { name: 'Reason', value: reason }
                                 ],
                                 footer: { text: `Ro-Link Systems • ID: ${guild_id}` },
@@ -3954,6 +4188,33 @@ export async function POST(req: Request) {
                 const placeId = getModalField(modalComponents, 'place_id').trim();
                 const universeId = getModalField(modalComponents, 'universe_id').trim();
                 const openCloudKey = getModalField(modalComponents, 'api_key').trim();
+                const modalServerBan = await findDgsuBanForTargets(supabase, [{ type: 'DISCORD_SERVER', targetId: guild_id }]);
+                if (modalServerBan) {
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: DGSU_BAN_ERROR_MESSAGE, flags: 64 }
+                    });
+                }
+
+                const modalGameBan = await findDgsuBanForRobloxGame(supabase, {
+                    placeId,
+                    universeId,
+                });
+                if (modalGameBan.ban) {
+                    await banUserForDgsuGameAttempt(supabase, {
+                        discordUserId: userId,
+                        serverId: guild_id,
+                        placeId,
+                        universeId: modalGameBan.universeId || universeId,
+                        sourceBan: modalGameBan.ban,
+                    });
+
+                    return NextResponse.json({
+                        type: 4,
+                        data: { content: DGSU_BAN_ERROR_MESSAGE, flags: 64 }
+                    });
+                }
+
                 const blocked = await findBlockedServer(supabase, guild_id);
                 if (blocked) {
                     return NextResponse.json({
@@ -4092,10 +4353,11 @@ function RoLink:Initialize()
 		
 		if self.settings and self.settings.blockUnverified then
 			local s, r = pcall(function()
-				return Http:RequestAsync({
-					Url = URL .. "/api/v1/lookup?robloxId=" .. player.UserId,
-					Method = "GET"
-				})
+					return Http:RequestAsync({
+						Url = URL .. "/api/v1/lookup?robloxId=" .. player.UserId,
+						Method = "GET",
+						Headers = { ["x-api-key"] = KEY }
+					})
 			end)
 			
 			-- 404 means the user has no mapping in Ro-Link
@@ -4462,7 +4724,16 @@ function RoLink:GetModuleReport(reportId)
 end
 
 function RoLink:CreateModuleReport(body)
-	return self:RequestModuleJson("/api/v1/game-admin/reports", "POST", body or {})
+	local payload = {}
+	if type(body) == "table" then
+		for key, value in pairs(body) do
+			payload[key] = value
+		end
+	end
+	if payload.reporterLiveServerId == nil and payload.reporter_live_server_id == nil then
+		payload.reporterLiveServerId = game.JobId
+	end
+	return self:RequestModuleJson("/api/v1/game-admin/reports", "POST", payload)
 end
 
 function RoLink:UpdateModuleReport(reportId, updates)

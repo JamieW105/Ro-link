@@ -25,6 +25,136 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.rl-site-banners {
+  position: relative;
+  z-index: 35;
+  background: #080b0f;
+}
+
+.rl-site-banner {
+  --banner-accent: #149cff;
+  --banner-soft: rgba(20, 156, 255, 0.1);
+  --banner-line: rgba(20, 156, 255, 0.28);
+  border-bottom: 1px solid var(--banner-line);
+  color: #f2f5f8;
+  background:
+    linear-gradient(90deg, var(--banner-soft), transparent 42%),
+    #0b0f14;
+}
+
+.rl-site-banner[data-tone="success"] {
+  --banner-accent: #34d399;
+  --banner-soft: rgba(52, 211, 153, 0.09);
+  --banner-line: rgba(52, 211, 153, 0.25);
+}
+
+.rl-site-banner[data-tone="warning"] {
+  --banner-accent: #fbbf24;
+  --banner-soft: rgba(251, 191, 36, 0.09);
+  --banner-line: rgba(251, 191, 36, 0.25);
+}
+
+.rl-site-banner[data-tone="critical"] {
+  --banner-accent: #fb7185;
+  --banner-soft: rgba(251, 113, 133, 0.09);
+  --banner-line: rgba(251, 113, 133, 0.26);
+}
+
+.rl-site-banner-inner {
+  display: grid;
+  width: min(calc(100% - 48px), 1180px);
+  min-height: 58px;
+  margin-inline: auto;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding-block: 10px;
+}
+
+.rl-site-banner-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--banner-line);
+  border-radius: 7px;
+  color: var(--banner-accent);
+  background: var(--banner-soft);
+}
+
+.rl-site-banner-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.rl-site-banner-copy {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.76rem;
+}
+
+.rl-site-banner-copy strong {
+  flex: none;
+  color: #fff;
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+}
+
+.rl-site-banner-copy span {
+  color: #a8b1bd;
+  line-height: 1.45;
+}
+
+.rl-site-banner-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 9px;
+  border-radius: 5px;
+  color: var(--banner-accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.rl-site-banner-link:hover {
+  background: var(--banner-soft);
+}
+
+.rl-site-banner-link svg {
+  width: 13px;
+  height: 13px;
+}
+
+@media (max-width: 640px) {
+  .rl-site-banner-inner {
+    width: min(calc(100% - 28px), 1180px);
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    padding-block: 12px;
+  }
+
+  .rl-site-banner-copy {
+    display: grid;
+    gap: 2px;
+  }
+
+  .rl-site-banner-link {
+    grid-column: 2;
+    width: max-content;
+    padding-left: 0;
+  }
+}
+
+/* App icon language: compact, rounded and weighty like the solid reference set. */
+svg[stroke="currentColor"] {
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 :root {
   --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-sharp: cubic-bezier(0.16, 1, 0.3, 1);
@@ -218,14 +348,7 @@ body {
 
 /* Custom Select Styling */
 select {
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  -moz-appearance: none !important;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
-  background-repeat: no-repeat !important;
-  background-position: right 1rem center !important;
-  background-size: 1rem !important;
-  padding-right: 2.5rem !important;
+  color-scheme: dark;
   transition: all 0.2s ease !important;
 }
 
@@ -300,6 +423,24 @@ select option {
 .custom-dashboard-shell:not([data-custom-dashboard-themed="true"])[data-dashboard-route="standard"] .dashboard-sidebar img {
   border-radius: 8px !important;
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Keep the per-server dashboard's navigation and header icons clean and outline-only. */
+.custom-dashboard-shell:not([data-custom-dashboard-themed="true"])[data-dashboard-route="standard"] .dashboard-sidebar svg,
+.custom-dashboard-shell:not([data-custom-dashboard-themed="true"])[data-dashboard-route="standard"] .dashboard-topbar svg {
+  fill: none !important;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Live-panel actions use the same outline-only icon language as the server dashboard. */
+.live-panel svg {
+  fill: none !important;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .custom-dashboard-shell:not([data-custom-dashboard-themed="true"])[data-dashboard-route="standard"] .dashboard-sidebar nav p {
