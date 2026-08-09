@@ -301,6 +301,11 @@ export default function Dashboard() {
                         {sortedGuilds.map(guild => (
                             <article key={guild.id} className="interactive-lift rl-dashboard-server-card">
                                 <div className="rl-dashboard-card-head">
+                                    {guild.hasBot && canOpenDashboardFromServerList(guild, guildPermissions[guild.id]) && (
+                                        <ServerIconLink href={`/dashboard/${guild.id}`} label="Settings">
+                                            <SettingsIcon />
+                                        </ServerIconLink>
+                                    )}
                                     <div className="rl-dashboard-server-icon-wrap">
                                         {guild.icon ? (
                                             <img
@@ -317,11 +322,6 @@ export default function Dashboard() {
                                             <span className="rl-dashboard-online" aria-label="Ro-Link connected" />
                                         )}
                                     </div>
-                                    {guild.hasBot && canOpenDashboardFromServerList(guild, guildPermissions[guild.id]) && (
-                                        <ServerIconLink href={`/dashboard/${guild.id}`} label="Settings">
-                                            <SettingsIcon />
-                                        </ServerIconLink>
-                                    )}
                                 </div>
 
                                 <h3>{guild.name}</h3>

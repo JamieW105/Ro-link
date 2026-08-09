@@ -2234,16 +2234,18 @@ a.rl-data-row:hover .rl-data-row-action {
 
 .rl-dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
 }
 
 .rl-dashboard-server-card {
   display: flex;
+  align-items: center;
   min-width: 0;
-  min-height: 250px;
-  flex-direction: column;
-  padding: 20px;
+  min-height: 68px;
+  flex-direction: row;
+  gap: 14px;
+  padding: 10px 12px;
   border: 1px solid var(--rl-line);
   border-radius: 8px;
   background: var(--rl-raised);
@@ -2257,9 +2259,9 @@ a.rl-data-row:hover .rl-data-row-action {
 
 .rl-dashboard-card-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
 }
 
 .rl-dashboard-server-icon-wrap {
@@ -2269,8 +2271,8 @@ a.rl-data-row:hover .rl-data-row-action {
 
 .rl-dashboard-server-icon {
   display: grid;
-  width: 58px;
-  height: 58px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border: 1px solid var(--rl-line-strong);
   border-radius: 8px;
@@ -2313,7 +2315,8 @@ a.rl-data-row:hover .rl-data-row-action {
 }
 
 .rl-dashboard-server-card h3 {
-  margin: 22px 0 26px;
+  min-width: 0;
+  margin: 0;
   overflow-wrap: anywhere;
   color: var(--rl-text);
   font-size: 1rem;
@@ -2321,9 +2324,10 @@ a.rl-data-row:hover .rl-data-row-action {
 }
 
 .rl-dashboard-card-footer {
-  margin-top: auto;
-  padding-top: 15px;
-  border-top: 1px solid var(--rl-line);
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0;
+  border-top: 0;
 }
 
 .rl-dashboard-card-actions {
@@ -2394,7 +2398,7 @@ a.rl-data-row:hover .rl-data-row-action {
 }
 
 .rl-dashboard-invite {
-  width: 100%;
+  width: auto;
 }
 
 .rl-dashboard-state,
@@ -2704,7 +2708,7 @@ a.rl-data-row:hover .rl-data-row-action {
   }
 
   .rl-dashboard-server-card {
-    min-height: 230px;
+    min-height: 64px;
   }
 
   .rl-dashboard-auth-card {
