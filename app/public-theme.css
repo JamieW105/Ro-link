@@ -2343,6 +2343,11 @@ a.rl-data-row:hover .rl-data-row-action {
   transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
 }
 
+.rl-dashboard-card-head .rl-dashboard-icon-action,
+.rl-dashboard-card-head .rl-dashboard-icon-action:hover {
+  border-color: transparent;
+}
+
 .rl-dashboard-icon-action:hover,
 .rl-dashboard-icon-action[data-tone="market"]:hover {
   border-color: rgba(20, 156, 255, 0.45);
