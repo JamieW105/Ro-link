@@ -260,12 +260,16 @@ export default function Dashboard() {
             </nav>
 
             <section className="rl-dashboard-hero" aria-labelledby="dashboard-title">
-                <PublicHeroBackdrop />
                 <div className="rl-dashboard-hero-inner rl-shell">
-                    <div>
-                        <p className="rl-eyebrow">Community workspace</p>
-                        <h1 id="dashboard-title">Select a <span>server.</span></h1>
-                        <p>Choose a community to manage, configure, and monitor.</p>
+                    <div className="rl-dashboard-hero-copy">
+                        <span className="rl-dashboard-hero-icon"><LayoutDashboard aria-hidden="true" /></span>
+                        <div>
+                            <p className="rl-eyebrow">Community workspace</p>
+                            <div className="rl-dashboard-hero-title-row">
+                                <h1 id="dashboard-title">Select a server</h1>
+                                <p>Choose a community to manage.</p>
+                            </div>
+                        </div>
                     </div>
                     <div className="rl-dashboard-primary-actions">
                         <Link href="/dashboard/marketplace" className="rl-button"><MarketplaceIcon />Marketplace</Link>
