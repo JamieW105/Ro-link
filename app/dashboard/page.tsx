@@ -5,6 +5,7 @@ import { BriefcaseBusiness as LucideBriefcaseBusiness } from 'lucide-react';
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from 'next/link';
+import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
 import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from "@/lib/discordMedia";
 import { LayoutDashboard, LogOut, MonitorPlay, Plus, ShieldAlert, Store } from "lucide-react";
@@ -17,7 +18,7 @@ const LivePanelIcon = () => <MonitorPlay size={15} aria-hidden="true" />;
 
 function ActionTooltip({ label }: { label: string }) {
     return (
-        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-200 opacity-0 shadow-xl transition-all group-hover/server-action:translate-y-0 group-hover/server-action:opacity-100">
+        <span className="rl-dashboard-tooltip">
             {label}
         </span>
     );
@@ -34,17 +35,12 @@ function ServerIconLink({
     children: ReactNode;
     tone?: 'default' | 'live' | 'market';
 }) {
-    const toneClass = tone === 'live'
-        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:border-emerald-300/70 hover:bg-emerald-500/20'
-        : tone === 'market'
-            ? 'border-sky-500/30 bg-sky-500/10 text-sky-200 hover:border-sky-300/70 hover:bg-sky-500/20'
-            : 'border-slate-700 bg-slate-800 text-slate-200 hover:border-sky-400/60 hover:bg-sky-500/15 hover:text-white';
-
     return (
         <Link
             href={href}
             aria-label={label}
-            className={`group/server-action relative flex h-10 w-10 items-center justify-center rounded-lg border transition-all ${toneClass}`}
+            className="rl-dashboard-icon-action group/server-action"
+            data-tone={tone}
         >
             {children}
             <ActionTooltip label={label} />
@@ -207,65 +203,55 @@ export default function Dashboard() {
 
     if (status === "loading") {
         return (
-            <div className="min-h-screen bg-[#020617] flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-sky-600 border-t-transparent rounded-full animate-spin"></div>
-            </div>
+            <main className="rl-public-page rl-dashboard-page rl-dashboard-state">
+                <div className="rl-dashboard-spinner" aria-label="Loading dashboard" />
+            </main>
         );
     }
 
     if (status === "unauthenticated") {
         return (
-            <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-6 text-center">
-                <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center mb-6 text-slate-400 border border-slate-700 shadow-xl">
-                    <ShieldAlert size={32} aria-hidden="true" />
-                </div>
-                <h1 className="text-2xl font-bold mb-2 tracking-tight">Access Denied</h1>
-                <p className="text-slate-400 mb-8 max-w-sm text-sm">Please authenticate with Discord to manage your community servers.</p>
-                <button
-                    onClick={() => signIn('discord')}
-                    className="bg-sky-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-sky-500 transition-all shadow-lg shadow-sky-900/10 text-sm"
-                >
-                    Sign In with Discord
-                </button>
-            </div>
+            <main className="rl-public-page rl-dashboard-page rl-dashboard-state">
+                <PublicHeroBackdrop />
+                <section className="rl-dashboard-auth-card" aria-labelledby="dashboard-access-title">
+                    <span className="rl-dashboard-state-icon"><ShieldAlert aria-hidden="true" /></span>
+                    <p className="rl-eyebrow">Secure dashboard</p>
+                    <h1 id="dashboard-access-title">Access your Ro-Link workspace.</h1>
+                    <p>Authenticate with Discord to manage and monitor your community servers.</p>
+                    <button onClick={() => signIn('discord')} className="rl-button rl-button-primary" type="button">
+                        Sign in with Discord
+                    </button>
+                </section>
+            </main>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-200">
-            {/* Sticky Professional Navbar */}
-            <nav className="sticky top-0 z-50 bg-[#020617]/80 backdrop-blur-md border-b border-slate-800">
-                <div className="max-w-7xl mx-auto flex min-h-16 items-center justify-between gap-3 px-4 py-3 sm:px-8 md:h-20 md:py-0">
-                    <Link href="/" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
-                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 md:w-9 md:h-9 rounded-lg object-contain shadow-lg border border-white/5" />
-                        <span className="text-base md:text-xl font-bold tracking-tight text-white">Ro-Link</span>
+        <main className="rl-public-page rl-dashboard-page">
+            <nav className="rl-dashboard-nav" aria-label="Dashboard navigation">
+                <div className="rl-dashboard-nav-inner rl-shell">
+                    <Link href="/" className="rl-brand" aria-label="Ro-Link home">
+                        <span className="rl-brand-mark"><img src="/Media/Ro-LinkIcon.png" alt="" /></span>
+                        <span>Ro-Link</span>
                     </Link>
 
-                    <div className="ml-auto flex items-center gap-2 border-l border-slate-800 pl-3 sm:gap-4 md:pl-4">
+                    <div className="rl-dashboard-account">
                         {(sessionUserId === '953414442060746854') && (
-                            <Link
-                                href="/management"
-                                className="hidden md:flex items-center gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-sky-900/20"
-                            >
-                                <LucideBriefcaseBusiness width="14" height="14" strokeWidth="2.5" />
+                            <Link href="/management" className="rl-button rl-dashboard-management">
+                                <LucideBriefcaseBusiness aria-hidden="true" width="14" height="14" strokeWidth="2.5" />
                                 Management
                             </Link>
                         )}
-                        <div className="text-right hidden sm:block">
-                            <p className="text-sm font-semibold text-white leading-none mb-1">{session?.user?.name}</p>
-                            <button type="button" onClick={handleSignOut} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
+                        <div className="rl-dashboard-user-copy">
+                            <strong>{session?.user?.name}</strong>
+                            <button type="button" onClick={handleSignOut}>
                                 <LogOutIcon />
                                 Sign Out
                             </button>
                         </div>
-                        <div className="relative group">
-                            <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm transition-transform group-hover:scale-105" />
-                            <button
-                                type="button"
-                                onClick={handleSignOut}
-                                className="sm:hidden absolute -bottom-1 -right-1 bg-slate-900 border border-slate-700 p-1 rounded-md text-slate-400 hover:text-red-400 shadow-xl"
-                                title="Sign Out"
-                            >
+                        <div className="rl-dashboard-avatar-wrap">
+                            <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="rl-dashboard-avatar" />
+                            <button type="button" onClick={handleSignOut} className="rl-dashboard-mobile-signout" aria-label="Sign out">
                                 <LogOutIcon />
                             </button>
                         </div>
@@ -273,81 +259,70 @@ export default function Dashboard() {
                 </div>
             </nav>
 
-            <div className="motion-page max-w-7xl mx-auto px-4 sm:px-8 py-6 md:py-12">
-                <header className="mb-6 flex flex-col gap-4 md:mb-12 md:flex-row md:items-end md:justify-between">
+            <section className="rl-dashboard-hero" aria-labelledby="dashboard-title">
+                <PublicHeroBackdrop />
+                <div className="rl-dashboard-hero-inner rl-shell">
                     <div>
-                        <h1 className="text-xl md:text-4xl font-extrabold text-white tracking-tight mb-1">Select a Server</h1>
-                        <p className="text-slate-500 text-xs md:text-base font-medium">Choose a community to manage and monitor.</p>
+                        <p className="rl-eyebrow">Community workspace</p>
+                        <h1 id="dashboard-title">Select a <span>server.</span></h1>
+                        <p>Choose a community to manage, configure, and monitor.</p>
                     </div>
-                    <Link
-                        href="/dashboard/marketplace"
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:border-sky-400/60 hover:bg-sky-500/20"
-                    >
-                        <MarketplaceIcon />
-                        Open Marketplace
-                    </Link>
-                    <Link
-                        href="/dashboard/creator/modules"
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3 text-xs font-bold uppercase tracking-widest text-emerald-200 transition-colors hover:border-emerald-400/60 hover:bg-emerald-500/20"
-                    >
-                        <PlusIcon />
-                        Creator Dashboard
-                    </Link>
-                </header>
+                    <div className="rl-dashboard-primary-actions">
+                        <Link href="/dashboard/marketplace" className="rl-button"><MarketplaceIcon />Marketplace</Link>
+                        <Link href="/dashboard/creator/modules" className="rl-button rl-button-primary"><PlusIcon />Creator dashboard</Link>
+                    </div>
+                </div>
+            </section>
 
+            <section className="rl-dashboard-content rl-shell" aria-label="Available servers">
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center py-32">
-                        <div className="w-10 h-10 border-2 border-sky-600 border-t-transparent rounded-full animate-spin mb-6"></div>
-                        <p className="text-slate-500 text-sm font-medium animate-pulse">Loading servers...</p>
+                    <div className="rl-dashboard-state-inline">
+                        <div className="rl-dashboard-spinner" />
+                        <p>Loading servers...</p>
                     </div>
                 ) : guildsError ? (
-                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-8 text-center">
-                        <h2 className="text-lg font-bold text-white">Could not load servers</h2>
-                        <p className="mt-2 text-sm font-medium text-red-100/80">{guildsError}</p>
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="mt-6 rounded-lg bg-red-500 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-red-400"
-                        >
-                            Retry
-                        </button>
+                    <div className="rl-dashboard-message" data-tone="error">
+                        <span className="rl-dashboard-state-icon"><ShieldAlert aria-hidden="true" /></span>
+                        <h2>Could not load servers</h2>
+                        <p>{guildsError}</p>
+                        <button onClick={() => window.location.reload()} className="rl-button" type="button">Retry</button>
                     </div>
                 ) : sortedGuilds.length === 0 ? (
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-8 text-center">
-                        <h2 className="text-lg font-bold text-white">No servers available</h2>
-                        <p className="mt-2 text-sm font-medium text-slate-500">Ro-Link could not find any Discord servers you can manage.</p>
+                    <div className="rl-dashboard-message">
+                        <h2>No servers available</h2>
+                        <p>Ro-Link could not find any Discord servers you can manage.</p>
                     </div>
                 ) : (
-                    <div className="motion-list grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+                    <div className="motion-list rl-dashboard-grid">
                         {sortedGuilds.map(guild => (
-                            <div key={guild.id} className="interactive-lift subtle-glow group relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40 p-5 transition-all hover:border-sky-500/30 sm:p-6">
-                                <div className="mb-5 flex flex-col items-start gap-4 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
-                                    <div className="relative">
+                            <article key={guild.id} className="interactive-lift rl-dashboard-server-card">
+                                <div className="rl-dashboard-card-head">
+                                    <div className="rl-dashboard-server-icon-wrap">
                                         {guild.icon ? (
                                             <img
                                                 src={getDiscordGuildIconProxyUrl(guild.id, guild.icon)}
                                                 alt={guild.name}
-                                                className="w-16 h-16 rounded-xl shadow-lg relative z-10 border border-white/5"
+                                                className="rl-dashboard-server-icon"
                                             />
                                         ) : (
-                                            <div className="w-16 h-16 rounded-xl bg-slate-800 flex items-center justify-center text-xl font-bold text-sky-500 relative z-10 border border-white/5">
+                                            <div className="rl-dashboard-server-icon rl-dashboard-server-fallback">
                                                 {guild.name.substring(0, 1)}
                                             </div>
                                         )}
                                         {guild.hasBot && (
-                                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-[#020617] z-20 shadow-lg"></div>
+                                            <span className="rl-dashboard-online" aria-label="Ro-Link connected" />
                                         )}
                                     </div>
-                                    <div className="break-all rounded-md border border-slate-700/50 bg-slate-800/50 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                        ID: {guild.id.substring(0, 8)}
+                                    <div className="rl-dashboard-server-id">
+                                        ID {guild.id.substring(0, 8)}
                                     </div>
                                 </div>
 
-                                <h3 className="mb-6 w-full break-words text-lg font-bold tracking-tight text-white sm:mb-8">{guild.name}</h3>
+                                <h3>{guild.name}</h3>
 
-                                <div className="mt-auto">
+                                <div className="rl-dashboard-card-footer">
                                     {guild.hasBot ? (
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex items-center gap-2">
+                                        <div className="rl-dashboard-card-actions">
                                                 {canOpenDashboardFromServerList(guild, guildPermissions[guild.id]) && (
                                                     <ServerIconLink href={`/dashboard/${guild.id}`} label="Open Console">
                                                         <SettingsIcon />
@@ -363,25 +338,24 @@ export default function Dashboard() {
                                                         <MarketplaceIcon />
                                                     </ServerIconLink>
                                                 )}
-                                            </div>
                                         </div>
                                     ) : (
                                         <a
                                             href={getDiscordBotInviteUrl(guild.id)}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-sky-900/10 flex items-center justify-center gap-2"
+                                            className="rl-button rl-button-primary rl-dashboard-invite"
                                         >
                                             <PlusIcon />
                                             Invite
                                         </a>
                                     )}
                                 </div>
-                            </div>
+                            </article>
                         ))}
                     </div>
                 )}
-            </div>
-        </div>
+            </section>
+        </main>
     );
 }
