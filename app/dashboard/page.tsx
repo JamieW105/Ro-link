@@ -273,26 +273,37 @@ export default function Dashboard() {
                 </div>
             </nav>
 
-            <div className="motion-page max-w-7xl mx-auto px-4 sm:px-8 py-6 md:py-12">
-                <header className="mb-6 flex flex-col gap-4 md:mb-12 md:flex-row md:items-end md:justify-between">
-                    <div>
-                        <h1 className="text-xl md:text-4xl font-extrabold text-white tracking-tight mb-1">Select a Server</h1>
-                        <p className="text-slate-500 text-xs md:text-base font-medium">Choose a community to manage and monitor.</p>
+            <div className="motion-page mx-auto max-w-7xl px-4 py-5 sm:px-8 md:py-8">
+                <header className="mb-6 rounded-xl border border-slate-800/90 bg-slate-900/35 px-4 py-4 shadow-sm shadow-black/10 sm:flex sm:items-center sm:justify-between sm:gap-5 sm:px-5">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-sky-500/20 bg-sky-500/10 text-sky-300">
+                            <LayoutDashboard size={17} aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-400">Community workspace</p>
+                            <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2">
+                                <h1 className="text-lg font-bold tracking-tight text-white sm:text-xl">Select a server</h1>
+                                <p className="text-xs text-slate-500">Choose a community to manage.</p>
+                            </div>
+                        </div>
                     </div>
-                    <Link
-                        href="/dashboard/marketplace"
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:border-sky-400/60 hover:bg-sky-500/20"
-                    >
-                        <MarketplaceIcon />
-                        Open Marketplace
-                    </Link>
-                    <Link
-                        href="/dashboard/creator/modules"
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3 text-xs font-bold uppercase tracking-widest text-emerald-200 transition-colors hover:border-emerald-400/60 hover:bg-emerald-500/20"
-                    >
-                        <PlusIcon />
-                        Creator Dashboard
-                    </Link>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-0 sm:flex sm:shrink-0">
+                        <Link
+                            href="/dashboard/marketplace"
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-900/70 px-3 text-xs font-semibold text-slate-200 transition-colors hover:border-sky-500/50 hover:bg-sky-500/10 hover:text-white"
+                        >
+                            <MarketplaceIcon />
+                            Marketplace
+                        </Link>
+                        <Link
+                            href="/dashboard/creator/modules"
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 text-xs font-semibold text-sky-100 transition-colors hover:border-sky-400/60 hover:bg-sky-500/20"
+                        >
+                            <PlusIcon />
+                            Creator dashboard
+                        </Link>
+                    </div>
                 </header>
 
                 {loading ? (
