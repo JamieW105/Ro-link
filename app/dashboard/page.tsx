@@ -8,11 +8,11 @@ import Link from 'next/link';
 import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
 import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from "@/lib/discordMedia";
-import { LayoutDashboard, LogOut, MonitorPlay, Plus, ShieldAlert, Store } from "lucide-react";
+import { LayoutDashboard, LogOut, MonitorPlay, Plus, Settings, ShieldAlert, Store } from "lucide-react";
 
 const LogOutIcon = () => <LogOut size={14} aria-hidden="true" />;
 const PlusIcon = () => <Plus size={14} strokeWidth={2.5} aria-hidden="true" />;
-const SettingsIcon = () => <LayoutDashboard size={15} aria-hidden="true" />;
+const SettingsIcon = () => <Settings size={15} aria-hidden="true" />;
 const MarketplaceIcon = () => <Store size={15} aria-hidden="true" />;
 const LivePanelIcon = () => <MonitorPlay size={15} aria-hidden="true" />;
 
@@ -328,18 +328,13 @@ export default function Dashboard() {
                                     {guild.hasBot ? (
                                         <div className="rl-dashboard-card-actions">
                                                 {canOpenDashboardFromServerList(guild, guildPermissions[guild.id]) && (
-                                                    <ServerIconLink href={`/dashboard/${guild.id}`} label="Open Console">
+                                                    <ServerIconLink href={`/dashboard/${guild.id}`} label="Settings">
                                                         <SettingsIcon />
                                                     </ServerIconLink>
                                                 )}
                                                 {canOpenLivePanelFromServerList(guild, guildPermissions[guild.id]) && (
                                                     <ServerIconLink href={`/dashboard/${guild.id}/live-panel`} label="Live Panel" tone="live">
                                                         <LivePanelIcon />
-                                                    </ServerIconLink>
-                                                )}
-                                                {canOpenMarketplaceFromServerList(guild) && (
-                                                    <ServerIconLink href="/dashboard/marketplace" label="Open Marketplace" tone="market">
-                                                        <MarketplaceIcon />
                                                     </ServerIconLink>
                                                 )}
                                         </div>
