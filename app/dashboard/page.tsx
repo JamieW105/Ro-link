@@ -317,9 +317,11 @@ export default function Dashboard() {
                                             <span className="rl-dashboard-online" aria-label="Ro-Link connected" />
                                         )}
                                     </div>
-                                    <div className="rl-dashboard-server-id">
-                                        ID {guild.id.substring(0, 8)}
-                                    </div>
+                                    {guild.hasBot && canOpenDashboardFromServerList(guild, guildPermissions[guild.id]) && (
+                                        <ServerIconLink href={`/dashboard/${guild.id}`} label="Settings">
+                                            <SettingsIcon />
+                                        </ServerIconLink>
+                                    )}
                                 </div>
 
                                 <h3>{guild.name}</h3>
@@ -327,11 +329,6 @@ export default function Dashboard() {
                                 <div className="rl-dashboard-card-footer">
                                     {guild.hasBot ? (
                                         <div className="rl-dashboard-card-actions">
-                                                {canOpenDashboardFromServerList(guild, guildPermissions[guild.id]) && (
-                                                    <ServerIconLink href={`/dashboard/${guild.id}`} label="Settings">
-                                                        <SettingsIcon />
-                                                    </ServerIconLink>
-                                                )}
                                                 {canOpenLivePanelFromServerList(guild, guildPermissions[guild.id]) && (
                                                     <ServerIconLink href={`/dashboard/${guild.id}/live-panel`} label="Live Panel" tone="live">
                                                         <LivePanelIcon />
