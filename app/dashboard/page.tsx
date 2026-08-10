@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
 import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from "@/lib/discordMedia";
-import { LayoutDashboard, LogOut, MonitorPlay, Plus, Settings, ShieldAlert, Store } from "lucide-react";
+import { LogOut, MonitorPlay, Plus, Settings, ShieldAlert, Store } from "lucide-react";
 
 const LogOutIcon = () => <LogOut size={14} aria-hidden="true" />;
 const PlusIcon = () => <Plus size={14} strokeWidth={2.5} aria-hidden="true" />;
@@ -262,7 +262,6 @@ export default function Dashboard() {
             <section className="rl-dashboard-hero" aria-labelledby="dashboard-title">
                 <div className="rl-dashboard-hero-inner rl-shell">
                     <div className="rl-dashboard-hero-copy">
-                        <span className="rl-dashboard-hero-icon"><LayoutDashboard aria-hidden="true" /></span>
                         <div>
                             <p className="rl-eyebrow">Community workspace</p>
                             <div className="rl-dashboard-hero-title-row">

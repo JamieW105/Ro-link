@@ -2150,8 +2150,6 @@ a.rl-data-row:hover .rl-data-row-action {
   padding: 14px 16px;
   border: 0;
   border-radius: 10px;
-  background: rgba(13, 18, 24, 0.64);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 .rl-dashboard-hero-copy,
@@ -2163,24 +2161,6 @@ a.rl-data-row:hover .rl-data-row-action {
 .rl-dashboard-hero-copy {
   min-width: 0;
   gap: 12px;
-}
-
-.rl-dashboard-hero-icon {
-  display: inline-flex;
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(20, 156, 255, 0.2);
-  border-radius: 8px;
-  color: #8fd0ff;
-  background: rgba(20, 156, 255, 0.08);
-}
-
-.rl-dashboard-hero-icon svg {
-  width: 17px;
-  height: 17px;
 }
 
 .rl-dashboard-hero .rl-eyebrow {
