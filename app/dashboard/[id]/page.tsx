@@ -1,6 +1,6 @@
 'use client';
 
-import { Activity as LucideActivity, ArrowRight as LucideArrowRight, Copy as LucideCopy, KeyRound as LucideKeyRound, Layers3 as LucideLayers3, Radio as LucideRadio, Server as LucideServer, ShieldCheck as LucideShieldCheck, TriangleAlert as LucideTriangleAlert } from 'lucide-react';
+import { Activity as LucideActivity, Copy as LucideCopy, KeyRound as LucideKeyRound, Layers3 as LucideLayers3, Radio as LucideRadio, ShieldCheck as LucideShieldCheck, TriangleAlert as LucideTriangleAlert } from 'lucide-react';
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -18,10 +18,6 @@ type IconProps = {
 
 const ActivityIcon = ({ className = "h-4 w-4" }: IconProps) => (
     <LucideActivity className={className} strokeWidth="2.2" />
-);
-
-const ServerIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <LucideServer className={className} strokeWidth="2.2" />
 );
 
 const ShieldIcon = ({ className = "h-4 w-4" }: IconProps) => (
@@ -42,10 +38,6 @@ const LayersIcon = ({ className = "h-4 w-4" }: IconProps) => (
 
 const AlertIcon = ({ className = "h-4 w-4" }: IconProps) => (
     <LucideTriangleAlert className={className} strokeWidth="2.2" />
-);
-
-const ArrowIcon = ({ className = "h-4 w-4" }: IconProps) => (
-    <LucideArrowRight className={className} strokeWidth="2.3" />
 );
 
 const CopyIcon = ({ className = "h-4 w-4" }: IconProps) => (
@@ -331,7 +323,6 @@ export default function ServerDashboard() {
 
     const canManageSettings = perms.is_admin || perms.can_manage_settings;
     const canManageReports = perms.is_admin || perms.can_manage_reports;
-    const canAccessLivePanel = perms.is_admin || perms.can_access_live_panel;
 
     useEffect(() => {
         let cancelled = false;
@@ -532,14 +523,6 @@ export default function ServerDashboard() {
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                            {canAccessLivePanel && (
-                                <ActionLink href={`/dashboard/${serverId}/live-panel`} label="Live Panel" tone="emerald">
-                                    <RadioIcon />
-                                </ActionLink>
-                            )}
-                            <ActionLink href={`/dashboard/${serverId}/servers`} label="Servers" tone="sky">
-                                <ServerIcon />
-                            </ActionLink>
                             {canManageSettings && (
                                 <ActionLink href={`/dashboard/${serverId}/settings/setup`} label="Setup" tone={setupComplete ? 'slate' : 'amber'}>
                                     <KeyIcon />
@@ -648,15 +631,6 @@ export default function ServerDashboard() {
                         </div>
                     )}
 
-                    <div className="border-t border-slate-800 bg-slate-950/45 px-5 py-4">
-                        <Link
-                            href={canAccessLivePanel ? `/dashboard/${serverId}/live-panel` : `/dashboard/${serverId}/servers`}
-                            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-sky-300 transition-colors hover:text-sky-100"
-                        >
-                            Open live operations
-                            <ArrowIcon />
-                        </Link>
-                    </div>
                 </section>
 
                 <div className="space-y-6">

@@ -8,13 +8,12 @@ import Link from 'next/link';
 import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
 import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from "@/lib/discordMedia";
-import { LogOut, MonitorPlay, Plus, Settings, ShieldAlert, Store } from "lucide-react";
+import { LogOut, Plus, Settings, ShieldAlert, Store } from "lucide-react";
 
 const LogOutIcon = () => <LogOut size={14} aria-hidden="true" />;
 const PlusIcon = () => <Plus size={14} strokeWidth={2.5} aria-hidden="true" />;
 const SettingsIcon = () => <Settings size={15} aria-hidden="true" />;
 const MarketplaceIcon = () => <Store size={15} aria-hidden="true" />;
-const LivePanelIcon = () => <MonitorPlay size={15} aria-hidden="true" />;
 
 function ActionTooltip({ label }: { label: string }) {
     return (
@@ -99,14 +98,6 @@ function canOpenDashboardAction(permissions?: GuildDashboardPermissions) {
 
 function canOpenDashboardFromServerList(guild: Guild, permissions?: GuildDashboardPermissions) {
     return canOpenDashboardAction(permissions) || canOpenMarketplaceFromServerList(guild);
-}
-
-function canOpenLivePanelAction(permissions?: GuildDashboardPermissions) {
-    return Boolean(permissions?.is_admin || permissions?.can_access_live_panel);
-}
-
-function canOpenLivePanelFromServerList(guild: Guild, permissions?: GuildDashboardPermissions) {
-    return canOpenLivePanelAction(permissions) || canOpenMarketplaceFromServerList(guild);
 }
 
 export default function Dashboard() {
@@ -327,13 +318,7 @@ export default function Dashboard() {
 
                                 <div className="rl-dashboard-card-footer">
                                     {guild.hasBot ? (
-                                        <div className="rl-dashboard-card-actions">
-                                                {canOpenLivePanelFromServerList(guild, guildPermissions[guild.id]) && (
-                                                    <ServerIconLink href={`/dashboard/${guild.id}/live-panel`} label="Live Panel" tone="live">
-                                                        <LivePanelIcon />
-                                                    </ServerIconLink>
-                                                )}
-                                        </div>
+                                        <div className="rl-dashboard-card-actions" />
                                     ) : (
                                         <a
                                             href={getDiscordBotInviteUrl(guild.id)}
