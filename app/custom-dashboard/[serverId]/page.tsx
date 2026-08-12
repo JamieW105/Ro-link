@@ -34,6 +34,7 @@ export default function CustomDashboardLandingPage() {
     const { status } = useSession();
     const [dashboard, setDashboard] = useState<DashboardInfo | null>(null);
     const [accessDenied, setAccessDenied] = useState(false);
+    const [accessError, setAccessError] = useState<'reauthenticate' | 'unavailable' | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -60,7 +61,13 @@ export default function CustomDashboardLandingPage() {
             try {
                 const res = await fetch(`/api/user/permissions?serverId=${encodeURIComponent(String(serverId))}`, { cache: 'no-store' });
                 if (!res.ok) {
-                    setAccessDenied(true);
+                    if (res.status === 401) {
+                        setAccessError('reauthenticate');
+                    } else if (res.status === 403) {
+                        setAccessDenied(true);
+                    } else {
+                        setAccessError('unavailable');
+                    }
                     return;
                 }
 
@@ -72,7 +79,7 @@ export default function CustomDashboardLandingPage() {
 
                 setAccessDenied(true);
             } catch {
-                setAccessDenied(true);
+                setAccessError('unavailable');
             }
         }
 
@@ -100,15 +107,37 @@ export default function CustomDashboardLandingPage() {
         );
     }
 
-    if (accessDenied) {
+    if (accessDenied || accessError) {
+        const requiresSignIn = accessError === 'reauthenticate';
+        const temporarilyUnavailable = accessError === 'unavailable';
         return (
             <div className="flex min-h-screen items-center justify-center bg-[#020617] p-6 text-white" style={{ background: theme.gradient }}>
                 <div className="w-full max-w-md rounded-2xl border bg-slate-900/70 p-8 text-center shadow-2xl shadow-black/30" style={{ borderColor: theme.border }}>
                     <img src={iconUrl} alt="" className="mx-auto mb-5 h-14 w-14 rounded-xl bg-slate-800 object-cover" />
-                    <h1 className="text-2xl font-bold tracking-tight">Sorry, you do not have access to this dashboard.</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">
+                        {requiresSignIn
+                            ? 'Your Discord session has expired.'
+                            : temporarilyUnavailable
+                                ? 'Dashboard access could not be checked.'
+                                : 'Sorry, you do not have access to this dashboard.'}
+                    </h1>
                     <p className="mt-3 text-sm leading-6 text-slate-400">
-                        If this is a mistake, please contact the server owner.
+                        {requiresSignIn
+                            ? 'Sign in again to continue.'
+                            : temporarilyUnavailable
+                                ? 'Discord or Ro-Link may be temporarily unavailable. Please try again.'
+                                : 'If this is a mistake, please contact the server owner.'}
                     </p>
+                    {(requiresSignIn || temporarilyUnavailable) && (
+                        <button
+                            type="button"
+                            onClick={() => requiresSignIn ? handleSignIn() : window.location.reload()}
+                            className="mt-6 w-full rounded-xl px-5 py-3 text-sm font-bold text-white transition-all hover:brightness-110"
+                            style={{ backgroundColor: theme.accent }}
+                        >
+                            {requiresSignIn ? 'Sign in with Discord' : 'Try again'}
+                        </button>
+                    )}
                 </div>
             </div>
         );
