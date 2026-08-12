@@ -38,9 +38,13 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
 
     // The signed, HTTP-only session cookie is verified here on the Ro-Link
     // server. A remembered browser never has to contact Discord itself.
-    if (rememberedDiscordUserId) {
-        redirect(session?.error === DGSU_BAN_AUTH_ERROR ? '/report#appeal' : callbackUrl);
+    if (session?.error === DGSU_BAN_AUTH_ERROR) {
+        redirect('/report#appeal');
     }
 
-    return <SignInClient callbackUrl={callbackUrl} error={error} />;
+    if (rememberedDiscordUserId && !session?.error) {
+        redirect(callbackUrl);
+    }
+
+    return <SignInClient callbackUrl={callbackUrl} error={error || session?.error} />;
 }

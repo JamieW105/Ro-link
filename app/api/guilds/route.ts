@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import type { Session } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { listVisibleGuildsForDiscordSession } from '@/lib/dashboardGuilds';
+import {
+    DiscordAccessTokenError,
+    DiscordRateLimitError,
+    listVisibleGuildsForDiscordSession,
+} from '@/lib/dashboardGuilds';
 import { DGSU_BAN_AUTH_ERROR, DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +48,18 @@ export async function GET(req: Request) {
 
     } catch (error) {
         console.error(error);
+        if (error instanceof DiscordAccessTokenError) {
+            return NextResponse.json({ error: 'Discord session expired' }, { status: 401 });
+        }
+        if (error instanceof DiscordRateLimitError) {
+            const retryAfterSeconds = error.retryAfter === null
+                ? 30
+                : Math.max(1, Math.ceil(error.retryAfter));
+            return NextResponse.json(
+                { error: 'Discord is temporarily rate limiting server access. Please try again shortly.' },
+                { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } },
+            );
+        }
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

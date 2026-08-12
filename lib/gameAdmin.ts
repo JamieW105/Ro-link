@@ -88,6 +88,7 @@ export interface RoLinkAdminAccess {
 }
 
 const ADMINISTRATOR_PERMISSION = 0x8n;
+const MANAGE_GUILD_PERMISSION = 0x20n;
 
 const rest = process.env.DISCORD_TOKEN
     ? new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN)
@@ -178,7 +179,8 @@ function computeIsAdmin(
         return combined;
     }, 0n);
 
-    return (effectivePermissions & ADMINISTRATOR_PERMISSION) === ADMINISTRATOR_PERMISSION;
+    return (effectivePermissions & ADMINISTRATOR_PERMISSION) === ADMINISTRATOR_PERMISSION
+        || (effectivePermissions & MANAGE_GUILD_PERMISSION) === MANAGE_GUILD_PERMISSION;
 }
 
 export function aggregateDashboardPermissions(isAdmin: boolean, dashboardRoles: DashboardRoleRecord[]) {

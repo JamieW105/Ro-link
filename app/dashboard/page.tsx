@@ -106,6 +106,7 @@ export default function Dashboard() {
     const [guildPermissions, setGuildPermissions] = useState<Record<string, GuildDashboardPermissions>>({});
     const [loading, setLoading] = useState(false);
     const [guildsError, setGuildsError] = useState<string | null>(null);
+    const [needsReauthentication, setNeedsReauthentication] = useState(false);
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
     const sortedGuilds = useMemo(() => [...guilds].sort(compareGuildsByBotStatus), [guilds]);
 
@@ -121,10 +122,14 @@ export default function Dashboard() {
 
             setLoading(true);
             setGuildsError(null);
+            setNeedsReauthentication(false);
             try {
                 const response = await fetch('/api/guilds', { cache: 'no-store' });
                 const data = await response.json();
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        setNeedsReauthentication(true);
+                    }
                     throw new Error(typeof data?.error === 'string' ? data.error : `Failed to load servers (${response.status})`);
                 }
                 if (!Array.isArray(data)) {
@@ -277,9 +282,21 @@ export default function Dashboard() {
                 ) : guildsError ? (
                     <div className="rl-dashboard-message" data-tone="error">
                         <span className="rl-dashboard-state-icon"><ShieldAlert aria-hidden="true" /></span>
-                        <h2>Could not load servers</h2>
-                        <p>{guildsError}</p>
-                        <button onClick={() => window.location.reload()} className="rl-button" type="button">Retry</button>
+                        <h2>
+                            {needsReauthentication ? 'Discord session expired' : 'Could not load servers'}
+                        </h2>
+                        <p>
+                            {needsReauthentication ? 'Sign in with Discord again to refresh your server access.' : guildsError}
+                        </p>
+                        <button
+                            onClick={() => needsReauthentication
+                                ? signIn('discord', { callbackUrl: '/dashboard' })
+                                : window.location.reload()}
+                            className="rl-button"
+                            type="button"
+                        >
+                            {needsReauthentication ? 'Sign in again' : 'Retry'}
+                        </button>
                     </div>
                 ) : sortedGuilds.length === 0 ? (
                     <div className="rl-dashboard-message">

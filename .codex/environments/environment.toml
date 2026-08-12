@@ -3,34 +3,15 @@ version = 1
 name = "Ro-link"
 
 [setup]
-script = ""
+script = '''
+cd "%CODEX_WORKTREE_PATH"
+
+npm install
+npm run build'''
 
 [[actions]]
-name = "Run"
-icon = "run"
-command = "npm run bot"
-
-[[actions]]
-name = "Run app"
-icon = "run"
-command = "npm run dev"
-
-[[actions]]
-name = "Push as preview"
+name = "RUN"
 icon = "tool"
 command = '''
-git add .
-git commit -m "Auto Commit"
-git checkout Preview
-git push
-'''
-
-[[actions]]
-name = "Push as main"
-icon = "tool"
-command = '''
-git add .
-git commit -m "Auto Commit"
-git checkout main
-git push
-'''
+npm run build
+npm start'''

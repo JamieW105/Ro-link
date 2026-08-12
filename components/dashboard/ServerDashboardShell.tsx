@@ -13,14 +13,9 @@ import {
     type CustomDashboardMetadata,
     type CustomDashboardTheme,
 } from "@/lib/customDashboardSettings";
-import { useSession } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { PermissionsProvider } from "@/context/PermissionsContext";
 import { getDiscordGuildIconProxyUrl } from "@/lib/discordMedia";
-
-interface VisibleGuild {
-    id: string;
-    hasBot?: boolean;
-}
 
 interface DashboardPermissions {
     can_access_dashboard: boolean;
@@ -37,6 +32,17 @@ interface DashboardPermissions {
     can_manage_settings: boolean;
     allowed_misc_cmds: string[];
     is_admin: boolean;
+}
+
+type DashboardAccessError = 'denied' | 'reauthenticate' | 'unavailable' | null;
+
+function isDashboardPermissions(value: unknown): value is DashboardPermissions {
+    if (!value || typeof value !== 'object') return false;
+
+    const permissions = value as Partial<DashboardPermissions>;
+    return typeof permissions.is_admin === 'boolean'
+        && typeof permissions.can_access_dashboard === 'boolean'
+        && typeof permissions.can_access_live_panel === 'boolean';
 }
 
 function canAccessDashboardRoute(perms: DashboardPermissions, pathname: string) {
@@ -128,7 +134,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [userPermissions, setUserPermissions] = useState<DashboardPermissions | null>(null);
     const [loading, setLoading] = useState(true);
-    const [accessDenied, setAccessDenied] = useState(false);
+    const [accessError, setAccessError] = useState<DashboardAccessError>(null);
     const [isCustomDashboardHost, setIsCustomDashboardHost] = useState(false);
     const [customDashboardInfo, setCustomDashboardInfo] = useState<CustomDashboardInfo | null>(null);
     const [customDashboardPreview, setCustomDashboardPreview] = useState<CustomDashboardPreview | null>(null);
@@ -148,42 +154,33 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
         async function checkAccess() {
             setLoading(true);
-            setAccessDenied(false);
+            setAccessError(null);
             try {
-                // 1. Fetch User Guilds to ensure they are even in the server
-                const guildsRes = await fetch('/api/guilds');
-                const guilds = await guildsRes.json() as VisibleGuild[];
-                const g = guilds.find((guild) => guild.id === String(id));
+                const permsRes = await fetch(`/api/user/permissions?serverId=${encodeURIComponent(String(id))}`, {
+                    cache: 'no-store',
+                });
+                const payload: unknown = await permsRes.json().catch(() => null);
 
-                if (!g || !g.hasBot) {
-                    console.log("[Guard] Access denied or bot not present.");
+                if (!permsRes.ok || !isDashboardPermissions(payload)) {
+                    const nextError: DashboardAccessError = permsRes.status === 401
+                        ? 'reauthenticate'
+                        : permsRes.status === 403
+                            ? 'denied'
+                            : 'unavailable';
                     if (!cancelled) {
-                        setAccessDenied(true);
-                        setUserPermissions(null);
-                    }
-                    return;
-                }
-
-                // 2. Fetch Detailed Permissions for this specific server
-                const permsRes = await fetch(`/api/user/permissions?serverId=${id}`);
-                const perms = await permsRes.json() as DashboardPermissions | null;
-
-                if (!perms) {
-                    console.log("[Guard] No permissions returned for this server.");
-                    if (!cancelled) {
-                        setAccessDenied(true);
+                        setAccessError(nextError);
                         setUserPermissions(null);
                     }
                     return;
                 }
 
                 if (!cancelled) {
-                    setUserPermissions(perms);
+                    setUserPermissions(payload);
                 }
             } catch (err) {
                 console.error("[Guard] Error checking access:", err);
                 if (!cancelled) {
-                    setAccessDenied(true);
+                    setAccessError('unavailable');
                     setUserPermissions(null);
                 }
             } finally {
@@ -394,15 +391,38 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         );
     }
 
-    if (accessDenied || (userPermissions && !canAccessDashboardRoute(userPermissions, pathname))) {
+    if (accessError || (userPermissions && !canAccessDashboardRoute(userPermissions, pathname))) {
+        const requiresSignIn = accessError === 'reauthenticate';
+        const temporarilyUnavailable = accessError === 'unavailable';
         return (
             <div className="flex min-h-screen items-center justify-center bg-[#020617] p-6 text-white">
                 <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/70 p-8 text-center shadow-2xl shadow-black/30">
                     <img src="/Media/Ro-LinkIcon.png" alt="" className="mx-auto mb-5 h-12 w-12 rounded-xl" />
-                    <h1 className="text-2xl font-bold tracking-tight">Sorry, you do not have access to this dashboard.</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">
+                        {requiresSignIn
+                            ? 'Your Discord session has expired.'
+                            : temporarilyUnavailable
+                                ? 'Dashboard access could not be checked.'
+                                : 'Sorry, you do not have access to this dashboard.'}
+                    </h1>
                     <p className="mt-3 text-sm leading-6 text-slate-400">
-                        If this is a mistake, please contact the server owner.
+                        {requiresSignIn
+                            ? 'Sign in again to continue.'
+                            : temporarilyUnavailable
+                                ? 'Discord or Ro-Link may be temporarily unavailable. Please try again.'
+                                : 'If this is a mistake, please contact the server owner.'}
                     </p>
+                    {(requiresSignIn || temporarilyUnavailable) && (
+                        <button
+                            type="button"
+                            onClick={() => requiresSignIn
+                                ? signIn('discord', { callbackUrl: window.location.href })
+                                : window.location.reload()}
+                            className="mt-6 w-full rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold text-white transition-all hover:bg-sky-500"
+                        >
+                            {requiresSignIn ? 'Sign in with Discord' : 'Try again'}
+                        </button>
+                    )}
                 </div>
             </div>
         );
