@@ -1,7 +1,7 @@
 import { createSeoMetadata } from '@/lib/seo';
 
 export const metadata = createSeoMetadata({
-    title: 'Discord Global Server Unban',
+    title: 'Dangerous Game, Server, or User Policy',
     description: 'Learn how Ro-Link global server bans work, what they cover, and how eligible users can submit an appeal.',
     path: '/dgsu',
 });
