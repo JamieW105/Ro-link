@@ -888,7 +888,7 @@ const docsPages: DocPage[] = [
         icon: Icons.Terminal,
         stats: [
             { label: 'Auth header', value: 'x-api-key' },
-            { label: 'Response model', value: 'Queued, then delivered' },
+            { label: 'Lookup scope', value: 'Connected server only' },
             { label: 'Best use case', value: 'Controlled external automation' },
         ],
         toc: [
@@ -946,7 +946,7 @@ const docsPages: DocPage[] = [
                     id="api-lookup"
                     eyebrow="Endpoint"
                     title="GET /lookup"
-                    description="Resolve a verified mapping between Discord and Roblox identities. This is useful for support tools, moderation backends, or verification-aware dashboards."
+                    description="Look up a user by Discord or Roblox identity. The response includes linked account details, server-scoped logs and moderation history, Ro-Link/DGSU/server-staff flags, and live presence for the game connected to your server key."
                 >
                     <CodeBlock label="Request">{'GET https://rolink.cloud/api/v1/lookup?discordId=123456789'}</CodeBlock>
                     <div className="mt-6">
@@ -956,18 +956,155 @@ const docsPages: DocPage[] = [
                                 ['discordId', 'string', 'One of these', 'Find the linked Roblox account for a Discord user.'],
                                 ['robloxId', 'string', 'One of these', 'Find the linked Discord account for a Roblox user ID.'],
                                 ['robloxUsername', 'string', 'One of these', 'Resolve using a Roblox username instead of a numeric ID.'],
+                                ['userId', 'string', 'Alias', 'Alias of robloxId for Roblox/server integrations.'],
+                                ['username or user', 'string', 'Alias', 'Alias of robloxUsername.'],
+                                ['limit', 'number', 'No', 'Maximum logs and moderation entries to return (default 50, maximum 100).'],
                             ]}
                         />
                     </div>
                     <div className="mt-6">
+                        <DataTable
+                            headers={['Response field', 'Description']}
+                            rows={[
+                                ['serverId / linked / verified', 'The API-key server ID and whether a Ro-Link verified identity mapping exists.'],
+                                ['discordId / robloxId / robloxUsername', 'Backward-compatible top-level linked identity values.'],
+                                ['user / verifiedUser', 'Roblox public profile and the verified Discord-to-Roblox mapping.'],
+                                ['discordUser / discordMember', 'Discord account details and membership details for the API-key server.'],
+                                ['serverRank / permissions', 'Server roles, ownership/admin state, and effective Ro-Link dashboard permissions.'],
+                                ['logs', 'Recent logs targeting any resolved identity for this user in the API-key server.'],
+                                ['pastModeration', 'The user logs whose actions represent bans, kicks, mutes, timeouts, warnings, or soft-bans.'],
+                                ['roles', 'Boolean Ro-Link staff, DGSU-banned, and current-server-staff indicators.'],
+                                ['dgsu', 'DGSU status plus matched target type and classification timestamp.'],
+                                ['presence', 'Whether the user is in a connected live server, their job/player data, and connected Roblox game.'],
+                            ]}
+                        />
+                    </div>
+                    <div className="mt-6">
+                        <CodeBlock label="Roblox server Luau">
+{`local HttpService = game:GetService("HttpService")
+
+local API_URL = "https://rolink.cloud/api/v1/lookup"
+local SERVER_API_KEY = "rl_xxxxxxxxxxxxx"
+
+local function lookupUser(queryName: string, queryValue: string | number)
+    local url = API_URL
+        .. "?" .. HttpService:UrlEncode(queryName)
+        .. "=" .. HttpService:UrlEncode(tostring(queryValue))
+        .. "&limit=50"
+
+    local response = HttpService:RequestAsync({
+        Url = url,
+        Method = "GET",
+        Headers = {
+            ["x-api-key"] = SERVER_API_KEY,
+            ["Accept"] = "application/json",
+        },
+    })
+
+    local body = HttpService:JSONDecode(response.Body)
+    if not response.Success then
+        error(body.message or body.error or ("Lookup failed with HTTP " .. response.StatusCode))
+    end
+
+    return body
+end
+
+local result = lookupUser("robloxId", 1234567)
+print(result.user.robloxUsername, result.roles.serverStaff, result.presence.inGame)`}
+                        </CodeBlock>
+                    </div>
+                    <div className="mt-6">
                         <CodeBlock label="Example response">
-                            {`{
+{`{
+  "serverId": "123456789012345678",
+  "linked": true,
+  "verified": true,
   "discordId": "953414442060746854",
   "robloxId": "1234567",
-  "robloxUsername": "RobloxPlayer"
+  "robloxUsername": "RobloxPlayer",
+  "user": {
+    "robloxId": "1234567",
+    "robloxUsername": "RobloxPlayer",
+    "displayName": "Player",
+    "description": "Roblox profile description",
+    "createdAt": "2020-01-01T00:00:00.000Z",
+    "robloxBanned": false
+  },
+  "verifiedUser": {
+    "discordId": "953414442060746854",
+    "robloxId": "1234567",
+    "robloxUsername": "RobloxPlayer"
+  },
+  "discordUser": {
+    "id": "953414442060746854",
+    "username": "example",
+    "globalName": "Example User",
+    "avatar": "avatar_hash",
+    "discriminator": "0"
+  },
+  "discordUsers": [{ "id": "953414442060746854", "username": "example" }],
+  "discordMember": {
+    "nick": "Example",
+    "joinedAt": "2024-01-01T00:00:00.000Z",
+    "roleIds": ["987654321098765432"]
+  },
+  "serverRank": {
+    "highestPosition": 10,
+    "highestRole": { "id": "987654321098765432", "name": "Moderator", "position": 10, "color": 3447003 },
+    "roles": [{ "id": "987654321098765432", "name": "Moderator", "position": 10, "color": 3447003 }],
+    "isOwner": false,
+    "isAdmin": false,
+    "inServer": true
+  },
+  "permissions": {
+    "can_access_dashboard": true,
+    "can_access_live_panel": true,
+    "can_kick": true,
+    "can_ban": true,
+    "can_timeout": false,
+    "can_mute": false,
+    "can_lookup": true,
+    "can_manage_settings": false,
+    "can_manage_reports": false,
+    "can_view_logs": true,
+    "can_view_runtime_logs": false,
+    "can_manage_staff_notes": false,
+    "allowed_misc_cmds": [],
+    "is_admin": false
+  },
+  "logs": [{
+    "id": "log-uuid",
+    "action": "BAN",
+    "target": "RobloxPlayer",
+    "moderator": "ExampleModerator",
+    "timestamp": "2026-08-25T00:00:00.000Z"
+  }],
+  "pastModeration": [{
+    "id": "log-uuid",
+    "action": "BAN",
+    "target": "RobloxPlayer",
+    "moderator": "ExampleModerator",
+    "timestamp": "2026-08-25T00:00:00.000Z"
+  }],
+  "roles": { "roLinkStaff": false, "dgsuBanned": false, "serverStaff": true },
+  "dgsu": { "banned": false, "targetType": null, "createdAt": null },
+  "presence": {
+    "inGame": true,
+    "jobId": "roblox-job-id",
+    "player": {
+      "username": "RobloxPlayer",
+      "displayName": "Player",
+      "userId": "1234567",
+      "avatarUrl": "https://www.roblox.com/headshot-thumbnail/image?userId=1234567"
+    },
+    "game": { "placeId": "123", "universeId": "456", "name": "Example Game" }
+  }
 }`}
                         </CodeBlock>
                     </div>
+                    <Callout title="Server-scoped data">
+                        Logs, moderation, staff permissions, and live presence are limited to the Discord server and Roblox experience belonging to the supplied server API key.
+                    </Callout>
                 </SectionCard>
 
                 <SectionCard
@@ -2123,7 +2260,7 @@ export default function DocsClientPage() {
                                 )}
                             </div>
 
-                            <p className="mt-8 text-sm text-slate-500">Last updated April 16, 2026</p>
+                            <p className="mt-8 text-sm text-slate-500">Last updated August 25, 2026</p>
                         </div>
                     </div>
                 </main>
