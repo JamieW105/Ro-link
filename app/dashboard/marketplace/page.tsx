@@ -6,6 +6,7 @@ import {
     Library,
     LogOut as LucideLogOut,
     Plus,
+    Search,
     ShieldAlert as LucideShieldAlert,
     Store,
     X,
@@ -100,6 +101,7 @@ export default function DashboardMarketplacePage() {
     const [installing, setInstalling] = useState(false);
     const [installMessage, setInstallMessage] = useState<string | null>(null);
     const [installError, setInstallError] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
 
     const selectedModule = useMemo(
@@ -110,6 +112,17 @@ export default function DashboardMarketplacePage() {
         () => modules.find((addon) => addon.id === installPickerModuleId) || null,
         [modules, installPickerModuleId],
     );
+    const filteredModules = useMemo(() => {
+        const normalizedQuery = searchQuery.trim().toLowerCase();
+        if (!normalizedQuery) return modules;
+
+        return modules.filter((addon) => (
+            addon.name.toLowerCase().includes(normalizedQuery)
+            || addon.description.toLowerCase().includes(normalizedQuery)
+            || addon.category.toLowerCase().includes(normalizedQuery)
+            || addon.version.toLowerCase().includes(normalizedQuery)
+        ));
+    }, [modules, searchQuery]);
 
     const syncSelectedModuleFromUrl = useCallback((nextModules: MarketplaceModule[]) => {
         const moduleParam = getModuleParam();
@@ -349,45 +362,72 @@ export default function DashboardMarketplacePage() {
                             <p>Published modules and your submissions will appear here.</p>
                         </div>
                     ) : (
-                        <div className="motion-list grid gap-2">
-                            {modules.map((addon) => (
-                                <article key={addon.id} className="interactive-lift flex min-w-0 flex-col gap-4 rounded-lg border border-slate-800 bg-[#0d1116] p-3 transition-colors hover:border-sky-500/30 hover:bg-[#0f141a] sm:flex-row sm:items-center">
-                                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-900/70 text-sky-300">
-                                        <Store size={18} aria-hidden="true" />
-                                    </span>
+                        <div className="grid gap-3">
+                            <label className="relative block w-full" htmlFor="marketplace-search">
+                                <span className="sr-only">Search marketplace modules</span>
+                                <Search
+                                    size={16}
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
+                                />
+                                <input
+                                    id="marketplace-search"
+                                    type="search"
+                                    value={searchQuery}
+                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                    placeholder="Search modules..."
+                                    className="w-full rounded-lg border border-slate-800 bg-[#0d1116] py-3 pl-10 pr-4 text-sm text-white outline-none transition-colors placeholder:text-slate-600 hover:border-slate-700 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
+                                />
+                            </label>
 
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                            <h2 className="mr-1 text-sm font-bold text-white">{addon.name}</h2>
-                                            <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-300">{addon.category}</span>
-                                            <span className={`rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${statusClassName(addon.status)}`}>{statusLabel(addon.status)}</span>
-                                            {addon.authorDiscordId === sessionUserId && addon.status !== 'PUBLISHED' && (
-                                                <span className="rounded-md border border-indigo-400/20 bg-indigo-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-300">Yours</span>
-                                            )}
-                                            {addon.isOfficial && (
-                                                <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-200">Official</span>
-                                            )}
-                                            {addon.creatorIsVerified && (
-                                                <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-200">Verified Creator</span>
-                                            )}
-                                        </div>
-                                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{addon.description || 'No description provided.'}</p>
-                                        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[9px] font-bold uppercase tracking-wider text-slate-600">
-                                            <span>v{addon.version}</span>
-                                            <span>{Object.keys(addon.configSchema || {}).length} config fields</span>
-                                            {addon.status === 'PENDING_REVIEW' && <span>Submitted {formatDate(addon.submittedAt)}</span>}
-                                        </div>
-                                    </div>
+                            {filteredModules.length === 0 ? (
+                                <div className="rl-dashboard-message">
+                                    <span className="rl-dashboard-state-icon"><Search aria-hidden="true" /></span>
+                                    <h2>No matching modules</h2>
+                                    <p>Try searching with a different name, category, or version.</p>
+                                </div>
+                            ) : (
+                                <div className="motion-list grid gap-2">
+                                    {filteredModules.map((addon) => (
+                                        <article key={addon.id} className="interactive-lift flex min-w-0 flex-col gap-4 rounded-lg border border-slate-800 bg-[#0d1116] p-3 transition-colors hover:border-sky-500/30 hover:bg-[#0f141a] sm:flex-row sm:items-center">
+                                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-900/70 text-sky-300">
+                                                <Store size={18} aria-hidden="true" />
+                                            </span>
 
-                                    <button
-                                        type="button"
-                                        onClick={() => openModulePreview(addon)}
-                                        className="rl-button w-full shrink-0 sm:w-auto"
-                                    >
-                                        Open Module
-                                    </button>
-                                </article>
-                            ))}
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <h2 className="mr-1 text-sm font-bold text-white">{addon.name}</h2>
+                                                    <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-300">{addon.category}</span>
+                                                    <span className={`rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${statusClassName(addon.status)}`}>{statusLabel(addon.status)}</span>
+                                                    {addon.authorDiscordId === sessionUserId && addon.status !== 'PUBLISHED' && (
+                                                        <span className="rounded-md border border-indigo-400/20 bg-indigo-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-300">Yours</span>
+                                                    )}
+                                                    {addon.isOfficial && (
+                                                        <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-200">Official</span>
+                                                    )}
+                                                    {addon.creatorIsVerified && (
+                                                        <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-200">Verified Creator</span>
+                                                    )}
+                                                </div>
+                                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{addon.description || 'No description provided.'}</p>
+                                                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[9px] font-bold uppercase tracking-wider text-slate-600">
+                                                    <span>v{addon.version}</span>
+                                                    <span>{Object.keys(addon.configSchema || {}).length} config fields</span>
+                                                    {addon.status === 'PENDING_REVIEW' && <span>Submitted {formatDate(addon.submittedAt)}</span>}
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => openModulePreview(addon)}
+                                                className="rl-button w-full shrink-0 sm:w-auto"
+                                            >
+                                                Open Module
+                                            </button>
+                                        </article>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </section>
