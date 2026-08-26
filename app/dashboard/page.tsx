@@ -312,11 +312,6 @@ export default function Dashboard() {
                         {sortedGuilds.map(guild => (
                             <article key={guild.id} className="interactive-lift rl-dashboard-server-card">
                                 <div className="rl-dashboard-card-head">
-                                    {guild.hasBot && canOpenLivePanelAction(guildPermissions[guild.id]) && (
-                                        <ServerIconLink href={`/dashboard/${guild.id}/live-panel`} label="Live Panel" tone="live">
-                                            <LivePanelIcon />
-                                        </ServerIconLink>
-                                    )}
                                     {guild.hasBot && canOpenDashboardFromServerList(guild, guildPermissions[guild.id]) && (
                                         <ServerIconLink href={`/dashboard/${guild.id}`} label="Settings">
                                             <SettingsIcon />
@@ -344,7 +339,15 @@ export default function Dashboard() {
 
                                 <div className="rl-dashboard-card-footer">
                                     {guild.hasBot ? (
-                                        <div className="rl-dashboard-card-actions" />
+                                        canOpenLivePanelAction(guildPermissions[guild.id]) ? (
+                                            <Link
+                                                href={`/dashboard/${guild.id}/live-panel`}
+                                                className="rl-dashboard-live-link"
+                                            >
+                                                <LivePanelIcon />
+                                                Live Panel
+                                            </Link>
+                                        ) : null
                                     ) : (
                                         <a
                                             href={getDiscordBotInviteUrl(guild.id)}

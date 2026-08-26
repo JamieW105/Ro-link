@@ -2386,6 +2386,34 @@ a.rl-data-row:hover .rl-data-row-action {
   width: auto;
 }
 
+.rl-dashboard-live-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 3px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #6ee7b7;
+  font-size: 0.76rem;
+  font-weight: 760;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: color 150ms ease;
+}
+
+.rl-dashboard-live-link:hover {
+  border: 0;
+  background: transparent;
+  color: #a7f3d0;
+}
+
+.rl-dashboard-live-link:focus-visible {
+  outline: 2px solid rgba(52, 211, 153, 0.72);
+  outline-offset: 3px;
+}
+
 .rl-dashboard-state,
 .rl-dashboard-state-inline,
 .rl-dashboard-message {
