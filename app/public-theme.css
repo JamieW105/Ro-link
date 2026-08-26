@@ -133,6 +133,11 @@
   object-fit: contain;
 }
 
+img[src="/Media/Ro-LinkIcon.png"] {
+  border: 0 !important;
+  background: transparent !important;
+}
+
 .rl-nav-links {
   display: flex;
   align-items: center;
