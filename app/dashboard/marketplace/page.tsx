@@ -1,6 +1,7 @@
 'use client';
 
 import {
+    ArrowRight,
     Boxes,
     LogOut as LucideLogOut,
     Plus,
@@ -188,12 +189,12 @@ export default function DashboardMarketplacePage() {
                             </div>
                         </div>
                         <div className="rl-dashboard-primary-actions">
-                            <Link href="/dashboard/creator/modules" className="rl-button rl-button-primary"><Plus size={14} strokeWidth={2.5} aria-hidden="true" />Create</Link>
+                            <Link href="/dashboard/marketplace/create" className="rl-button rl-button-primary"><Plus size={14} strokeWidth={2.5} aria-hidden="true" />Create</Link>
                         </div>
                     </div>
                 </section>
 
-                <section className="rl-dashboard-content rl-shell" aria-label="Available modules">
+                <section className="rl-shell pb-10 pt-4" aria-label="Available modules">
                     {loading ? (
                         <div className="rl-dashboard-state-inline">
                             <div className="rl-dashboard-spinner" />
@@ -242,16 +243,16 @@ export default function DashboardMarketplacePage() {
                                         <Link
                                             key={addon.id}
                                             href={`/dashboard/marketplace/${encodeURIComponent(addon.slug)}`}
-                                            className="interactive-lift flex min-w-0 flex-col gap-4 rounded-lg border border-slate-800 bg-[#0d1116] p-3 transition-colors hover:border-sky-500/30 hover:bg-[#0f141a] focus-visible:border-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 sm:flex-row sm:items-center"
+                                            className="interactive-lift group flex min-w-0 items-center gap-4 rounded-lg border border-slate-800 bg-[#0d1116] p-4 transition-colors hover:border-sky-500/40 hover:bg-[#10161d] focus-visible:border-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
                                             aria-label={`View ${addon.name}`}
                                         >
-                                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-900/70 text-sky-300">
-                                                <Store size={18} aria-hidden="true" />
+                                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-900/70 text-sky-300 transition-colors group-hover:border-sky-500/40 group-hover:bg-sky-500/10">
+                                                <Store size={19} aria-hidden="true" />
                                             </span>
 
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-1.5">
-                                                    <h2 className="mr-1 text-sm font-bold text-white">{addon.name}</h2>
+                                                    <h2 className="mr-1 text-base font-bold text-white">{addon.name}</h2>
                                                     <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-300">{addon.category}</span>
                                                     <span className={`rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${statusClassName(addon.status)}`}>{statusLabel(addon.status)}</span>
                                                     {addon.authorDiscordId === sessionUserId && addon.status !== 'PUBLISHED' && (
@@ -264,27 +265,29 @@ export default function DashboardMarketplacePage() {
                                                         <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-200">Verified Creator</span>
                                                     )}
                                                 </div>
-                                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{addon.description || 'No description provided.'}</p>
-                                                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[9px] font-bold uppercase tracking-wider text-slate-600">
+                                                <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-400">{addon.description || 'No description provided.'}</p>
+                                                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
                                                     <span>v{addon.version}</span>
                                                     <span>{Object.keys(addon.configSchema || {}).length} config fields</span>
                                                     {addon.status === 'PENDING_REVIEW' && <span>Submitted {formatDate(addon.submittedAt)}</span>}
                                                 </div>
                                             </div>
-
+                                            <span className="ml-auto flex shrink-0 items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 transition-colors group-hover:text-sky-300">
+                                                <span className="hidden sm:inline">View details</span>
+                                                <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                                            </span>
                                         </Link>
                                     ))}
                                 </div>
                             )}
+                            <div className="mt-4 text-right">
+                                <Link href="/terms/modules/use" className="text-xs font-semibold text-slate-500 transition-colors hover:text-sky-300">
+                                    Module terms
+                                </Link>
+                            </div>
                         </div>
                     )}
                 </section>
-
-                <div className="rl-shell pb-8 text-right">
-                    <Link href="/terms/modules/use" className="text-[10px] font-medium text-slate-700 transition-colors hover:text-slate-500">
-                        Module terms
-                    </Link>
-                </div>
 
             </main>
         </div>
