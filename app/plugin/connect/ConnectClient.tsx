@@ -127,7 +127,7 @@ export function ConnectClient({ sessionId, code, outcome, signedInName }: Props)
         <main className="min-h-screen bg-[#07111f] text-white flex items-center justify-center px-6 py-12">
             <section className="w-full max-w-xl rounded-[28px] border border-sky-900/40 bg-slate-950/80 shadow-[0_30px_80px_rgba(2,6,23,0.55)] backdrop-blur-xl p-10">
                 <div className="flex items-center gap-4 mb-8">
-                    <div className="h-14 w-14 rounded-2xl bg-sky-500/10 border border-sky-400/20 flex items-center justify-center">
+                    <div className="flex h-14 w-14 items-center justify-center">
                         <Image src="/Media/Ro-LinkIcon.png" alt="Ro-Link" width={32} height={32} className="h-8 w-8 object-contain" />
                     </div>
                     <div>

@@ -323,6 +323,7 @@ export default function ServerDashboard() {
 
     const canManageSettings = perms.is_admin || perms.can_manage_settings;
     const canManageReports = perms.is_admin || perms.can_manage_reports;
+    const canAccessLivePanel = perms.is_admin || perms.can_access_live_panel;
 
     useEffect(() => {
         let cancelled = false;
@@ -523,6 +524,11 @@ export default function ServerDashboard() {
                         </div>
 
                         <div className="flex flex-wrap gap-2">
+                            {canAccessLivePanel && (
+                                <ActionLink href={`/dashboard/${serverId}/live-panel`} label="Live Panel" tone="emerald">
+                                    <RadioIcon />
+                                </ActionLink>
+                            )}
                             {canManageSettings && (
                                 <ActionLink href={`/dashboard/${serverId}/settings/setup`} label="Setup" tone={setupComplete ? 'slate' : 'amber'}>
                                     <KeyIcon />

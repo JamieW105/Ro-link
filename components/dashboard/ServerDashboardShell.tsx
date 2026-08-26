@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft as LucideArrowLeft, ChevronDown as LucideChevronDown, FileText as LucideFileText, Home as LucideHome, LayoutDashboard as LucideLayoutDashboard, Menu as LucideMenu, Package as LucidePackage, Rss as LucideRss, Settings as LucideSettings, Shield as LucideShield, TriangleAlert as LucideTriangleAlert, UserCheck as LucideUserCheck, X as LucideX } from 'lucide-react';
+import { ArrowLeft as LucideArrowLeft, ChevronDown as LucideChevronDown, FileText as LucideFileText, Home as LucideHome, LayoutDashboard as LucideLayoutDashboard, Menu as LucideMenu, MonitorPlay as LucideMonitorPlay, Package as LucidePackage, Rss as LucideRss, Settings as LucideSettings, Shield as LucideShield, TriangleAlert as LucideTriangleAlert, UserCheck as LucideUserCheck, X as LucideX } from 'lucide-react';
 
 import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -81,6 +81,10 @@ type CustomDashboardPreview = {
 
 const HomeIcon = () => (
     <LucideHome width="18" height="18" />
+);
+
+const LivePanelIcon = () => (
+    <LucideMonitorPlay width="18" height="18" />
 );
 
 const BackIcon = () => (
@@ -457,6 +461,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             : '...';
     const canManageDashboardSettings = userPermissions.is_admin || userPermissions.can_manage_settings;
     const canUseStandardDashboard = userPermissions.is_admin || userPermissions.can_access_dashboard;
+    const canUseLivePanel = userPermissions.is_admin || userPermissions.can_access_live_panel;
     const dashboardHomeHref = isCustomDashboardHost ? `/custom-dashboard/${id}` : '/dashboard';
     const hasConfiguredCustomDashboard = Boolean(customDashboardInfo?.subdomain || customDashboardInfo?.hostname);
     const isCustomDashboardStyled = Boolean(customDashboardPreview || hasConfiguredCustomDashboard || isCustomDashboardHost);
@@ -517,6 +522,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
     const utilityItems = [
         { label: "Home", icon: <HomeIcon />, href: `/dashboard/${id}`, hide: !canUseStandardDashboard },
+        { label: "Live Panel", icon: <LivePanelIcon />, href: `/dashboard/${id}/live-panel`, hide: !canUseLivePanel },
         {
             label: "Modules",
             icon: <ModulesIcon />,

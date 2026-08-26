@@ -107,7 +107,7 @@ export default function CreatorModulesPage() {
         return (
             <div className="flex min-h-screen items-center justify-center bg-[#020617] p-6 text-center text-white">
                 <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900/35 p-8 shadow-2xl shadow-slate-950/40">
-                    <Image src="/Media/Ro-LinkIcon.png" alt="" width={48} height={48} className="mx-auto mb-5 h-12 w-12 rounded-xl border border-white/5 object-contain shadow-lg" />
+                    <Image src="/Media/Ro-LinkIcon.png" alt="" width={48} height={48} className="mx-auto mb-5 h-12 w-12 rounded-xl object-contain shadow-lg" />
                     <h1 className="text-2xl font-bold">Sign in required</h1>
                     <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-slate-400">Authenticate with Discord before viewing your modules.</p>
                     <button
@@ -126,7 +126,7 @@ export default function CreatorModulesPage() {
             <nav className="sticky top-0 z-50 border-b border-slate-800/80 bg-[#020617]/90 backdrop-blur-md">
                 <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-8 md:h-20 md:py-0">
                     <Link href="/dashboard" className="flex items-center gap-2 transition-opacity hover:opacity-80 md:gap-3">
-                        <Image src="/Media/Ro-LinkIcon.png" alt="Ro-Link" width={36} height={36} className="h-8 w-8 rounded-lg border border-white/5 object-contain shadow-lg md:h-9 md:w-9" />
+                        <Image src="/Media/Ro-LinkIcon.png" alt="Ro-Link" width={36} height={36} className="h-8 w-8 rounded-lg object-contain shadow-lg md:h-9 md:w-9" />
                         <span className="text-base font-bold text-white md:text-xl">Ro-Link</span>
                     </Link>
                     <Link

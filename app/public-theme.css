@@ -122,9 +122,9 @@
   height: 34px;
   place-items: center;
   overflow: hidden;
-  border: 1px solid rgba(20, 156, 255, 0.24);
+  border: 0;
   border-radius: 7px;
-  background: var(--rl-blue-soft);
+  background: transparent;
 }
 
 .rl-brand-mark img {

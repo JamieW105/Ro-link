@@ -8,9 +8,10 @@ import Link from 'next/link';
 import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
 import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from "@/lib/discordMedia";
-import { LogOut, Plus, Settings, ShieldAlert, Store } from "lucide-react";
+import { LogOut, MonitorPlay, Plus, Settings, ShieldAlert, Store } from "lucide-react";
 
 const LogOutIcon = () => <LogOut size={14} aria-hidden="true" />;
+const LivePanelIcon = () => <MonitorPlay size={15} aria-hidden="true" />;
 const PlusIcon = () => <Plus size={14} strokeWidth={2.5} aria-hidden="true" />;
 const SettingsIcon = () => <Settings size={15} aria-hidden="true" />;
 const MarketplaceIcon = () => <Store size={15} aria-hidden="true" />;
@@ -98,6 +99,10 @@ function canOpenDashboardAction(permissions?: GuildDashboardPermissions) {
 
 function canOpenDashboardFromServerList(guild: Guild, permissions?: GuildDashboardPermissions) {
     return canOpenDashboardAction(permissions) || canOpenMarketplaceFromServerList(guild);
+}
+
+function canOpenLivePanelAction(permissions?: GuildDashboardPermissions) {
+    return Boolean(permissions?.is_admin || permissions?.can_access_live_panel);
 }
 
 export default function Dashboard() {
@@ -307,6 +312,11 @@ export default function Dashboard() {
                         {sortedGuilds.map(guild => (
                             <article key={guild.id} className="interactive-lift rl-dashboard-server-card">
                                 <div className="rl-dashboard-card-head">
+                                    {guild.hasBot && canOpenLivePanelAction(guildPermissions[guild.id]) && (
+                                        <ServerIconLink href={`/dashboard/${guild.id}/live-panel`} label="Live Panel" tone="live">
+                                            <LivePanelIcon />
+                                        </ServerIconLink>
+                                    )}
                                     {guild.hasBot && canOpenDashboardFromServerList(guild, guildPermissions[guild.id]) && (
                                         <ServerIconLink href={`/dashboard/${guild.id}`} label="Settings">
                                             <SettingsIcon />
