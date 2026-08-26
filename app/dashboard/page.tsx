@@ -119,6 +119,7 @@ export default function Dashboard() {
     const [guildPermissions, setGuildPermissions] = useState<Record<string, GuildDashboardPermissions>>({});
     const [loading, setLoading] = useState(false);
     const [guildsError, setGuildsError] = useState<string | null>(null);
+    const [needsReauthentication, setNeedsReauthentication] = useState(false);
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
     const sortedGuilds = useMemo(() => [...guilds].sort(compareGuildsByBotStatus), [guilds]);
 
@@ -134,10 +135,14 @@ export default function Dashboard() {
 
             setLoading(true);
             setGuildsError(null);
+            setNeedsReauthentication(false);
             try {
                 const response = await fetch('/api/guilds', { cache: 'no-store' });
                 const data = await response.json();
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        setNeedsReauthentication(true);
+                    }
                     throw new Error(typeof data?.error === 'string' ? data.error : `Failed to load servers (${response.status})`);
                 }
                 if (!Array.isArray(data)) {
@@ -302,13 +307,19 @@ export default function Dashboard() {
                     </div>
                 ) : guildsError ? (
                     <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-8 text-center">
-                        <h2 className="text-lg font-bold text-white">Could not load servers</h2>
-                        <p className="mt-2 text-sm font-medium text-red-100/80">{guildsError}</p>
+                        <h2 className="text-lg font-bold text-white">
+                            {needsReauthentication ? 'Discord session expired' : 'Could not load servers'}
+                        </h2>
+                        <p className="mt-2 text-sm font-medium text-red-100/80">
+                            {needsReauthentication ? 'Sign in with Discord again to refresh your server access.' : guildsError}
+                        </p>
                         <button
-                            onClick={() => window.location.reload()}
+                            onClick={() => needsReauthentication
+                                ? signIn('discord', { callbackUrl: '/dashboard' })
+                                : window.location.reload()}
                             className="mt-6 rounded-lg bg-red-500 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-red-400"
                         >
-                            Retry
+                            {needsReauthentication ? 'Sign in again' : 'Retry'}
                         </button>
                     </div>
                 ) : sortedGuilds.length === 0 ? (
