@@ -214,10 +214,21 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
             <main>
                 <section className="border-b border-slate-800/80 bg-gradient-to-b from-[#0b1016] to-[#080b0f]" aria-labelledby="module-title">
                     <div className="rl-shell py-8 md:py-10">
-                        <Link href="/dashboard/marketplace" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-sky-300">
-                            <ArrowLeft size={14} aria-hidden="true" />
-                            Back to Marketplace
-                        </Link>
+                        <div className="flex items-center justify-between gap-4">
+                            <Link href="/dashboard/marketplace" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-sky-300">
+                                <ArrowLeft size={14} aria-hidden="true" />
+                                Back to Marketplace
+                            </Link>
+                            {addon && (
+                                <button
+                                    type="button"
+                                    onClick={() => setInstallPickerOpen(true)}
+                                    className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 text-xs font-bold uppercase tracking-wider text-sky-200 transition-colors hover:bg-sky-500/15 hover:text-white"
+                                >
+                                    Install
+                                </button>
+                            )}
+                        </div>
                         {addon && (
                             <div className="mt-6">
                                 <div className="flex flex-wrap items-center gap-2">
@@ -293,13 +304,6 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                         <p className="mt-1.5 break-all font-mono text-[11px] leading-5 text-slate-400">{addon.sourceChecksum || 'Unavailable'}</p>
                                     </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setInstallPickerOpen(true)}
-                                    className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 text-xs font-bold uppercase tracking-wider text-sky-200 transition-colors hover:bg-sky-500/15 hover:text-white"
-                                >
-                                    Select Server To Install
-                                </button>
                             </aside>
                         </div>
                     </section>
