@@ -268,7 +268,6 @@ export default function Dashboard() {
                     </div>
                     <div className="rl-dashboard-primary-actions">
                         <Link href="/dashboard/marketplace" className="rl-button"><MarketplaceIcon />Marketplace</Link>
-                        <Link href="/dashboard/creator/modules" className="rl-button rl-button-primary"><PlusIcon />Creator dashboard</Link>
                     </div>
                 </div>
             </section>
