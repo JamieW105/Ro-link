@@ -1,6 +1,16 @@
 'use client';
 
-import { LogOut as LucideLogOut, ShieldAlert as LucideShieldAlert } from 'lucide-react';
+import {
+    ArrowLeft,
+    Boxes,
+    FileText,
+    Library,
+    LogOut as LucideLogOut,
+    Plus,
+    ShieldAlert as LucideShieldAlert,
+    Store,
+    X,
+} from 'lucide-react';
 
 import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
@@ -244,113 +254,132 @@ export default function DashboardMarketplacePage() {
 
     if (status === 'loading') {
         return (
-            <div className="min-h-screen bg-[#020617] flex items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent"></div>
-            </div>
+            <main className="rl-public-page rl-dashboard-page rl-dashboard-state">
+                <div className="rl-dashboard-spinner" aria-label="Loading marketplace" />
+            </main>
         );
     }
 
     if (status === 'unauthenticated') {
         return (
-            <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-6 text-center">
-                <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center mb-6 text-slate-400 border border-slate-700 shadow-xl">
-                    <LucideShieldAlert width="32" height="32" strokeWidth="2" />
-                </div>
-                <h1 className="text-2xl font-bold mb-2 tracking-tight">Access Denied</h1>
-                <p className="text-slate-400 mb-8 max-w-sm text-sm">Please authenticate with Discord to browse marketplace modules.</p>
-                <button
-                    onClick={() => signIn('discord')}
-                    className="bg-sky-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-sky-500 transition-all shadow-lg shadow-sky-900/10 text-sm"
-                >
-                    Sign In with Discord
-                </button>
-            </div>
+            <main className="rl-public-page rl-dashboard-page rl-dashboard-state">
+                <section className="rl-dashboard-auth-card" aria-labelledby="marketplace-access-title">
+                    <span className="rl-dashboard-state-icon"><LucideShieldAlert aria-hidden="true" /></span>
+                    <p className="rl-eyebrow">Module marketplace</p>
+                    <h1 id="marketplace-access-title">Sign in to browse modules.</h1>
+                    <p>Authenticate with Discord to explore and install modules for your Ro-Link servers.</p>
+                    <button onClick={() => signIn('discord')} className="rl-button rl-button-primary" type="button">
+                        Sign in with Discord
+                    </button>
+                </section>
+            </main>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-200">
-            <nav className="sticky top-0 z-50 border-b border-slate-800 bg-[#020617]/80 backdrop-blur-md">
-                <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-8 md:h-20 md:py-0">
-                    <Link href="/dashboard" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
-                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 md:w-9 md:h-9 rounded-lg object-contain shadow-lg border border-white/5" />
-                        <span className="text-base md:text-xl font-bold tracking-tight text-white">Ro-Link</span>
+        <div className="rl-public-page min-h-screen bg-[#080b0f] text-slate-200">
+            <nav className="rl-dashboard-nav" aria-label="Marketplace navigation">
+                <div className="rl-dashboard-nav-inner rl-shell">
+                    <Link href="/dashboard" className="rl-brand" aria-label="Back to Ro-Link dashboard">
+                        <span className="rl-brand-mark"><img src="/Media/Ro-LinkIcon.png" alt="" /></span>
+                        <span>Ro-Link</span>
                     </Link>
 
-                    <div className="ml-auto flex items-center gap-2 border-l border-slate-800 pl-3 sm:gap-4 md:pl-4">
+                    <div className="rl-dashboard-account">
                         {sessionUserId === '953414442060746854' && (
                             <Link
                                 href="/management"
-                                className="hidden md:flex items-center gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-sky-900/20"
+                                className="rl-button rl-dashboard-management"
                             >
                                 Management
                             </Link>
                         )}
-                        <div className="text-right hidden sm:block">
-                            <p className="text-sm font-semibold text-white leading-none mb-1">{session?.user?.name}</p>
-                            <button type="button" onClick={handleSignOut} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
+                        <div className="rl-dashboard-user-copy">
+                            <strong>{session?.user?.name}</strong>
+                            <button type="button" onClick={handleSignOut}>
                                 <LogOutIcon />
                                 Sign Out
                             </button>
                         </div>
-                        <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm" />
+                        <div className="rl-dashboard-avatar-wrap">
+                            <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="rl-dashboard-avatar" />
+                            <button type="button" onClick={handleSignOut} className="rl-dashboard-mobile-signout" aria-label="Sign out">
+                                <LogOutIcon />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </nav>
 
-            <main className="mx-auto max-w-7xl px-4 py-6 sm:px-8 md:py-12">
-                <header className="mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-                    <div>
-                        <Link href="/dashboard" className="text-xs font-bold uppercase tracking-widest text-sky-300 hover:text-sky-200">
-                            Back to Dashboard
-                        </Link>
-                        <h1 className="mt-3 text-3xl font-black tracking-tight text-white md:text-4xl">Marketplace</h1>
-                        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
-                            Browse published modules, submit your own, and track your submissions while moderation reviews them.
-                        </p>
+            <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-8 md:py-10">
+                <header className="overflow-hidden rounded-lg border border-slate-800 bg-[#070b12] shadow-2xl shadow-black/25">
+                    <div className="border-b border-slate-800 bg-gradient-to-r from-slate-950 via-slate-950 to-slate-900 px-5 py-5 md:px-7 md:py-6">
+                        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="min-w-0">
+                                <Link href="/dashboard" className="mb-3 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 transition-colors hover:text-sky-300">
+                                    <ArrowLeft size={13} aria-hidden="true" />
+                                    Back to servers
+                                </Link>
+                                <div className="flex items-center gap-3">
+                                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-sky-500/20 bg-sky-500/10 text-sky-300">
+                                        <Store size={20} aria-hidden="true" />
+                                    </span>
+                                    <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-400">Module library</p>
+                                        <h1 className="mt-1 text-2xl font-black tracking-tight text-white md:text-4xl">Marketplace</h1>
+                                    </div>
+                                </div>
+                                <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-slate-400">
+                                    Browse published modules, submit your own, and track submissions through moderation.
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Link href="/terms/modules/use" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-950/40 px-4 text-xs font-bold uppercase tracking-wider text-slate-300 transition-all hover:border-sky-500/40 hover:text-white">
+                                    <FileText size={14} aria-hidden="true" />
+                                    Terms
+                                </Link>
+                                <Link href="/dashboard/creator/modules" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-950/40 px-4 text-xs font-bold uppercase tracking-wider text-slate-300 transition-all hover:border-emerald-500/40 hover:text-emerald-200">
+                                    <Library size={14} aria-hidden="true" />
+                                    My Modules
+                                </Link>
+                                <Link href="/dashboard/marketplace/create" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 text-xs font-bold uppercase tracking-wider text-sky-200 transition-all hover:bg-sky-500/15 hover:text-white">
+                                    <Plus size={14} strokeWidth={2.5} aria-hidden="true" />
+                                    Create Module
+                                </Link>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        <Link
-                            href="/terms/modules/use"
-                            className="inline-flex items-center justify-center rounded-xl border border-slate-700 px-5 py-4 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
-                        >
-                            Module Terms
-                        </Link>
-                        <Link
-                            href="/dashboard/creator/modules"
-                            className="inline-flex items-center justify-center rounded-xl border border-emerald-500/30 px-5 py-4 text-xs font-bold uppercase tracking-widest text-emerald-200 transition-colors hover:bg-emerald-500/10"
-                        >
-                            My Modules
-                        </Link>
-                        <Link
-                            href="/dashboard/marketplace/create"
-                            className="inline-flex items-center justify-center rounded-xl bg-sky-600 px-5 py-4 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500"
-                        >
-                            Create Module
-                        </Link>
-                        <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4 text-right">
-                            <div className="text-2xl font-black text-white">{modules.length}</div>
-                            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Visible Modules</div>
+                    <div className="grid grid-cols-2 divide-x divide-slate-800/80">
+                        <div className="px-5 py-4 md:px-7">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">Visible Modules</p>
+                            <p className="mt-2 text-2xl font-black text-white">{modules.length}</p>
+                        </div>
+                        <div className="px-5 py-4 md:px-7">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">Install Targets</p>
+                            <p className="mt-2 text-2xl font-black text-sky-300">{installTargets.length}</p>
                         </div>
                     </div>
                 </header>
 
                 {loading ? (
-                    <div className="flex min-h-[360px] items-center justify-center">
-                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent"></div>
+                    <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 rounded-lg border border-slate-800 bg-slate-950/35">
+                        <div className="rl-dashboard-spinner" />
+                        <p className="text-xs font-medium text-slate-500">Loading marketplace...</p>
                     </div>
                 ) : error ? (
-                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
                         {error}
                     </div>
                 ) : modules.length === 0 ? (
-                    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-10 text-center text-slate-500">
-                        No modules are available.
+                    <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border border-slate-800 bg-slate-950/35 p-10 text-center">
+                        <span className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-slate-800 bg-slate-900/70 text-slate-500"><Boxes size={19} aria-hidden="true" /></span>
+                        <h2 className="text-sm font-bold text-white">No modules available</h2>
+                        <p className="mt-2 text-sm text-slate-500">Published modules and your submissions will appear here.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                         {modules.map((addon) => (
-                            <article key={addon.id} className="flex min-h-64 flex-col rounded-xl border border-slate-800 bg-slate-900/40 p-6 transition-colors hover:border-sky-500/30">
+                            <article key={addon.id} className="flex min-h-60 flex-col rounded-lg border border-slate-800 bg-slate-950/45 p-5 shadow-lg shadow-black/10 transition-all hover:-translate-y-0.5 hover:border-sky-500/30 hover:bg-slate-900/55">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">
                                         {addon.category}
@@ -374,8 +403,8 @@ export default function DashboardMarketplacePage() {
                                         </span>
                                     )}
                                 </div>
-                                <h2 className="mt-4 text-xl font-bold text-white">{addon.name}</h2>
-                                <p className="mt-2 line-clamp-4 text-sm leading-relaxed text-slate-400">{addon.description || 'No description provided.'}</p>
+                                <h2 className="mt-4 text-lg font-black tracking-tight text-white">{addon.name}</h2>
+                                <p className="mt-2 line-clamp-4 text-sm font-medium leading-6 text-slate-500">{addon.description || 'No description provided.'}</p>
                                 <div className="mt-auto pt-6">
                                     <div className="mb-4 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">
                                         <span>v{addon.version}</span>
@@ -385,7 +414,7 @@ export default function DashboardMarketplacePage() {
                                     <button
                                         type="button"
                                         onClick={() => openModulePreview(addon)}
-                                        className="w-full rounded-xl border border-sky-500/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10"
+                                        className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/5 px-4 text-xs font-bold uppercase tracking-wider text-sky-200 transition-colors hover:bg-sky-500/10 hover:text-white"
                                     >
                                         Open Module
                                     </button>
@@ -396,9 +425,9 @@ export default function DashboardMarketplacePage() {
                 )}
 
                 {selectedModule && (
-                    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-                        <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-700 bg-[#020617] shadow-2xl">
-                            <div className="flex flex-col gap-4 border-b border-slate-800 bg-slate-950/80 px-5 py-5 md:flex-row md:items-start md:justify-between md:px-7">
+                    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+                        <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-lg border border-slate-700 bg-[#070b12] shadow-2xl shadow-black/50">
+                            <div className="flex flex-col gap-4 border-b border-slate-800 bg-gradient-to-r from-slate-950 via-slate-950 to-slate-900 px-5 py-5 md:flex-row md:items-start md:justify-between md:px-7">
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">
@@ -421,18 +450,18 @@ export default function DashboardMarketplacePage() {
                                             </span>
                                         )}
                                     </div>
-                                    <h2 className="mt-4 text-2xl font-black tracking-tight text-white md:text-4xl">{selectedModule.name}</h2>
-                                    <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
+                                    <h2 className="mt-4 text-2xl font-black tracking-tight text-white md:text-3xl">{selectedModule.name}</h2>
+                                    <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-slate-400">
                                         {selectedModule.description || 'No description provided.'}
                                     </p>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={closeModulePreview}
-                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
+                                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-950/40 text-slate-400 transition-colors hover:border-sky-500/40 hover:text-white"
                                     aria-label="Close module preview"
                                 >
-                                    x
+                                    <X size={16} aria-hidden="true" />
                                 </button>
                             </div>
 
@@ -441,13 +470,13 @@ export default function DashboardMarketplacePage() {
                                     <section>
                                         <h3 className="text-sm font-bold uppercase tracking-widest text-white">Configuration Fields</h3>
                                         {Object.values(selectedModule.configSchema || {}).length === 0 ? (
-                                            <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-5 text-sm text-slate-500">
+                                            <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-5 text-sm text-slate-500">
                                                 This module does not expose configurable fields.
                                             </div>
                                         ) : (
                                             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                                                 {Object.values(selectedModule.configSchema || {}).map((field) => (
-                                                    <div key={field.key} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                                                    <div key={field.key} className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div>
                                                                 <p className="text-sm font-bold text-white">{field.label}</p>
@@ -480,29 +509,29 @@ export default function DashboardMarketplacePage() {
                                     </section>
 
                                     <aside className="space-y-4">
-                                        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+                                        <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-5">
                                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Slug</p>
                                             <p className="mt-2 break-all font-mono text-sm text-slate-300">{selectedModule.slug}</p>
                                         </div>
-                                        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+                                        <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-5">
                                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Review Status</p>
                                             <p className="mt-2 text-sm font-semibold text-slate-300">{statusLabel(selectedModule.status)}</p>
                                             {selectedModule.status === 'REJECTED' && selectedModule.moderationNote && (
                                                 <p className="mt-2 text-xs leading-relaxed text-red-300">{selectedModule.moderationNote}</p>
                                             )}
                                         </div>
-                                        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+                                        <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-5">
                                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Published</p>
                                             <p className="mt-2 text-sm font-semibold text-slate-300">{formatDate(selectedModule.publishedAt)}</p>
                                         </div>
-                                        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+                                        <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-5">
                                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Checksum</p>
                                             <p className="mt-2 break-all font-mono text-xs text-slate-300">{selectedModule.sourceChecksum || 'Unavailable'}</p>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={() => openInstallPicker(selectedModule.id)}
-                                            className="inline-flex w-full items-center justify-center rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500"
+                                            className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 text-xs font-bold uppercase tracking-wider text-sky-200 transition-colors hover:bg-sky-500/15 hover:text-white"
                                         >
                                             Select Server To Install
                                         </button>
@@ -515,40 +544,40 @@ export default function DashboardMarketplacePage() {
 
                 {installPickerModule && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-                        <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-700 bg-[#020617] shadow-2xl">
-                            <div className="flex items-start justify-between gap-4 border-b border-slate-800 bg-slate-950/80 px-5 py-5">
+                        <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-lg border border-slate-700 bg-[#070b12] shadow-2xl shadow-black/50">
+                            <div className="flex items-start justify-between gap-4 border-b border-slate-800 bg-gradient-to-r from-slate-950 via-slate-950 to-slate-900 px-5 py-5">
                                 <div>
                                     <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-sky-400">Install Module</p>
                                     <h3 className="mt-2 text-2xl font-black tracking-tight text-white">{installPickerModule.name}</h3>
-                                    <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                                    <p className="mt-2 text-sm font-medium leading-6 text-slate-400">
                                         Click a server to install. Right-click a server to start multi-select.
                                     </p>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={closeInstallPicker}
-                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition-colors hover:border-slate-500 hover:text-white disabled:opacity-50"
+                                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-950/40 text-slate-400 transition-colors hover:border-sky-500/40 hover:text-white disabled:opacity-50"
                                     aria-label="Close install picker"
                                     disabled={installing}
                                 >
-                                    x
+                                    <X size={16} aria-hidden="true" />
                                 </button>
                             </div>
 
                             <div className="custom-scrollbar max-h-[calc(90vh-170px)] overflow-y-auto px-5 py-5">
                                 {installError && (
-                                    <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300">
+                                    <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300">
                                         {installError}
                                     </div>
                                 )}
                                 {installMessage && (
-                                    <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-300">
+                                    <div className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-300">
                                         {installMessage}
                                     </div>
                                 )}
 
                                 {installTargets.length === 0 ? (
-                                    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-8 text-center text-sm text-slate-500">
+                                    <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-8 text-center text-sm text-slate-500">
                                         No servers are available for module installs.
                                     </div>
                                 ) : (
@@ -575,7 +604,7 @@ export default function DashboardMarketplacePage() {
                                                         toggleServerSelection(server.id);
                                                     }}
                                                     disabled={installing || full}
-                                                    className={`flex min-h-20 items-center gap-3 rounded-xl border p-4 text-left transition-colors disabled:opacity-50 ${selected ? 'border-sky-400 bg-sky-500/15' : 'border-slate-800 bg-slate-900/40 hover:border-sky-500/40'}`}
+                                                    className={`flex min-h-20 items-center gap-3 rounded-lg border p-4 text-left transition-all disabled:opacity-50 ${selected ? 'border-sky-400 bg-sky-500/15' : 'border-slate-800 bg-slate-950/45 hover:border-sky-500/40 hover:bg-slate-900/55'}`}
                                                 >
                                                     {server.icon ? (
                                                         <img
@@ -614,7 +643,7 @@ export default function DashboardMarketplacePage() {
                                                 setSelectedServerIds([]);
                                             }}
                                             disabled={installing}
-                                            className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-slate-500 disabled:opacity-50"
+                                            className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-700 px-4 text-xs font-bold uppercase tracking-wider text-slate-200 transition-colors hover:border-slate-500 disabled:opacity-50"
                                         >
                                             Cancel
                                         </button>
@@ -622,7 +651,7 @@ export default function DashboardMarketplacePage() {
                                             type="button"
                                             onClick={() => installModuleToServers(installPickerModule.id, selectedServerIds)}
                                             disabled={installing || selectedServerIds.length === 0}
-                                            className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
+                                            className="inline-flex h-10 items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 text-xs font-bold uppercase tracking-wider text-sky-200 transition-colors hover:bg-sky-500/15 hover:text-white disabled:opacity-50"
                                         >
                                             {installing ? 'Installing' : 'Install Selected'}
                                         </button>

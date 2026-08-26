@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"next dev\" \"node scripts/bot.js\"",
+    "web": "next dev",
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "test:module-ide": "tsx --test scripts/module-ide.test.ts",
