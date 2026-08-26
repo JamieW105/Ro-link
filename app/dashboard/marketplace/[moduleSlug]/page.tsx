@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { trimModuleString } from '@/lib/modules';
 import { supabase } from '@/lib/supabase';
 
-import ModuleMarketplaceRedirect from './ModuleMarketplaceRedirect';
+import ModuleMarketplaceDetail from './ModuleMarketplaceDetail';
 
 type RouteContext = {
     params: Promise<{
@@ -91,5 +91,5 @@ export async function generateMetadata(context: RouteContext): Promise<Metadata>
 export default async function MarketplaceModulePage(context: RouteContext) {
     const { moduleSlug } = await context.params;
 
-    return <ModuleMarketplaceRedirect moduleSlug={moduleSlug} />;
+    return <ModuleMarketplaceDetail moduleSlug={moduleSlug} />;
 }

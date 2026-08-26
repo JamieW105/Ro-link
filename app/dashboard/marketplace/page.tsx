@@ -2,20 +2,17 @@
 
 import {
     Boxes,
-    FileText,
-    Library,
     LogOut as LucideLogOut,
     Plus,
     Search,
     ShieldAlert as LucideShieldAlert,
     Store,
-    X,
 } from 'lucide-react';
 
 import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from '@/lib/discordMedia';
+import { useEffect, useMemo, useState } from 'react';
+import { getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 
 type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
 
@@ -50,14 +47,6 @@ interface MarketplaceModule {
     updatedAt: string | null;
 }
 
-interface InstallTarget {
-    id: string;
-    name: string;
-    icon: string | null;
-    installedModuleCount: number;
-    moduleLimit: number;
-}
-
 type SessionUserWithId = {
     id?: string;
 };
@@ -83,35 +72,14 @@ function statusLabel(status: string) {
     return status.replace(/_/g, ' ');
 }
 
-function getModuleParam() {
-    if (typeof window === 'undefined') return '';
-    return new URLSearchParams(window.location.search).get('module') || '';
-}
-
 export default function DashboardMarketplacePage() {
     const { data: session, status } = useSession();
     const [modules, setModules] = useState<MarketplaceModule[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
-    const [installTargets, setInstallTargets] = useState<InstallTarget[]>([]);
-    const [installPickerModuleId, setInstallPickerModuleId] = useState<string | null>(null);
-    const [selectedServerIds, setSelectedServerIds] = useState<string[]>([]);
-    const [multiSelectInstall, setMultiSelectInstall] = useState(false);
-    const [installing, setInstalling] = useState(false);
-    const [installMessage, setInstallMessage] = useState<string | null>(null);
-    const [installError, setInstallError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
 
-    const selectedModule = useMemo(
-        () => modules.find((addon) => addon.id === selectedModuleId) || null,
-        [modules, selectedModuleId],
-    );
-    const installPickerModule = useMemo(
-        () => modules.find((addon) => addon.id === installPickerModuleId) || null,
-        [modules, installPickerModuleId],
-    );
     const filteredModules = useMemo(() => {
         const normalizedQuery = searchQuery.trim().toLowerCase();
         if (!normalizedQuery) return modules;
@@ -123,43 +91,6 @@ export default function DashboardMarketplacePage() {
             || addon.version.toLowerCase().includes(normalizedQuery)
         ));
     }, [modules, searchQuery]);
-
-    const syncSelectedModuleFromUrl = useCallback((nextModules: MarketplaceModule[]) => {
-        const moduleParam = getModuleParam();
-        if (!moduleParam) {
-            setSelectedModuleId(null);
-            return;
-        }
-
-        const decodedModuleParam = moduleParam.toLowerCase();
-        const matchedModule = nextModules.find((addon) => (
-            addon.slug.toLowerCase() === decodedModuleParam
-            || addon.id.toLowerCase() === decodedModuleParam
-        ));
-
-        setSelectedModuleId(matchedModule?.id || null);
-    }, []);
-
-    function setMarketplaceModuleUrl(moduleSlug: string | null) {
-        if (typeof window === 'undefined') return;
-        const url = new URL(window.location.href);
-        if (moduleSlug) {
-            url.searchParams.set('module', moduleSlug);
-        } else {
-            url.searchParams.delete('module');
-        }
-        window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`);
-    }
-
-    function openModulePreview(addon: MarketplaceModule) {
-        setSelectedModuleId(addon.id);
-        setMarketplaceModuleUrl(addon.slug);
-    }
-
-    function closeModulePreview() {
-        setSelectedModuleId(null);
-        setMarketplaceModuleUrl(null);
-    }
 
     useEffect(() => {
         if (status !== 'authenticated') {
@@ -174,94 +105,15 @@ export default function DashboardMarketplacePage() {
                 }
                 const nextModules = Array.isArray(payload.modules) ? payload.modules : [];
                 setModules(nextModules);
-                setInstallTargets(Array.isArray(payload.installTargets) ? payload.installTargets : []);
-                syncSelectedModuleFromUrl(nextModules);
             })
             .catch((loadError) => {
                 setError(loadError instanceof Error ? loadError.message : 'Failed to load marketplace.');
             })
             .finally(() => setLoading(false));
-    }, [status, syncSelectedModuleFromUrl]);
-
-    useEffect(() => {
-        function handlePopState() {
-            syncSelectedModuleFromUrl(modules);
-        }
-
-        window.addEventListener('popstate', handlePopState);
-        return () => window.removeEventListener('popstate', handlePopState);
-    }, [modules, syncSelectedModuleFromUrl]);
-
-    function openInstallPicker(moduleId: string) {
-        setInstallPickerModuleId(moduleId);
-        setSelectedServerIds([]);
-        setMultiSelectInstall(false);
-        setInstallMessage(null);
-        setInstallError(null);
-    }
-
-    function closeInstallPicker() {
-        if (installing) return;
-        setInstallPickerModuleId(null);
-        setSelectedServerIds([]);
-        setMultiSelectInstall(false);
-        setInstallMessage(null);
-        setInstallError(null);
-    }
+    }, [status]);
 
     function handleSignOut() {
         void signOut({ callbackUrl: '/auth/signin' });
-    }
-
-    function toggleServerSelection(serverId: string) {
-        const target = installTargets.find((server) => server.id === serverId);
-        if (target && target.installedModuleCount >= target.moduleLimit && !selectedServerIds.includes(serverId)) {
-            return;
-        }
-
-        setSelectedServerIds((current) => (
-            current.includes(serverId)
-                ? current.filter((id) => id !== serverId)
-                : [...current, serverId]
-        ));
-    }
-
-    async function installModuleToServers(moduleId: string, serverIds: string[]) {
-        if (serverIds.length === 0) return;
-
-        setInstalling(true);
-        setInstallError(null);
-        setInstallMessage(null);
-
-        try {
-            const results = await Promise.all(serverIds.map(async (serverId) => {
-                const response = await fetch('/api/dashboard/modules', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        serverId,
-                        moduleId,
-                        action: 'install',
-                    }),
-                });
-                const payload = await response.json().catch(() => ({}));
-
-                if (!response.ok) {
-                    const target = installTargets.find((server) => server.id === serverId);
-                    throw new Error(`${target?.name || serverId}: ${String(payload.error || 'Install failed.')}`);
-                }
-
-                return serverId;
-            }));
-
-            setInstallMessage(`Installed to ${results.length} server${results.length === 1 ? '' : 's'}.`);
-            setSelectedServerIds([]);
-            setMultiSelectInstall(false);
-        } catch (installFailure) {
-            setInstallError(installFailure instanceof Error ? installFailure.message : 'Install failed.');
-        } finally {
-            setInstalling(false);
-        }
     }
 
     if (status === 'loading') {
@@ -336,9 +188,7 @@ export default function DashboardMarketplacePage() {
                             </div>
                         </div>
                         <div className="rl-dashboard-primary-actions">
-                            <Link href="/terms/modules/use" className="rl-button"><FileText size={14} aria-hidden="true" />Terms</Link>
-                            <Link href="/dashboard/creator/modules" className="rl-button"><Library size={14} aria-hidden="true" />My Modules</Link>
-                            <Link href="/dashboard/marketplace/create" className="rl-button rl-button-primary"><Plus size={14} strokeWidth={2.5} aria-hidden="true" />Create</Link>
+                            <Link href="/dashboard/creator/modules" className="rl-button rl-button-primary"><Plus size={14} strokeWidth={2.5} aria-hidden="true" />Create</Link>
                         </div>
                     </div>
                 </section>
@@ -389,7 +239,12 @@ export default function DashboardMarketplacePage() {
                             ) : (
                                 <div className="motion-list grid gap-2">
                                     {filteredModules.map((addon) => (
-                                        <article key={addon.id} className="interactive-lift flex min-w-0 flex-col gap-4 rounded-lg border border-slate-800 bg-[#0d1116] p-3 transition-colors hover:border-sky-500/30 hover:bg-[#0f141a] sm:flex-row sm:items-center">
+                                        <Link
+                                            key={addon.id}
+                                            href={`/dashboard/marketplace/${encodeURIComponent(addon.slug)}`}
+                                            className="interactive-lift flex min-w-0 flex-col gap-4 rounded-lg border border-slate-800 bg-[#0d1116] p-3 transition-colors hover:border-sky-500/30 hover:bg-[#0f141a] focus-visible:border-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 sm:flex-row sm:items-center"
+                                            aria-label={`View ${addon.name}`}
+                                        >
                                             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-900/70 text-sky-300">
                                                 <Store size={18} aria-hidden="true" />
                                             </span>
@@ -417,14 +272,7 @@ export default function DashboardMarketplacePage() {
                                                 </div>
                                             </div>
 
-                                            <button
-                                                type="button"
-                                                onClick={() => openModulePreview(addon)}
-                                                className="rl-button w-full shrink-0 sm:w-auto"
-                                            >
-                                                Open Module
-                                            </button>
-                                        </article>
+                                        </Link>
                                     ))}
                                 </div>
                             )}
@@ -432,243 +280,12 @@ export default function DashboardMarketplacePage() {
                     )}
                 </section>
 
-                {selectedModule && (
-                    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-                        <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-lg border border-slate-700 bg-[#070b12] shadow-2xl shadow-black/50">
-                            <div className="flex flex-col gap-4 border-b border-slate-800 bg-gradient-to-r from-slate-950 via-slate-950 to-slate-900 px-5 py-5 md:flex-row md:items-start md:justify-between md:px-7">
-                                <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">
-                                            {selectedModule.category}
-                                        </span>
-                                        <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                            v{selectedModule.version}
-                                        </span>
-                                        <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(selectedModule.status)}`}>
-                                            {statusLabel(selectedModule.status)}
-                                        </span>
-                                        {selectedModule.isOfficial && (
-                                            <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
-                                                Official
-                                            </span>
-                                        )}
-                                        {selectedModule.creatorIsVerified && (
-                                            <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
-                                                Verified Creator
-                                            </span>
-                                        )}
-                                    </div>
-                                    <h2 className="mt-4 text-2xl font-black tracking-tight text-white md:text-3xl">{selectedModule.name}</h2>
-                                    <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-slate-400">
-                                        {selectedModule.description || 'No description provided.'}
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={closeModulePreview}
-                                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-950/40 text-slate-400 transition-colors hover:border-sky-500/40 hover:text-white"
-                                    aria-label="Close module preview"
-                                >
-                                    <X size={16} aria-hidden="true" />
-                                </button>
-                            </div>
+                <div className="rl-shell pb-8 text-right">
+                    <Link href="/terms/modules/use" className="text-[10px] font-medium text-slate-700 transition-colors hover:text-slate-500">
+                        Module terms
+                    </Link>
+                </div>
 
-                            <div className="custom-scrollbar max-h-[calc(90vh-180px)] overflow-y-auto px-5 py-6 md:px-7">
-                                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-                                    <section>
-                                        <h3 className="text-sm font-bold uppercase tracking-widest text-white">Configuration Fields</h3>
-                                        {Object.values(selectedModule.configSchema || {}).length === 0 ? (
-                                            <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-5 text-sm text-slate-500">
-                                                This module does not expose configurable fields.
-                                            </div>
-                                        ) : (
-                                            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                {Object.values(selectedModule.configSchema || {}).map((field) => (
-                                                    <div key={field.key} className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-                                                        <div className="flex items-start justify-between gap-3">
-                                                            <div>
-                                                                <p className="text-sm font-bold text-white">{field.label}</p>
-                                                                <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                                                                    {field.shortDescription || 'No field description provided.'}
-                                                                </p>
-                                                            </div>
-                                                            <span className="rounded-md border border-slate-700 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                                                {field.type}
-                                                            </span>
-                                                        </div>
-                                                        {field.options.length > 0 && (
-                                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                                {field.options.slice(0, 6).map((option) => (
-                                                                    <span key={option} className="rounded-md border border-slate-800 bg-black/30 px-2 py-1 text-[10px] font-semibold text-slate-400">
-                                                                        {option}
-                                                                    </span>
-                                                                ))}
-                                                                {field.options.length > 6 && (
-                                                                    <span className="rounded-md border border-slate-800 bg-black/30 px-2 py-1 text-[10px] font-semibold text-slate-500">
-                                                                        +{field.options.length - 6} more
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </section>
-
-                                    <aside className="space-y-4">
-                                        <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-5">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Slug</p>
-                                            <p className="mt-2 break-all font-mono text-sm text-slate-300">{selectedModule.slug}</p>
-                                        </div>
-                                        <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-5">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Review Status</p>
-                                            <p className="mt-2 text-sm font-semibold text-slate-300">{statusLabel(selectedModule.status)}</p>
-                                            {selectedModule.status === 'REJECTED' && selectedModule.moderationNote && (
-                                                <p className="mt-2 text-xs leading-relaxed text-red-300">{selectedModule.moderationNote}</p>
-                                            )}
-                                        </div>
-                                        <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-5">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Published</p>
-                                            <p className="mt-2 text-sm font-semibold text-slate-300">{formatDate(selectedModule.publishedAt)}</p>
-                                        </div>
-                                        <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-5">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Checksum</p>
-                                            <p className="mt-2 break-all font-mono text-xs text-slate-300">{selectedModule.sourceChecksum || 'Unavailable'}</p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => openInstallPicker(selectedModule.id)}
-                                            className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 text-xs font-bold uppercase tracking-wider text-sky-200 transition-colors hover:bg-sky-500/15 hover:text-white"
-                                        >
-                                            Select Server To Install
-                                        </button>
-                                    </aside>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {installPickerModule && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-                        <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-lg border border-slate-700 bg-[#070b12] shadow-2xl shadow-black/50">
-                            <div className="flex items-start justify-between gap-4 border-b border-slate-800 bg-gradient-to-r from-slate-950 via-slate-950 to-slate-900 px-5 py-5">
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-sky-400">Install Module</p>
-                                    <h3 className="mt-2 text-2xl font-black tracking-tight text-white">{installPickerModule.name}</h3>
-                                    <p className="mt-2 text-sm font-medium leading-6 text-slate-400">
-                                        Click a server to install. Right-click a server to start multi-select.
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={closeInstallPicker}
-                                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-950/40 text-slate-400 transition-colors hover:border-sky-500/40 hover:text-white disabled:opacity-50"
-                                    aria-label="Close install picker"
-                                    disabled={installing}
-                                >
-                                    <X size={16} aria-hidden="true" />
-                                </button>
-                            </div>
-
-                            <div className="custom-scrollbar max-h-[calc(90vh-170px)] overflow-y-auto px-5 py-5">
-                                {installError && (
-                                    <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300">
-                                        {installError}
-                                    </div>
-                                )}
-                                {installMessage && (
-                                    <div className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-300">
-                                        {installMessage}
-                                    </div>
-                                )}
-
-                                {installTargets.length === 0 ? (
-                                    <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-8 text-center text-sm text-slate-500">
-                                        No servers are available for module installs.
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                        {installTargets.map((server) => {
-                                            const selected = selectedServerIds.includes(server.id);
-                                            const full = server.installedModuleCount >= server.moduleLimit;
-
-                                            return (
-                                                <button
-                                                    key={server.id}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        if (multiSelectInstall) {
-                                                            toggleServerSelection(server.id);
-                                                            return;
-                                                        }
-
-                                                        installModuleToServers(installPickerModule.id, [server.id]);
-                                                    }}
-                                                    onContextMenu={(event) => {
-                                                        event.preventDefault();
-                                                        setMultiSelectInstall(true);
-                                                        toggleServerSelection(server.id);
-                                                    }}
-                                                    disabled={installing || full}
-                                                    className={`flex min-h-20 items-center gap-3 rounded-lg border p-4 text-left transition-all disabled:opacity-50 ${selected ? 'border-sky-400 bg-sky-500/15' : 'border-slate-800 bg-slate-950/45 hover:border-sky-500/40 hover:bg-slate-900/55'}`}
-                                                >
-                                                    {server.icon ? (
-                                                        <img
-                                                            src={getDiscordGuildIconProxyUrl(server.id, server.icon)}
-                                                            alt=""
-                                                            className="h-11 w-11 shrink-0 rounded-lg border border-white/5 object-cover"
-                                                        />
-                                                    ) : (
-                                                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-sm font-bold text-sky-300">
-                                                            {server.name.substring(0, 1)}
-                                                        </span>
-                                                    )}
-                                                    <span className="min-w-0">
-                                                        <span className="block break-words text-sm font-bold text-white">{server.name}</span>
-                                                        <span className="mt-1 block font-mono text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                                            {full ? `${server.installedModuleCount}/${server.moduleLimit} installed` : selected ? 'Selected' : `${server.installedModuleCount}/${server.moduleLimit} installed`}
-                                                        </span>
-                                                    </span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-
-                            {multiSelectInstall && installTargets.length > 0 && (
-                                <div className="flex flex-col gap-3 border-t border-slate-800 bg-slate-950/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <p className="text-xs font-semibold text-slate-400">
-                                        {selectedServerIds.length} server{selectedServerIds.length === 1 ? '' : 's'} selected
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setMultiSelectInstall(false);
-                                                setSelectedServerIds([]);
-                                            }}
-                                            disabled={installing}
-                                            className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-700 px-4 text-xs font-bold uppercase tracking-wider text-slate-200 transition-colors hover:border-slate-500 disabled:opacity-50"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => installModuleToServers(installPickerModule.id, selectedServerIds)}
-                                            disabled={installing || selectedServerIds.length === 0}
-                                            className="inline-flex h-10 items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 text-xs font-bold uppercase tracking-wider text-sky-200 transition-colors hover:bg-sky-500/15 hover:text-white disabled:opacity-50"
-                                        >
-                                            {installing ? 'Installing' : 'Install Selected'}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
             </main>
         </div>
     );
