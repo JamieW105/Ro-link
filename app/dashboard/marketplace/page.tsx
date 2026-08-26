@@ -1,7 +1,6 @@
 'use client';
 
 import {
-    ArrowLeft,
     Boxes,
     FileText,
     Library,
@@ -311,118 +310,87 @@ export default function DashboardMarketplacePage() {
                 </div>
             </nav>
 
-            <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-8 md:py-10">
-                <header className="overflow-hidden rounded-lg border border-slate-800 bg-[#070b12] shadow-2xl shadow-black/25">
-                    <div className="border-b border-slate-800 bg-gradient-to-r from-slate-950 via-slate-950 to-slate-900 px-5 py-5 md:px-7 md:py-6">
-                        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                            <div className="min-w-0">
-                                <Link href="/dashboard" className="mb-3 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 transition-colors hover:text-sky-300">
-                                    <ArrowLeft size={13} aria-hidden="true" />
-                                    Back to servers
-                                </Link>
-                                <div className="flex items-center gap-3">
-                                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-sky-500/20 bg-sky-500/10 text-sky-300">
-                                        <Store size={20} aria-hidden="true" />
-                                    </span>
-                                    <div>
-                                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-400">Module library</p>
-                                        <h1 className="mt-1 text-2xl font-black tracking-tight text-white md:text-4xl">Marketplace</h1>
-                                    </div>
+            <main>
+                <section className="rl-dashboard-hero" aria-labelledby="marketplace-title">
+                    <div className="rl-dashboard-hero-inner rl-shell">
+                        <div className="rl-dashboard-hero-copy">
+                            <div>
+                                <p className="rl-eyebrow">Module library</p>
+                                <div className="rl-dashboard-hero-title-row">
+                                    <h1 id="marketplace-title">Marketplace</h1>
+                                    <p>{modules.length} module{modules.length === 1 ? '' : 's'} available.</p>
                                 </div>
-                                <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-slate-400">
-                                    Browse published modules, submit your own, and track submissions through moderation.
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                <Link href="/terms/modules/use" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-950/40 px-4 text-xs font-bold uppercase tracking-wider text-slate-300 transition-all hover:border-sky-500/40 hover:text-white">
-                                    <FileText size={14} aria-hidden="true" />
-                                    Terms
-                                </Link>
-                                <Link href="/dashboard/creator/modules" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-950/40 px-4 text-xs font-bold uppercase tracking-wider text-slate-300 transition-all hover:border-emerald-500/40 hover:text-emerald-200">
-                                    <Library size={14} aria-hidden="true" />
-                                    My Modules
-                                </Link>
-                                <Link href="/dashboard/marketplace/create" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 text-xs font-bold uppercase tracking-wider text-sky-200 transition-all hover:bg-sky-500/15 hover:text-white">
-                                    <Plus size={14} strokeWidth={2.5} aria-hidden="true" />
-                                    Create Module
-                                </Link>
                             </div>
                         </div>
-                    </div>
-                    <div className="grid grid-cols-2 divide-x divide-slate-800/80">
-                        <div className="px-5 py-4 md:px-7">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">Visible Modules</p>
-                            <p className="mt-2 text-2xl font-black text-white">{modules.length}</p>
-                        </div>
-                        <div className="px-5 py-4 md:px-7">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">Install Targets</p>
-                            <p className="mt-2 text-2xl font-black text-sky-300">{installTargets.length}</p>
+                        <div className="rl-dashboard-primary-actions">
+                            <Link href="/terms/modules/use" className="rl-button"><FileText size={14} aria-hidden="true" />Terms</Link>
+                            <Link href="/dashboard/creator/modules" className="rl-button"><Library size={14} aria-hidden="true" />My Modules</Link>
+                            <Link href="/dashboard/marketplace/create" className="rl-button rl-button-primary"><Plus size={14} strokeWidth={2.5} aria-hidden="true" />Create</Link>
                         </div>
                     </div>
-                </header>
+                </section>
 
-                {loading ? (
-                    <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 rounded-lg border border-slate-800 bg-slate-950/35">
-                        <div className="rl-dashboard-spinner" />
-                        <p className="text-xs font-medium text-slate-500">Loading marketplace...</p>
-                    </div>
-                ) : error ? (
-                    <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
-                        {error}
-                    </div>
-                ) : modules.length === 0 ? (
-                    <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border border-slate-800 bg-slate-950/35 p-10 text-center">
-                        <span className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-slate-800 bg-slate-900/70 text-slate-500"><Boxes size={19} aria-hidden="true" /></span>
-                        <h2 className="text-sm font-bold text-white">No modules available</h2>
-                        <p className="mt-2 text-sm text-slate-500">Published modules and your submissions will appear here.</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {modules.map((addon) => (
-                            <article key={addon.id} className="flex min-h-60 flex-col rounded-lg border border-slate-800 bg-slate-950/45 p-5 shadow-lg shadow-black/10 transition-all hover:-translate-y-0.5 hover:border-sky-500/30 hover:bg-slate-900/55">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">
-                                        {addon.category}
+                <section className="rl-dashboard-content rl-shell" aria-label="Available modules">
+                    {loading ? (
+                        <div className="rl-dashboard-state-inline">
+                            <div className="rl-dashboard-spinner" />
+                            <p>Loading marketplace...</p>
+                        </div>
+                    ) : error ? (
+                        <div className="rl-dashboard-message" data-tone="error">
+                            <span className="rl-dashboard-state-icon"><LucideShieldAlert aria-hidden="true" /></span>
+                            <h2>Could not load modules</h2>
+                            <p>{error}</p>
+                        </div>
+                    ) : modules.length === 0 ? (
+                        <div className="rl-dashboard-message">
+                            <span className="rl-dashboard-state-icon"><Boxes aria-hidden="true" /></span>
+                            <h2>No modules available</h2>
+                            <p>Published modules and your submissions will appear here.</p>
+                        </div>
+                    ) : (
+                        <div className="motion-list grid gap-2">
+                            {modules.map((addon) => (
+                                <article key={addon.id} className="interactive-lift flex min-w-0 flex-col gap-4 rounded-lg border border-slate-800 bg-[#0d1116] p-3 transition-colors hover:border-sky-500/30 hover:bg-[#0f141a] sm:flex-row sm:items-center">
+                                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-900/70 text-sky-300">
+                                        <Store size={18} aria-hidden="true" />
                                     </span>
-                                    <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(addon.status)}`}>
-                                        {statusLabel(addon.status)}
-                                    </span>
-                                    {addon.authorDiscordId === sessionUserId && addon.status !== 'PUBLISHED' && (
-                                        <span className="rounded-md border border-indigo-400/20 bg-indigo-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-300">
-                                            Yours
-                                        </span>
-                                    )}
-                                    {addon.isOfficial && (
-                                        <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
-                                            Official
-                                        </span>
-                                    )}
-                                    {addon.creatorIsVerified && (
-                                        <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
-                                            Verified Creator
-                                        </span>
-                                    )}
-                                </div>
-                                <h2 className="mt-4 text-lg font-black tracking-tight text-white">{addon.name}</h2>
-                                <p className="mt-2 line-clamp-4 text-sm font-medium leading-6 text-slate-500">{addon.description || 'No description provided.'}</p>
-                                <div className="mt-auto pt-6">
-                                    <div className="mb-4 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">
-                                        <span>v{addon.version}</span>
-                                        <span>{Object.keys(addon.configSchema || {}).length} config fields</span>
-                                        {addon.status === 'PENDING_REVIEW' && <span>Submitted {formatDate(addon.submittedAt)}</span>}
+
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            <h2 className="mr-1 text-sm font-bold text-white">{addon.name}</h2>
+                                            <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-300">{addon.category}</span>
+                                            <span className={`rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${statusClassName(addon.status)}`}>{statusLabel(addon.status)}</span>
+                                            {addon.authorDiscordId === sessionUserId && addon.status !== 'PUBLISHED' && (
+                                                <span className="rounded-md border border-indigo-400/20 bg-indigo-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-300">Yours</span>
+                                            )}
+                                            {addon.isOfficial && (
+                                                <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-200">Official</span>
+                                            )}
+                                            {addon.creatorIsVerified && (
+                                                <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-200">Verified Creator</span>
+                                            )}
+                                        </div>
+                                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{addon.description || 'No description provided.'}</p>
+                                        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[9px] font-bold uppercase tracking-wider text-slate-600">
+                                            <span>v{addon.version}</span>
+                                            <span>{Object.keys(addon.configSchema || {}).length} config fields</span>
+                                            {addon.status === 'PENDING_REVIEW' && <span>Submitted {formatDate(addon.submittedAt)}</span>}
+                                        </div>
                                     </div>
+
                                     <button
                                         type="button"
                                         onClick={() => openModulePreview(addon)}
-                                        className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/5 px-4 text-xs font-bold uppercase tracking-wider text-sky-200 transition-colors hover:bg-sky-500/10 hover:text-white"
+                                        className="rl-button w-full shrink-0 sm:w-auto"
                                     >
                                         Open Module
                                     </button>
-                                </div>
-                            </article>
-                        ))}
-                    </div>
-                )}
+                                </article>
+                            ))}
+                        </div>
+                    )}
+                </section>
 
                 {selectedModule && (
                     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
