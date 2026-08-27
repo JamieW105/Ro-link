@@ -10,13 +10,12 @@ local ChangeHistoryService = game:GetService("ChangeHistoryService")
 local GuiService = game:GetService("GuiService")
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ScriptEditorService = game:GetService("ScriptEditorService")
 local Selection = game:GetService("Selection")
 local ServerScriptService = game:GetService("ServerScriptService")
 local StarterPlayer = game:GetService("StarterPlayer")
 
-local PLUGIN_VERSION = "1.2.1"
-local PROTOCOL_VERSION = 1
+local PLUGIN_VERSION = "1.3.0"
+local PROTOCOL_VERSION = 2
 local DEFAULT_BASE_URL = "https://rolink.site"
 local TOOLBAR_ICON = "rbxassetid://80325173339413"
 local ACCOUNT_POLL_SECONDS = 2.5
@@ -24,29 +23,6 @@ local BRIDGE_POLL_SECONDS = 1.25
 local CHANGE_FLUSH_SECONDS = 0.6
 local MAX_SNAPSHOT_NODES = 2500
 local MAX_UI_NODES = 1000
-
-local SERVICE_NAMES = {
-	"Workspace",
-	"Players",
-	"Lighting",
-	"ReplicatedFirst",
-	"ReplicatedStorage",
-	"ServerScriptService",
-	"ServerStorage",
-	"StarterGui",
-	"StarterPack",
-	"StarterPlayer",
-	"Teams",
-	"SoundService",
-	"TextChatService",
-	"MaterialService",
-}
-
-local SCRIPT_CLASSES = {
-	Script = true,
-	LocalScript = true,
-	ModuleScript = true,
-}
 
 local UI_CLASSES = {
 	ScreenGui = true,
@@ -73,90 +49,6 @@ local UI_CLASSES = {
 	UIAspectRatioConstraint = true,
 	UISizeConstraint = true,
 	UITextSizeConstraint = true,
-	Folder = true,
-	Configuration = true,
-	StringValue = true,
-	BoolValue = true,
-	IntValue = true,
-	NumberValue = true,
-}
-
-local SERIALIZABLE_PROPERTIES = {
-	"Name",
-	"Active",
-	"AnchorPoint",
-	"AutomaticSize",
-	"BackgroundColor3",
-	"BackgroundTransparency",
-	"BorderColor3",
-	"BorderMode",
-	"BorderSizePixel",
-	"ClipsDescendants",
-	"LayoutOrder",
-	"Position",
-	"Rotation",
-	"Selectable",
-	"SelectionOrder",
-	"Size",
-	"SizeConstraint",
-	"Visible",
-	"ZIndex",
-	"Text",
-	"TextColor3",
-	"TextSize",
-	"TextScaled",
-	"TextTransparency",
-	"TextStrokeColor3",
-	"TextStrokeTransparency",
-	"TextWrapped",
-	"TextXAlignment",
-	"TextYAlignment",
-	"Font",
-	"RichText",
-	"PlaceholderText",
-	"PlaceholderColor3",
-	"ClearTextOnFocus",
-	"MultiLine",
-	"Image",
-	"ImageColor3",
-	"ImageTransparency",
-	"ScaleType",
-	"SliceCenter",
-	"TileSize",
-	"ResetOnSpawn",
-	"DisplayOrder",
-	"IgnoreGuiInset",
-	"ZIndexBehavior",
-	"Adornee",
-	"AlwaysOnTop",
-	"Brightness",
-	"CanvasSize",
-	"AutomaticCanvasSize",
-	"ScrollBarImageColor3",
-	"ScrollBarImageTransparency",
-	"ScrollBarThickness",
-	"ScrollingDirection",
-	"ElasticBehavior",
-	"FillDirection",
-	"HorizontalAlignment",
-	"VerticalAlignment",
-	"Padding",
-	"SortOrder",
-	"CellPadding",
-	"CellSize",
-	"CornerRadius",
-	"Thickness",
-	"Transparency",
-	"Color",
-	"Enabled",
-	"AspectRatio",
-	"DominantAxis",
-	"AspectType",
-	"MinSize",
-	"MaxSize",
-	"MinTextSize",
-	"MaxTextSize",
-	"Value",
 }
 
 type BridgeEvent = {
@@ -309,90 +201,36 @@ local function getInstancePath(instance: Instance): string
 end
 
 local function serializeExplorerNode(instance: Instance, includeChildren: boolean?, depth: number?, counter: { count: number }?): { [string]: any }
+	local starterGui = game:GetService("StarterGui")
+	local hasUiChildren = false
+	for _, child in ipairs(instance:GetChildren()) do
+		if UI_CLASSES[child.ClassName] then
+			hasUiChildren = true
+			break
+		end
+	end
 	local node = {
 		id = getInstanceId(instance),
 		name = instance.Name,
 		className = instance.ClassName,
 		path = getInstancePath(instance),
-		parentId = if instance.Parent and instance.Parent ~= game then getInstanceId(instance.Parent) else nil,
-		hasChildren = #instance:GetChildren() > 0,
-		isScript = SCRIPT_CLASSES[instance.ClassName] == true,
+		parentId = if instance.Parent and instance.Parent ~= starterGui then getInstanceId(instance.Parent) else nil,
+		hasChildren = hasUiChildren,
 	}
 	if includeChildren and (depth or 0) > 0 and counter and counter.count < MAX_SNAPSHOT_NODES then
 		local children = {}
 		for _, child in ipairs(instance:GetChildren()) do
-			if counter.count >= MAX_SNAPSHOT_NODES then
+			if UI_CLASSES[child.ClassName] and counter.count >= MAX_SNAPSHOT_NODES then
 				break
 			end
-			counter.count += 1
-			table.insert(children, serializeExplorerNode(child, true, (depth or 1) - 1, counter))
+			if UI_CLASSES[child.ClassName] then
+				counter.count += 1
+				table.insert(children, serializeExplorerNode(child, true, (depth or 1) - 1, counter))
+			end
 		end
 		node.children = children
 	end
 	return node
-end
-
-local function sourceRevision(source: string): string
-	local hash = 5381
-	for index = 1, #source do
-		hash = bit32.band((hash * 33) + string.byte(source, index), 0xFFFFFFFF)
-	end
-	return string.format("%08x-%d", hash, #source)
-end
-
-local function readScript(instance: Instance): (string?, string?)
-	if not SCRIPT_CLASSES[instance.ClassName] then
-		return nil, "Selected instance is not a script."
-	end
-	local ok, source = pcall(function()
-		return (instance :: any).Source
-	end)
-	if not ok then
-		return nil, "Studio denied script source access. Enable script injection permissions for this plugin."
-	end
-	return tostring(source), nil
-end
-
-local function encodeValue(value: any): any
-	local valueType = typeof(value)
-	if valueType == "nil" or valueType == "boolean" or valueType == "number" or valueType == "string" then
-		return value
-	elseif valueType == "Color3" then
-		return { type = "Color3", r = value.R, g = value.G, b = value.B }
-	elseif valueType == "Vector2" then
-		return { type = "Vector2", x = value.X, y = value.Y }
-	elseif valueType == "Vector3" then
-		return { type = "Vector3", x = value.X, y = value.Y, z = value.Z }
-	elseif valueType == "UDim" then
-		return { type = "UDim", scale = value.Scale, offset = value.Offset }
-	elseif valueType == "UDim2" then
-		return {
-			type = "UDim2",
-			xScale = value.X.Scale,
-			xOffset = value.X.Offset,
-			yScale = value.Y.Scale,
-			yOffset = value.Y.Offset,
-		}
-	elseif valueType == "Rect" then
-		return { type = "Rect", min = encodeValue(value.Min), max = encodeValue(value.Max) }
-	elseif valueType == "ColorSequence" then
-		local points = {}
-		for _, keypoint in ipairs(value.Keypoints) do
-			table.insert(points, { time = keypoint.Time, value = encodeValue(keypoint.Value) })
-		end
-		return { type = "ColorSequence", keypoints = points }
-	elseif valueType == "NumberSequence" then
-		local points = {}
-		for _, keypoint in ipairs(value.Keypoints) do
-			table.insert(points, { time = keypoint.Time, value = keypoint.Value, envelope = keypoint.Envelope })
-		end
-		return { type = "NumberSequence", keypoints = points }
-	elseif valueType == "EnumItem" then
-		return { type = "EnumItem", value = tostring(value) }
-	elseif valueType == "Instance" then
-		return { type = "InstanceRef", path = getInstancePath(value) }
-	end
-	return nil
 end
 
 local function serializeUi(instance: Instance, counter: { count: number }, warnings: { string }, depth: number): { [string]: any }?
@@ -405,25 +243,6 @@ local function serializeUi(instance: Instance, counter: { count: number }, warni
 		return nil
 	end
 	counter.count += 1
-	local properties = {}
-	for _, property in ipairs(SERIALIZABLE_PROPERTIES) do
-		local ok, value = pcall(function()
-			return (instance :: any)[property]
-		end)
-		if ok then
-			local encoded = encodeValue(value)
-			if encoded ~= nil then
-				properties[property] = encoded
-			end
-		end
-	end
-	local attributes = {}
-	for name, value in pairs(instance:GetAttributes()) do
-		local encoded = encodeValue(value)
-		if encoded ~= nil then
-			attributes[name] = encoded
-		end
-	end
 	local children = {}
 	for _, child in ipairs(instance:GetChildren()) do
 		local encoded = serializeUi(child, counter, warnings, depth + 1)
@@ -434,8 +253,7 @@ local function serializeUi(instance: Instance, counter: { count: number }, warni
 	return {
 		className = instance.ClassName,
 		name = instance.Name,
-		properties = properties,
-		attributes = attributes,
+		studioPath = getInstancePath(instance),
 		children = children,
 	}
 end
@@ -483,7 +301,7 @@ local function watchInstance(instance: Instance)
 		})
 	end))
 	table.insert(state.watchConnections, instance.AncestryChanged:Connect(function(_, parent)
-		if parent then
+		if parent and instance:IsDescendantOf(game:GetService("StarterGui")) then
 			queueChange({ type = "tree.instanceMoved", payload = serializeExplorerNode(instance) })
 		end
 	end))
@@ -491,18 +309,20 @@ end
 
 local function beginHierarchyWatch()
 	disconnectWatchers()
-	for _, serviceName in ipairs(SERVICE_NAMES) do
-		local ok, service = pcall(game.GetService, game, serviceName)
-		if ok and service then
-			watchInstance(service)
-			for _, descendant in ipairs(service:GetDescendants()) do
+	local starterGui = game:GetService("StarterGui")
+	for _, descendant in ipairs(starterGui:GetDescendants()) do
+		if UI_CLASSES[descendant.ClassName] then
 				watchInstance(descendant)
-			end
-			table.insert(state.watchConnections, service.DescendantAdded:Connect(function(instance)
+		end
+	end
+	table.insert(state.watchConnections, starterGui.DescendantAdded:Connect(function(instance)
+		if UI_CLASSES[instance.ClassName] then
 				watchInstance(instance)
 				queueChange({ type = "tree.instanceCreated", payload = serializeExplorerNode(instance) })
-			end))
-			table.insert(state.watchConnections, service.DescendantRemoving:Connect(function(instance)
+		end
+	end))
+	table.insert(state.watchConnections, starterGui.DescendantRemoving:Connect(function(instance)
+		if UI_CLASSES[instance.ClassName] then
 				local id = state.idByInstance[instance]
 				queueChange({
 					type = "tree.instanceDeleted",
@@ -511,19 +331,18 @@ local function beginHierarchyWatch()
 				if id then
 					state.instanceById[id] = nil
 				end
-			end))
 		end
-	end
+	end))
 end
 
 local function sendSnapshot()
 	local roots = {}
 	local counter = { count = 0 }
-	for _, serviceName in ipairs(SERVICE_NAMES) do
-		local ok, service = pcall(game.GetService, game, serviceName)
-		if ok and service then
+	local starterGui = game:GetService("StarterGui")
+	for _, instance in ipairs(starterGui:GetChildren()) do
+		if UI_CLASSES[instance.ClassName] then
 			counter.count += 1
-			table.insert(roots, serializeExplorerNode(service, true, 2, counter))
+			table.insert(roots, serializeExplorerNode(instance, true, 32, counter))
 		end
 	end
 	sendEvents({ {
@@ -537,33 +356,6 @@ local function sendSnapshot()
 	} })
 end
 
-local function respondToScriptRequest(event: any)
-	local payload = event.payload or {}
-	local instance = state.instanceById[tostring(payload.instanceId or "")]
-	if not instance then
-		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "Studio instance no longer exists." } } })
-		return
-	end
-	local source, sourceError = readScript(instance)
-	if not source then
-		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = sourceError } } })
-		return
-	end
-	local revision = sourceRevision(source)
-	sendEvents({ {
-		type = "script.contents",
-		requestId = event.requestId,
-		revision = revision,
-		payload = {
-			instanceId = getInstanceId(instance),
-			path = getInstancePath(instance),
-			name = instance.Name,
-			className = instance.ClassName,
-			source = source,
-		},
-	} })
-end
-
 local function respondToChildrenRequest(event: any)
 	local payload = event.payload or {}
 	local instance = state.instanceById[tostring(payload.instanceId or "")]
@@ -573,7 +365,9 @@ local function respondToChildrenRequest(event: any)
 	end
 	local children = {}
 	for _, child in ipairs(instance:GetChildren()) do
-		table.insert(children, serializeExplorerNode(child))
+		if UI_CLASSES[child.ClassName] then
+			table.insert(children, serializeExplorerNode(child))
+		end
 	end
 	sendEvents({ {
 		type = "tree.children",
@@ -582,64 +376,36 @@ local function respondToChildrenRequest(event: any)
 	} })
 end
 
-local function applyScriptUpdate(event: any)
+local function applyUiRename(event: any)
 	local payload = event.payload or {}
 	local instance = state.instanceById[tostring(payload.instanceId or "")]
-	if not instance or not SCRIPT_CLASSES[instance.ClassName] then
-		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "Studio script no longer exists." } } })
+	if not instance or not UI_CLASSES[instance.ClassName] or not instance:IsDescendantOf(game:GetService("StarterGui")) then
+		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "Studio UI instance no longer exists." } } })
 		return
 	end
-	local currentSource, sourceError = readScript(instance)
-	if not currentSource then
-		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = sourceError } } })
+	local nextName = trim(payload.name):sub(1, 100)
+	if nextName == "" or nextName:find("[/\\%c]") then
+		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "UI names cannot be empty or contain slashes/control characters." } } })
 		return
 	end
-	local currentRevision = sourceRevision(currentSource)
-	local expectedRevision = tostring(event.revision or payload.expectedRevision or "")
-	if expectedRevision ~= "" and expectedRevision ~= currentRevision then
-		sendEvents({ {
-			type = "script.conflict",
-			requestId = event.requestId,
-			revision = currentRevision,
-			payload = {
-				instanceId = getInstanceId(instance),
-				path = getInstancePath(instance),
-				source = currentSource,
-				message = "This script changed in Roblox Studio after it was opened in the browser.",
-			},
-		} })
+	local sibling = instance.Parent and instance.Parent:FindFirstChild(nextName)
+	if sibling and sibling ~= instance then
+		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "A sibling UI object already uses that name." } } })
 		return
 	end
-	local nextSource = tostring(payload.source or "")
-	if #nextSource > 1024 * 1024 then
-		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "Script exceeds the 1 MB safety limit." } } })
-		return
-	end
-	pcall(ChangeHistoryService.SetWaypoint, ChangeHistoryService, "Ro-Link IDE before script update")
-	local ok, updateError = pcall(function()
-		ScriptEditorService:UpdateSourceAsync(instance :: LuaSourceContainer, function()
-			return nextSource
-		end)
-	end)
-	if not ok then
-		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "Studio rejected the script update: " .. tostring(updateError) } } })
-		return
-	end
-	pcall(ChangeHistoryService.SetWaypoint, ChangeHistoryService, "Ro-Link IDE script update")
-	local revision = sourceRevision(nextSource)
+	pcall(ChangeHistoryService.SetWaypoint, ChangeHistoryService, "Ro-Link before UI rename")
+	instance.Name = nextName
+	pcall(ChangeHistoryService.SetWaypoint, ChangeHistoryService, "Ro-Link UI renamed")
 	sendEvents({ {
-		type = "script.updated",
+		type = "ui.renamed",
 		requestId = event.requestId,
-		revision = revision,
-		payload = { instanceId = getInstanceId(instance), path = getInstancePath(instance) },
+		payload = serializeExplorerNode(instance),
 	} })
 end
 
 local function processBrowserEvent(event: any)
-	if event.type == "script.request" then
-		respondToScriptRequest(event)
-	elseif event.type == "script.update" then
-		applyScriptUpdate(event)
+	if event.type == "ui.rename" then
+		applyUiRename(event)
 	elseif event.type == "tree.children" then
 		respondToChildrenRequest(event)
 	elseif event.type == "tree.snapshot" then
@@ -686,7 +452,7 @@ local function startBridge()
 	state.bridgePollId = pollId
 	updateConnectionUi()
 	beginHierarchyWatch()
-	setStatus("Module paired. Sending the Studio Explorer snapshot...", "success")
+	setStatus("Module paired. Sending the StarterGui name snapshot...", "success")
 	sendEvents({ {
 		type = "studio.connected",
 		payload = {
@@ -849,10 +615,14 @@ local function importSelection()
 	local selectionPaths = {}
 	local counter = { count = 0 }
 	for _, instance in ipairs(selected) do
-		table.insert(selectionPaths, getInstancePath(instance))
-		local root = serializeUi(instance, counter, warnings, 0)
-		if root then
-			table.insert(roots, root)
+		if instance:IsDescendantOf(game:GetService("StarterGui")) then
+			table.insert(selectionPaths, getInstancePath(instance))
+			local root = serializeUi(instance, counter, warnings, 0)
+			if root then
+				table.insert(roots, root)
+			end
+		else
+			table.insert(warnings, "Skipped UI outside StarterGui: " .. getInstancePath(instance))
 		end
 	end
 	if #roots == 0 then
@@ -876,84 +646,20 @@ local function importSelection()
 	end
 end
 
-local function decodeValue(value: any): any
-	if type(value) ~= "table" then
-		return value
-	end
-	local valueType = tostring(value.type or "")
-	if valueType == "Color3" then
-		return Color3.new(tonumber(value.r) or 0, tonumber(value.g) or 0, tonumber(value.b) or 0)
-	elseif valueType == "Vector2" then
-		return Vector2.new(tonumber(value.x) or 0, tonumber(value.y) or 0)
-	elseif valueType == "Vector3" then
-		return Vector3.new(tonumber(value.x) or 0, tonumber(value.y) or 0, tonumber(value.z) or 0)
-	elseif valueType == "UDim" then
-		return UDim.new(tonumber(value.scale) or 0, tonumber(value.offset) or 0)
-	elseif valueType == "UDim2" then
-		return UDim2.new(tonumber(value.xScale) or 0, tonumber(value.xOffset) or 0, tonumber(value.yScale) or 0, tonumber(value.yOffset) or 0)
-	elseif valueType == "Rect" then
-		return Rect.new(decodeValue(value.min), decodeValue(value.max))
-	elseif valueType == "ColorSequence" then
-		local keypoints = {}
-		for _, point in ipairs(value.keypoints or {}) do
-			table.insert(keypoints, ColorSequenceKeypoint.new(tonumber(point.time) or 0, decodeValue(point.value)))
-		end
-		return ColorSequence.new(keypoints)
-	elseif valueType == "NumberSequence" then
-		local keypoints = {}
-		for _, point in ipairs(value.keypoints or {}) do
-			table.insert(keypoints, NumberSequenceKeypoint.new(tonumber(point.time) or 0, tonumber(point.value) or 0, tonumber(point.envelope) or 0))
-		end
-		return NumberSequence.new(keypoints)
-	elseif valueType == "EnumItem" then
-		local enumName, itemName = tostring(value.value or ""):match("^Enum%.([^.]+)%.(.+)$")
-		if enumName and itemName then
-			local ok, item = pcall(function()
-				return (Enum :: any)[enumName][itemName]
-			end)
-			if ok then
-				return item
-			end
-		end
-	end
-	return nil
-end
-
-local function materializeUi(node: any, parent: Instance, counter: { count: number }): Instance?
+local function materializeUiReference(node: any, parent: Instance, counter: { count: number }): Instance?
 	if type(node) ~= "table" or counter.count >= MAX_UI_NODES then
 		return nil
 	end
-	local className = tostring(node.className or "")
-	if not UI_CLASSES[className] then
-		return nil
-	end
-	local ok, instance = pcall(Instance.new, className)
-	if not ok or not instance then
-		return nil
-	end
 	counter.count += 1
-	instance.Name = tostring(node.name or className):sub(1, 100)
-	for property, encoded in pairs(node.properties or {}) do
-		if property ~= "Name" then
-			local decoded = decodeValue(encoded)
-			if decoded ~= nil then
-				pcall(function()
-					(instance :: any)[property] = decoded
-				end)
-			end
-		end
-	end
-	for attribute, encoded in pairs(node.attributes or {}) do
-		local decoded = decodeValue(encoded)
-		if decoded ~= nil then
-			pcall(instance.SetAttribute, instance, tostring(attribute):sub(1, 100), decoded)
-		end
-	end
-	instance.Parent = parent
+	local reference = Instance.new("Folder")
+	local referenceName = tostring(node.name or node.className or "UI"):gsub("[%c/\\]", "-"):sub(1, 100)
+	reference.Name = if referenceName == "" then "UI" else referenceName
+	reference:SetAttribute("RoLinkStudioPath", tostring(node.studioPath or ("StarterGui/" .. reference.Name)))
+	reference.Parent = parent
 	for _, child in ipairs(node.children or {}) do
-		materializeUi(child, instance, counter)
+		materializeUiReference(child, reference, counter)
 	end
-	return instance
+	return reference
 end
 
 local function childFolder(parent: Instance, name: string): Folder
@@ -1228,6 +934,37 @@ if remoteFolder then
 	end
 end
 local manifest = decodeJson(packageRoot:GetAttribute("RoLinkManifest"), {})
+local uiReferences = replicatedRoot:FindFirstChild("UI")
+local function getUi(referencePath: string): Instance?
+	if runContext ~= "client" or not uiReferences then
+		return nil
+	end
+	local reference: Instance? = uiReferences
+	for _, segment in ipairs(string.split(referencePath:gsub("%.", "/"), "/")) do
+		if segment ~= "" then
+			if not reference then return nil end
+			reference = reference:FindFirstChild(segment)
+			if not reference then return nil end
+		end
+	end
+	if not reference then return nil end
+	local studioPath = tostring(reference:GetAttribute("RoLinkStudioPath") or "")
+	local segments = string.split(studioPath, "/")
+	if segments[1] ~= "StarterGui" then return nil end
+	local player = game:GetService("Players").LocalPlayer
+	local cursor: Instance? = player and player:FindFirstChildOfClass("PlayerGui")
+	if not cursor then return nil end
+	for index = 2, #segments do
+		cursor = cursor:FindFirstChild(segments[index]:gsub("%%2F", "/"))
+		if not cursor then return nil end
+	end
+	return cursor
+end
+local ui = setmetatable({}, {
+	__index = function(_, name)
+		return getUi(tostring(name))
+	end,
+})
 local context = {
 	ModuleId = moduleId,
 	Module = manifest,
@@ -1235,6 +972,8 @@ local context = {
 	Settings = {},
 	Services = services,
 	Remotes = remotes,
+	UI = ui,
+	GetUI = getUi,
 	GetRemote = function(name: string)
 		return remotes[name]
 	end,
@@ -1320,7 +1059,7 @@ local function installProjectPackage(projectPackage: any, packageHash: string): 
 			createSourceModule(replicatedModule, path, source)
 		elseif kind == "ui" and type(file.uiTree) == "table" then
 			local uiFolder = childFolder(replicatedModule, "UI")
-			materializeUi(file.uiTree, uiFolder, { count = 0 })
+			materializeUiReference(file.uiTree, uiFolder, { count = 0 })
 		end
 	end
 
@@ -1582,7 +1321,7 @@ end
 
 ui.importButton = actionButton("Add Selected UI To Module")
 ui.syncProjectButton = actionButton("Sync Module Project Into Place")
-ui.snapshotButton = actionButton("Refresh Studio Explorer Snapshot")
+ui.snapshotButton = actionButton("Refresh StarterGui Names")
 ui.openIdeButton = actionButton("Open Browser IDE")
 ui.openIdeButton.Active = true
 ui.disconnectButton = actionButton("Disconnect Module")

@@ -19,6 +19,10 @@ type RobloxMember = { n: string; k: string; t: string; c: string; p: Array<{ n: 
 type RobloxClass = { n: string; s: string; t?: string[]; m: RobloxMember[] };
 type RobloxEnum = { n: string; i: Array<{ n: string; v: number; t?: string[] }> };
 type RobloxMetadata = { classes: RobloxClass[]; enums: RobloxEnum[]; studioVersion: string; generatedAt: string };
+type ScriptApiParameter = { n: string; t: string; v?: string };
+type ScriptApiMember = { n: string; k: 'constructor' | 'property' | 'function' | 'method' | 'event' | 'callback'; s: string; p?: ScriptApiParameter[]; r?: string[]; d?: string; tg?: string[]; o?: string[] };
+type ScriptApiNamespace = { n: string; d?: string; m: ScriptApiMember[] };
+type ScriptApiMetadata = { version: number; generatedAt: string; revision: string; sources: string[]; globals: ScriptApiMember[]; libraries: ScriptApiNamespace[]; dataTypes: ScriptApiNamespace[] };
 
 interface ModuleIdeEditorProps {
     value: string;
@@ -34,6 +38,7 @@ let languageConfigured = false;
 let providersConfigured = false;
 let currentProjectPaths: string[] = [];
 let robloxMetadataPromise: Promise<RobloxMetadata> | null = null;
+let scriptApiMetadataPromise: Promise<ScriptApiMetadata> | null = null;
 
 function loadRobloxMetadata() {
     if (!robloxMetadataPromise) {
@@ -45,6 +50,16 @@ function loadRobloxMetadata() {
     return robloxMetadataPromise;
 }
 
+function loadScriptApiMetadata() {
+    if (!scriptApiMetadataPromise) {
+        scriptApiMetadataPromise = fetch('/data/roblox-script-api.min.json', { cache: 'force-cache' }).then(async (response) => {
+            if (!response.ok) throw new Error(`Roblox script API metadata failed (${response.status}).`);
+            return response.json() as Promise<ScriptApiMetadata>;
+        });
+    }
+    return scriptApiMetadataPromise;
+}
+
 function memberSignature(member: RobloxMember) {
     const parameters = (member.p || []).map((parameter) => `${parameter.n}: ${parameter.t || 'any'}`).join(', ');
     if (member.k === 'Function' || member.k === 'Callback') return `${member.n}(${parameters}): ${member.t || 'any'}`;
@@ -53,9 +68,16 @@ function memberSignature(member: RobloxMember) {
 }
 
 function completionKind(monaco: typeof Monaco, kind: string) {
-    if (kind === 'Function' || kind === 'Callback') return monaco.languages.CompletionItemKind.Method;
-    if (kind === 'Event') return monaco.languages.CompletionItemKind.Event;
+    if (kind === 'Function' || kind === 'Callback' || kind === 'function' || kind === 'method') return monaco.languages.CompletionItemKind.Method;
+    if (kind === 'constructor') return monaco.languages.CompletionItemKind.Constructor;
+    if (kind === 'Event' || kind === 'event') return monaco.languages.CompletionItemKind.Event;
     return monaco.languages.CompletionItemKind.Property;
+}
+
+function snippetForMember(member: { n: string; k: string; p?: Array<{ n: string }> }) {
+    if (!['Function', 'Callback', 'function', 'method', 'constructor'].includes(member.k)) return member.n;
+    const parameters = (member.p || []).map((parameter, index) => `\${${index + 1}:${parameter.n === '...' ? '...' : parameter.n}}`).join(', ');
+    return `${member.n}(${parameters})`;
 }
 
 function resolveClassMembers(className: string, classes: Map<string, RobloxClass>) {
@@ -77,7 +99,10 @@ function resolveClassMembers(className: string, classes: Map<string, RobloxClass
 function inferVariableClasses(source: string) {
     const variables = new Map<string, string>();
     for (const match of source.matchAll(/local\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*game:GetService\(["']([^"']+)["']\)/g)) variables.set(match[1], match[2]);
-    for (const match of source.matchAll(/local\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z_][A-Za-z0-9_]*)/g)) variables.set(match[1], match[2]);
+    for (const match of source.matchAll(/(?:\blocal\s+|[,(]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z_][A-Za-z0-9_]*)/g)) variables.set(match[1], match[2]);
+    for (const match of source.matchAll(/local\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*Instance\.new\(["']([^"']+)["']/g)) variables.set(match[1], match[2]);
+    for (const match of source.matchAll(/local\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\.(?:new|from[A-Za-z0-9_]*)\s*\(/g)) variables.set(match[1], match[2]);
+    for (const match of source.matchAll(/local\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[A-Za-z_][A-Za-z0-9_]*:(?:FindFirstChildOfClass|FindFirstChildWhichIsA)\(["']([^"']+)["']/g)) variables.set(match[1], match[2]);
     variables.set('game', 'DataModel');
     variables.set('workspace', 'Workspace');
     variables.set('script', 'LuaSourceContainer');
@@ -142,7 +167,7 @@ function configureLuau(monaco: typeof Monaco, projectPaths: string[]) {
             defaultToken: '',
             tokenPostfix: '.luau',
             keywords: ['and', 'break', 'continue', 'do', 'else', 'elseif', 'end', 'export', 'false', 'for', 'function', 'if', 'in', 'local', 'nil', 'not', 'or', 'repeat', 'return', 'then', 'true', 'type', 'typeof', 'until', 'while'],
-            builtins: ['assert', 'bit32', 'buffer', 'CFrame', 'Color3', 'coroutine', 'debug', 'Enum', 'error', 'game', 'Instance', 'ipairs', 'math', 'next', 'os', 'pairs', 'pcall', 'print', 'Random', 'RaycastParams', 'require', 'script', 'shared', 'string', 'table', 'task', 'tonumber', 'tostring', 'UDim', 'UDim2', 'Vector2', 'Vector3', 'warn', 'workspace', 'xpcall'],
+            builtins: ['assert', 'bit32', 'buffer', 'CFrame', 'Color3', 'coroutine', 'debug', 'Enum', 'error', 'game', 'Instance', 'ipairs', 'math', 'next', 'os', 'pairs', 'pcall', 'print', 'Random', 'RaycastParams', 'require', 'script', 'select', 'shared', 'string', 'table', 'task', 'tonumber', 'tostring', 'type', 'typeof', 'utf8', 'Vector2', 'Vector3', 'vector', 'warn', 'workspace', 'xpcall'],
             typeKeywords: ['any', 'boolean', 'buffer', 'never', 'nil', 'number', 'string', 'thread', 'unknown'],
             operators: ['+', '-', '*', '/', '//', '%', '^', '#', '==', '~=', '<=', '>=', '<', '>', '=', '+=', '-=', '*=', '/=', '%=', '^=', '..', '->', '::', ':'],
             tokenizer: {
@@ -189,12 +214,24 @@ function configureLuau(monaco: typeof Monaco, projectPaths: string[]) {
         languageConfigured = true;
     }
 
-    void loadRobloxMetadata().then((metadata) => {
+    void Promise.all([loadRobloxMetadata(), loadScriptApiMetadata()]).then(([metadata, scriptApi]) => {
         if (providersConfigured) return;
         providersConfigured = true;
         const classMap = new Map(metadata.classes.map((item) => [item.n, item]));
         const enumMap = new Map(metadata.enums.map((item) => [item.n, item]));
         const services = metadata.classes.filter((item) => item.t?.includes('Service') || item.n.endsWith('Service'));
+        const scriptNamespaces = new Map([...scriptApi.libraries, ...scriptApi.dataTypes].map((item) => [item.n, item]));
+
+        const scriptMemberSuggestion = (member: ScriptApiMember, range: Monaco.IRange) => ({
+            label: member.n,
+            kind: completionKind(monaco, member.k),
+            insertText: snippetForMember(member),
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            range,
+            detail: member.s,
+            documentation: member.d ? { value: member.d } : undefined,
+            tags: member.tg?.includes('Deprecated') ? [monaco.languages.CompletionItemTag.Deprecated] : undefined,
+        });
 
         monaco.languages.registerCompletionItemProvider('luau', {
             triggerCharacters: ['.', ':', '"', "'"],
@@ -218,11 +255,24 @@ function configureLuau(monaco: typeof Monaco, projectPaths: string[]) {
                 }
                 const memberMatch = /([A-Za-z_][A-Za-z0-9_]*)[.:]([A-Za-z0-9_]*)$/.exec(line);
                 if (memberMatch) {
+                    const namespace = scriptNamespaces.get(memberMatch[1]);
+                    if (namespace) {
+                        const members = scriptApi.dataTypes.includes(namespace)
+                            ? namespace.m.filter((member) => member.k !== 'method' && member.k !== 'event' && member.k !== 'callback')
+                            : namespace.m;
+                        return { suggestions: members.map((member) => scriptMemberSuggestion(member, range)) };
+                    }
                     const variableClasses = inferVariableClasses(model.getValue());
                     const className = variableClasses.get(memberMatch[1]);
-                    if (className) return { suggestions: resolveClassMembers(className, classMap).map((member) => ({ label: member.n, kind: completionKind(monaco, member.k), insertText: member.k === 'Function' ? `${member.n}(${member.p?.length ? '${1}' : ''})` : member.n, insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet, range, detail: memberSignature(member), documentation: { value: `${className}.${member.n}${member.tg?.includes('Deprecated') ? '\n\n**Deprecated**' : ''}` }, tags: member.tg?.includes('Deprecated') ? [monaco.languages.CompletionItemTag.Deprecated] : undefined })) };
+                    const dataType = className ? scriptNamespaces.get(className) : undefined;
+                    if (dataType && scriptApi.dataTypes.includes(dataType)) return { suggestions: dataType.m.filter((member) => member.k !== 'constructor').map((member) => scriptMemberSuggestion(member, range)) };
+                    if (className) return { suggestions: resolveClassMembers(className, classMap).map((member) => ({ label: member.n, kind: completionKind(monaco, member.k), insertText: snippetForMember(member), insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet, range, detail: memberSignature(member), documentation: { value: `${className}.${member.n}${member.tg?.includes('Deprecated') ? '\n\n**Deprecated**' : ''}` }, tags: member.tg?.includes('Deprecated') ? [monaco.languages.CompletionItemTag.Deprecated] : undefined })) };
                 }
                 if (/require\(script(?:\.Parent)*\.[A-Za-z0-9_]*$/.test(line)) return { suggestions: currentProjectPaths.filter((path) => path.endsWith('.luau')).map((path) => ({ label: path.split('/').at(-1)?.replace(/\.luau$/, '') || path, kind: monaco.languages.CompletionItemKind.Module, insertText: path.split('/').at(-1)?.replace(/\.luau$/, '') || path, range, detail: path })) };
+                if (/^\s*$|(?:^|[^.:])\b[A-Za-z_][A-Za-z0-9_]*$/.test(line)) {
+                    const namespaceSuggestions = [...scriptApi.libraries, ...scriptApi.dataTypes].map((namespace) => ({ label: namespace.n, kind: monaco.languages.CompletionItemKind.Class, insertText: namespace.n, range, detail: namespace.d || `Roblox ${scriptApi.libraries.includes(namespace) ? 'library' : 'data type'}` }));
+                    return { suggestions: [...scriptApi.globals.map((member) => scriptMemberSuggestion(member, range)), ...namespaceSuggestions] };
+                }
                 return { suggestions: [] };
             },
         });

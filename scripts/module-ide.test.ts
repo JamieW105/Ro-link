@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildModuleProjectPackage, normalizeModuleProjectPath, validateModuleProject, type ModuleProjectFile, type ModuleProjectManifest } from '../lib/moduleIde';
+import { buildModuleProjectPackage, defaultModuleManifest, normalizeModuleProjectPath, validateModuleProject, type ModuleProjectFile, type ModuleProjectManifest } from '../lib/moduleIde';
 import { validateBridgeEvent } from '../lib/moduleStudioBridge';
 import { validateModuleUiTree } from '../lib/moduleUiSchema';
 
@@ -11,26 +11,31 @@ const manifest: ModuleProjectManifest = {
     version: '1.2.3',
     description: 'Fixture',
     requiredRuntimeVersion: '2.2.0',
-    entrypoints: { server: 'Server/Main.server.luau', client: 'Client/Main.client.luau' },
+    entrypoints: { server: 'Server/Main.server', client: 'Client/Main.client' },
     capabilities: [],
     dependencies: {},
 };
 
 const files: ModuleProjectFile[] = [
-    { id: '1', path: 'Server/Main.server.luau', name: 'Main.server.luau', kind: 'server_script', sourceCode: 'return {}', uiTree: null, revision: 2, createdAt: '', updatedAt: '' },
-    { id: '2', path: 'Client/Main.client.luau', name: 'Main.client.luau', kind: 'client_script', sourceCode: 'return {}', uiTree: null, revision: 3, createdAt: '', updatedAt: '' },
+    { id: '1', path: 'Server/Main.server', name: 'Main.server', kind: 'server_script', sourceCode: '', uiTree: null, revision: 2, createdAt: '', updatedAt: '' },
+    { id: '2', path: 'Client/Main.client', name: 'Main.client', kind: 'client_script', sourceCode: '', uiTree: null, revision: 3, createdAt: '', updatedAt: '' },
 ];
 
+test('new projects use a single extensionless server entrypoint', () => {
+    const defaults = defaultModuleManifest({ name: 'New Module', description: '', version: '1.0.0' });
+    assert.deepEqual(defaults.entrypoints, { server: 'Server/Main.server' });
+});
+
 test('project paths reject traversal and preserve canonical project paths', () => {
-    assert.equal(normalizeModuleProjectPath('Server/Main.server.luau'), 'Server/Main.server.luau');
-    assert.equal(normalizeModuleProjectPath('../Server/Main.server.luau'), null);
-    assert.equal(normalizeModuleProjectPath('Server//Main.server.luau'), null);
-    assert.equal(normalizeModuleProjectPath('/Server/Main.server.luau'), null);
+    assert.equal(normalizeModuleProjectPath('Server/Main.server'), 'Server/Main.server');
+    assert.equal(normalizeModuleProjectPath('../Server/Main.server'), null);
+    assert.equal(normalizeModuleProjectPath('Server//Main.server'), null);
+    assert.equal(normalizeModuleProjectPath('/Server/Main.server'), null);
 });
 
 test('project validation detects missing entrypoints and invalid remotes', () => {
     const problems = validateModuleProject({
-        manifest: { ...manifest, entrypoints: { server: 'Server/Missing.server.luau' } },
+        manifest: { ...manifest, entrypoints: { server: 'Server/Missing.server' } },
         files,
         remotes: [
             { id: '1', name: 'bad name', remoteType: 'event', direction: 'bidirectional', schema: {} },
@@ -62,12 +67,13 @@ test('package hash and ordering are deterministic', () => {
     const first = buildModuleProjectPackage(base as never);
     const second = buildModuleProjectPackage({ ...base, files: [...files].reverse(), remotes: [...base.remotes].reverse() } as never);
     assert.equal(first.packageHash, second.packageHash);
-    assert.deepEqual(first.packagePayload.files.map((file) => file.path), ['Client/Main.client.luau', 'Server/Main.server.luau']);
+    assert.deepEqual(first.packagePayload.files.map((file) => file.path), ['Client/Main.client', 'Server/Main.server']);
     assert.deepEqual(first.packagePayload.remotes.map((remote) => remote.name), ['Alpha', 'Zulu']);
 });
 
 test('Studio bridge accepts known events and rejects unknown or oversized payloads', () => {
-    assert.equal(validateBridgeEvent({ type: 'script.request', requestId: '1', payload: { instanceId: 'abc' } }).type, 'script.request');
+    assert.equal(validateBridgeEvent({ type: 'ui.rename', requestId: '1', payload: { instanceId: 'abc', name: 'MainHud' } }).type, 'ui.rename');
+    assert.throws(() => validateBridgeEvent({ type: 'script.request', payload: { instanceId: 'abc' } }), /Unsupported Studio event type/);
     assert.throws(() => validateBridgeEvent({ type: 'database.secret', payload: {} }), /Unsupported Studio event type/);
     assert.throws(() => validateBridgeEvent({ type: 'sync.error', payload: { message: 'x'.repeat(513 * 1024) } }), /too large/);
 });

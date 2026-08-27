@@ -119,8 +119,7 @@ export function defaultModuleManifest(module: Pick<AddonModuleOwnerRow, 'name' |
         description: module.description || '',
         requiredRuntimeVersion: MODULE_PROJECT_RUNTIME_VERSION,
         entrypoints: {
-            server: 'Server/Main.server.luau',
-            client: 'Client/Main.client.luau',
+            server: 'Server/Main.server',
         },
         capabilities: [],
         dependencies: {},
@@ -193,18 +192,14 @@ export async function getOwnedModule(moduleId: string, discordUserId: string): P
     return (data as AddonModuleOwnerRow | null) || null;
 }
 
-async function insertDefaultProjectFiles(module: AddonModuleOwnerRow, manifest: ModuleProjectManifest) {
+async function insertDefaultProjectFiles(module: AddonModuleOwnerRow) {
     const client = getSupabaseAdmin();
-    const legacySource = module.source_code || `return {\n    Init = function(context, settings)\n        context.Log("${module.name} loaded")\n    end,\n}\n`;
     const rows = [
         { path: 'Server', name: 'Server', kind: 'folder', source_code: null },
-        { path: 'Server/Main.server.luau', name: 'Main.server.luau', kind: 'server_script', source_code: legacySource },
+        { path: 'Server/Main.server', name: 'Main.server', kind: 'server_script', source_code: '' },
         { path: 'Client', name: 'Client', kind: 'folder', source_code: null },
-        { path: 'Client/Main.client.luau', name: 'Main.client.luau', kind: 'client_script', source_code: '-- Client entrypoint\nreturn {}\n' },
         { path: 'Shared', name: 'Shared', kind: 'folder', source_code: null },
-        { path: 'Shared/Types.luau', name: 'Types.luau', kind: 'shared_module', source_code: 'export type ModuleContext = { [string]: any }\nreturn {}\n' },
         { path: 'UI', name: 'UI', kind: 'folder', source_code: null },
-        { path: 'module.json', name: 'module.json', kind: 'manifest', source_code: JSON.stringify(manifest, null, 2) + '\n' },
     ].map((row) => ({ ...row, module_id: module.id, revision: 1 }));
 
     const { error } = await client.from('addon_module_files').upsert(rows, { onConflict: 'module_id,path', ignoreDuplicates: true });
@@ -240,7 +235,7 @@ export async function ensureOwnedModuleProject(moduleId: string, discordUserId: 
             .single();
         if (inserted.error) throw new Error(inserted.error.message);
         project = inserted.data as ProjectRow;
-        await insertDefaultProjectFiles(ownedModule, manifest);
+        await insertDefaultProjectFiles(ownedModule);
     }
 
     const [{ data: files, error: filesError }, { data: remotes, error: remotesError }] = await Promise.all([
@@ -250,7 +245,11 @@ export async function ensureOwnedModuleProject(moduleId: string, discordUserId: 
     if (filesError) throw new Error(filesError.message);
     if (remotesError) throw new Error(remotesError.message);
 
-    const normalizedFiles = ((files || []) as Record<string, unknown>[]).map((row) => normalizeFile(row));
+    // Older projects may still have a stored manifest row. Metadata now lives on
+    // addon_module_projects, so it is intentionally omitted from the IDE.
+    const normalizedFiles = ((files || []) as Record<string, unknown>[])
+        .map((row) => normalizeFile(row))
+        .filter((file) => file.kind !== 'manifest' && file.path !== 'module.json');
     const normalizedRemotes = ((remotes || []) as Record<string, unknown>[]).map((row) => normalizeRemote(row));
 
     return {
@@ -306,12 +305,12 @@ export function validateModuleProject(input: {
 
     for (const [context, entrypoint] of Object.entries(input.manifest.entrypoints)) {
         if (entrypoint && !paths.has(entrypoint)) {
-            problems.push({ severity: 'error', file: 'module.json', code: 'missing_entrypoint', message: `${context} entrypoint ${entrypoint} does not exist.` });
+            problems.push({ severity: 'error', code: 'missing_entrypoint', message: `${context} entrypoint ${entrypoint} does not exist.` });
         }
     }
 
     if (!input.manifest.entrypoints.server) {
-        problems.push({ severity: 'error', file: 'module.json', code: 'missing_server_entrypoint', message: 'A server entrypoint is required for legacy runtime compatibility.' });
+        problems.push({ severity: 'error', code: 'missing_server_entrypoint', message: 'A server entrypoint is required for legacy runtime compatibility.' });
     }
 
     for (const file of scriptFiles) {
@@ -427,9 +426,8 @@ export async function publishModuleProject(moduleId: string, discordUserId: stri
             ok: false as const,
             problems: [...problems, {
                 severity: 'error' as const,
-                file: 'module.json',
                 code: 'version_already_published',
-                message: `Version ${version} is immutable and already exists. Increase the version in module.json before publishing again.`,
+                message: `Version ${version} is immutable and already exists. Increase the module version before publishing again.`,
             }],
         };
     }

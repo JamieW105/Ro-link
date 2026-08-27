@@ -8,7 +8,9 @@
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "test:module-ide": "tsx --test scripts/module-ide.test.ts",
+    "test:script-editor-api": "tsx --test scripts/script-editor-api.test.ts",
     "sync:roblox-api": "node scripts/sync-roblox-api.mjs",
+    "sync:script-editor-api": "node scripts/sync-script-editor-api.mjs",
     "start": "concurrently \"next start\" \"node scripts/bot.js\"",
     "lint": "eslint",
     "bot": "node scripts/bot.js"
@@ -40,6 +42,7 @@
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
     "tsx": "^4.23.11",
-    "typescript": "^5"
+    "typescript": "^5",
+    "yaml": "^2.9.0"
   }
 }
