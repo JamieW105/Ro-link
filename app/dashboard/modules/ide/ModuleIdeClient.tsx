@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
     AlertTriangle, Boxes, Braces, Cable, Check, ChevronDown, ChevronRight,
@@ -516,7 +517,10 @@ export default function ModuleIdeClient() {
     return <div className="relative flex h-screen min-h-[640px] flex-col overflow-hidden bg-[#0b0f17] text-slate-100">
         <div className="fixed inset-0 z-[100] hidden items-center justify-center bg-[#0b0f17] p-8 text-center max-[560px]:flex"><div><Braces className="mx-auto h-10 w-10 text-sky-300" /><p className="mt-4 font-bold">Ro-Link Module IDE is best used on a desktop display.</p><Link href="/dashboard/creator/modules" className="mt-4 inline-block text-sm text-sky-300 underline">Return to Modules</Link></div></div>
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-white/8 bg-[#111722] px-3">
-            <Link href="/dashboard/creator/modules" className="flex items-center gap-2 font-black tracking-tight text-white"><Braces className="h-5 w-5 text-sky-300" /><span className="hidden lg:inline">Ro-Link</span></Link>
+            <Link href="/dashboard/creator/modules" className="rl-brand" aria-label="Back to Ro-Link modules">
+                <span className="rl-brand-mark"><Image src="/Media/Ro-LinkIcon.png" alt="" width={25} height={25} /></span>
+                <span>Ro-Link</span>
+            </Link>
             <div
                 aria-label="Current module"
                 title={project?.module.name || selectedModule?.name || 'No module'}
