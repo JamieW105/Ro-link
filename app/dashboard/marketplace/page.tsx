@@ -189,7 +189,7 @@ export default function DashboardMarketplacePage() {
                             </div>
                         </div>
                         <div className="rl-dashboard-primary-actions">
-                            <Link href="/dashboard/marketplace/create" className="rl-button rl-button-primary"><Plus size={14} strokeWidth={2.5} aria-hidden="true" />Create</Link>
+                            <Link href="/dashboard/creator/modules" className="rl-button rl-button-primary"><Plus size={14} strokeWidth={2.5} aria-hidden="true" />Create</Link>
                         </div>
                     </div>
                 </section>
