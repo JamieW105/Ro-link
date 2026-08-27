@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+import { luauLanguageSuggestions } from '../lib/luauLanguageSuggestions';
+
 type Member = { n: string; k: string; s: string };
 type Namespace = { n: string; m: Member[] };
 type Metadata = { sources: string[]; globals: Member[]; libraries: Namespace[]; dataTypes: Namespace[] };
@@ -46,4 +48,12 @@ test('catalog exposes Roblox data type constructors, properties, and methods', (
     for (const dataType of metadata.dataTypes) {
         assert.ok(dataType.m.every((member) => !member.n.includes('.') && !member.n.includes(':')), `${dataType.n} contains a qualified completion label`);
     }
+});
+
+test('language suggestions include statements, loops, keywords, and literal values', () => {
+    const labels = new Set(luauLanguageSuggestions.map((suggestion) => suggestion.label));
+    for (const label of ['local', 'local function', 'if', 'for … in', 'for … in pairs', 'for … in ipairs', 'for i = …', 'while', 'repeat … until', 'in', 'true', 'false', 'nil']) {
+        assert.ok(labels.has(label), `Expected Luau suggestion ${label}`);
+    }
+    assert.ok(luauLanguageSuggestions.find((suggestion) => suggestion.label === 'for … in pairs')?.insertText.includes('pairs('));
 });
