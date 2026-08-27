@@ -38,14 +38,6 @@ export interface ModuleProjectFile {
     updatedAt: string;
 }
 
-export interface ModuleProjectRemote {
-    id: string;
-    name: string;
-    remoteType: 'event' | 'function';
-    direction: 'client_to_server' | 'server_to_client' | 'bidirectional';
-    schema: Record<string, unknown>;
-}
-
 export interface ModuleProjectProblem {
     severity: 'error' | 'warning';
     file?: string;
@@ -119,7 +111,8 @@ export function defaultModuleManifest(module: Pick<AddonModuleOwnerRow, 'name' |
         description: module.description || '',
         requiredRuntimeVersion: MODULE_PROJECT_RUNTIME_VERSION,
         entrypoints: {
-            server: 'Server/Main.server',
+            server: 'Server/Main.server.luau',
+            client: 'Client/Main.client.luau',
         },
         capabilities: [],
         dependencies: {},
@@ -167,18 +160,6 @@ function normalizeFile(row: Record<string, unknown>): ModuleProjectFile {
     };
 }
 
-function normalizeRemote(row: Record<string, unknown>): ModuleProjectRemote {
-    return {
-        id: String(row.id || ''),
-        name: String(row.name || ''),
-        remoteType: String(row.remote_type || 'event') as ModuleProjectRemote['remoteType'],
-        direction: String(row.direction || 'bidirectional') as ModuleProjectRemote['direction'],
-        schema: row.schema && typeof row.schema === 'object' && !Array.isArray(row.schema)
-            ? row.schema as Record<string, unknown>
-            : {},
-    };
-}
-
 export async function getOwnedModule(moduleId: string, discordUserId: string): Promise<AddonModuleOwnerRow | null> {
     const client = getSupabaseAdmin();
     const { data, error } = await client
@@ -192,14 +173,18 @@ export async function getOwnedModule(moduleId: string, discordUserId: string): P
     return (data as AddonModuleOwnerRow | null) || null;
 }
 
-async function insertDefaultProjectFiles(module: AddonModuleOwnerRow) {
+async function insertDefaultProjectFiles(module: AddonModuleOwnerRow, manifest: ModuleProjectManifest) {
     const client = getSupabaseAdmin();
+    const legacySource = module.source_code || `return {\n    Init = function(context, settings)\n        context.Log("${module.name} loaded")\n    end,\n}\n`;
     const rows = [
         { path: 'Server', name: 'Server', kind: 'folder', source_code: null },
-        { path: 'Server/Main.server', name: 'Main.server', kind: 'server_script', source_code: '' },
+        { path: 'Server/Main.server.luau', name: 'Main.server.luau', kind: 'server_script', source_code: legacySource },
         { path: 'Client', name: 'Client', kind: 'folder', source_code: null },
+        { path: 'Client/Main.client.luau', name: 'Main.client.luau', kind: 'client_script', source_code: '-- Client entrypoint\nreturn {}\n' },
         { path: 'Shared', name: 'Shared', kind: 'folder', source_code: null },
+        { path: 'Shared/Types.luau', name: 'Types.luau', kind: 'shared_module', source_code: 'export type ModuleContext = { [string]: any }\nreturn {}\n' },
         { path: 'UI', name: 'UI', kind: 'folder', source_code: null },
+        { path: 'module.json', name: 'module.json', kind: 'manifest', source_code: JSON.stringify(manifest, null, 2) + '\n' },
     ].map((row) => ({ ...row, module_id: module.id, revision: 1 }));
 
     const { error } = await client.from('addon_module_files').upsert(rows, { onConflict: 'module_id,path', ignoreDuplicates: true });
@@ -235,22 +220,17 @@ export async function ensureOwnedModuleProject(moduleId: string, discordUserId: 
             .single();
         if (inserted.error) throw new Error(inserted.error.message);
         project = inserted.data as ProjectRow;
-        await insertDefaultProjectFiles(ownedModule);
+        await insertDefaultProjectFiles(ownedModule, manifest);
     }
 
-    const [{ data: files, error: filesError }, { data: remotes, error: remotesError }] = await Promise.all([
-        client.from('addon_module_files').select('*').eq('module_id', ownedModule.id).order('path'),
-        client.from('addon_module_remotes').select('*').eq('module_id', ownedModule.id).order('name'),
-    ]);
+    const { data: files, error: filesError } = await client
+        .from('addon_module_files')
+        .select('*')
+        .eq('module_id', ownedModule.id)
+        .order('path');
     if (filesError) throw new Error(filesError.message);
-    if (remotesError) throw new Error(remotesError.message);
 
-    // Older projects may still have a stored manifest row. Metadata now lives on
-    // addon_module_projects, so it is intentionally omitted from the IDE.
-    const normalizedFiles = ((files || []) as Record<string, unknown>[])
-        .map((row) => normalizeFile(row))
-        .filter((file) => file.kind !== 'manifest' && file.path !== 'module.json');
-    const normalizedRemotes = ((remotes || []) as Record<string, unknown>[]).map((row) => normalizeRemote(row));
+    const normalizedFiles = ((files || []) as Record<string, unknown>[]).map((row) => normalizeFile(row));
 
     return {
         module: {
@@ -274,7 +254,6 @@ export async function ensureOwnedModuleProject(moduleId: string, discordUserId: 
             updatedAt: project.updated_at,
         },
         files: normalizedFiles,
-        remotes: normalizedRemotes,
     };
 }
 
@@ -297,7 +276,6 @@ function findLine(source: string, pattern: RegExp) {
 export function validateModuleProject(input: {
     manifest: ModuleProjectManifest;
     files: ModuleProjectFile[];
-    remotes: ModuleProjectRemote[];
 }) {
     const problems: ModuleProjectProblem[] = [];
     const paths = new Set(input.files.map((file) => file.path));
@@ -305,12 +283,12 @@ export function validateModuleProject(input: {
 
     for (const [context, entrypoint] of Object.entries(input.manifest.entrypoints)) {
         if (entrypoint && !paths.has(entrypoint)) {
-            problems.push({ severity: 'error', code: 'missing_entrypoint', message: `${context} entrypoint ${entrypoint} does not exist.` });
+            problems.push({ severity: 'error', file: 'module.json', code: 'missing_entrypoint', message: `${context} entrypoint ${entrypoint} does not exist.` });
         }
     }
 
     if (!input.manifest.entrypoints.server) {
-        problems.push({ severity: 'error', code: 'missing_server_entrypoint', message: 'A server entrypoint is required for legacy runtime compatibility.' });
+        problems.push({ severity: 'error', file: 'module.json', code: 'missing_server_entrypoint', message: 'A server entrypoint is required for legacy runtime compatibility.' });
     }
 
     for (const file of scriptFiles) {
@@ -329,28 +307,12 @@ export function validateModuleProject(input: {
         problems.push(...validateModuleUiTree(file.uiTree, file.path));
     }
 
-    const remoteNames = new Set<string>();
-    for (const remote of input.remotes) {
-        if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(remote.name)) {
-            problems.push({ severity: 'error', code: 'invalid_remote_name', message: `Remote name ${remote.name} is invalid.` });
-        }
-        const lower = remote.name.toLowerCase();
-        if (remoteNames.has(lower)) {
-            problems.push({ severity: 'error', code: 'duplicate_remote', message: `Remote ${remote.name} is duplicated.` });
-        }
-        remoteNames.add(lower);
-        if (Buffer.byteLength(JSON.stringify(remote.schema || {}), 'utf8') > 64 * 1024) {
-            problems.push({ severity: 'error', code: 'remote_schema_too_large', message: `Remote ${remote.name} schema exceeds 64 KB.` });
-        }
-    }
-
     if (input.files.length > MAX_MODULE_FILES) {
         problems.push({ severity: 'error', code: 'too_many_files', message: `Projects are limited to ${MAX_MODULE_FILES} files and folders.` });
     }
     const totalBytes = input.files.reduce((sum, file) => sum
         + Buffer.byteLength(file.sourceCode || '', 'utf8')
-        + Buffer.byteLength(file.uiTree == null ? '' : JSON.stringify(file.uiTree), 'utf8'), 0)
-        + Buffer.byteLength(JSON.stringify(input.remotes), 'utf8');
+        + Buffer.byteLength(file.uiTree == null ? '' : JSON.stringify(file.uiTree), 'utf8'), 0);
     if (totalBytes > MAX_MODULE_PROJECT_BYTES) {
         problems.push({ severity: 'error', code: 'project_too_large', message: 'Module Project v2 packages are limited to 10 MB.' });
     }
@@ -381,9 +343,6 @@ export function buildModuleProjectPackage(input: Awaited<ReturnType<typeof ensur
             uiTree: file.uiTree,
             revision: file.revision,
         }));
-    const remotes = [...input.remotes]
-        .sort((left, right) => left.name.localeCompare(right.name))
-        .map(({ name, remoteType, direction, schema }) => ({ name, remoteType, direction, schema }));
     const packagePayload = {
         formatVersion: MODULE_PROJECT_FORMAT_VERSION,
         moduleId: input.module.id,
@@ -396,7 +355,6 @@ export function buildModuleProjectPackage(input: Awaited<ReturnType<typeof ensur
         capabilities: input.project.manifest.capabilities,
         dependencies: input.project.manifest.dependencies,
         files,
-        remotes,
     };
     const serialized = stableJson(packagePayload);
     return {
@@ -410,7 +368,7 @@ export async function publishModuleProject(moduleId: string, discordUserId: stri
     const client = getSupabaseAdmin();
     const input = await ensureOwnedModuleProject(moduleId, discordUserId);
     if (!input) return null;
-    const problems = validateModuleProject({ manifest: input.project.manifest, files: input.files, remotes: input.remotes });
+    const problems = validateModuleProject({ manifest: input.project.manifest, files: input.files });
     if (problems.some((problem) => problem.severity === 'error')) {
         return { ok: false as const, problems };
     }
@@ -426,8 +384,9 @@ export async function publishModuleProject(moduleId: string, discordUserId: stri
             ok: false as const,
             problems: [...problems, {
                 severity: 'error' as const,
+                file: 'module.json',
                 code: 'version_already_published',
-                message: `Version ${version} is immutable and already exists. Increase the module version before publishing again.`,
+                message: `Version ${version} is immutable and already exists. Increase the version in module.json before publishing again.`,
             }],
         };
     }

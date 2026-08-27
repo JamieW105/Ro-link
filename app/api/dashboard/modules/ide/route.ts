@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     const name = trimModuleString(body?.name, 120);
     if (!name) return NextResponse.json({ error: 'Module name is required.' }, { status: 400 });
     const description = trimModuleString(body?.description, 2000);
-    const source = '';
+    const source = `return {\n    Init = function(context, settings)\n        context.Log("${name.replace(/["\\]/g, '')} loaded")\n    end,\n}\n`;
     const client = getSupabaseAdmin();
     const slug = await uniqueSlug(name);
     const { data, error } = await client.from('addon_modules').insert({

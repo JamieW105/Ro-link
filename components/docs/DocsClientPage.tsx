@@ -1202,7 +1202,7 @@ print(result.user.robloxUsername, result.roles.serverStaff, result.presence.inGa
         category: 'Developer',
         eyebrow: 'Module Runtime',
         title: 'Module Developer API',
-        summary: 'Build Module Project v2 workspaces in the browser IDE, pair Roblox Studio, and use the typed runtime context for commands, reports, Discord messages, user data, UI, client code, and remotes.',
+        summary: 'Build Module Project v2 workspaces in the browser IDE, pair Roblox Studio, and use the typed runtime context for commands, reports, Discord messages, user data, UI, and module client/server calls.',
         icon: Icons.Terminal,
         stats: [
             { label: 'Runtime object', value: 'context' },
@@ -1215,6 +1215,7 @@ print(result.user.robloxUsername, result.roles.serverStaff, result.presence.inGa
             { id: 'module-api-config', title: 'Configuration' },
             { id: 'module-api-live-inputs', title: 'Live input dropdowns' },
             { id: 'module-api-functions', title: 'Context functions' },
+            { id: 'module-api-calls', title: 'Client and server calls' },
             { id: 'module-api-command-panel', title: 'Cmds panel commands' },
             { id: 'module-api-reports', title: 'Reports data' },
             { id: 'module-api-discord', title: 'Discord messages' },
@@ -1229,13 +1230,13 @@ print(result.user.robloxUsername, result.roles.serverStaff, result.presence.inGa
                     id="module-api-project-v2"
                     eyebrow="Module Project v2"
                     title="Build in the browser, synchronize with Studio"
-                    description="Open the Module IDE from the Creator Dashboard. Projects keep independent Server, Client, Shared, UI, and Remotes data with file-level draft revisions; project metadata is managed automatically. Connect Studio with the one-time code shown by the IDE to browse StarterGui names, rename UI objects, import read-only UI references for client scripts, or sync the validated project into the place. UI properties and Studio script sources never enter the browser IDE."
+                    description="Open the Module IDE from the Creator Dashboard. Projects keep independent Server, Client, Shared, UI, and module.json data with file-level draft revisions. Connect Studio with the one-time code shown by the IDE, then use the standalone Ro-Link Module IDE plugin to browse live instances, edit Studio scripts safely, import selected UI, or sync the validated project into the place."
                 >
                     <InfoGrid
                         items={[
                             { meta: 'Browser', title: 'Multi-file Luau workspace', description: 'Monaco provides Luau highlighting, Roblox and Ro-Link completions, diagnostics, tabs, search, quick open, formatting, and debounced revision-aware draft saves.' },
                             { meta: 'Studio', title: 'Scoped pairing', description: 'Pairing codes are one-time and expire quickly. The plugin receives a module-scoped credential and never receives the website session or database keys.' },
-                            { meta: 'Runtime', title: 'Deterministic v2 package', description: 'Publish validates scripts, entrypoints, UI, and remotes, stores an immutable package hash, and keeps legacy server source delivery for existing installs.' },
+                            { meta: 'Runtime', title: 'Deterministic v2 package', description: 'Publish validates scripts, entrypoints, and UI, stores an immutable package hash, and provides CallClient and CallServer through the shared Module API transport.' },
                         ]}
                     />
                     <div className="mt-5 flex flex-wrap gap-3">
@@ -1538,6 +1539,43 @@ return {
                         headers={['Name', 'Type', 'Description']}
                         rows={moduleDeveloperFunctions.map((row) => [...row])}
                     />
+                </SectionCard>
+
+                <SectionCard
+                    id="module-api-calls"
+                    eyebrow="Module API"
+                    title="Call module clients and servers"
+                    description="Use one shared Module API instead of configuring RemoteEvents or RemoteFunctions in the IDE. The ModuleID selects the receiving module, and every argument after it is forwarded unchanged."
+                >
+                    <div className="grid gap-6 xl:grid-cols-2">
+                        <CodeBlock label="Server entrypoint">
+                            {`return {
+    Start = function(context)
+        context.CallClient(context.ModuleId, player, "Open", {
+            title = "Hello"
+        })
+    end,
+
+    CallServer = function(context, player, action, payload)
+        context.Log(player.Name, action, payload)
+    end
+}`}
+                        </CodeBlock>
+                        <CodeBlock label="Client entrypoint">
+                            {`return {
+    Start = function(context)
+        context.CallServer(context.ModuleId, "Ready")
+    end,
+
+    CallClient = function(context, action, payload)
+        print(action, payload.title)
+    end
+}`}
+                        </CodeBlock>
+                    </div>
+                    <Callout title="CallServer supplies the player" tone="info">
+                        A server <InlineCode>CallServer</InlineCode> handler receives <InlineCode>context, player, ...args</InlineCode>. A client <InlineCode>CallClient</InlineCode> handler receives <InlineCode>context, ...args</InlineCode>.
+                    </Callout>
                 </SectionCard>
 
                 <SectionCard

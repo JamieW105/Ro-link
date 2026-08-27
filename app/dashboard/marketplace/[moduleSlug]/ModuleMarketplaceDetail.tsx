@@ -46,11 +46,6 @@ type SessionUserWithId = {
     id?: string;
 };
 
-function formatDate(value: string | null) {
-    if (!value) return 'Unpublished';
-    return new Date(value).toLocaleDateString();
-}
-
 function statusClassName(status: string) {
     if (status === 'PUBLISHED') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
     if (status === 'PENDING_REVIEW') return 'border-amber-400/20 bg-amber-400/10 text-amber-300';
@@ -214,21 +209,10 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
             <main>
                 <section className="border-b border-slate-800/80 bg-gradient-to-b from-[#0b1016] to-[#080b0f]" aria-labelledby="module-title">
                     <div className="rl-shell py-8 md:py-10">
-                        <div className="flex items-center justify-between gap-4">
-                            <Link href="/dashboard/marketplace" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-sky-300">
-                                <ArrowLeft size={14} aria-hidden="true" />
-                                Back to Marketplace
-                            </Link>
-                            {addon && (
-                                <button
-                                    type="button"
-                                    onClick={() => setInstallPickerOpen(true)}
-                                    className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 text-xs font-bold uppercase tracking-wider text-sky-200 transition-colors hover:bg-sky-500/15 hover:text-white"
-                                >
-                                    Install
-                                </button>
-                            )}
-                        </div>
+                        <Link href="/dashboard/marketplace" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-sky-300">
+                            <ArrowLeft size={14} aria-hidden="true" />
+                            Back to Marketplace
+                        </Link>
                         {addon && (
                             <div className="mt-6">
                                 <div className="flex flex-wrap items-center gap-2">
@@ -285,25 +269,13 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                             </section>
 
                             <aside className="space-y-4">
-                                <div className="overflow-hidden rounded-lg border border-slate-800 bg-[#0d1116]">
-                                    <div className="border-b border-slate-800 px-5 py-4">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Slug</p>
-                                        <p className="mt-1.5 break-all font-mono text-sm text-slate-300">{addon.slug}</p>
-                                    </div>
-                                    <div className="border-b border-slate-800 px-5 py-4">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Review Status</p>
-                                        <p className="mt-1.5 text-sm font-semibold text-slate-300">{statusLabel(addon.status)}</p>
-                                        {addon.status === 'REJECTED' && addon.moderationNote && <p className="mt-2 text-xs leading-relaxed text-red-300">{addon.moderationNote}</p>}
-                                    </div>
-                                    <div className="border-b border-slate-800 px-5 py-4">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Published</p>
-                                        <p className="mt-1.5 text-sm font-semibold text-slate-300">{formatDate(addon.publishedAt)}</p>
-                                    </div>
-                                    <div className="px-5 py-4">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Checksum</p>
-                                        <p className="mt-1.5 break-all font-mono text-[11px] leading-5 text-slate-400">{addon.sourceChecksum || 'Unavailable'}</p>
-                                    </div>
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setInstallPickerOpen(true)}
+                                    className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 text-xs font-bold uppercase tracking-wider text-sky-200 transition-colors hover:bg-sky-500/15 hover:text-white"
+                                >
+                                    Select Server To Install
+                                </button>
                             </aside>
                         </div>
                     </section>

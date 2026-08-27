@@ -13,13 +13,12 @@ export async function GET(_req: Request, context: Context) {
         const { moduleId } = await context.params;
         const project = await ensureOwnedModuleProject(moduleId, auth.discordUserId);
         if (!project) return NextResponse.json({ error: 'Module not found.' }, { status: 404 });
-        const problems = validateModuleProject({ manifest: project.project.manifest, files: project.files, remotes: project.remotes });
+        const problems = validateModuleProject({ manifest: project.project.manifest, files: project.files });
         return noStoreJson({
             ready: !problems.some((problem) => problem.severity === 'error'),
             problems,
             summary: {
                 scripts: project.files.filter((file) => ['server_script', 'client_script', 'shared_module'].includes(file.kind)).length,
-                remotes: project.remotes.length,
                 uiRoots: project.files.filter((file) => file.kind === 'ui').length,
                 warnings: problems.filter((problem) => problem.severity === 'warning').length,
                 errors: problems.filter((problem) => problem.severity === 'error').length,

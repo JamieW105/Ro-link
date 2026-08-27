@@ -10,12 +10,13 @@ local ChangeHistoryService = game:GetService("ChangeHistoryService")
 local GuiService = game:GetService("GuiService")
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ScriptEditorService = game:GetService("ScriptEditorService")
 local Selection = game:GetService("Selection")
 local ServerScriptService = game:GetService("ServerScriptService")
 local StarterPlayer = game:GetService("StarterPlayer")
 
-local PLUGIN_VERSION = "1.3.0"
-local PROTOCOL_VERSION = 2
+local PLUGIN_VERSION = "1.2.1"
+local PROTOCOL_VERSION = 1
 local DEFAULT_BASE_URL = "https://rolink.site"
 local TOOLBAR_ICON = "rbxassetid://80325173339413"
 local ACCOUNT_POLL_SECONDS = 2.5
@@ -23,6 +24,29 @@ local BRIDGE_POLL_SECONDS = 1.25
 local CHANGE_FLUSH_SECONDS = 0.6
 local MAX_SNAPSHOT_NODES = 2500
 local MAX_UI_NODES = 1000
+
+local SERVICE_NAMES = {
+	"Workspace",
+	"Players",
+	"Lighting",
+	"ReplicatedFirst",
+	"ReplicatedStorage",
+	"ServerScriptService",
+	"ServerStorage",
+	"StarterGui",
+	"StarterPack",
+	"StarterPlayer",
+	"Teams",
+	"SoundService",
+	"TextChatService",
+	"MaterialService",
+}
+
+local SCRIPT_CLASSES = {
+	Script = true,
+	LocalScript = true,
+	ModuleScript = true,
+}
 
 local UI_CLASSES = {
 	ScreenGui = true,
@@ -49,6 +73,90 @@ local UI_CLASSES = {
 	UIAspectRatioConstraint = true,
 	UISizeConstraint = true,
 	UITextSizeConstraint = true,
+	Folder = true,
+	Configuration = true,
+	StringValue = true,
+	BoolValue = true,
+	IntValue = true,
+	NumberValue = true,
+}
+
+local SERIALIZABLE_PROPERTIES = {
+	"Name",
+	"Active",
+	"AnchorPoint",
+	"AutomaticSize",
+	"BackgroundColor3",
+	"BackgroundTransparency",
+	"BorderColor3",
+	"BorderMode",
+	"BorderSizePixel",
+	"ClipsDescendants",
+	"LayoutOrder",
+	"Position",
+	"Rotation",
+	"Selectable",
+	"SelectionOrder",
+	"Size",
+	"SizeConstraint",
+	"Visible",
+	"ZIndex",
+	"Text",
+	"TextColor3",
+	"TextSize",
+	"TextScaled",
+	"TextTransparency",
+	"TextStrokeColor3",
+	"TextStrokeTransparency",
+	"TextWrapped",
+	"TextXAlignment",
+	"TextYAlignment",
+	"Font",
+	"RichText",
+	"PlaceholderText",
+	"PlaceholderColor3",
+	"ClearTextOnFocus",
+	"MultiLine",
+	"Image",
+	"ImageColor3",
+	"ImageTransparency",
+	"ScaleType",
+	"SliceCenter",
+	"TileSize",
+	"ResetOnSpawn",
+	"DisplayOrder",
+	"IgnoreGuiInset",
+	"ZIndexBehavior",
+	"Adornee",
+	"AlwaysOnTop",
+	"Brightness",
+	"CanvasSize",
+	"AutomaticCanvasSize",
+	"ScrollBarImageColor3",
+	"ScrollBarImageTransparency",
+	"ScrollBarThickness",
+	"ScrollingDirection",
+	"ElasticBehavior",
+	"FillDirection",
+	"HorizontalAlignment",
+	"VerticalAlignment",
+	"Padding",
+	"SortOrder",
+	"CellPadding",
+	"CellSize",
+	"CornerRadius",
+	"Thickness",
+	"Transparency",
+	"Color",
+	"Enabled",
+	"AspectRatio",
+	"DominantAxis",
+	"AspectType",
+	"MinSize",
+	"MaxSize",
+	"MinTextSize",
+	"MaxTextSize",
+	"Value",
 }
 
 type BridgeEvent = {
@@ -201,36 +309,90 @@ local function getInstancePath(instance: Instance): string
 end
 
 local function serializeExplorerNode(instance: Instance, includeChildren: boolean?, depth: number?, counter: { count: number }?): { [string]: any }
-	local starterGui = game:GetService("StarterGui")
-	local hasUiChildren = false
-	for _, child in ipairs(instance:GetChildren()) do
-		if UI_CLASSES[child.ClassName] then
-			hasUiChildren = true
-			break
-		end
-	end
 	local node = {
 		id = getInstanceId(instance),
 		name = instance.Name,
 		className = instance.ClassName,
 		path = getInstancePath(instance),
-		parentId = if instance.Parent and instance.Parent ~= starterGui then getInstanceId(instance.Parent) else nil,
-		hasChildren = hasUiChildren,
+		parentId = if instance.Parent and instance.Parent ~= game then getInstanceId(instance.Parent) else nil,
+		hasChildren = #instance:GetChildren() > 0,
+		isScript = SCRIPT_CLASSES[instance.ClassName] == true,
 	}
 	if includeChildren and (depth or 0) > 0 and counter and counter.count < MAX_SNAPSHOT_NODES then
 		local children = {}
 		for _, child in ipairs(instance:GetChildren()) do
-			if UI_CLASSES[child.ClassName] and counter.count >= MAX_SNAPSHOT_NODES then
+			if counter.count >= MAX_SNAPSHOT_NODES then
 				break
 			end
-			if UI_CLASSES[child.ClassName] then
-				counter.count += 1
-				table.insert(children, serializeExplorerNode(child, true, (depth or 1) - 1, counter))
-			end
+			counter.count += 1
+			table.insert(children, serializeExplorerNode(child, true, (depth or 1) - 1, counter))
 		end
 		node.children = children
 	end
 	return node
+end
+
+local function sourceRevision(source: string): string
+	local hash = 5381
+	for index = 1, #source do
+		hash = bit32.band((hash * 33) + string.byte(source, index), 0xFFFFFFFF)
+	end
+	return string.format("%08x-%d", hash, #source)
+end
+
+local function readScript(instance: Instance): (string?, string?)
+	if not SCRIPT_CLASSES[instance.ClassName] then
+		return nil, "Selected instance is not a script."
+	end
+	local ok, source = pcall(function()
+		return (instance :: any).Source
+	end)
+	if not ok then
+		return nil, "Studio denied script source access. Enable script injection permissions for this plugin."
+	end
+	return tostring(source), nil
+end
+
+local function encodeValue(value: any): any
+	local valueType = typeof(value)
+	if valueType == "nil" or valueType == "boolean" or valueType == "number" or valueType == "string" then
+		return value
+	elseif valueType == "Color3" then
+		return { type = "Color3", r = value.R, g = value.G, b = value.B }
+	elseif valueType == "Vector2" then
+		return { type = "Vector2", x = value.X, y = value.Y }
+	elseif valueType == "Vector3" then
+		return { type = "Vector3", x = value.X, y = value.Y, z = value.Z }
+	elseif valueType == "UDim" then
+		return { type = "UDim", scale = value.Scale, offset = value.Offset }
+	elseif valueType == "UDim2" then
+		return {
+			type = "UDim2",
+			xScale = value.X.Scale,
+			xOffset = value.X.Offset,
+			yScale = value.Y.Scale,
+			yOffset = value.Y.Offset,
+		}
+	elseif valueType == "Rect" then
+		return { type = "Rect", min = encodeValue(value.Min), max = encodeValue(value.Max) }
+	elseif valueType == "ColorSequence" then
+		local points = {}
+		for _, keypoint in ipairs(value.Keypoints) do
+			table.insert(points, { time = keypoint.Time, value = encodeValue(keypoint.Value) })
+		end
+		return { type = "ColorSequence", keypoints = points }
+	elseif valueType == "NumberSequence" then
+		local points = {}
+		for _, keypoint in ipairs(value.Keypoints) do
+			table.insert(points, { time = keypoint.Time, value = keypoint.Value, envelope = keypoint.Envelope })
+		end
+		return { type = "NumberSequence", keypoints = points }
+	elseif valueType == "EnumItem" then
+		return { type = "EnumItem", value = tostring(value) }
+	elseif valueType == "Instance" then
+		return { type = "InstanceRef", path = getInstancePath(value) }
+	end
+	return nil
 end
 
 local function serializeUi(instance: Instance, counter: { count: number }, warnings: { string }, depth: number): { [string]: any }?
@@ -243,6 +405,25 @@ local function serializeUi(instance: Instance, counter: { count: number }, warni
 		return nil
 	end
 	counter.count += 1
+	local properties = {}
+	for _, property in ipairs(SERIALIZABLE_PROPERTIES) do
+		local ok, value = pcall(function()
+			return (instance :: any)[property]
+		end)
+		if ok then
+			local encoded = encodeValue(value)
+			if encoded ~= nil then
+				properties[property] = encoded
+			end
+		end
+	end
+	local attributes = {}
+	for name, value in pairs(instance:GetAttributes()) do
+		local encoded = encodeValue(value)
+		if encoded ~= nil then
+			attributes[name] = encoded
+		end
+	end
 	local children = {}
 	for _, child in ipairs(instance:GetChildren()) do
 		local encoded = serializeUi(child, counter, warnings, depth + 1)
@@ -253,7 +434,8 @@ local function serializeUi(instance: Instance, counter: { count: number }, warni
 	return {
 		className = instance.ClassName,
 		name = instance.Name,
-		studioPath = getInstancePath(instance),
+		properties = properties,
+		attributes = attributes,
 		children = children,
 	}
 end
@@ -301,7 +483,7 @@ local function watchInstance(instance: Instance)
 		})
 	end))
 	table.insert(state.watchConnections, instance.AncestryChanged:Connect(function(_, parent)
-		if parent and instance:IsDescendantOf(game:GetService("StarterGui")) then
+		if parent then
 			queueChange({ type = "tree.instanceMoved", payload = serializeExplorerNode(instance) })
 		end
 	end))
@@ -309,20 +491,18 @@ end
 
 local function beginHierarchyWatch()
 	disconnectWatchers()
-	local starterGui = game:GetService("StarterGui")
-	for _, descendant in ipairs(starterGui:GetDescendants()) do
-		if UI_CLASSES[descendant.ClassName] then
+	for _, serviceName in ipairs(SERVICE_NAMES) do
+		local ok, service = pcall(game.GetService, game, serviceName)
+		if ok and service then
+			watchInstance(service)
+			for _, descendant in ipairs(service:GetDescendants()) do
 				watchInstance(descendant)
-		end
-	end
-	table.insert(state.watchConnections, starterGui.DescendantAdded:Connect(function(instance)
-		if UI_CLASSES[instance.ClassName] then
+			end
+			table.insert(state.watchConnections, service.DescendantAdded:Connect(function(instance)
 				watchInstance(instance)
 				queueChange({ type = "tree.instanceCreated", payload = serializeExplorerNode(instance) })
-		end
-	end))
-	table.insert(state.watchConnections, starterGui.DescendantRemoving:Connect(function(instance)
-		if UI_CLASSES[instance.ClassName] then
+			end))
+			table.insert(state.watchConnections, service.DescendantRemoving:Connect(function(instance)
 				local id = state.idByInstance[instance]
 				queueChange({
 					type = "tree.instanceDeleted",
@@ -331,18 +511,19 @@ local function beginHierarchyWatch()
 				if id then
 					state.instanceById[id] = nil
 				end
+			end))
 		end
-	end))
+	end
 end
 
 local function sendSnapshot()
 	local roots = {}
 	local counter = { count = 0 }
-	local starterGui = game:GetService("StarterGui")
-	for _, instance in ipairs(starterGui:GetChildren()) do
-		if UI_CLASSES[instance.ClassName] then
+	for _, serviceName in ipairs(SERVICE_NAMES) do
+		local ok, service = pcall(game.GetService, game, serviceName)
+		if ok and service then
 			counter.count += 1
-			table.insert(roots, serializeExplorerNode(instance, true, 32, counter))
+			table.insert(roots, serializeExplorerNode(service, true, 2, counter))
 		end
 	end
 	sendEvents({ {
@@ -356,6 +537,33 @@ local function sendSnapshot()
 	} })
 end
 
+local function respondToScriptRequest(event: any)
+	local payload = event.payload or {}
+	local instance = state.instanceById[tostring(payload.instanceId or "")]
+	if not instance then
+		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "Studio instance no longer exists." } } })
+		return
+	end
+	local source, sourceError = readScript(instance)
+	if not source then
+		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = sourceError } } })
+		return
+	end
+	local revision = sourceRevision(source)
+	sendEvents({ {
+		type = "script.contents",
+		requestId = event.requestId,
+		revision = revision,
+		payload = {
+			instanceId = getInstanceId(instance),
+			path = getInstancePath(instance),
+			name = instance.Name,
+			className = instance.ClassName,
+			source = source,
+		},
+	} })
+end
+
 local function respondToChildrenRequest(event: any)
 	local payload = event.payload or {}
 	local instance = state.instanceById[tostring(payload.instanceId or "")]
@@ -365,9 +573,7 @@ local function respondToChildrenRequest(event: any)
 	end
 	local children = {}
 	for _, child in ipairs(instance:GetChildren()) do
-		if UI_CLASSES[child.ClassName] then
-			table.insert(children, serializeExplorerNode(child))
-		end
+		table.insert(children, serializeExplorerNode(child))
 	end
 	sendEvents({ {
 		type = "tree.children",
@@ -376,36 +582,64 @@ local function respondToChildrenRequest(event: any)
 	} })
 end
 
-local function applyUiRename(event: any)
+local function applyScriptUpdate(event: any)
 	local payload = event.payload or {}
 	local instance = state.instanceById[tostring(payload.instanceId or "")]
-	if not instance or not UI_CLASSES[instance.ClassName] or not instance:IsDescendantOf(game:GetService("StarterGui")) then
-		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "Studio UI instance no longer exists." } } })
+	if not instance or not SCRIPT_CLASSES[instance.ClassName] then
+		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "Studio script no longer exists." } } })
 		return
 	end
-	local nextName = trim(payload.name):sub(1, 100)
-	if nextName == "" or nextName:find("[/\\%c]") then
-		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "UI names cannot be empty or contain slashes/control characters." } } })
+	local currentSource, sourceError = readScript(instance)
+	if not currentSource then
+		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = sourceError } } })
 		return
 	end
-	local sibling = instance.Parent and instance.Parent:FindFirstChild(nextName)
-	if sibling and sibling ~= instance then
-		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "A sibling UI object already uses that name." } } })
+	local currentRevision = sourceRevision(currentSource)
+	local expectedRevision = tostring(event.revision or payload.expectedRevision or "")
+	if expectedRevision ~= "" and expectedRevision ~= currentRevision then
+		sendEvents({ {
+			type = "script.conflict",
+			requestId = event.requestId,
+			revision = currentRevision,
+			payload = {
+				instanceId = getInstanceId(instance),
+				path = getInstancePath(instance),
+				source = currentSource,
+				message = "This script changed in Roblox Studio after it was opened in the browser.",
+			},
+		} })
 		return
 	end
-	pcall(ChangeHistoryService.SetWaypoint, ChangeHistoryService, "Ro-Link before UI rename")
-	instance.Name = nextName
-	pcall(ChangeHistoryService.SetWaypoint, ChangeHistoryService, "Ro-Link UI renamed")
+	local nextSource = tostring(payload.source or "")
+	if #nextSource > 1024 * 1024 then
+		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "Script exceeds the 1 MB safety limit." } } })
+		return
+	end
+	pcall(ChangeHistoryService.SetWaypoint, ChangeHistoryService, "Ro-Link IDE before script update")
+	local ok, updateError = pcall(function()
+		ScriptEditorService:UpdateSourceAsync(instance :: LuaSourceContainer, function()
+			return nextSource
+		end)
+	end)
+	if not ok then
+		sendEvents({ { type = "sync.error", requestId = event.requestId, payload = { message = "Studio rejected the script update: " .. tostring(updateError) } } })
+		return
+	end
+	pcall(ChangeHistoryService.SetWaypoint, ChangeHistoryService, "Ro-Link IDE script update")
+	local revision = sourceRevision(nextSource)
 	sendEvents({ {
-		type = "ui.renamed",
+		type = "script.updated",
 		requestId = event.requestId,
-		payload = serializeExplorerNode(instance),
+		revision = revision,
+		payload = { instanceId = getInstanceId(instance), path = getInstancePath(instance) },
 	} })
 end
 
 local function processBrowserEvent(event: any)
-	if event.type == "ui.rename" then
-		applyUiRename(event)
+	if event.type == "script.request" then
+		respondToScriptRequest(event)
+	elseif event.type == "script.update" then
+		applyScriptUpdate(event)
 	elseif event.type == "tree.children" then
 		respondToChildrenRequest(event)
 	elseif event.type == "tree.snapshot" then
@@ -452,7 +686,7 @@ local function startBridge()
 	state.bridgePollId = pollId
 	updateConnectionUi()
 	beginHierarchyWatch()
-	setStatus("Module paired. Sending the StarterGui name snapshot...", "success")
+	setStatus("Module paired. Sending the Studio Explorer snapshot...", "success")
 	sendEvents({ {
 		type = "studio.connected",
 		payload = {
@@ -615,14 +849,10 @@ local function importSelection()
 	local selectionPaths = {}
 	local counter = { count = 0 }
 	for _, instance in ipairs(selected) do
-		if instance:IsDescendantOf(game:GetService("StarterGui")) then
-			table.insert(selectionPaths, getInstancePath(instance))
-			local root = serializeUi(instance, counter, warnings, 0)
-			if root then
-				table.insert(roots, root)
-			end
-		else
-			table.insert(warnings, "Skipped UI outside StarterGui: " .. getInstancePath(instance))
+		table.insert(selectionPaths, getInstancePath(instance))
+		local root = serializeUi(instance, counter, warnings, 0)
+		if root then
+			table.insert(roots, root)
 		end
 	end
 	if #roots == 0 then
@@ -646,20 +876,84 @@ local function importSelection()
 	end
 end
 
-local function materializeUiReference(node: any, parent: Instance, counter: { count: number }): Instance?
+local function decodeValue(value: any): any
+	if type(value) ~= "table" then
+		return value
+	end
+	local valueType = tostring(value.type or "")
+	if valueType == "Color3" then
+		return Color3.new(tonumber(value.r) or 0, tonumber(value.g) or 0, tonumber(value.b) or 0)
+	elseif valueType == "Vector2" then
+		return Vector2.new(tonumber(value.x) or 0, tonumber(value.y) or 0)
+	elseif valueType == "Vector3" then
+		return Vector3.new(tonumber(value.x) or 0, tonumber(value.y) or 0, tonumber(value.z) or 0)
+	elseif valueType == "UDim" then
+		return UDim.new(tonumber(value.scale) or 0, tonumber(value.offset) or 0)
+	elseif valueType == "UDim2" then
+		return UDim2.new(tonumber(value.xScale) or 0, tonumber(value.xOffset) or 0, tonumber(value.yScale) or 0, tonumber(value.yOffset) or 0)
+	elseif valueType == "Rect" then
+		return Rect.new(decodeValue(value.min), decodeValue(value.max))
+	elseif valueType == "ColorSequence" then
+		local keypoints = {}
+		for _, point in ipairs(value.keypoints or {}) do
+			table.insert(keypoints, ColorSequenceKeypoint.new(tonumber(point.time) or 0, decodeValue(point.value)))
+		end
+		return ColorSequence.new(keypoints)
+	elseif valueType == "NumberSequence" then
+		local keypoints = {}
+		for _, point in ipairs(value.keypoints or {}) do
+			table.insert(keypoints, NumberSequenceKeypoint.new(tonumber(point.time) or 0, tonumber(point.value) or 0, tonumber(point.envelope) or 0))
+		end
+		return NumberSequence.new(keypoints)
+	elseif valueType == "EnumItem" then
+		local enumName, itemName = tostring(value.value or ""):match("^Enum%.([^.]+)%.(.+)$")
+		if enumName and itemName then
+			local ok, item = pcall(function()
+				return (Enum :: any)[enumName][itemName]
+			end)
+			if ok then
+				return item
+			end
+		end
+	end
+	return nil
+end
+
+local function materializeUi(node: any, parent: Instance, counter: { count: number }): Instance?
 	if type(node) ~= "table" or counter.count >= MAX_UI_NODES then
 		return nil
 	end
-	counter.count += 1
-	local reference = Instance.new("Folder")
-	local referenceName = tostring(node.name or node.className or "UI"):gsub("[%c/\\]", "-"):sub(1, 100)
-	reference.Name = if referenceName == "" then "UI" else referenceName
-	reference:SetAttribute("RoLinkStudioPath", tostring(node.studioPath or ("StarterGui/" .. reference.Name)))
-	reference.Parent = parent
-	for _, child in ipairs(node.children or {}) do
-		materializeUiReference(child, reference, counter)
+	local className = tostring(node.className or "")
+	if not UI_CLASSES[className] then
+		return nil
 	end
-	return reference
+	local ok, instance = pcall(Instance.new, className)
+	if not ok or not instance then
+		return nil
+	end
+	counter.count += 1
+	instance.Name = tostring(node.name or className):sub(1, 100)
+	for property, encoded in pairs(node.properties or {}) do
+		if property ~= "Name" then
+			local decoded = decodeValue(encoded)
+			if decoded ~= nil then
+				pcall(function()
+					(instance :: any)[property] = decoded
+				end)
+			end
+		end
+	end
+	for attribute, encoded in pairs(node.attributes or {}) do
+		local decoded = decodeValue(encoded)
+		if decoded ~= nil then
+			pcall(instance.SetAttribute, instance, tostring(attribute):sub(1, 100), decoded)
+		end
+	end
+	instance.Parent = parent
+	for _, child in ipairs(node.children or {}) do
+		materializeUi(child, instance, counter)
+	end
+	return instance
 end
 
 local function childFolder(parent: Instance, name: string): Folder
@@ -713,8 +1007,8 @@ local entrypoint = %q
 local runContext = %q
 local packageRoot = %s:WaitForChild(moduleId)
 local replicatedRoot = game:GetService("ReplicatedStorage"):WaitForChild("RoLinkModuleProjects"):WaitForChild(moduleId)
+local moduleApiEvent = game:GetService("ReplicatedStorage"):WaitForChild("RoLinkModuleProjects"):WaitForChild("ModuleAPI")
 local HttpService = game:GetService("HttpService")
-local MAX_PAYLOAD_BYTES = 32 * 1024
 local RATE_WINDOW_SECONDS = 10
 local RATE_MAX_CALLS = 60
 
@@ -762,84 +1056,9 @@ local function decodeJson(value: any, fallback: any): any
 	return if ok then decoded else fallback
 end
 
-local function validateSchema(value: any, schema: any, depth: number?): (boolean, string?)
-	if type(schema) ~= "table" or next(schema) == nil then
-		return true, nil
-	end
-	if (depth or 0) > 6 then
-		return false, "payload nesting exceeds six levels"
-	end
-	if type(schema.enum) == "table" then
-		local found = false
-		for _, allowed in ipairs(schema.enum) do
-			if allowed == value then
-				found = true
-				break
-			end
-		end
-		if not found then
-			return false, "payload value is not in the allowed enum"
-		end
-	end
-	local expected = tostring(schema.type or "")
-	if expected == "object" then
-		if type(value) ~= "table" then
-			return false, "payload must be an object"
-		end
-		for _, key in ipairs(schema.required or {}) do
-			if value[key] == nil then
-				return false, "payload is missing required field " .. tostring(key)
-			end
-		end
-		for key, childSchema in pairs(schema.properties or {}) do
-			if value[key] ~= nil then
-				local valid, reason = validateSchema(value[key], childSchema, (depth or 0) + 1)
-				if not valid then
-					return false, tostring(key) .. ": " .. tostring(reason)
-				end
-			end
-		end
-	elseif expected == "array" then
-		if type(value) ~= "table" then
-			return false, "payload must be an array"
-		end
-		for _, item in ipairs(value) do
-			local valid, reason = validateSchema(item, schema.items or {}, (depth or 0) + 1)
-			if not valid then
-				return false, reason
-			end
-		end
-	elseif expected == "string" and type(value) ~= "string" then
-		return false, "payload must be a string"
-	elseif expected == "number" and type(value) ~= "number" then
-		return false, "payload must be a number"
-	elseif expected == "integer" and (type(value) ~= "number" or value %% 1 ~= 0) then
-		return false, "payload must be an integer"
-	elseif expected == "boolean" and type(value) ~= "boolean" then
-		return false, "payload must be a boolean"
-	end
-	return true, nil
-end
-
-local function validatePayload(remote: Instance, payload: any): (boolean, string?)
-	local encodedOk, encoded = pcall(HttpService.JSONEncode, HttpService, payload)
-	if not encodedOk then
-		return false, "payload is not JSON serializable"
-	end
-	if #encoded > MAX_PAYLOAD_BYTES then
-		return false, "payload exceeds the 32 KB limit"
-	end
-	return validateSchema(payload, decodeJson(remote:GetAttribute("RoLinkSchema"), {}), 0)
-end
-
-local function directionAllows(remote: Instance, requested: string): boolean
-	local direction = tostring(remote:GetAttribute("RoLinkDirection") or "bidirectional")
-	return direction == "bidirectional" or direction == requested
-end
-
 local rateBuckets = {}
-local function allowIncoming(remote: Instance, player: Player): boolean
-	local key = remote.Name .. ":" .. tostring(player.UserId)
+local function allowIncoming(player: Player): boolean
+	local key = tostring(player.UserId)
 	local now = os.clock()
 	local bucket = rateBuckets[key]
 	if not bucket or now - bucket.startedAt >= RATE_WINDOW_SECONDS then
@@ -850,132 +1069,29 @@ local function allowIncoming(remote: Instance, player: Player): boolean
 	return bucket.count <= RATE_MAX_CALLS
 end
 
-local function reject(remote: Instance, reason: string)
-	warn("[Ro-Link Module Runtime] " .. moduleId .. "/" .. remote.Name .. " rejected payload: " .. reason)
+local function normalizeTargetModuleId(targetModuleId: any): string
+	local normalized = tostring(targetModuleId or "")
+	if normalized == "" then
+		error("ModuleID is required", 3)
+	end
+	return normalized
 end
 
-local remoteFolder = replicatedRoot:FindFirstChild("Remotes")
-local remotes = {}
-if remoteFolder then
-	for _, remote in ipairs(remoteFolder:GetChildren()) do
-		local wrapper = { Raw = remote, Name = remote.Name }
-		if remote:IsA("RemoteEvent") then
-			if runContext == "client" then
-				wrapper.FireServer = function(_, payload)
-					if not directionAllows(remote, "client_to_server") then error("Remote direction does not allow FireServer", 2) end
-					local valid, reason = validatePayload(remote, payload)
-					if not valid then error(reason, 2) end
-					remote:FireServer(payload)
-				end
-				wrapper.Connect = function(_, callback)
-					if not directionAllows(remote, "server_to_client") then error("Remote direction does not allow client connections", 2) end
-					return remote.OnClientEvent:Connect(function(payload)
-						local valid, reason = validatePayload(remote, payload)
-						if valid then callback(payload) else reject(remote, tostring(reason)) end
-					end)
-				end
-			else
-				wrapper.FireClient = function(_, player, payload)
-					if not directionAllows(remote, "server_to_client") then error("Remote direction does not allow FireClient", 2) end
-					local valid, reason = validatePayload(remote, payload)
-					if not valid then error(reason, 2) end
-					remote:FireClient(player, payload)
-				end
-				wrapper.FireAllClients = function(_, payload)
-					if not directionAllows(remote, "server_to_client") then error("Remote direction does not allow FireAllClients", 2) end
-					local valid, reason = validatePayload(remote, payload)
-					if not valid then error(reason, 2) end
-					remote:FireAllClients(payload)
-				end
-				wrapper.Connect = function(_, callback)
-					if not directionAllows(remote, "client_to_server") then error("Remote direction does not allow server connections", 2) end
-					return remote.OnServerEvent:Connect(function(player, payload)
-						if not allowIncoming(remote, player) then reject(remote, "rate limit exceeded") return end
-						local valid, reason = validatePayload(remote, payload)
-						if valid then callback(player, payload) else reject(remote, tostring(reason)) end
-					end)
-				end
-			end
-		elseif remote:IsA("RemoteFunction") then
-			if runContext == "client" then
-				wrapper.InvokeServer = function(_, payload)
-					if not directionAllows(remote, "client_to_server") then error("Remote direction does not allow InvokeServer", 2) end
-					local valid, reason = validatePayload(remote, payload)
-					if not valid then error(reason, 2) end
-					return remote:InvokeServer(payload)
-				end
-				wrapper.SetCallback = function(_, callback)
-					if not directionAllows(remote, "server_to_client") then error("Remote direction does not allow a client callback", 2) end
-					remote.OnClientInvoke = function(payload)
-						local valid, reason = validatePayload(remote, payload)
-						if not valid then reject(remote, tostring(reason)) return nil end
-						return callback(payload)
-					end
-				end
-			else
-				wrapper.InvokeClient = function(_, player, payload)
-					if not directionAllows(remote, "server_to_client") then error("Remote direction does not allow InvokeClient", 2) end
-					local valid, reason = validatePayload(remote, payload)
-					if not valid then error(reason, 2) end
-					return remote:InvokeClient(player, payload)
-				end
-				wrapper.SetCallback = function(_, callback)
-					if not directionAllows(remote, "client_to_server") then error("Remote direction does not allow a server callback", 2) end
-					remote.OnServerInvoke = function(player, payload)
-						if not allowIncoming(remote, player) then reject(remote, "rate limit exceeded") return nil end
-						local valid, reason = validatePayload(remote, payload)
-						if not valid then reject(remote, tostring(reason)) return nil end
-						return callback(player, payload)
-					end
-				end
-			end
-		end
-		remotes[remote.Name] = wrapper
-	end
-end
 local manifest = decodeJson(packageRoot:GetAttribute("RoLinkManifest"), {})
-local uiReferences = replicatedRoot:FindFirstChild("UI")
-local function getUi(referencePath: string): Instance?
-	if runContext ~= "client" or not uiReferences then
-		return nil
-	end
-	local reference: Instance? = uiReferences
-	for _, segment in ipairs(string.split(referencePath:gsub("%.", "/"), "/")) do
-		if segment ~= "" then
-			if not reference then return nil end
-			reference = reference:FindFirstChild(segment)
-			if not reference then return nil end
-		end
-	end
-	if not reference then return nil end
-	local studioPath = tostring(reference:GetAttribute("RoLinkStudioPath") or "")
-	local segments = string.split(studioPath, "/")
-	if segments[1] ~= "StarterGui" then return nil end
-	local player = game:GetService("Players").LocalPlayer
-	local cursor: Instance? = player and player:FindFirstChildOfClass("PlayerGui")
-	if not cursor then return nil end
-	for index = 2, #segments do
-		cursor = cursor:FindFirstChild(segments[index]:gsub("%%2F", "/"))
-		if not cursor then return nil end
-	end
-	return cursor
-end
-local ui = setmetatable({}, {
-	__index = function(_, name)
-		return getUi(tostring(name))
-	end,
-})
 local context = {
 	ModuleId = moduleId,
 	Module = manifest,
 	Config = manifest.configuration or {},
 	Settings = {},
 	Services = services,
-	Remotes = remotes,
-	UI = ui,
-	GetUI = getUi,
-	GetRemote = function(name: string)
-		return remotes[name]
+	CallClient = function(targetModuleId: string, user: Player, ...: any)
+		if runContext ~= "server" then error("CallClient is only available to server modules", 2) end
+		if typeof(user) ~= "Instance" or not user:IsA("Player") then error("CallClient expects a Player", 2) end
+		moduleApiEvent:FireClient(user, normalizeTargetModuleId(targetModuleId), ...)
+	end,
+	CallServer = function(targetModuleId: string, ...: any)
+		if runContext ~= "client" then error("CallServer is only available to client modules", 2) end
+		moduleApiEvent:FireServer(normalizeTargetModuleId(targetModuleId), ...)
 	end,
 	Log = function(...)
 		print("[Ro-Link Module " .. moduleId .. "]", ...)
@@ -994,6 +1110,27 @@ if type(definition) ~= "table" then
 	warn("[Ro-Link Module Runtime] " .. moduleId .. " entrypoint must return a table")
 	return
 end
+local moduleApiConnection
+if runContext == "client" then
+	moduleApiConnection = moduleApiEvent.OnClientEvent:Connect(function(targetModuleId: any, ...: any)
+		if tostring(targetModuleId or "") ~= moduleId or type(definition.CallClient) ~= "function" then return end
+		local succeeded, callError = pcall(definition.CallClient, context, ...)
+		if not succeeded then warn("[Ro-Link Module Runtime] " .. moduleId .. " CallClient failed: " .. tostring(callError)) end
+	end)
+else
+	moduleApiConnection = moduleApiEvent.OnServerEvent:Connect(function(player: Player, targetModuleId: any, ...: any)
+		if tostring(targetModuleId or "") ~= moduleId or type(definition.CallServer) ~= "function" then return end
+		if not allowIncoming(player) then
+			warn("[Ro-Link Module Runtime] " .. moduleId .. " CallServer rejected: rate limit exceeded")
+			return
+		end
+		local succeeded, callError = pcall(definition.CallServer, context, player, ...)
+		if not succeeded then warn("[Ro-Link Module Runtime] " .. moduleId .. " CallServer failed: " .. tostring(callError)) end
+	end)
+end
+script.Destroying:Connect(function()
+	moduleApiConnection:Disconnect()
+end)
 local function lifecycle(name: string)
 	local callback = definition[name]
 	if type(callback) == "function" then
@@ -1059,18 +1196,19 @@ local function installProjectPackage(projectPackage: any, packageHash: string): 
 			createSourceModule(replicatedModule, path, source)
 		elseif kind == "ui" and type(file.uiTree) == "table" then
 			local uiFolder = childFolder(replicatedModule, "UI")
-			materializeUiReference(file.uiTree, uiFolder, { count = 0 })
+			materializeUi(file.uiTree, uiFolder, { count = 0 })
 		end
 	end
 
-	local remoteFolder = childFolder(replicatedModule, "Remotes")
-	for _, remoteDefinition in ipairs(projectPackage.remotes or {}) do
-		local remoteType = tostring(remoteDefinition.remoteType or "event")
-		local remote = Instance.new(if remoteType == "function" then "RemoteFunction" else "RemoteEvent")
-		remote.Name = safeProjectSegment(remoteDefinition.name)
-		remote:SetAttribute("RoLinkDirection", tostring(remoteDefinition.direction or "bidirectional"))
-		remote:SetAttribute("RoLinkSchema", HttpService:JSONEncode(remoteDefinition.schema or {}):sub(1, 200000))
-		remote.Parent = remoteFolder
+	local moduleApiEvent = replicatedProjects:FindFirstChild("ModuleAPI")
+	if moduleApiEvent and not moduleApiEvent:IsA("RemoteEvent") then
+		moduleApiEvent:Destroy()
+		moduleApiEvent = nil
+	end
+	if not moduleApiEvent then
+		moduleApiEvent = Instance.new("RemoteEvent")
+		moduleApiEvent.Name = "ModuleAPI"
+		moduleApiEvent.Parent = replicatedProjects
 	end
 
 	local runnerFolder = childFolder(ServerScriptService, "RoLinkModuleRunners")
@@ -1321,7 +1459,7 @@ end
 
 ui.importButton = actionButton("Add Selected UI To Module")
 ui.syncProjectButton = actionButton("Sync Module Project Into Place")
-ui.snapshotButton = actionButton("Refresh StarterGui Names")
+ui.snapshotButton = actionButton("Refresh Studio Explorer Snapshot")
 ui.openIdeButton = actionButton("Open Browser IDE")
 ui.openIdeButton.Active = true
 ui.disconnectButton = actionButton("Disconnect Module")

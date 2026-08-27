@@ -55,18 +55,6 @@ GRANT EXECUTE ON FUNCTION public.bump_module_project_revision(UUID, BIGINT) TO s
 CREATE INDEX IF NOT EXISTS idx_addon_module_files_module_path
     ON public.addon_module_files(module_id, path);
 
-CREATE TABLE IF NOT EXISTS public.addon_module_remotes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    module_id UUID NOT NULL REFERENCES public.addon_module_projects(module_id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    remote_type TEXT NOT NULL CHECK (remote_type IN ('event', 'function')),
-    direction TEXT NOT NULL DEFAULT 'bidirectional' CHECK (direction IN ('client_to_server', 'server_to_client', 'bidirectional')),
-    schema JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (module_id, name)
-);
-
 CREATE TABLE IF NOT EXISTS public.addon_module_versions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     module_id UUID NOT NULL REFERENCES public.addon_modules(id) ON DELETE CASCADE,
@@ -137,7 +125,6 @@ CREATE INDEX IF NOT EXISTS idx_module_studio_events_poll
 -- Studio credentials. Browser clients never receive direct table access.
 ALTER TABLE public.addon_module_projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.addon_module_files ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.addon_module_remotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.addon_module_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.module_studio_pairings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.module_studio_sessions ENABLE ROW LEVEL SECURITY;

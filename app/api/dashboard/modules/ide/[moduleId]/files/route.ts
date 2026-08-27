@@ -36,21 +36,17 @@ export async function POST(req: Request, context: Context) {
             const kind = body?.kind;
             if (!path || !isModuleFileKind(kind)) return NextResponse.json({ error: 'A valid path and file kind are required.' }, { status: 400 });
             if (project.files.length >= MAX_MODULE_FILES) return NextResponse.json({ error: `Projects are limited to ${MAX_MODULE_FILES} files and folders.` }, { status: 400 });
-            if (kind === 'manifest' || path === 'module.json') return NextResponse.json({ error: 'Project metadata is managed automatically.' }, { status: 400 });
+            if (kind === 'manifest' || path === 'module.json') return NextResponse.json({ error: 'The project manifest already exists and must be edited through module.json.' }, { status: 400 });
             if (!hasParentFolder(project.files, path)) return NextResponse.json({ error: 'Create the destination folder before adding this file.' }, { status: 400 });
             if (kind === 'ui' && !path.startsWith('UI/')) return NextResponse.json({ error: 'Imported UI must be stored under UI/.' }, { status: 400 });
-            const sourceCode = kind === 'shared_module'
-                ? 'module {\n\n}\n'
-                : kind === 'server_script' || kind === 'client_script'
-                    ? ''
-                    : null;
+            const sourceCode = typeof body?.sourceCode === 'string' ? body.sourceCode : null;
             if (sourceCode && Buffer.byteLength(sourceCode, 'utf8') > MAX_MODULE_FILE_BYTES) return NextResponse.json({ error: 'Files are limited to 1 MB.' }, { status: 413 });
             const { data, error } = await client.from('addon_module_files').insert({
                 module_id: moduleId,
                 path,
                 name: fileName(path),
                 kind,
-                source_code: sourceCode,
+                source_code: kind === 'folder' || kind === 'ui' ? null : sourceCode || '',
                 ui_tree: kind === 'ui' ? body?.uiTree || {} : null,
             }).select('*').single();
             if (error) return NextResponse.json({ error: error.message }, { status: error.code === '23505' ? 409 : 400 });

@@ -3,7 +3,7 @@ import { createHmac, randomBytes, randomUUID } from 'crypto';
 import { getOwnedModule } from '@/lib/moduleIde';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
-export const MODULE_STUDIO_PROTOCOL_VERSION = 2;
+export const MODULE_STUDIO_PROTOCOL_VERSION = 1;
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 const STUDIO_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const MAX_EVENT_BYTES = 512 * 1024;
@@ -18,8 +18,11 @@ export const STUDIO_MESSAGE_TYPES = new Set([
     'tree.instanceDeleted',
     'tree.instanceMoved',
     'tree.instanceRenamed',
-    'ui.rename',
-    'ui.renamed',
+    'script.request',
+    'script.contents',
+    'script.update',
+    'script.conflict',
+    'script.updated',
     'ui.import',
     'ui.importResult',
     'module.saved',

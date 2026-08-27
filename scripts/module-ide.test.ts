@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { buildModuleProjectPackage, defaultModuleManifest, normalizeModuleProjectPath, validateModuleProject, type ModuleProjectFile, type ModuleProjectManifest } from '../lib/moduleIde';
+import { buildModuleProjectPackage, normalizeModuleProjectPath, validateModuleProject, type ModuleProjectFile, type ModuleProjectManifest } from '../lib/moduleIde';
 import { validateBridgeEvent } from '../lib/moduleStudioBridge';
 import { validateModuleUiTree } from '../lib/moduleUiSchema';
 
@@ -11,40 +12,29 @@ const manifest: ModuleProjectManifest = {
     version: '1.2.3',
     description: 'Fixture',
     requiredRuntimeVersion: '2.2.0',
-    entrypoints: { server: 'Server/Main.server', client: 'Client/Main.client' },
+    entrypoints: { server: 'Server/Main.server.luau', client: 'Client/Main.client.luau' },
     capabilities: [],
     dependencies: {},
 };
 
 const files: ModuleProjectFile[] = [
-    { id: '1', path: 'Server/Main.server', name: 'Main.server', kind: 'server_script', sourceCode: '', uiTree: null, revision: 2, createdAt: '', updatedAt: '' },
-    { id: '2', path: 'Client/Main.client', name: 'Main.client', kind: 'client_script', sourceCode: '', uiTree: null, revision: 3, createdAt: '', updatedAt: '' },
+    { id: '1', path: 'Server/Main.server.luau', name: 'Main.server.luau', kind: 'server_script', sourceCode: 'return {}', uiTree: null, revision: 2, createdAt: '', updatedAt: '' },
+    { id: '2', path: 'Client/Main.client.luau', name: 'Main.client.luau', kind: 'client_script', sourceCode: 'return {}', uiTree: null, revision: 3, createdAt: '', updatedAt: '' },
 ];
 
-test('new projects use a single extensionless server entrypoint', () => {
-    const defaults = defaultModuleManifest({ name: 'New Module', description: '', version: '1.0.0' });
-    assert.deepEqual(defaults.entrypoints, { server: 'Server/Main.server' });
-});
-
 test('project paths reject traversal and preserve canonical project paths', () => {
-    assert.equal(normalizeModuleProjectPath('Server/Main.server'), 'Server/Main.server');
-    assert.equal(normalizeModuleProjectPath('../Server/Main.server'), null);
-    assert.equal(normalizeModuleProjectPath('Server//Main.server'), null);
-    assert.equal(normalizeModuleProjectPath('/Server/Main.server'), null);
+    assert.equal(normalizeModuleProjectPath('Server/Main.server.luau'), 'Server/Main.server.luau');
+    assert.equal(normalizeModuleProjectPath('../Server/Main.server.luau'), null);
+    assert.equal(normalizeModuleProjectPath('Server//Main.server.luau'), null);
+    assert.equal(normalizeModuleProjectPath('/Server/Main.server.luau'), null);
 });
 
-test('project validation detects missing entrypoints and invalid remotes', () => {
+test('project validation detects missing entrypoints', () => {
     const problems = validateModuleProject({
-        manifest: { ...manifest, entrypoints: { server: 'Server/Missing.server' } },
+        manifest: { ...manifest, entrypoints: { server: 'Server/Missing.server.luau' } },
         files,
-        remotes: [
-            { id: '1', name: 'bad name', remoteType: 'event', direction: 'bidirectional', schema: {} },
-            { id: '2', name: 'BAD NAME', remoteType: 'function', direction: 'client_to_server', schema: {} },
-        ],
     });
     assert.ok(problems.some((problem) => problem.code === 'missing_entrypoint'));
-    assert.ok(problems.some((problem) => problem.code === 'invalid_remote_name'));
-    assert.ok(problems.some((problem) => problem.code === 'duplicate_remote'));
 });
 
 test('UI validation accepts serialized whitelisted instances and blocks scripts', () => {
@@ -59,21 +49,26 @@ test('package hash and ordering are deterministic', () => {
         module: { id: 'module-id', slug: 'regression', name: 'Regression Module', version: '1.2.3' },
         project: { manifest, requiredRuntimeVersion: '2.2.0', revision: 9 },
         files,
-        remotes: [
-            { id: '2', name: 'Zulu', remoteType: 'event' as const, direction: 'bidirectional' as const, schema: {} },
-            { id: '1', name: 'Alpha', remoteType: 'function' as const, direction: 'client_to_server' as const, schema: { type: 'object' } },
-        ],
     };
     const first = buildModuleProjectPackage(base as never);
-    const second = buildModuleProjectPackage({ ...base, files: [...files].reverse(), remotes: [...base.remotes].reverse() } as never);
+    const second = buildModuleProjectPackage({ ...base, files: [...files].reverse() } as never);
     assert.equal(first.packageHash, second.packageHash);
-    assert.deepEqual(first.packagePayload.files.map((file) => file.path), ['Client/Main.client', 'Server/Main.server']);
-    assert.deepEqual(first.packagePayload.remotes.map((remote) => remote.name), ['Alpha', 'Zulu']);
+    assert.deepEqual(first.packagePayload.files.map((file) => file.path), ['Client/Main.client.luau', 'Server/Main.server.luau']);
+    assert.equal('remotes' in first.packagePayload, false);
 });
 
 test('Studio bridge accepts known events and rejects unknown or oversized payloads', () => {
-    assert.equal(validateBridgeEvent({ type: 'ui.rename', requestId: '1', payload: { instanceId: 'abc', name: 'MainHud' } }).type, 'ui.rename');
-    assert.throws(() => validateBridgeEvent({ type: 'script.request', payload: { instanceId: 'abc' } }), /Unsupported Studio event type/);
+    assert.equal(validateBridgeEvent({ type: 'script.request', requestId: '1', payload: { instanceId: 'abc' } }).type, 'script.request');
     assert.throws(() => validateBridgeEvent({ type: 'database.secret', payload: {} }), /Unsupported Studio event type/);
     assert.throws(() => validateBridgeEvent({ type: 'sync.error', payload: { message: 'x'.repeat(513 * 1024) } }), /too large/);
+});
+
+test('Studio runtime uses the shared Module API instead of project remotes', () => {
+    const source = readFileSync(new URL('../roblox/ModuleIDEPlugin/PluginMain.luau', import.meta.url), 'utf8');
+    assert.match(source, /CallClient = function\(targetModuleId: string, user: Player, \.\.\.: any\)/);
+    assert.match(source, /CallServer = function\(targetModuleId: string, \.\.\.: any\)/);
+    assert.match(source, /definition\.CallClient/);
+    assert.match(source, /definition\.CallServer/);
+    assert.doesNotMatch(source, /projectPackage\.remotes/);
+    assert.doesNotMatch(source, /FindFirstChild\("Remotes"\)/);
 });
