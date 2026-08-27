@@ -24,7 +24,7 @@ export async function PATCH(req: Request, context: Context) {
             formatVersion: MODULE_PROJECT_FORMAT_VERSION,
             name: trimModuleString(rawManifest.name || project.module.name, 120),
             version: trimModuleString(rawManifest.version || project.module.version, 32),
-            description: trimModuleString(rawManifest.description || project.module.description, 2000),
+            description: trimModuleString(rawManifest.description ?? project.module.description, 2000),
             requiredRuntimeVersion: trimModuleString(rawManifest.requiredRuntimeVersion || project.project.requiredRuntimeVersion, 32),
             entrypoints: {
                 server: normalizeModuleProjectPath(rawEntrypoints.server) || undefined,

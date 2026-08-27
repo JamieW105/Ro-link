@@ -138,6 +138,9 @@ export default function ModuleIdeClient() {
     const [quickQuery, setQuickQuery] = useState('');
     const [createModuleOpen, setCreateModuleOpen] = useState(false);
     const [createModuleName, setCreateModuleName] = useState('');
+    const [moduleInfoOpen, setModuleInfoOpen] = useState(false);
+    const [moduleInfo, setModuleInfo] = useState({ title: '', description: '' });
+    const [moduleInfoSaving, setModuleInfoSaving] = useState(false);
     const [remoteForm, setRemoteForm] = useState({ name: '', remoteType: 'event' as 'event' | 'function', direction: 'bidirectional' as ProjectRemote['direction'], schema: '{}', id: '' });
     const cursorRef = useRef(0);
     const activeTabRef = useRef(activeTab);
@@ -319,6 +322,47 @@ export default function ModuleIdeClient() {
         for (const [id, draft] of Object.entries(draftsRef.current)) if (draft.dirty && !await saveProjectFile(id)) return false;
         return true;
     }, [saveProjectFile]);
+
+    const openModuleInfo = useCallback(() => {
+        const currentModule = projectRef.current?.module;
+        if (!currentModule) return;
+        setModuleInfo({ title: currentModule.name, description: currentModule.description });
+        setModuleInfoOpen(true);
+    }, []);
+
+    const saveModuleInfo = useCallback(async () => {
+        const title = moduleInfo.title.trim();
+        if (!title || moduleInfoSaving) return;
+        setModuleInfoSaving(true);
+        try {
+            if (!await saveAll()) return;
+            const currentProject = projectRef.current;
+            if (!currentProject) return;
+            const result = await api<{ manifest: Record<string, unknown>; projectRevision: number }>(`/api/dashboard/modules/ide/${moduleId}/manifest`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    manifest: { ...currentProject.project.manifest, name: title, description: moduleInfo.description },
+                    expectedRevision: currentProject.project.revision,
+                }),
+            });
+            const manifestFile = currentProject.files.find((file) => file.kind === 'manifest');
+            const manifestSource = JSON.stringify(result.manifest, null, 2) + '\n';
+            setProject((current) => current ? {
+                ...current,
+                module: { ...current.module, name: String(result.manifest.name), description: String(result.manifest.description || '') },
+                project: { ...current.project, manifest: result.manifest, revision: result.projectRevision },
+                files: current.files.map((file) => file.id === manifestFile?.id ? { ...file, sourceCode: manifestSource, revision: file.revision + 1, updatedAt: new Date().toISOString() } : file),
+            } : current);
+            if (manifestFile) setDrafts((current) => ({ ...current, [manifestFile.id]: { value: manifestSource, revision: manifestFile.revision + 1, dirty: false, status: 'saved' } }));
+            void loadModules().catch(() => undefined);
+            setModuleInfoOpen(false);
+            log('Module info saved.', 'output', 'success');
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : 'Module info failed to save.');
+        } finally {
+            setModuleInfoSaving(false);
+        }
+    }, [loadModules, log, moduleId, moduleInfo, moduleInfoSaving, saveAll, setDrafts, setProject]);
 
     useEffect(() => {
         if (!activeFile || !activeDraft?.dirty || activeDraft.status === 'conflict') return;
@@ -510,6 +554,7 @@ export default function ModuleIdeClient() {
     };
     const commands = [
         { label: 'Save all files', run: () => void saveAll() }, { label: 'Publish module', run: () => void preparePublish() },
+        { label: 'Edit module info', run: openModuleInfo },
         { label: 'Create server script', run: () => setNewItem({ kind: 'server_script', name: '' }) }, { label: 'Create client script', run: () => setNewItem({ kind: 'client_script', name: '' }) },
         { label: rightPanelShown ? 'Hide inspector' : 'Show inspector', run: toggleRightPanel }, { label: 'Connect Roblox Studio', run: () => void api<{ code: string; expiresAt: string }>(`/api/dashboard/modules/ide/${moduleId}/studio/pair`, { method: 'POST' }).then(setPairing) },
     ].filter((command) => command.label.toLowerCase().includes(quickQuery.toLowerCase()));
@@ -529,6 +574,7 @@ export default function ModuleIdeClient() {
                 {project?.module.name || selectedModule?.name || (loading ? 'Loading module…' : 'No module')}
             </div>
             <button type="button" onClick={() => setCreateModuleOpen(true)} className="rounded-md border border-white/10 p-2 text-slate-400 hover:text-white" aria-label="Create module"><Plus className="h-4 w-4" /></button>
+            <button type="button" onClick={openModuleInfo} disabled={!project} className="rounded-md border border-white/10 p-2 text-slate-400 hover:text-white disabled:opacity-40" aria-label="Edit module info" title="Edit module info"><Settings2 className="h-4 w-4" /></button>
             <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 max-[980px]:hidden">{selectedModule?.status || 'No module'}</span>
             {project?.project.publishedRevision != null && project.project.publishedRevision !== project.project.revision && <span className="hidden text-[10px] font-semibold text-amber-300 lg:inline">Unpublished changes</span>}
             <div className="ml-auto flex items-center gap-2">
@@ -595,6 +641,7 @@ export default function ModuleIdeClient() {
         {quickMode && <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/45 pt-[12vh]" onMouseDown={() => setQuickMode(null)}><div onMouseDown={(event) => event.stopPropagation()} className="w-[min(620px,90vw)] overflow-hidden rounded-lg border border-white/12 bg-[#111722] shadow-2xl"><div className="flex items-center gap-3 border-b border-white/8 px-4"><Search className="h-4 w-4 text-slate-500" /><input autoFocus value={quickQuery} onChange={(event) => setQuickQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') setQuickMode(null); }} placeholder={quickMode === 'files' ? 'Go to file…' : 'Run a command…'} className="h-12 flex-1 bg-transparent text-sm outline-none" /><kbd className="text-[10px] text-slate-600">ESC</kbd></div><div className="max-h-96 overflow-y-auto p-2">{quickMode === 'files' ? quickFiles.map((file) => <button key={file.id} onClick={() => { openProjectFile(file); setQuickMode(null); }} className="flex w-full items-center gap-3 rounded px-3 py-2 text-left text-sm text-slate-300 hover:bg-white/[0.05]">{fileIcon(file)}<span>{file.name}</span><span className="ml-auto text-xs text-slate-600">{file.path}</span></button>) : commands.map((command) => <button key={command.label} onClick={() => { command.run(); setQuickMode(null); }} className="flex w-full items-center gap-3 rounded px-3 py-2 text-left text-sm text-slate-300 hover:bg-white/[0.05]"><Settings2 className="h-4 w-4 text-sky-300" />{command.label}</button>)}</div></div></div>}
         {conflict && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"><div className="w-[min(1000px,95vw)] rounded-lg border border-red-400/20 bg-[#111722] shadow-2xl"><div className="flex items-center gap-3 border-b border-white/8 p-4"><GitCompare className="h-5 w-5 text-amber-300" /><div><p className="font-semibold">Revision conflict: {conflict.title}</p><p className="text-xs text-slate-500">Compare both versions before choosing which source should continue.</p></div></div><div className="grid max-h-[60vh] grid-cols-2 divide-x divide-white/8"><div className="min-w-0"><p className="border-b border-white/8 px-4 py-2 text-xs font-bold text-sky-300">Browser version</p><pre className="max-h-[52vh] overflow-auto whitespace-pre-wrap p-4 text-xs leading-5 text-slate-300">{conflict.browserSource}</pre></div><div className="min-w-0"><p className="border-b border-white/8 px-4 py-2 text-xs font-bold text-emerald-300">Server version</p><pre className="max-h-[52vh] overflow-auto whitespace-pre-wrap p-4 text-xs leading-5 text-slate-300">{conflict.serverSource}</pre></div></div><div className="flex justify-end gap-2 border-t border-white/8 p-4"><button onClick={() => { const id = conflict.fileId; setDrafts((current) => ({ ...current, [id]: { value: conflict.serverSource, revision: conflict.serverRevision, dirty: false, status: 'saved' } })); setProject((current) => current ? { ...current, files: current.files.map((file) => file.id === id ? { ...file, sourceCode: conflict.serverSource, revision: conflict.serverRevision } : file) } : current); setConflict(null); }} className="rounded border border-white/10 px-3 py-2 text-xs">Use server version</button><button onClick={() => { const id = conflict.fileId; setDrafts((current) => ({ ...current, [id]: { ...current[id], revision: conflict.serverRevision, dirty: true, status: 'dirty' } })); setConflict(null); }} className="rounded bg-sky-500 px-3 py-2 text-xs font-bold">Keep browser version</button></div></div></div>}
         {publishCheck && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"><div className="w-[min(560px,94vw)] rounded-lg border border-white/10 bg-[#111722] shadow-2xl"><div className="flex items-center gap-3 border-b border-white/8 p-5">{publishCheck.ready ? <Check className="h-6 w-6 text-emerald-300" /> : <AlertTriangle className="h-6 w-6 text-red-300" />}<div><p className="font-semibold">{publishCheck.ready ? 'Ready to Publish' : 'Publishing is blocked'}</p><p className="text-xs text-slate-500">Validation never publishes automatically.</p></div></div><div className="space-y-2 p-5 text-sm"><p className="text-emerald-300">✓ {publishCheck.summary.scripts} scripts checked</p><p className="text-emerald-300">✓ {publishCheck.summary.remotes} remotes configured</p><p className="text-emerald-300">✓ {publishCheck.summary.uiRoots} UI roots bundled</p><p className={publishCheck.summary.errors ? 'text-red-300' : 'text-emerald-300'}>{publishCheck.summary.errors ? '✕' : '✓'} {publishCheck.summary.errors} errors</p><p className={publishCheck.summary.warnings ? 'text-amber-300' : 'text-emerald-300'}>⚠ {publishCheck.summary.warnings} warnings</p>{publishCheck.problems.slice(0, 6).map((problem, index) => <p key={index} className="border-t border-white/6 pt-2 text-xs text-slate-400">{problem.file ? `${problem.file}: ` : ''}{problem.message}</p>)}</div><div className="flex justify-end gap-2 border-t border-white/8 p-4"><button onClick={() => setPublishCheck(null)} className="rounded border border-white/10 px-4 py-2 text-xs">Cancel</button><button onClick={() => void publish()} disabled={!publishCheck.ready || publishing} className="rounded bg-sky-500 px-4 py-2 text-xs font-bold disabled:opacity-40">{publishing ? 'Publishing…' : `Publish v${String(project?.project.manifest.version || project?.module.version || '')}`}</button></div></div></div>}
+        {moduleInfoOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" onMouseDown={() => { if (!moduleInfoSaving) setModuleInfoOpen(false); }}><form onSubmit={(event) => { event.preventDefault(); void saveModuleInfo(); }} onMouseDown={(event) => event.stopPropagation()} className="w-[min(520px,94vw)] rounded-lg border border-white/10 bg-[#111722] shadow-2xl"><div className="flex items-center gap-3 border-b border-white/8 p-5"><Settings2 className="h-5 w-5 text-sky-300" /><div><p className="font-semibold">Edit Module Info</p><p className="text-xs text-slate-500">Update the details shown for this module.</p></div></div><div className="space-y-4 p-5"><label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">Title</span><input autoFocus required maxLength={120} value={moduleInfo.title} onChange={(event) => setModuleInfo((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-sky-400/60" /></label><label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">Description</span><textarea rows={5} maxLength={2000} value={moduleInfo.description} onChange={(event) => setModuleInfo((current) => ({ ...current, description: event.target.value }))} placeholder="Describe what this module does…" className="w-full resize-y rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm leading-6 outline-none focus:border-sky-400/60" /><span className="mt-1 block text-right text-[10px] text-slate-600">{moduleInfo.description.length} / 2000</span></label></div><div className="flex justify-end gap-2 border-t border-white/8 p-4"><button type="button" onClick={() => setModuleInfoOpen(false)} disabled={moduleInfoSaving} className="rounded border border-white/10 px-4 py-2 text-xs disabled:opacity-40">Cancel</button><button disabled={!moduleInfo.title.trim() || moduleInfoSaving} className="rounded bg-sky-500 px-4 py-2 text-xs font-bold text-white hover:bg-sky-400 disabled:opacity-40">{moduleInfoSaving ? 'Saving…' : 'Save changes'}</button></div></form></div>}
         {createModuleOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"><form onSubmit={(event) => { event.preventDefault(); void api<{ module: ModuleSummary }>('/api/dashboard/modules/ide', { method: 'POST', body: JSON.stringify({ name: createModuleName }) }).then(async ({ module }) => { await loadModules(); setCreateModuleOpen(false); setCreateModuleName(''); switchModule(module.id); }).catch((reason) => setError(reason.message)); }} className="w-[min(440px,94vw)] rounded-lg border border-white/10 bg-[#111722] p-5"><p className="font-semibold">Create Module Project</p><p className="mt-1 text-xs text-slate-500">A draft with Server, Client, Shared, and UI roots plus an empty Main.server script will be created.</p><input autoFocus value={createModuleName} onChange={(event) => setCreateModuleName(event.target.value)} placeholder="Module name" className="mt-4 w-full rounded border border-white/10 bg-black/20 p-3 text-sm outline-none focus:border-sky-400" /><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setCreateModuleOpen(false)} className="rounded border border-white/10 px-4 py-2 text-xs">Cancel</button><button disabled={!createModuleName.trim()} className="rounded bg-sky-500 px-4 py-2 text-xs font-bold disabled:opacity-40">Create and open</button></div></form></div>}
     </div>;
 }
