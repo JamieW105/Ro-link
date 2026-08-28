@@ -997,6 +997,8 @@ export function normalizeAddonModule(row: Record<string, unknown> | null | undef
         sourceChecksum: String(row.source_checksum || ''),
         configSchema: parseStoredModuleConfigSchema(row.config_schema),
         authorDiscordId: row.author_discord_id ? String(row.author_discord_id) : null,
+        creatorName: String(row.creator_name || ''),
+        creatorAvatarUrl: String(row.creator_avatar_url || ''),
         submittedAt: row.submitted_at || null,
         reviewedAt: row.reviewed_at || null,
         reviewedByDiscordId: row.reviewed_by_discord_id ? String(row.reviewed_by_discord_id) : null,

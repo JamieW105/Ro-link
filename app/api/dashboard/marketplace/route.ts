@@ -15,6 +15,7 @@ import {
 } from '@/lib/modules';
 import { applyVerifiedCreatorBadges } from '@/lib/moduleCreatorVerification';
 import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
+import { getDiscordAvatarProxyUrl, getDiscordDefaultAvatarProxyUrl } from '@/lib/discordMedia';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,63 @@ type SessionWithDiscord = Awaited<ReturnType<typeof getServerSession>> & {
         id?: string;
     };
 };
+
+type DiscordCreator = {
+    id: string;
+    username: string;
+    global_name?: string | null;
+    discriminator?: string | null;
+    avatar?: string | null;
+};
+
+function getDiscordCreatorAvatarUrl(user: DiscordCreator) {
+    if (user.avatar) {
+        return getDiscordAvatarProxyUrl(user.id, user.avatar, 128);
+    }
+
+    const discriminator = Number(user.discriminator || 0);
+    const index = discriminator > 0
+        ? discriminator % 5
+        : Number((BigInt(user.id) >> 22n) % 6n);
+    return getDiscordDefaultAvatarProxyUrl(index);
+}
+
+async function applyCreatorProfiles(rows: Record<string, unknown>[]) {
+    const botToken = process.env.DISCORD_TOKEN;
+    const authorIds = Array.from(new Set(
+        rows.map((row) => String(row.author_discord_id || '')).filter((id) => /^\d{17,20}$/.test(id)),
+    ));
+
+    if (!botToken || authorIds.length === 0) return rows;
+
+    const profiles = await Promise.all(authorIds.map(async (authorId) => {
+        try {
+            const response = await fetch(`https://discord.com/api/v10/users/${encodeURIComponent(authorId)}`, {
+                headers: { Authorization: `Bot ${botToken}` },
+                cache: 'no-store',
+            });
+            if (!response.ok) return null;
+
+            const user = await response.json() as DiscordCreator;
+            return [authorId, {
+                name: String(user.global_name || user.username || '').trim(),
+                avatarUrl: getDiscordCreatorAvatarUrl(user),
+            }] as const;
+        } catch {
+            return null;
+        }
+    }));
+    const profilesById = new Map(profiles.filter((profile): profile is NonNullable<typeof profile> => Boolean(profile)));
+
+    return rows.map((row) => {
+        const profile = profilesById.get(String(row.author_discord_id || ''));
+        return profile ? {
+            ...row,
+            creator_name: profile.name,
+            creator_avatar_url: profile.avatarUrl,
+        } : row;
+    });
+}
 
 async function buildUniqueSlug(seed: string) {
     const baseSlug = slugifyModuleName(seed);
@@ -169,9 +227,9 @@ export async function GET() {
         }
     }
 
-    const labeledModules = await applyVerifiedCreatorBadges(
+    const labeledModules = await applyCreatorProfiles(await applyVerifiedCreatorBadges(
         applyOfficialModuleLabels((data || []) as Record<string, unknown>[], staffDiscordIds),
-    );
+    ));
 
     return NextResponse.json({
         modules: labeledModules
@@ -261,9 +319,9 @@ export async function POST(req: Request) {
     }
 
     const staffDiscordIds = await getRoLinkStaffDiscordIds();
-    const [labeledModule] = await applyVerifiedCreatorBadges(
+    const [labeledModule] = await applyCreatorProfiles(await applyVerifiedCreatorBadges(
         applyOfficialModuleLabels([data as Record<string, unknown>], staffDiscordIds),
-    );
+    ));
 
     return NextResponse.json({ module: normalizeAddonModule(labeledModule, false) }, { status: 201 });
 }

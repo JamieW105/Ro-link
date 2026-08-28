@@ -48,6 +48,8 @@ interface MarketplaceModule {
     sourceChecksum: string;
     configSchema: Record<string, ModuleConfigField>;
     authorDiscordId: string | null;
+    creatorName: string;
+    creatorAvatarUrl: string;
     submittedAt: string | null;
     reviewedAt: string | null;
     moderationNote: string;
@@ -199,8 +201,8 @@ function formatDate(value: string | null) {
 }
 
 function creatorLabel(addon: MarketplaceModule, sessionUserId?: string, sessionUserName?: string | null) {
+    if (addon.creatorName) return addon.creatorName;
     if (addon.authorDiscordId === sessionUserId) return sessionUserName || 'Your module';
-    if (addon.isOfficial) return 'Ro-Link';
     if (addon.creatorIsVerified) return 'Verified creator';
     return 'Community creator';
 }
@@ -483,6 +485,12 @@ export default function DashboardMarketplacePage() {
                                                             <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover/official:opacity-100">Official</span>
                                                         </span>
                                                     )}
+                                                    {!addon.isOfficial && addon.creatorIsVerified && (
+                                                        <span className="group/verified relative shrink-0 text-sky-400" aria-label="Verified creator">
+                                                            <Check size={15} strokeWidth={3} aria-hidden="true" />
+                                                            <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover/verified:opacity-100">Verified creator</span>
+                                                        </span>
+                                                    )}
                                                     <span className="shrink-0 text-[10px] font-medium text-slate-500">v{addon.version}</span>
                                                 </div>
                                                 <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{addon.description || 'No description provided.'}</p>
@@ -492,10 +500,10 @@ export default function DashboardMarketplacePage() {
                                             </div>
 
                                             <div className="flex w-full items-center gap-2 border-t border-slate-800 px-3.5 py-3 text-[10px] font-semibold text-slate-300">
-                                                {addon.authorDiscordId === sessionUserId && session?.user?.image ? (
+                                                {addon.creatorAvatarUrl ? (
+                                                    <img src={addon.creatorAvatarUrl} alt="" className="h-5 w-5 rounded-full object-cover" />
+                                                ) : addon.authorDiscordId === sessionUserId && session?.user?.image ? (
                                                     <img src={getDiscordMediaProxyUrl(session.user.image)} alt="" className="h-5 w-5 rounded-full object-cover" />
-                                                ) : addon.isOfficial ? (
-                                                    <img src="/Media/Ro-LinkIcon.png" alt="" className="h-5 w-5 rounded-full object-cover" />
                                                 ) : (
                                                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-slate-400">
                                                         <CircleUserRound size={13} aria-hidden="true" />
