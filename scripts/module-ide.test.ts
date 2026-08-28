@@ -5,6 +5,7 @@ import test from 'node:test';
 import { buildModuleProjectPackage, normalizeModuleProjectPath, validateModuleProject, type ModuleProjectFile, type ModuleProjectManifest } from '../lib/moduleIde';
 import { validateBridgeEvent } from '../lib/moduleStudioBridge';
 import { validateModuleUiTree } from '../lib/moduleUiSchema';
+import { normalizeAddonModule } from '../lib/modules';
 
 const manifest: ModuleProjectManifest = {
     formatVersion: 2,
@@ -61,6 +62,19 @@ test('Studio bridge accepts known events and rejects unknown or oversized payloa
     assert.equal(validateBridgeEvent({ type: 'script.request', requestId: '1', payload: { instanceId: 'abc' } }).type, 'script.request');
     assert.throws(() => validateBridgeEvent({ type: 'database.secret', payload: {} }), /Unsupported Studio event type/);
     assert.throws(() => validateBridgeEvent({ type: 'sync.error', payload: { message: 'x'.repeat(513 * 1024) } }), /too large/);
+});
+
+test('module thumbnails preserve legacy images and cap galleries at five', () => {
+    const legacy = normalizeAddonModule({ thumbnail_url: 'https://example.com/legacy.png' });
+    assert.equal(legacy?.thumbnailUrl, 'https://example.com/legacy.png');
+    assert.deepEqual(legacy?.thumbnailUrls, ['https://example.com/legacy.png']);
+
+    const gallery = normalizeAddonModule({
+        thumbnail_url: 'https://example.com/legacy.png',
+        thumbnail_urls: Array.from({ length: 6 }, (_, index) => `https://example.com/${index + 1}.png`),
+    });
+    assert.equal(gallery?.thumbnailUrl, 'https://example.com/1.png');
+    assert.equal(gallery?.thumbnailUrls.length, 5);
 });
 
 test('Studio runtime uses the shared Module API instead of project remotes', () => {

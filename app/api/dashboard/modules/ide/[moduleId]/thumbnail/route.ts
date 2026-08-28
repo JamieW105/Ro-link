@@ -10,6 +10,7 @@ type Context = { params: Promise<{ moduleId: string }> };
 
 const THUMBNAIL_BUCKET = 'module-thumbnails';
 const MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024;
+const MAX_MODULE_THUMBNAILS = 5;
 const IMAGE_TYPES = {
     'image/png': { extension: 'png', signature: [0x89, 0x50, 0x4e, 0x47] },
     'image/jpeg': { extension: 'jpg', signature: [0xff, 0xd8, 0xff] },
@@ -27,6 +28,14 @@ function getStoredThumbnailPath(thumbnailUrl: string) {
     const marker = `/storage/v1/object/public/${THUMBNAIL_BUCKET}/`;
     const markerIndex = thumbnailUrl.indexOf(marker);
     return markerIndex === -1 ? '' : decodeURIComponent(thumbnailUrl.slice(markerIndex + marker.length).split('?')[0]);
+}
+
+function getModuleThumbnailUrls(module: { thumbnail_url: string; thumbnail_urls: unknown }) {
+    const thumbnailUrls = Array.isArray(module.thumbnail_urls)
+        ? module.thumbnail_urls.map((value) => String(value || '').trim()).filter(Boolean).slice(0, MAX_MODULE_THUMBNAILS)
+        : [];
+    if (thumbnailUrls.length === 0 && module.thumbnail_url) thumbnailUrls.push(module.thumbnail_url);
+    return thumbnailUrls;
 }
 
 async function ensureThumbnailBucket() {
@@ -52,41 +61,78 @@ export async function POST(req: Request, context: Context) {
         if (!ownedModule) return NextResponse.json({ error: 'Module not found.' }, { status: 404 });
 
         const formData = await req.formData();
-        const file = formData.get('thumbnail');
-        if (!(file instanceof File)) return NextResponse.json({ error: 'Choose a thumbnail image.' }, { status: 400 });
-        if (file.size === 0 || file.size > MAX_THUMBNAIL_BYTES) return NextResponse.json({ error: 'Thumbnail images must be no larger than 5 MB.' }, { status: 400 });
-        if (!(file.type in IMAGE_TYPES)) return NextResponse.json({ error: 'Use a PNG, JPEG, or WebP image.' }, { status: 400 });
+        const files = [...formData.getAll('thumbnails'), ...formData.getAll('thumbnail')]
+            .filter((value): value is File => value instanceof File && value.size > 0);
+        const currentThumbnailUrls = getModuleThumbnailUrls(ownedModule);
+        let retainedThumbnailUrls: string[];
+        try {
+            const retainedValue = formData.get('retainedThumbnailUrls');
+            retainedThumbnailUrls = retainedValue == null
+                ? currentThumbnailUrls
+                : (JSON.parse(String(retainedValue)) as unknown[]).map((value) => String(value || '').trim()).filter(Boolean);
+        } catch {
+            return NextResponse.json({ error: 'The retained thumbnail list is invalid.' }, { status: 400 });
+        }
+        retainedThumbnailUrls = [...new Set(retainedThumbnailUrls)];
+        if (retainedThumbnailUrls.some((url) => !currentThumbnailUrls.includes(url))) {
+            return NextResponse.json({ error: 'The retained thumbnail list contains an unknown image.' }, { status: 400 });
+        }
+        if (retainedThumbnailUrls.length + files.length > MAX_MODULE_THUMBNAILS) {
+            return NextResponse.json({ error: `Modules can have up to ${MAX_MODULE_THUMBNAILS} thumbnails.` }, { status: 400 });
+        }
+        if (files.length === 0 && retainedThumbnailUrls.length === currentThumbnailUrls.length
+            && retainedThumbnailUrls.every((url, index) => url === currentThumbnailUrls[index])) {
+            return NextResponse.json({ thumbnailUrl: currentThumbnailUrls[0] || '', thumbnailUrls: currentThumbnailUrls });
+        }
 
-        const contentType = file.type as keyof typeof IMAGE_TYPES;
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        if (!isValidImageSignature(bytes, contentType)) return NextResponse.json({ error: 'The selected file is not a valid image.' }, { status: 400 });
+        const validatedFiles: Array<{ bytes: Uint8Array; contentType: keyof typeof IMAGE_TYPES }> = [];
+        for (const file of files) {
+            if (file.size > MAX_THUMBNAIL_BYTES) return NextResponse.json({ error: 'Each thumbnail must be no larger than 5 MB.' }, { status: 400 });
+            if (!(file.type in IMAGE_TYPES)) return NextResponse.json({ error: 'Use PNG, JPEG, or WebP images.' }, { status: 400 });
+            const contentType = file.type as keyof typeof IMAGE_TYPES;
+            const bytes = new Uint8Array(await file.arrayBuffer());
+            if (!isValidImageSignature(bytes, contentType)) return NextResponse.json({ error: 'One of the selected files is not a valid image.' }, { status: 400 });
+            validatedFiles.push({ bytes, contentType });
+        }
 
         await ensureThumbnailBucket();
         const client = getSupabaseAdmin();
-        const objectPath = `${moduleId}/${crypto.randomUUID()}.${IMAGE_TYPES[contentType].extension}`;
-        const { error: uploadError } = await client.storage.from(THUMBNAIL_BUCKET).upload(objectPath, bytes, {
-            cacheControl: '31536000',
-            contentType,
-            upsert: false,
-        });
-        if (uploadError) throw new Error(uploadError.message);
+        const uploadedPaths: string[] = [];
+        const uploadedUrls: string[] = [];
+        for (const file of validatedFiles) {
+            const objectPath = `${moduleId}/${crypto.randomUUID()}.${IMAGE_TYPES[file.contentType].extension}`;
+            const { error: uploadError } = await client.storage.from(THUMBNAIL_BUCKET).upload(objectPath, file.bytes, {
+                cacheControl: '31536000',
+                contentType: file.contentType,
+                upsert: false,
+            });
+            if (uploadError) {
+                if (uploadedPaths.length) await client.storage.from(THUMBNAIL_BUCKET).remove(uploadedPaths);
+                throw new Error(uploadError.message);
+            }
+            uploadedPaths.push(objectPath);
+            uploadedUrls.push(client.storage.from(THUMBNAIL_BUCKET).getPublicUrl(objectPath).data.publicUrl);
+        }
 
-        const { data: publicUrlData } = client.storage.from(THUMBNAIL_BUCKET).getPublicUrl(objectPath);
-        const thumbnailUrl = publicUrlData.publicUrl;
+        const thumbnailUrls = [...retainedThumbnailUrls, ...uploadedUrls];
+        const thumbnailUrl = thumbnailUrls[0] || '';
         const { error: updateError } = await client
             .from('addon_modules')
-            .update({ thumbnail_url: thumbnailUrl, updated_at: new Date().toISOString() })
+            .update({ thumbnail_url: thumbnailUrl, thumbnail_urls: thumbnailUrls, updated_at: new Date().toISOString() })
             .eq('id', moduleId)
             .eq('author_discord_id', auth.discordUserId);
         if (updateError) {
-            await client.storage.from(THUMBNAIL_BUCKET).remove([objectPath]);
+            if (uploadedPaths.length) await client.storage.from(THUMBNAIL_BUCKET).remove(uploadedPaths);
             throw new Error(updateError.message);
         }
 
-        const oldPath = getStoredThumbnailPath(ownedModule.thumbnail_url || '');
-        if (oldPath && oldPath !== objectPath) await client.storage.from(THUMBNAIL_BUCKET).remove([oldPath]);
+        const removedPaths = currentThumbnailUrls
+            .filter((url) => !retainedThumbnailUrls.includes(url))
+            .map(getStoredThumbnailPath)
+            .filter(Boolean);
+        if (removedPaths.length) await client.storage.from(THUMBNAIL_BUCKET).remove(removedPaths);
 
-        return NextResponse.json({ thumbnailUrl });
+        return NextResponse.json({ thumbnailUrl, thumbnailUrls });
     } catch (error) {
         return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to upload thumbnail.' }, { status: 500 });
     }
@@ -104,14 +150,14 @@ export async function DELETE(_req: Request, context: Context) {
         const client = getSupabaseAdmin();
         const { error } = await client
             .from('addon_modules')
-            .update({ thumbnail_url: '', updated_at: new Date().toISOString() })
+            .update({ thumbnail_url: '', thumbnail_urls: [], updated_at: new Date().toISOString() })
             .eq('id', moduleId)
             .eq('author_discord_id', auth.discordUserId);
         if (error) throw new Error(error.message);
 
-        const oldPath = getStoredThumbnailPath(ownedModule.thumbnail_url || '');
-        if (oldPath) await client.storage.from(THUMBNAIL_BUCKET).remove([oldPath]);
-        return NextResponse.json({ thumbnailUrl: '' });
+        const oldPaths = getModuleThumbnailUrls(ownedModule).map(getStoredThumbnailPath).filter(Boolean);
+        if (oldPaths.length) await client.storage.from(THUMBNAIL_BUCKET).remove(oldPaths);
+        return NextResponse.json({ thumbnailUrl: '', thumbnailUrls: [] });
     } catch (error) {
         return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to remove thumbnail.' }, { status: 500 });
     }

@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS public.addon_modules (
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     thumbnail_url TEXT NOT NULL DEFAULT '',
+    thumbnail_urls JSONB NOT NULL DEFAULT '[]'::JSONB,
     version TEXT NOT NULL DEFAULT '1.0.0',
     category TEXT NOT NULL DEFAULT 'General',
     status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'ARCHIVED')),
@@ -32,6 +33,24 @@ ALTER TABLE public.addon_modules
 
 ALTER TABLE public.addon_modules
     ADD COLUMN IF NOT EXISTS thumbnail_url TEXT NOT NULL DEFAULT '';
+
+ALTER TABLE public.addon_modules
+    ADD COLUMN IF NOT EXISTS thumbnail_urls JSONB NOT NULL DEFAULT '[]'::JSONB;
+
+UPDATE public.addon_modules
+SET thumbnail_urls = jsonb_build_array(thumbnail_url)
+WHERE thumbnail_url <> ''
+  AND thumbnail_urls = '[]'::JSONB;
+
+ALTER TABLE public.addon_modules
+    DROP CONSTRAINT IF EXISTS addon_modules_thumbnail_urls_check;
+
+ALTER TABLE public.addon_modules
+    ADD CONSTRAINT addon_modules_thumbnail_urls_check
+    CHECK (
+        jsonb_typeof(thumbnail_urls) = 'array'
+        AND jsonb_array_length(thumbnail_urls) <= 5
+    );
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (

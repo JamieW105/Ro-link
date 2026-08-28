@@ -12,11 +12,11 @@ import {
 import ModuleIdeEditor, { type IdeDiagnostic } from '@/components/dashboard/ModuleIdeEditor';
 
 type ModuleFileKind = 'folder' | 'server_script' | 'client_script' | 'shared_module' | 'ui' | 'manifest';
-type ModuleSummary = { id: string; slug: string; name: string; description: string; thumbnail_url?: string; version: string; status: string; updated_at: string; published_at?: string | null };
+type ModuleSummary = { id: string; slug: string; name: string; description: string; thumbnail_url?: string; thumbnail_urls?: unknown; version: string; status: string; updated_at: string; published_at?: string | null };
 type ProjectFile = { id: string; path: string; name: string; kind: ModuleFileKind; sourceCode: string | null; uiTree: unknown; revision: number; createdAt: string; updatedAt: string };
 type ProjectProblem = { severity: 'error' | 'warning'; file?: string; line?: number; column?: number; message: string; code: string };
 type ProjectResponse = {
-    module: { id: string; slug: string; name: string; description: string; thumbnailUrl: string; version: string; status: string; createdAt: string; updatedAt: string; publishedAt: string | null };
+    module: { id: string; slug: string; name: string; description: string; thumbnailUrl: string; thumbnailUrls: string[]; version: string; status: string; createdAt: string; updatedAt: string; publishedAt: string | null };
     project: { formatVersion: number; revision: number; publishedRevision: number | null; requiredRuntimeVersion: string; manifest: Record<string, unknown>; createdAt: string; updatedAt: string };
     files: ProjectFile[];
 };
@@ -27,6 +27,7 @@ type SyncLog = { id: string; time: string; message: string; channel: 'output' | 
 type BridgeEvent = { id: number; type: string; requestId?: string; revision?: string; payload: Record<string, unknown> };
 type PublishCheck = { ready: boolean; problems: ProjectProblem[]; summary: { scripts: number; uiRoots: number; warnings: number; errors: number } };
 type Conflict = { kind: 'project' | 'studio'; title: string; fileId?: string; browserSource: string; serverSource: string; serverRevision: number | string };
+type ModuleThumbnailDraft = { id: string; url: string; file?: File };
 
 class ApiError extends Error {
     status: number;
@@ -131,11 +132,11 @@ export default function ModuleIdeClient() {
     const [quickQuery, setQuickQuery] = useState('');
     const [moduleInfoOpen, setModuleInfoOpen] = useState(false);
     const [moduleInfo, setModuleInfo] = useState({ title: '', description: '' });
-    const [moduleThumbnailFile, setModuleThumbnailFile] = useState<File | null>(null);
-    const [moduleThumbnailPreview, setModuleThumbnailPreview] = useState('');
-    const [removeModuleThumbnail, setRemoveModuleThumbnail] = useState(false);
+    const [moduleThumbnails, setModuleThumbnails] = useState<ModuleThumbnailDraft[]>([]);
+    const [moduleThumbnailsDirty, setModuleThumbnailsDirty] = useState(false);
     const [moduleInfoError, setModuleInfoError] = useState('');
     const moduleThumbnailInputRef = useRef<HTMLInputElement | null>(null);
+    const moduleThumbnailBlobUrlsRef = useRef<Set<string>>(new Set());
     const [moduleInfoSaving, setModuleInfoSaving] = useState(false);
     const [moduleName, setModuleNameState] = useState('');
     const [moduleNameStatus, setModuleNameStatus] = useState<'saved' | 'dirty' | 'saving' | 'failed'>('saved');
@@ -160,10 +161,10 @@ export default function ModuleIdeClient() {
     useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
     useEffect(() => { tabsRef.current = tabs; }, [tabs]);
     useEffect(() => { studioScriptRef.current = studioScript; }, [studioScript]);
-    useEffect(() => {
-        if (!moduleThumbnailPreview.startsWith('blob:')) return;
-        return () => URL.revokeObjectURL(moduleThumbnailPreview);
-    }, [moduleThumbnailPreview]);
+    useEffect(() => () => {
+        moduleThumbnailBlobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+        moduleThumbnailBlobUrlsRef.current.clear();
+    }, []);
 
     const log = useCallback((message: string, channel: SyncLog['channel'] = 'output', tone: SyncLog['tone'] = 'normal') => {
         setLogs((items) => [...items.slice(-150), { id: crypto.randomUUID(), time: new Date().toLocaleTimeString(), message, channel, tone }]);
@@ -398,28 +399,36 @@ export default function ModuleIdeClient() {
         const currentModule = projectRef.current?.module;
         if (!currentModule) return;
         setModuleInfo({ title: currentModule.name, description: currentModule.description });
-        setModuleThumbnailFile(null);
-        setModuleThumbnailPreview(currentModule.thumbnailUrl || '');
-        setRemoveModuleThumbnail(false);
+        const thumbnailUrls = currentModule.thumbnailUrls?.length ? currentModule.thumbnailUrls : currentModule.thumbnailUrl ? [currentModule.thumbnailUrl] : [];
+        setModuleThumbnails(thumbnailUrls.map((url) => ({ id: url, url })));
+        setModuleThumbnailsDirty(false);
         setModuleInfoError('');
         setModuleInfoOpen(true);
     }, []);
 
-    const chooseModuleThumbnail = useCallback((file: File | null) => {
-        if (!file) return;
-        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+    const chooseModuleThumbnails = useCallback((files: File[]) => {
+        if (!files.length) return;
+        if (moduleThumbnails.length + files.length > 5) {
+            setModuleInfoError('Modules can have up to 5 thumbnails.');
+            return;
+        }
+        if (files.some((file) => !['image/png', 'image/jpeg', 'image/webp'].includes(file.type))) {
             setModuleInfoError('Use a PNG, JPEG, or WebP image.');
             return;
         }
-        if (file.size > 5 * 1024 * 1024) {
-            setModuleInfoError('Thumbnail images must be no larger than 5 MB.');
+        if (files.some((file) => file.size > 5 * 1024 * 1024)) {
+            setModuleInfoError('Each thumbnail must be no larger than 5 MB.');
             return;
         }
         setModuleInfoError('');
-        setModuleThumbnailFile(file);
-        setRemoveModuleThumbnail(false);
-        setModuleThumbnailPreview(URL.createObjectURL(file));
-    }, []);
+        const additions = files.map((file) => {
+            const url = URL.createObjectURL(file);
+            moduleThumbnailBlobUrlsRef.current.add(url);
+            return { id: crypto.randomUUID(), url, file };
+        });
+        setModuleThumbnails((current) => [...current, ...additions]);
+        setModuleThumbnailsDirty(true);
+    }, [moduleThumbnails.length]);
 
     const saveModuleInfo = useCallback(async () => {
         const title = moduleInfo.title.trim();
@@ -448,20 +457,18 @@ export default function ModuleIdeClient() {
             if (manifestFile) setDrafts((current) => ({ ...current, [manifestFile.id]: { value: manifestSource, revision: manifestFile.revision + 1, dirty: false, status: 'saved' } }));
 
             let thumbnailUrl = currentProject.module.thumbnailUrl || '';
-            if (moduleThumbnailFile) {
+            let thumbnailUrls = currentProject.module.thumbnailUrls || (thumbnailUrl ? [thumbnailUrl] : []);
+            if (moduleThumbnailsDirty) {
                 const thumbnailBody = new FormData();
-                thumbnailBody.set('thumbnail', moduleThumbnailFile);
+                thumbnailBody.set('retainedThumbnailUrls', JSON.stringify(moduleThumbnails.filter((thumbnail) => !thumbnail.file).map((thumbnail) => thumbnail.url)));
+                moduleThumbnails.forEach((thumbnail) => { if (thumbnail.file) thumbnailBody.append('thumbnails', thumbnail.file); });
                 const thumbnailResponse = await fetch(`/api/dashboard/modules/ide/${moduleId}/thumbnail`, { method: 'POST', body: thumbnailBody });
                 const thumbnailPayload = await thumbnailResponse.json().catch(() => ({})) as Record<string, unknown>;
                 if (!thumbnailResponse.ok) throw new Error(String(thumbnailPayload.error || 'Thumbnail upload failed.'));
                 thumbnailUrl = String(thumbnailPayload.thumbnailUrl || '');
-            } else if (removeModuleThumbnail && thumbnailUrl) {
-                const thumbnailResponse = await fetch(`/api/dashboard/modules/ide/${moduleId}/thumbnail`, { method: 'DELETE' });
-                const thumbnailPayload = await thumbnailResponse.json().catch(() => ({})) as Record<string, unknown>;
-                if (!thumbnailResponse.ok) throw new Error(String(thumbnailPayload.error || 'Thumbnail removal failed.'));
-                thumbnailUrl = '';
+                thumbnailUrls = Array.isArray(thumbnailPayload.thumbnailUrls) ? thumbnailPayload.thumbnailUrls.map(String) : thumbnailUrl ? [thumbnailUrl] : [];
             }
-            setProject((current) => current ? { ...current, module: { ...current.module, thumbnailUrl } } : current);
+            setProject((current) => current ? { ...current, module: { ...current.module, thumbnailUrl, thumbnailUrls } } : current);
             void loadModules().catch(() => undefined);
             setModuleInfoOpen(false);
             log('Module info saved.', 'output', 'success');
@@ -472,7 +479,7 @@ export default function ModuleIdeClient() {
         } finally {
             setModuleInfoSaving(false);
         }
-    }, [loadModules, log, moduleId, moduleInfo, moduleInfoSaving, moduleThumbnailFile, removeModuleThumbnail, saveAll, setDrafts, setProject]);
+    }, [loadModules, log, moduleId, moduleInfo, moduleInfoSaving, moduleThumbnails, moduleThumbnailsDirty, saveAll, setDrafts, setProject]);
 
     useEffect(() => {
         if (!activeFile || !activeDraft?.dirty || activeDraft.status === 'conflict') return;
@@ -753,11 +760,24 @@ export default function ModuleIdeClient() {
                     <div className="space-y-4 overflow-y-auto p-5">
                         <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">Title</span><input autoFocus required maxLength={120} value={moduleInfo.title} onChange={(event) => setModuleInfo((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-sky-400/60" /></label>
                         <div>
-                            <div className="mb-1.5 flex items-end justify-between gap-4"><span className="text-xs font-semibold text-slate-300">Thumbnail</span><span className="text-[10px] text-slate-600">PNG, JPEG or WebP · 5 MB max</span></div>
-                            <input ref={moduleThumbnailInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => { chooseModuleThumbnail(event.currentTarget.files?.[0] || null); event.currentTarget.value = ''; }} />
-                            <div className="group relative h-36 overflow-hidden rounded-lg border border-dashed border-white/12 bg-black/25 sm:h-40">
-                                {moduleThumbnailPreview ? <img src={moduleThumbnailPreview} alt="Module thumbnail preview" className="h-full w-full object-cover" /> : <button type="button" onClick={() => moduleThumbnailInputRef.current?.click()} className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-500 transition-colors hover:bg-white/[0.03] hover:text-sky-300"><ImagePlus className="h-7 w-7" /><span className="text-xs font-semibold">Choose a thumbnail</span><span className="text-[10px] text-slate-600">16:9 recommended</span></button>}
-                                {moduleThumbnailPreview && <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 bg-gradient-to-t from-black/85 to-transparent p-3 pt-8 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"><button type="button" onClick={() => moduleThumbnailInputRef.current?.click()} className="rounded border border-white/15 bg-black/65 px-3 py-1.5 text-[10px] font-bold text-white hover:border-sky-400/60">Replace</button><button type="button" aria-label="Remove thumbnail" onClick={() => { setModuleThumbnailFile(null); setModuleThumbnailPreview(''); setRemoveModuleThumbnail(true); }} className="flex items-center gap-1 rounded border border-red-400/25 bg-black/65 px-3 py-1.5 text-[10px] font-bold text-red-200 hover:bg-red-400/10"><Trash2 className="h-3 w-3" />Remove</button></div>}
+                            <div className="mb-1.5 flex items-end justify-between gap-4"><span className="text-xs font-semibold text-slate-300">Thumbnails</span><span className="text-[10px] text-slate-600">{moduleThumbnails.length} / 5 · PNG, JPEG or WebP · 5 MB each</span></div>
+                            <input ref={moduleThumbnailInputRef} type="file" multiple accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => { chooseModuleThumbnails(Array.from(event.currentTarget.files || [])); event.currentTarget.value = ''; }} />
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                {moduleThumbnails.map((thumbnail, index) => (
+                                    <div key={thumbnail.id} className="group relative aspect-video overflow-hidden rounded-lg border border-white/12 bg-black/25">
+                                        <img src={thumbnail.url} alt={`Module thumbnail ${index + 1}`} className="h-full w-full object-cover" />
+                                        {index === 0 && <span className="absolute left-1.5 top-1.5 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">Primary</span>}
+                                        <button type="button" aria-label={`Remove thumbnail ${index + 1}`} onClick={() => {
+                                            if (thumbnail.url.startsWith('blob:')) {
+                                                URL.revokeObjectURL(thumbnail.url);
+                                                moduleThumbnailBlobUrlsRef.current.delete(thumbnail.url);
+                                            }
+                                            setModuleThumbnails((current) => current.filter((item) => item.id !== thumbnail.id));
+                                            setModuleThumbnailsDirty(true);
+                                        }} className="absolute bottom-1.5 right-1.5 flex items-center gap-1 rounded border border-red-400/25 bg-black/75 px-2 py-1 text-[9px] font-bold text-red-200 opacity-100 hover:bg-red-400/15 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"><Trash2 className="h-3 w-3" />Remove</button>
+                                    </div>
+                                ))}
+                                {moduleThumbnails.length < 5 && <button type="button" onClick={() => moduleThumbnailInputRef.current?.click()} className="flex aspect-video flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-white/12 bg-black/25 text-slate-500 transition-colors hover:bg-white/[0.03] hover:text-sky-300"><ImagePlus className="h-6 w-6" /><span className="text-[10px] font-semibold">Add thumbnails</span><span className="text-[9px] text-slate-600">16:9 recommended</span></button>}
                             </div>
                         </div>
                         <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">Description</span><textarea rows={5} maxLength={2000} value={moduleInfo.description} onChange={(event) => setModuleInfo((current) => ({ ...current, description: event.target.value }))} placeholder="Describe what this module does…" className="w-full resize-y rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm leading-6 outline-none focus:border-sky-400/60" /><span className="mt-1 block text-right text-[10px] text-slate-600">{moduleInfo.description.length} / 2000</span></label>

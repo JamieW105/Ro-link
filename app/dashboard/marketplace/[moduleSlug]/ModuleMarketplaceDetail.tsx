@@ -4,6 +4,8 @@ import {
     ArrowLeft,
     CalendarDays,
     CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
     Code2,
     Download,
     LogOut as LucideLogOut,
@@ -38,6 +40,7 @@ interface MarketplaceModule {
     name: string;
     description: string;
     thumbnailUrl: string;
+    thumbnailUrls: string[];
     version: string;
     category: string;
     status: string;
@@ -99,6 +102,7 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
     const [installing, setInstalling] = useState(false);
     const [installMessage, setInstallMessage] = useState<string | null>(null);
     const [installError, setInstallError] = useState<string | null>(null);
+    const [activeThumbnailIndex, setActiveThumbnailIndex] = useState(0);
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
 
     const addon = useMemo(() => {
@@ -117,6 +121,12 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
             : addon?.creatorIsVerified
                 ? 'Verified creator'
                 : 'Community creator';
+    const thumbnailUrls = addon?.thumbnailUrls?.length ? addon.thumbnailUrls : addon?.thumbnailUrl ? [addon.thumbnailUrl] : [];
+    const activeThumbnailUrl = thumbnailUrls[activeThumbnailIndex] || thumbnailUrls[0] || '';
+
+    useEffect(() => {
+        setActiveThumbnailIndex(0);
+    }, [addon?.id]);
 
     useEffect(() => {
         if (status !== 'authenticated') return;
@@ -276,18 +286,25 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                             <div className="min-w-0 space-y-6">
                                 <section className="overflow-hidden rounded-xl border border-slate-800 bg-[#0d1116] p-2.5 shadow-2xl shadow-black/20" aria-label="Module preview">
                                     <div className="relative aspect-video overflow-hidden rounded-lg border border-slate-800 bg-[#080b0f]">
-                                        {addon.thumbnailUrl ? (
-                                            <img src={addon.thumbnailUrl} alt={`${addon.name} preview`} className="h-full w-full object-cover" />
+                                        {activeThumbnailUrl ? (
+                                            <img src={activeThumbnailUrl} alt={`${addon.name} preview ${activeThumbnailIndex + 1} of ${thumbnailUrls.length}`} className="h-full w-full object-cover" />
                                         ) : (
                                             <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_50%_35%,rgba(14,165,233,0.14),transparent_58%)] text-sky-300/70">
                                                 <Package2 size={64} strokeWidth={1.25} aria-hidden="true" />
                                             </div>
                                         )}
+                                        {thumbnailUrls.length > 1 && <>
+                                            <button type="button" aria-label="Previous thumbnail" onClick={() => setActiveThumbnailIndex((current) => (current - 1 + thumbnailUrls.length) % thumbnailUrls.length)} className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/65 text-white transition-colors hover:bg-black/85"><ChevronLeft size={18} aria-hidden="true" /></button>
+                                            <button type="button" aria-label="Next thumbnail" onClick={() => setActiveThumbnailIndex((current) => (current + 1) % thumbnailUrls.length)} className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/65 text-white transition-colors hover:bg-black/85"><ChevronRight size={18} aria-hidden="true" /></button>
+                                        </>}
                                     </div>
+                                    {thumbnailUrls.length > 1 && <div className="mt-2 grid grid-cols-5 gap-2" aria-label="Module thumbnails">
+                                        {thumbnailUrls.map((url, index) => <button key={url} type="button" aria-label={`Show thumbnail ${index + 1}`} aria-current={index === activeThumbnailIndex} onClick={() => setActiveThumbnailIndex(index)} className={`aspect-video overflow-hidden rounded-md border transition-colors ${index === activeThumbnailIndex ? 'border-sky-400 ring-1 ring-sky-400/40' : 'border-slate-800 hover:border-slate-600'}`}><img src={url} alt="" className="h-full w-full object-cover" /></button>)}
+                                    </div>}
                                     <div className="flex items-center justify-between gap-4 px-1 pb-0.5 pt-3">
                                         <div className="flex min-w-0 items-center gap-2 text-xs text-slate-500">
                                             <Package2 size={14} className="shrink-0" aria-hidden="true" />
-                                            <span className="truncate">Module preview</span>
+                                            <span className="truncate">{thumbnailUrls.length > 1 ? `${activeThumbnailIndex + 1} of ${thumbnailUrls.length} previews` : 'Module preview'}</span>
                                         </div>
                                         <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-slate-600">{addon.category}</span>
                                     </div>

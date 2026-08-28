@@ -969,12 +969,19 @@ export function normalizeAddonModule(row: Record<string, unknown> | null | undef
         return null;
     }
 
+    const thumbnailUrls = Array.isArray(row.thumbnail_urls)
+        ? row.thumbnail_urls.map((value) => String(value || '').trim()).filter(Boolean).slice(0, 5)
+        : [];
+    const legacyThumbnailUrl = String(row.thumbnail_url || '').trim();
+    if (thumbnailUrls.length === 0 && legacyThumbnailUrl) thumbnailUrls.push(legacyThumbnailUrl);
+
     return {
         id: String(row.id || ''),
         slug: String(row.slug || ''),
         name: String(row.name || 'Untitled Module'),
         description: String(row.description || ''),
-        thumbnailUrl: String(row.thumbnail_url || ''),
+        thumbnailUrl: thumbnailUrls[0] || legacyThumbnailUrl,
+        thumbnailUrls,
         version: String(row.version || '1.0.0'),
         category: String(row.category || 'General'),
         status: String(row.status || 'DRAFT') as AddonModuleStatus,

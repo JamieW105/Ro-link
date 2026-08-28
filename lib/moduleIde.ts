@@ -53,6 +53,7 @@ interface AddonModuleOwnerRow {
     name: string;
     description: string;
     thumbnail_url: string;
+    thumbnail_urls: unknown;
     version: string;
     status: string;
     source_code: string;
@@ -165,7 +166,7 @@ export async function getOwnedModule(moduleId: string, discordUserId: string): P
     const client = getSupabaseAdmin();
     const { data, error } = await client
         .from('addon_modules')
-        .select('id, slug, name, description, thumbnail_url, version, status, source_code, author_discord_id, created_at, updated_at, published_at')
+        .select('id, slug, name, description, thumbnail_url, thumbnail_urls, version, status, source_code, author_discord_id, created_at, updated_at, published_at')
         .eq('id', moduleId)
         .eq('author_discord_id', discordUserId)
         .maybeSingle();
@@ -233,13 +234,19 @@ export async function ensureOwnedModuleProject(moduleId: string, discordUserId: 
 
     const normalizedFiles = ((files || []) as Record<string, unknown>[]).map((row) => normalizeFile(row));
 
+    const thumbnailUrls = Array.isArray(ownedModule.thumbnail_urls)
+        ? ownedModule.thumbnail_urls.map((value) => String(value || '').trim()).filter(Boolean).slice(0, 5)
+        : [];
+    if (thumbnailUrls.length === 0 && ownedModule.thumbnail_url) thumbnailUrls.push(ownedModule.thumbnail_url);
+
     return {
         module: {
             id: ownedModule.id,
             slug: ownedModule.slug,
             name: ownedModule.name,
             description: ownedModule.description,
-            thumbnailUrl: ownedModule.thumbnail_url || '',
+            thumbnailUrl: thumbnailUrls[0] || '',
+            thumbnailUrls,
             version: ownedModule.version,
             status: ownedModule.status,
             createdAt: ownedModule.created_at,

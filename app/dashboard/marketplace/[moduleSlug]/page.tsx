@@ -17,6 +17,7 @@ type ModulePreviewRow = {
     description?: string | null;
     category?: string | null;
     thumbnail_url?: string | null;
+    thumbnail_urls?: unknown;
 };
 
 function getBaseUrl() {
@@ -33,7 +34,7 @@ async function getPublishedModuleBySlug(moduleSlug: string) {
 
     const { data, error } = await supabase
         .from('addon_modules')
-        .select('slug, name, description, category, thumbnail_url')
+        .select('slug, name, description, category, thumbnail_url, thumbnail_urls')
         .eq('slug', slug)
         .eq('status', 'PUBLISHED')
         .maybeSingle<ModulePreviewRow>();
