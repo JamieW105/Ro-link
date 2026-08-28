@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
 import { getServerByApiKey, isDgsuGameAdminAccessError } from '@/lib/gameAdmin';
+import { getModuleVersionKey } from '@/lib/moduleApprovedVersion';
 import { canCreatorUseUnpublishedModule, normalizeAddonModule, normalizeServerCustomModule, parseModuleConfigSettings, parseStoredModuleConfigSchema } from '@/lib/modules';
 import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
@@ -124,7 +125,7 @@ export async function GET(req: Request) {
     const addonRows = (data || []) as unknown as ServerAddonModuleRow[];
     const customModuleRows = (customModuleStorageMissing ? [] : customRows || []) as unknown as ServerCustomModuleRow[];
 
-    const latestProjectVersionByModule = new Map<string, ModuleProjectVersionRow>();
+    const projectVersionByModuleAndVersion = new Map<string, ModuleProjectVersionRow>();
     if (!configOnly) {
         const moduleIds = addonRows.map((row) => {
             const moduleRow = Array.isArray(row.module) ? row.module[0] : row.module;
@@ -142,7 +143,7 @@ export async function GET(req: Request) {
                 return NextResponse.json({ error: projectVersions.error.message }, { status: 500 });
             }
             for (const row of (projectVersions.data || []) as ModuleProjectVersionRow[]) {
-                if (!latestProjectVersionByModule.has(row.module_id)) latestProjectVersionByModule.set(row.module_id, row);
+                projectVersionByModuleAndVersion.set(getModuleVersionKey(row.module_id, row.version), row);
             }
         }
     }
@@ -165,11 +166,12 @@ export async function GET(req: Request) {
                 return null;
             }
 
+            const approvedProjectVersion = projectVersionByModuleAndVersion.get(getModuleVersionKey(normalized.id, normalized.version));
             return {
                 ...normalized,
                 ...(configOnly ? {} : { sourceCode: String(normalized.sourceCode || '') }),
-                ...(!configOnly && latestProjectVersionByModule.has(normalized.id) ? (() => {
-                    const projectVersion = latestProjectVersionByModule.get(normalized.id)!;
+                ...(!configOnly && approvedProjectVersion ? (() => {
+                    const projectVersion = approvedProjectVersion;
                     return {
                         projectPackage: projectVersion.package,
                         projectPackageHash: projectVersion.package_hash,

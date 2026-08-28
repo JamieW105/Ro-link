@@ -271,7 +271,10 @@ export default function ModuleIdeClient() {
 
     const selectedModule = modules.find((item) => item.id === moduleId);
     const isModuleUpdate = Boolean(project?.module.publishedAt || selectedModule?.published_at || selectedModule?.status === 'PUBLISHED');
-    const canChangeMarketplaceVisibility = Boolean(project?.module.publishedAt || project?.module.status === 'PUBLISHED');
+    const canChangeMarketplaceVisibility = Boolean(
+        (project?.module.publishedAt || project?.module.status === 'PUBLISHED')
+        && (project?.module.status === 'DRAFT' || project?.module.status === 'PUBLISHED'),
+    );
     const selectedFile = project?.files.find((file) => file.id === selectedFileId) || null;
     const activeProjectId = activeTab.startsWith('project:') ? activeTab.slice(8) : '';
     const activeFile = project?.files.find((file) => file.id === activeProjectId) || null;
@@ -489,14 +492,14 @@ export default function ModuleIdeClient() {
                 thumbnailUrl = String(thumbnailPayload.thumbnailUrl || '');
                 thumbnailUrls = Array.isArray(thumbnailPayload.thumbnailUrls) ? thumbnailPayload.thumbnailUrls.map(String) : thumbnailUrl ? [thumbnailUrl] : [];
             }
-            const visibilityResult = await api<{ status: string; visibility: 'PRIVATE' | 'PUBLISHED'; publishedAt: string | null }>(`/api/dashboard/modules/ide/${moduleId}/visibility`, {
+            const visibilityResult = await api<{ status: string; visibility: 'PRIVATE' | 'PUBLISHED'; publishedAt: string | null; approvedVersion: string | null }>(`/api/dashboard/modules/ide/${moduleId}/visibility`, {
                 method: 'PATCH',
                 body: JSON.stringify({ visibility: moduleVisibility }),
             });
-            setProject((current) => current ? { ...current, module: { ...current.module, thumbnailUrl, thumbnailUrls, status: visibilityResult.status, publishedAt: visibilityResult.publishedAt } } : current);
+            setProject((current) => current ? { ...current, module: { ...current.module, thumbnailUrl, thumbnailUrls, status: visibilityResult.status, publishedAt: visibilityResult.publishedAt, version: visibilityResult.approvedVersion || current.module.version } } : current);
             void loadModules().catch(() => undefined);
             setModuleInfoOpen(false);
-            log(`Module info saved. Marketplace visibility is ${visibilityResult.visibility === 'PUBLISHED' ? 'Published' : 'Private'}.`, 'output', 'success');
+            log(`Module info saved. Marketplace visibility is ${visibilityResult.visibility === 'PUBLISHED' ? `Published on approved v${visibilityResult.approvedVersion}` : 'Private'}.`, 'output', 'success');
         } catch (reason) {
             const message = reason instanceof Error ? reason.message : 'Module info failed to save.';
             setModuleInfoError(message);
@@ -876,7 +879,7 @@ export default function ModuleIdeClient() {
                         <div className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-black/20 px-3 py-3">
                             <div>
                                 <span className="block text-xs font-semibold text-slate-300">Marketplace visibility</span>
-                                <span className="mt-0.5 block text-[10px] text-slate-500">{canChangeMarketplaceVisibility ? 'Private modules are hidden and uninstalled from servers.' : 'Publish this module once to control its marketplace visibility.'}</span>
+                                <span className="mt-0.5 block text-[10px] text-slate-500">{canChangeMarketplaceVisibility ? 'Published restores the latest approved version. New changes require Publish/Update.' : 'Publish or finish the current review before changing visibility.'}</span>
                             </div>
                             <div className="flex shrink-0 items-center gap-2" role="group" aria-label="Marketplace visibility">
                                 <span className={`text-[10px] font-bold uppercase tracking-wider ${moduleVisibility === 'PRIVATE' ? 'text-white' : 'text-slate-600'}`}>Private</span>

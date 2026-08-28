@@ -7,6 +7,7 @@ import { MODULE_CATEGORIES, parseModuleCategory } from '../lib/moduleCategories'
 import { validateBridgeEvent } from '../lib/moduleStudioBridge';
 import { validateModuleUiTree } from '../lib/moduleUiSchema';
 import { canCreatorUseUnpublishedModule, normalizeAddonModule } from '../lib/modules';
+import { canRestoreApprovedModuleVersion, getModulePackageServerSource, getModuleVersionKey } from '../lib/moduleApprovedVersion';
 import { compareModuleVersions, isModuleVersionGreater, MODULE_VERSION_PATTERN, suggestNextModuleVersion } from '../lib/moduleVersions';
 
 const manifest: ModuleProjectManifest = {
@@ -79,6 +80,20 @@ test('denied modules remain private testable projects for their uploader', () =>
     assert.equal(canCreatorUseUnpublishedModule('REJECTED', 'creator-1', 'creator-1'), true);
     assert.equal(canCreatorUseUnpublishedModule('REJECTED', 'creator-1', 'someone-else'), false);
     assert.equal(canCreatorUseUnpublishedModule('ARCHIVED', 'creator-1', 'creator-1'), false);
+});
+
+test('marketplace visibility only restores an approved release package', () => {
+    assert.equal(canRestoreApprovedModuleVersion({ status: 'DRAFT', publishedAt: '2026-08-01', reviewedAt: '2026-08-01' }), true);
+    assert.equal(canRestoreApprovedModuleVersion({ status: 'PENDING_REVIEW', publishedAt: '2026-08-01', reviewedAt: '2026-08-01' }), false);
+    assert.equal(canRestoreApprovedModuleVersion({ status: 'DRAFT', publishedAt: null, reviewedAt: null }), false);
+    assert.notEqual(getModuleVersionKey('module-1', '1.0.0'), getModuleVersionKey('module-1', '1.1.0'));
+    assert.equal(getModulePackageServerSource({
+        entrypoints: { server: 'Server/Main.server.luau' },
+        files: [
+            { path: 'Server/Old.server.luau', sourceCode: 'return "old"' },
+            { path: 'Server/Main.server.luau', sourceCode: 'return "approved"' },
+        ],
+    }), 'return "approved"');
 });
 
 test('module thumbnails preserve legacy images and cap galleries at five', () => {
