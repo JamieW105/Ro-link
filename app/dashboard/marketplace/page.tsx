@@ -3,10 +3,14 @@
 import {
     ArrowRight,
     Boxes,
+    ChevronDown,
     CircleUserRound,
+    Clock3,
+    Layers3,
     LogOut as LucideLogOut,
     Plus,
     Search,
+    Shapes,
     SlidersHorizontal,
     ShieldAlert as LucideShieldAlert,
     Store,
@@ -55,6 +59,9 @@ type SessionUserWithId = {
     id?: string;
 };
 
+type CreatorFilter = 'all' | 'official' | 'verified' | 'community' | 'yours';
+type SortOption = 'latest' | 'oldest' | 'name';
+
 const LogOutIcon = () => (
     <LucideLogOut width="14" height="14" strokeWidth="2" />
 );
@@ -83,25 +90,55 @@ function creatorLabel(addon: MarketplaceModule, sessionUserId?: string, sessionU
     return 'Community creator';
 }
 
+function moduleTimestamp(addon: MarketplaceModule) {
+    const value = addon.updatedAt || addon.publishedAt || addon.reviewedAt || addon.submittedAt;
+    const timestamp = value ? new Date(value).getTime() : 0;
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
 export default function DashboardMarketplacePage() {
     const { data: session, status } = useSession();
     const [modules, setModules] = useState<MarketplaceModule[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [creatorFilter, setCreatorFilter] = useState<CreatorFilter>('all');
+    const [categoryFilter, setCategoryFilter] = useState('all');
+    const [sortOption, setSortOption] = useState<SortOption>('latest');
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
+
+    const categories = useMemo(() => (
+        Array.from(new Set(modules.map((addon) => addon.category).filter(Boolean)))
+            .sort((left, right) => left.localeCompare(right))
+    ), [modules]);
 
     const filteredModules = useMemo(() => {
         const normalizedQuery = searchQuery.trim().toLowerCase();
-        if (!normalizedQuery) return modules;
 
-        return modules.filter((addon) => (
-            addon.name.toLowerCase().includes(normalizedQuery)
-            || addon.description.toLowerCase().includes(normalizedQuery)
-            || addon.category.toLowerCase().includes(normalizedQuery)
-            || addon.version.toLowerCase().includes(normalizedQuery)
-        ));
-    }, [modules, searchQuery]);
+        return modules
+            .filter((addon) => {
+                const matchesSearch = !normalizedQuery || [
+                    addon.name,
+                    addon.description,
+                    addon.category,
+                    addon.version,
+                    creatorLabel(addon, sessionUserId, session?.user?.name),
+                ].some((value) => value.toLowerCase().includes(normalizedQuery));
+                const matchesCategory = categoryFilter === 'all' || addon.category === categoryFilter;
+                const matchesCreator = creatorFilter === 'all'
+                    || (creatorFilter === 'official' && addon.isOfficial)
+                    || (creatorFilter === 'verified' && addon.creatorIsVerified)
+                    || (creatorFilter === 'community' && !addon.isOfficial && !addon.creatorIsVerified)
+                    || (creatorFilter === 'yours' && addon.authorDiscordId === sessionUserId);
+
+                return matchesSearch && matchesCategory && matchesCreator;
+            })
+            .sort((left, right) => {
+                if (sortOption === 'name') return left.name.localeCompare(right.name);
+                const dateDifference = moduleTimestamp(right) - moduleTimestamp(left);
+                return sortOption === 'oldest' ? -dateDifference : dateDifference;
+            });
+    }, [categoryFilter, creatorFilter, modules, searchQuery, session?.user?.name, sessionUserId, sortOption]);
 
     useEffect(() => {
         if (status !== 'authenticated') {
@@ -224,28 +261,79 @@ export default function DashboardMarketplacePage() {
                         </div>
                     ) : (
                         <div className="grid gap-3">
-                            <label className="relative block w-full" htmlFor="marketplace-search">
-                                <span className="sr-only">Search marketplace modules</span>
-                                <Search
-                                    size={16}
-                                    aria-hidden="true"
-                                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
-                                />
-                                <input
-                                    id="marketplace-search"
-                                    type="search"
-                                    value={searchQuery}
-                                    onChange={(event) => setSearchQuery(event.target.value)}
-                                    placeholder="Search modules..."
-                                    className="w-full rounded-lg border border-slate-800 bg-[#0d1116] py-3 pl-10 pr-4 text-sm text-white outline-none transition-colors placeholder:text-slate-600 hover:border-slate-700 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
-                                />
-                            </label>
+                            <div className="grid gap-2 rounded-xl border border-slate-800 bg-[#0b0f13] p-2 md:grid-cols-[minmax(240px,1fr)_170px_160px_150px]" role="search" aria-label="Filter marketplace modules">
+                                <label className="relative block min-w-0" htmlFor="marketplace-search">
+                                    <span className="sr-only">Search marketplace modules</span>
+                                    <Search
+                                        size={15}
+                                        aria-hidden="true"
+                                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                                    />
+                                    <input
+                                        id="marketplace-search"
+                                        type="search"
+                                        value={searchQuery}
+                                        onChange={(event) => setSearchQuery(event.target.value)}
+                                        placeholder="Search by title, creator, or category..."
+                                        className="h-10 w-full rounded-lg border border-slate-800 bg-[#0d1116] pl-9 pr-3 text-sm text-white outline-none transition-colors placeholder:text-slate-500 hover:border-slate-700 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
+                                    />
+                                </label>
+
+                                <label className="relative block" htmlFor="marketplace-creator-filter">
+                                    <span className="sr-only">Filter by creator</span>
+                                    <Shapes size={15} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                    <select
+                                        id="marketplace-creator-filter"
+                                        value={creatorFilter}
+                                        onChange={(event) => setCreatorFilter(event.target.value as CreatorFilter)}
+                                        className="h-10 w-full appearance-none rounded-lg border border-slate-800 bg-[#0d1116] pl-9 pr-9 text-sm font-semibold text-white outline-none transition-colors hover:border-slate-700 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
+                                    >
+                                        <option value="all">All modules</option>
+                                        <option value="official">Official</option>
+                                        <option value="verified">Verified creators</option>
+                                        <option value="community">Community</option>
+                                        <option value="yours">Your modules</option>
+                                    </select>
+                                    <ChevronDown size={14} aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                </label>
+
+                                <label className="relative block" htmlFor="marketplace-category-filter">
+                                    <span className="sr-only">Filter by category</span>
+                                    <Layers3 size={15} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                    <select
+                                        id="marketplace-category-filter"
+                                        value={categoryFilter}
+                                        onChange={(event) => setCategoryFilter(event.target.value)}
+                                        className="h-10 w-full appearance-none rounded-lg border border-slate-800 bg-[#0d1116] pl-9 pr-9 text-sm font-semibold text-white outline-none transition-colors hover:border-slate-700 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
+                                    >
+                                        <option value="all">All categories</option>
+                                        {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+                                    </select>
+                                    <ChevronDown size={14} aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                </label>
+
+                                <label className="relative block" htmlFor="marketplace-sort">
+                                    <span className="sr-only">Sort modules</span>
+                                    <Clock3 size={15} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                    <select
+                                        id="marketplace-sort"
+                                        value={sortOption}
+                                        onChange={(event) => setSortOption(event.target.value as SortOption)}
+                                        className="h-10 w-full appearance-none rounded-lg border border-slate-800 bg-[#0d1116] pl-9 pr-9 text-sm font-semibold text-white outline-none transition-colors hover:border-slate-700 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
+                                    >
+                                        <option value="latest">Latest</option>
+                                        <option value="oldest">Oldest</option>
+                                        <option value="name">Name A–Z</option>
+                                    </select>
+                                    <ChevronDown size={14} aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                </label>
+                            </div>
 
                             {filteredModules.length === 0 ? (
                                 <div className="rl-dashboard-message">
                                     <span className="rl-dashboard-state-icon"><Search aria-hidden="true" /></span>
                                     <h2>No matching modules</h2>
-                                    <p>Try searching with a different name, category, or version.</p>
+                                    <p>Try changing your search or filters.</p>
                                 </div>
                             ) : (
                                 <div className="motion-list grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
