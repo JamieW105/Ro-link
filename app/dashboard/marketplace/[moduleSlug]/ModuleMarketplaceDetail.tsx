@@ -301,13 +301,6 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                     {thumbnailUrls.length > 1 && <div className="mt-2 grid grid-cols-5 gap-2" aria-label="Module thumbnails">
                                         {thumbnailUrls.map((url, index) => <button key={url} type="button" aria-label={`Show thumbnail ${index + 1}`} aria-current={index === activeThumbnailIndex} onClick={() => setActiveThumbnailIndex(index)} className={`aspect-video overflow-hidden rounded-md border transition-colors ${index === activeThumbnailIndex ? 'border-sky-400 ring-1 ring-sky-400/40' : 'border-slate-800 hover:border-slate-600'}`}><img src={url} alt="" className="h-full w-full object-cover" /></button>)}
                                     </div>}
-                                    <div className="flex items-center justify-between gap-4 px-1 pb-0.5 pt-3">
-                                        <div className="flex min-w-0 items-center gap-2 text-xs text-slate-500">
-                                            <Package2 size={14} className="shrink-0" aria-hidden="true" />
-                                            <span className="truncate">{thumbnailUrls.length > 1 ? `${activeThumbnailIndex + 1} of ${thumbnailUrls.length} previews` : 'Module preview'}</span>
-                                        </div>
-                                        <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-slate-600">{addon.category}</span>
-                                    </div>
                                 </section>
 
                                 <section aria-labelledby="module-description-title">
