@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
-    AlertTriangle, Boxes, Braces, Cable, Check, ChevronDown, ChevronRight, Code2,
+    AlertTriangle, Boxes, Braces, Cable, Check, ChevronDown, ChevronRight,
     File, FileCode2, FileJson, Folder, FolderOpen, GitCompare, Play, PlugZap,
     ImagePlus, RefreshCw, Save, Search, Server, Settings2, Trash2, Unplug, X,
 } from 'lucide-react';
@@ -82,22 +82,6 @@ function replaceStudioChildren(roots: StudioNode[], id: string, children: Studio
     return roots.map((item) => item.id === id ? { ...item, children } : { ...item, children: item.children ? replaceStudioChildren(item.children, id, children) : item.children });
 }
 
-function StudioTreeNode({ node, onOpen, onExpand }: { node: StudioNode; onOpen: (node: StudioNode) => void; onExpand: (node: StudioNode) => void }) {
-    const [open, setOpen] = useState(Boolean(node.children?.length));
-    const toggle = () => {
-        if (node.hasChildren && !open && !node.children) onExpand(node);
-        setOpen((value) => !value);
-    };
-    return <div className="select-none text-xs">
-        <button type="button" onDoubleClick={() => node.isScript && onOpen(node)} onClick={toggle} className="flex h-7 w-full items-center gap-1.5 rounded px-1.5 text-left text-slate-300 outline-none hover:bg-white/[0.05] hover:text-white focus-visible:ring-1 focus-visible:ring-sky-400">
-            {node.hasChildren ? (open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />) : <span className="w-3" />}
-            {node.isScript ? <Code2 className="h-3.5 w-3.5 text-sky-300" /> : open ? <FolderOpen className="h-3.5 w-3.5 text-amber-300" /> : <Folder className="h-3.5 w-3.5 text-amber-300" />}
-            <span className="truncate">{node.name}</span><span className="ml-auto truncate text-[9px] uppercase tracking-wider text-slate-600">{node.className}</span>
-        </button>
-        {open && node.children && <div className="ml-3 border-l border-white/8 pl-1">{node.children.map((child) => <StudioTreeNode key={child.id} node={child} onOpen={onOpen} onExpand={onExpand} />)}</div>}
-    </div>;
-}
-
 function UiTree({ value, depth = 0 }: { value: unknown; depth?: number }) {
     if (!value || typeof value !== 'object') return null;
     const node = value as { name?: string; className?: string; children?: unknown[]; properties?: Record<string, unknown> };
@@ -133,7 +117,7 @@ export default function ModuleIdeClient() {
     const [error, setError] = useState('');
     const [pairing, setPairing] = useState<{ code: string; expiresAt: string } | null>(null);
     const [connected, setConnected] = useState(false);
-    const [studioRoots, setStudioRoots] = useState<StudioNode[]>([]);
+    const [, setStudioRoots] = useState<StudioNode[]>([]);
     const [studioScript, setStudioScript] = useState<StudioScript | null>(null);
     const [conflict, setConflict] = useState<Conflict | null>(null);
     const [publishCheck, setPublishCheck] = useState<PublishCheck | null>(null);
@@ -580,14 +564,6 @@ export default function ModuleIdeClient() {
         return () => { cancelled = true; };
     }, [moduleId, processEvents]);
 
-    const openStudioScript = useCallback(async (node: StudioNode) => {
-        const requestId = crypto.randomUUID(); pendingOpenRef.current.set(requestId, node);
-        await sendEvents([{ type: 'script.request', requestId, payload: { instanceId: node.id } }]);
-        log(`Requested ${node.path} from Studio.`, 'studio');
-    }, [log, sendEvents]);
-    const expandStudioNode = useCallback(async (node: StudioNode) => {
-        await sendEvents([{ type: 'tree.children', requestId: crypto.randomUUID(), payload: { instanceId: node.id } }]);
-    }, [sendEvents]);
     const saveStudioScript = useCallback(async (forceRevision?: string) => {
         if (!studioScript?.dirty || studioScript.saving) return;
         setStudioScript({ ...studioScript, saving: true });
@@ -792,7 +768,6 @@ export default function ModuleIdeClient() {
                     })}
                     {project && !flatFiles.length && <p className="p-4 text-xs text-slate-500">No project files match the search.</p>}
                 </div>
-                <div className="border-t border-white/8 p-2"><div className="mb-2 flex items-center justify-between px-1"><span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Studio Explorer</span><button disabled={!connected} onClick={() => void sendEvents([{ type: 'tree.snapshot', payload: {} }])} className="rounded p-1 text-slate-500 hover:text-white disabled:opacity-30"><RefreshCw className="h-3.5 w-3.5" /></button></div>{studioRoots.map((root) => <StudioTreeNode key={root.id} node={root} onOpen={openStudioScript} onExpand={expandStudioNode} />)}</div>
             </aside>
             <div onPointerDown={(event) => beginResize('left', event)} className="cursor-col-resize bg-white/[0.04] hover:bg-sky-400/50" />
 
