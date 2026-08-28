@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
-import { Archive, Boxes, Gavel, LogOut, Pencil, Plus, Search, ShieldAlert, UserRound, X } from 'lucide-react';
+import { Boxes, Gavel, LogOut, Pencil, Plus, Search, ShieldAlert, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 
@@ -30,7 +30,6 @@ const moduleFilters: { value: CreatorFilter; label: string }[] = [
     { value: 'PENDING_REVIEW', label: 'Review' },
     { value: 'DRAFT', label: 'Drafts' },
     { value: 'REJECTED', label: 'Needs Work' },
-    { value: 'ARCHIVED', label: 'Archived' },
 ];
 
 function statusLabel(status: ModuleStatus) {
@@ -59,8 +58,6 @@ export default function CreatorModulesPage() {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<CreatorFilter>('ALL');
     const [notice, setNotice] = useState<string | null>(null);
-    const [takeDownTarget, setTakeDownTarget] = useState<CreatorModule | null>(null);
-    const [takingDownId, setTakingDownId] = useState<string | null>(null);
     const userAvatarUrl = getDiscordMediaProxyUrl(session?.user?.image);
 
     const filteredModules = useMemo(() => {
@@ -122,36 +119,6 @@ export default function CreatorModulesPage() {
             setNotice(`Dispute submitted for ${addon.name}. You can still edit, test, or reupload the module while it is reviewed.`);
         } catch (submitError) {
             setError(submitError instanceof Error ? submitError.message : 'Failed to submit dispute.');
-        }
-    }
-
-    async function takeDownModule() {
-        if (!takeDownTarget || takingDownId) return;
-
-        const target = takeDownTarget;
-        setTakingDownId(target.id);
-        setError(null);
-        setNotice(null);
-
-        try {
-            const response = await fetch(`/api/dashboard/creator/modules/${encodeURIComponent(target.id)}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'ARCHIVED' }),
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(String(payload.error || 'Failed to take down module.'));
-
-            const updatedModule = payload.module as CreatorModule | undefined;
-            setModules((current) => current.map((addon) => addon.id === target.id
-                ? { ...addon, ...updatedModule, status: 'ARCHIVED' }
-                : addon));
-            setTakeDownTarget(null);
-            setNotice(`${target.name} has been taken down from the marketplace.`);
-        } catch (takeDownError) {
-            setError(takeDownError instanceof Error ? takeDownError.message : 'Failed to take down module.');
-        } finally {
-            setTakingDownId(null);
         }
     }
 
@@ -304,7 +271,6 @@ export default function CreatorModulesPage() {
 
                                             <div className="absolute right-4 top-1/2 flex -translate-y-1/2 gap-2">
                                                 {addon.status === 'REJECTED' && <button type="button" onClick={() => void disputeModule(addon)} aria-label={`Dispute denial of ${addon.name}`} title="Dispute denial" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-amber-500/30 bg-[#080b0f] text-amber-300 transition-colors hover:bg-amber-500/10"><Gavel className="h-4 w-4" aria-hidden="true" /></button>}
-                                                {addon.status === 'PUBLISHED' && <button type="button" onClick={() => setTakeDownTarget(addon)} aria-label={`Take down ${addon.name} from the marketplace`} title="Take down from marketplace" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-500/30 bg-[#080b0f] text-red-300 transition-colors hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"><Archive className="h-4 w-4" aria-hidden="true" /></button>}
                                                 {addon.status !== 'ARCHIVED' && <Link href={`/dashboard/modules/ide?module=${encodeURIComponent(addon.id)}`} aria-label={`Edit ${addon.name} in the Module IDE`} title={`Edit ${addon.name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 bg-[#080b0f] text-slate-400 transition-colors hover:border-sky-500/60 hover:bg-sky-500/10 hover:text-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"><Pencil className="h-4 w-4" aria-hidden="true" /></Link>}
                                             </div>
                                         </article>
@@ -327,36 +293,6 @@ export default function CreatorModulesPage() {
                     )}
                 </section>
             </main>
-
-            {takeDownTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" role="presentation" onMouseDown={(event) => {
-                    if (event.target === event.currentTarget && !takingDownId) setTakeDownTarget(null);
-                }}>
-                    <section role="dialog" aria-modal="true" aria-labelledby="take-down-title" aria-describedby="take-down-description" className="w-full max-w-md rounded-xl border border-slate-700 bg-[#0d1116] shadow-2xl">
-                        <div className="flex items-start justify-between gap-4 border-b border-slate-800 p-5">
-                            <div>
-                                <p className="rl-eyebrow">Marketplace listing</p>
-                                <h2 id="take-down-title" className="mt-1 text-xl font-bold text-white">Take down {takeDownTarget.name}?</h2>
-                            </div>
-                            <button autoFocus type="button" onClick={() => setTakeDownTarget(null)} disabled={Boolean(takingDownId)} aria-label="Close take down confirmation" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-800 hover:text-white disabled:opacity-40">
-                                <X className="h-4 w-4" aria-hidden="true" />
-                            </button>
-                        </div>
-                        <div className="p-5">
-                            <p id="take-down-description" className="text-sm leading-6 text-slate-300">
-                                This immediately removes the module from the marketplace and uninstalls it from servers. The archived module record will remain in My Modules.
-                            </p>
-                        </div>
-                        <div className="flex flex-col-reverse gap-2 border-t border-slate-800 p-4 sm:flex-row sm:justify-end">
-                            <button type="button" onClick={() => setTakeDownTarget(null)} disabled={Boolean(takingDownId)} className="rl-button disabled:cursor-not-allowed disabled:opacity-50">Cancel</button>
-                            <button type="button" onClick={() => void takeDownModule()} disabled={Boolean(takingDownId)} className="rl-button border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50">
-                                <Archive size={14} aria-hidden="true" />
-                                {takingDownId ? 'Taking down…' : 'Take down module'}
-                            </button>
-                        </div>
-                    </section>
-                </div>
-            )}
         </div>
     );
 }

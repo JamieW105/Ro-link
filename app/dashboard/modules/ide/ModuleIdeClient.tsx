@@ -143,6 +143,7 @@ export default function ModuleIdeClient() {
     const [quickQuery, setQuickQuery] = useState('');
     const [moduleInfoOpen, setModuleInfoOpen] = useState(false);
     const [moduleInfo, setModuleInfo] = useState({ title: '', category: 'General', description: '' });
+    const [moduleVisibility, setModuleVisibility] = useState<'PRIVATE' | 'PUBLISHED'>('PRIVATE');
     const [moduleCategoryOpen, setModuleCategoryOpen] = useState(false);
     const moduleCategoryButtonRef = useRef<HTMLButtonElement | null>(null);
     const moduleCategoryMenuRef = useRef<HTMLDivElement | null>(null);
@@ -270,6 +271,7 @@ export default function ModuleIdeClient() {
 
     const selectedModule = modules.find((item) => item.id === moduleId);
     const isModuleUpdate = Boolean(project?.module.publishedAt || selectedModule?.published_at || selectedModule?.status === 'PUBLISHED');
+    const canChangeMarketplaceVisibility = Boolean(project?.module.publishedAt || project?.module.status === 'PUBLISHED');
     const selectedFile = project?.files.find((file) => file.id === selectedFileId) || null;
     const activeProjectId = activeTab.startsWith('project:') ? activeTab.slice(8) : '';
     const activeFile = project?.files.find((file) => file.id === activeProjectId) || null;
@@ -415,6 +417,7 @@ export default function ModuleIdeClient() {
         if (!currentModule) return;
         const currentCategory = modules.find((item) => item.id === currentModule.id)?.category;
         setModuleInfo({ title: currentModule.name, category: currentCategory || 'General', description: currentModule.description });
+        setModuleVisibility(currentModule.status === 'PUBLISHED' ? 'PUBLISHED' : 'PRIVATE');
         setModuleCategoryOpen(false);
         const thumbnailUrls = currentModule.thumbnailUrls?.length ? currentModule.thumbnailUrls : currentModule.thumbnailUrl ? [currentModule.thumbnailUrl] : [];
         setModuleThumbnails(thumbnailUrls.map((url) => ({ id: url, url })));
@@ -486,10 +489,14 @@ export default function ModuleIdeClient() {
                 thumbnailUrl = String(thumbnailPayload.thumbnailUrl || '');
                 thumbnailUrls = Array.isArray(thumbnailPayload.thumbnailUrls) ? thumbnailPayload.thumbnailUrls.map(String) : thumbnailUrl ? [thumbnailUrl] : [];
             }
-            setProject((current) => current ? { ...current, module: { ...current.module, thumbnailUrl, thumbnailUrls } } : current);
+            const visibilityResult = await api<{ status: string; visibility: 'PRIVATE' | 'PUBLISHED'; publishedAt: string | null }>(`/api/dashboard/modules/ide/${moduleId}/visibility`, {
+                method: 'PATCH',
+                body: JSON.stringify({ visibility: moduleVisibility }),
+            });
+            setProject((current) => current ? { ...current, module: { ...current.module, thumbnailUrl, thumbnailUrls, status: visibilityResult.status, publishedAt: visibilityResult.publishedAt } } : current);
             void loadModules().catch(() => undefined);
             setModuleInfoOpen(false);
-            log('Module info saved.', 'output', 'success');
+            log(`Module info saved. Marketplace visibility is ${visibilityResult.visibility === 'PUBLISHED' ? 'Published' : 'Private'}.`, 'output', 'success');
         } catch (reason) {
             const message = reason instanceof Error ? reason.message : 'Module info failed to save.';
             setModuleInfoError(message);
@@ -497,7 +504,7 @@ export default function ModuleIdeClient() {
         } finally {
             setModuleInfoSaving(false);
         }
-    }, [loadModules, log, moduleId, moduleInfo, moduleInfoSaving, moduleThumbnails, moduleThumbnailsDirty, saveAll, setDrafts, setProject]);
+    }, [loadModules, log, moduleId, moduleInfo, moduleInfoSaving, moduleThumbnails, moduleThumbnailsDirty, moduleVisibility, saveAll, setDrafts, setProject]);
 
     useEffect(() => {
         if (!activeFile || !activeDraft?.dirty || activeDraft.status === 'conflict') return;
@@ -865,6 +872,27 @@ export default function ModuleIdeClient() {
                                     })}
                                 </div>
                             )}
+                        </div>
+                        <div className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-black/20 px-3 py-3">
+                            <div>
+                                <span className="block text-xs font-semibold text-slate-300">Marketplace visibility</span>
+                                <span className="mt-0.5 block text-[10px] text-slate-500">{canChangeMarketplaceVisibility ? 'Private modules are hidden and uninstalled from servers.' : 'Publish this module once to control its marketplace visibility.'}</span>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2" role="group" aria-label="Marketplace visibility">
+                                <span className={`text-[10px] font-bold uppercase tracking-wider ${moduleVisibility === 'PRIVATE' ? 'text-white' : 'text-slate-600'}`}>Private</span>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={moduleVisibility === 'PUBLISHED'}
+                                    aria-label="Publish module in the marketplace"
+                                    disabled={!canChangeMarketplaceVisibility}
+                                    onClick={() => setModuleVisibility((current) => current === 'PUBLISHED' ? 'PRIVATE' : 'PUBLISHED')}
+                                    className={`relative h-6 w-11 rounded-full border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-40 ${moduleVisibility === 'PUBLISHED' ? 'border-sky-400/60 bg-sky-500/35' : 'border-white/15 bg-slate-800'}`}
+                                >
+                                    <span className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow transition-transform ${moduleVisibility === 'PUBLISHED' ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                                </button>
+                                <span className={`text-[10px] font-bold uppercase tracking-wider ${moduleVisibility === 'PUBLISHED' ? 'text-sky-200' : 'text-slate-600'}`}>Published</span>
+                            </div>
                         </div>
                         <div>
                             <div className="mb-1.5 flex items-end justify-between gap-4"><span className="text-xs font-semibold text-slate-300">Thumbnails</span><span className="text-[10px] text-slate-600">{moduleThumbnails.length} / 5 · PNG, JPEG or WebP · 5 MB each</span></div>
