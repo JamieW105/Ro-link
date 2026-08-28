@@ -8,6 +8,7 @@
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "test:module-ide": "tsx --test scripts/module-ide.test.ts",
+    "test:server-removal": "tsx --test scripts/server-data-removal.test.ts",
     "sync:roblox-api": "node scripts/sync-roblox-api.mjs",
     "start": "concurrently \"next start\" \"node scripts/bot.js\"",
     "lint": "eslint",

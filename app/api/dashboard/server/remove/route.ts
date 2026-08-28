@@ -1,10 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
-import { supabase } from '@/lib/supabase';
+import { deleteServerData } from '@/lib/serverDataRemoval';
 
 type RemovalRequest = {
     serverId?: unknown;
@@ -12,51 +11,8 @@ type RemovalRequest = {
     deleteData?: unknown;
 };
 
-const supabaseParams = {
-    auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-    },
-};
-
 function trimString(value: unknown) {
     return String(value ?? '').trim();
-}
-
-function getServerSupabaseClient() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (url && serviceKey) {
-        return createClient(url, serviceKey, supabaseParams);
-    }
-
-    return supabase;
-}
-
-async function deleteServerData(serverId: string) {
-    const client = getServerSupabaseClient();
-    const childTables = ['logs', 'live_servers', 'command_queue', 'dashboard_roles', 'reports', 'server_addon_modules', 'server_custom_modules'];
-
-    for (const table of childTables) {
-        const { error } = await client
-            .from(table)
-            .delete()
-            .eq('server_id', serverId);
-
-        if (error) {
-            throw new Error(`Failed to delete ${table}: ${error.message}`);
-        }
-    }
-
-    const { error: serverDeleteError } = await client
-        .from('servers')
-        .delete()
-        .eq('id', serverId);
-
-    if (serverDeleteError) {
-        throw new Error(`Failed to delete server configuration: ${serverDeleteError.message}`);
-    }
 }
 
 async function removeBotFromGuild(serverId: string) {
