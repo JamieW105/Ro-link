@@ -48,6 +48,13 @@ const api = async <T,>(url: string, init?: RequestInit): Promise<T> => {
 };
 
 const dirname = (path: string) => path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+
+function focusCategoryOption(menu: HTMLDivElement | null, index: number) {
+    const options = Array.from(menu?.querySelectorAll<HTMLButtonElement>('[role="option"]') || []);
+    if (!options.length) return;
+    options[(index + options.length) % options.length]?.focus();
+}
+
 function fileIcon(file: ProjectFile, open = false) {
     if (file.kind === 'folder') return open ? <FolderOpen className="h-3.5 w-3.5 text-amber-300" /> : <Folder className="h-3.5 w-3.5 text-amber-300" />;
     if (file.kind === 'manifest') return <FileJson className="h-3.5 w-3.5 text-amber-200" />;
@@ -133,6 +140,9 @@ export default function ModuleIdeClient() {
     const [quickQuery, setQuickQuery] = useState('');
     const [moduleInfoOpen, setModuleInfoOpen] = useState(false);
     const [moduleInfo, setModuleInfo] = useState({ title: '', category: 'General', description: '' });
+    const [moduleCategoryOpen, setModuleCategoryOpen] = useState(false);
+    const moduleCategoryButtonRef = useRef<HTMLButtonElement | null>(null);
+    const moduleCategoryMenuRef = useRef<HTMLDivElement | null>(null);
     const [moduleThumbnails, setModuleThumbnails] = useState<ModuleThumbnailDraft[]>([]);
     const [moduleThumbnailsDirty, setModuleThumbnailsDirty] = useState(false);
     const [moduleInfoError, setModuleInfoError] = useState('');
@@ -401,6 +411,7 @@ export default function ModuleIdeClient() {
         if (!currentModule) return;
         const currentCategory = modules.find((item) => item.id === currentModule.id)?.category;
         setModuleInfo({ title: currentModule.name, category: currentCategory || 'General', description: currentModule.description });
+        setModuleCategoryOpen(false);
         const thumbnailUrls = currentModule.thumbnailUrls?.length ? currentModule.thumbnailUrls : currentModule.thumbnailUrl ? [currentModule.thumbnailUrl] : [];
         setModuleThumbnails(thumbnailUrls.map((url) => ({ id: url, url })));
         setModuleThumbnailsDirty(false);
@@ -762,7 +773,55 @@ export default function ModuleIdeClient() {
                     <div className="flex shrink-0 items-center gap-3 border-b border-white/8 p-5"><Settings2 className="h-5 w-5 text-sky-300" /><div><p className="font-semibold">Edit Module Info</p><p className="text-xs text-slate-500">Update the details shown for this module.</p></div></div>
                     <div className="space-y-4 overflow-y-auto p-5">
                         <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">Title</span><input autoFocus required maxLength={120} value={moduleInfo.title} onChange={(event) => setModuleInfo((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-sky-400/60" /></label>
-                        <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">Category</span><select value={moduleInfo.category} onChange={(event) => setModuleInfo((current) => ({ ...current, category: event.target.value }))} className="w-full rounded-lg border border-white/10 bg-[#0b1017] px-3 py-2.5 text-sm text-white outline-none focus:border-sky-400/60">{MODULE_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+                        <div className="relative" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setModuleCategoryOpen(false); }}>
+                            <span id="module-category-label" className="mb-1.5 block text-xs font-semibold text-slate-300">Category</span>
+                            <button
+                                ref={moduleCategoryButtonRef}
+                                type="button"
+                                aria-labelledby="module-category-label module-category-value"
+                                aria-haspopup="listbox"
+                                aria-expanded={moduleCategoryOpen}
+                                onClick={() => setModuleCategoryOpen((open) => !open)}
+                                onKeyDown={(event) => {
+                                    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+                                    event.preventDefault();
+                                    const selectedIndex = Math.max(0, MODULE_CATEGORIES.findIndex((category) => category === moduleInfo.category));
+                                    setModuleCategoryOpen(true);
+                                    window.requestAnimationFrame(() => focusCategoryOption(moduleCategoryMenuRef.current, selectedIndex + (event.key === 'ArrowDown' ? 1 : -1)));
+                                }}
+                                className={`flex w-full items-center justify-between rounded-lg border bg-black/20 px-3 py-2.5 text-left text-sm text-white outline-none transition-colors hover:border-white/20 focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10 ${moduleCategoryOpen ? 'border-sky-400/60 ring-2 ring-sky-400/10' : 'border-white/10'}`}
+                            >
+                                <span id="module-category-value">{moduleInfo.category}</span>
+                                <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${moduleCategoryOpen ? 'rotate-180 text-sky-300' : ''}`} />
+                            </button>
+                            {moduleCategoryOpen && (
+                                <div ref={moduleCategoryMenuRef} role="listbox" aria-labelledby="module-category-label" className="absolute z-30 mt-1.5 w-full overflow-hidden rounded-lg border border-white/10 bg-[#111923] p-1.5 shadow-2xl shadow-black/50">
+                                    {MODULE_CATEGORIES.map((category, index) => {
+                                        const selected = moduleInfo.category === category;
+                                        return (
+                                            <button
+                                                key={category}
+                                                type="button"
+                                                role="option"
+                                                aria-selected={selected}
+                                                onClick={() => { setModuleInfo((current) => ({ ...current, category })); setModuleCategoryOpen(false); moduleCategoryButtonRef.current?.focus(); }}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === 'Escape') { event.preventDefault(); setModuleCategoryOpen(false); moduleCategoryButtonRef.current?.focus(); }
+                                                    else if (event.key === 'ArrowDown') { event.preventDefault(); focusCategoryOption(moduleCategoryMenuRef.current, index + 1); }
+                                                    else if (event.key === 'ArrowUp') { event.preventDefault(); focusCategoryOption(moduleCategoryMenuRef.current, index - 1); }
+                                                    else if (event.key === 'Home') { event.preventDefault(); focusCategoryOption(moduleCategoryMenuRef.current, 0); }
+                                                    else if (event.key === 'End') { event.preventDefault(); focusCategoryOption(moduleCategoryMenuRef.current, MODULE_CATEGORIES.length - 1); }
+                                                }}
+                                                className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm outline-none transition-colors ${selected ? 'bg-sky-400/12 font-semibold text-sky-200' : 'text-slate-300 hover:bg-white/[0.06] hover:text-white focus:bg-white/[0.06] focus:text-white'}`}
+                                            >
+                                                <span>{category}</span>
+                                                {selected && <Check className="h-4 w-4 text-sky-300" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                         <div>
                             <div className="mb-1.5 flex items-end justify-between gap-4"><span className="text-xs font-semibold text-slate-300">Thumbnails</span><span className="text-[10px] text-slate-600">{moduleThumbnails.length} / 5 · PNG, JPEG or WebP · 5 MB each</span></div>
                             <input ref={moduleThumbnailInputRef} type="file" multiple accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => { chooseModuleThumbnails(Array.from(event.currentTarget.files || [])); event.currentTarget.value = ''; }} />
