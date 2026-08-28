@@ -13,7 +13,6 @@ import {
     Shapes,
     SlidersHorizontal,
     ShieldAlert as LucideShieldAlert,
-    Store,
 } from 'lucide-react';
 
 import Link from 'next/link';
@@ -345,16 +344,12 @@ export default function DashboardMarketplacePage() {
                                             aria-label={`View ${addon.name}`}
                                         >
                                             <div className="aspect-video w-full overflow-hidden border-b border-slate-800 bg-[#090d11]">
-                                                {addon.thumbnailUrl ? (
+                                                {addon.thumbnailUrl && (
                                                     <img
                                                         src={addon.thumbnailUrl}
                                                         alt=""
                                                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                                                     />
-                                                ) : (
-                                                    <span className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_50%_35%,rgba(14,165,233,0.12),transparent_55%)] text-sky-300/70">
-                                                        <Store size={42} strokeWidth={1.5} aria-hidden="true" />
-                                                    </span>
                                                 )}
                                             </div>
 
