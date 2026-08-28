@@ -4,6 +4,9 @@ import { checksumModuleSource, parseModuleConfigSchema, trimModuleString } from 
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { validateModuleUiTree } from '@/lib/moduleUiSchema';
 import { isModuleVersionGreater, MODULE_VERSION_PATTERN } from '@/lib/moduleVersions';
+import { getNewModuleScriptSource, isModuleIdeVisibleFile, normalizeModuleScriptPath } from '@/lib/moduleFileRules';
+
+export { normalizeModuleScriptPath } from '@/lib/moduleFileRules';
 
 export const MODULE_PROJECT_FORMAT_VERSION = 2;
 export const MODULE_PROJECT_RUNTIME_VERSION = '2.2.0';
@@ -114,8 +117,8 @@ export function defaultModuleManifest(module: Pick<AddonModuleOwnerRow, 'name' |
         description: module.description || '',
         requiredRuntimeVersion: MODULE_PROJECT_RUNTIME_VERSION,
         entrypoints: {
-            server: 'Server/Main.server.luau',
-            client: 'Client/Main.client.luau',
+            server: 'Server/Main.server',
+            client: 'Client/Main.client',
         },
         capabilities: [],
         dependencies: {},
@@ -135,8 +138,8 @@ function normalizeManifest(value: unknown, module: AddonModuleOwnerRow): ModuleP
         description: trimModuleString(raw.description || module.description, 2000),
         requiredRuntimeVersion: trimModuleString(raw.requiredRuntimeVersion || MODULE_PROJECT_RUNTIME_VERSION, 32),
         entrypoints: {
-            server: normalizeModuleProjectPath(rawEntrypoints.server) || undefined,
-            client: normalizeModuleProjectPath(rawEntrypoints.client) || undefined,
+            server: rawEntrypoints.server ? normalizeModuleScriptPath(normalizeModuleProjectPath(rawEntrypoints.server) || '', 'server_script') || undefined : undefined,
+            client: rawEntrypoints.client ? normalizeModuleScriptPath(normalizeModuleProjectPath(rawEntrypoints.client) || '', 'client_script') || undefined : undefined,
         },
         capabilities: Array.isArray(raw.capabilities)
             ? raw.capabilities.map((item) => trimModuleString(item, 64)).filter(Boolean).slice(0, 64)
@@ -150,11 +153,14 @@ function normalizeManifest(value: unknown, module: AddonModuleOwnerRow): ModuleP
 }
 
 function normalizeFile(row: Record<string, unknown>): ModuleProjectFile {
+    const kind = String(row.kind || 'folder') as ModuleFileKind;
+    const storedPath = String(row.path || '');
+    const path = storedPath.toLowerCase().endsWith('.json') ? storedPath : normalizeModuleScriptPath(storedPath, kind);
     return {
         id: String(row.id || ''),
-        path: String(row.path || ''),
-        name: String(row.name || ''),
-        kind: String(row.kind || 'folder') as ModuleFileKind,
+        path,
+        name: path.split('/').at(-1) || path,
+        kind,
         sourceCode: typeof row.source_code === 'string' ? row.source_code : null,
         uiTree: row.ui_tree ?? null,
         revision: Number(row.revision || 1),
@@ -188,18 +194,16 @@ export async function getModuleForReview(moduleId: string): Promise<AddonModuleO
     return (data as AddonModuleOwnerRow | null) || null;
 }
 
-async function insertDefaultProjectFiles(module: AddonModuleOwnerRow, manifest: ModuleProjectManifest) {
+async function insertDefaultProjectFiles(module: AddonModuleOwnerRow) {
     const client = getSupabaseAdmin();
-    const legacySource = module.source_code || `return {\n    Init = function(context, settings)\n        context.Log("${module.name} loaded")\n    end,\n}\n`;
     const rows = [
         { path: 'Server', name: 'Server', kind: 'folder', source_code: null },
-        { path: 'Server/Main.server.luau', name: 'Main.server.luau', kind: 'server_script', source_code: legacySource },
+        { path: 'Server/Main.server', name: 'Main.server', kind: 'server_script', source_code: getNewModuleScriptSource('server_script') },
         { path: 'Client', name: 'Client', kind: 'folder', source_code: null },
-        { path: 'Client/Main.client.luau', name: 'Main.client.luau', kind: 'client_script', source_code: '-- Client entrypoint\nreturn {}\n' },
+        { path: 'Client/Main.client', name: 'Main.client', kind: 'client_script', source_code: getNewModuleScriptSource('client_script') },
         { path: 'Shared', name: 'Shared', kind: 'folder', source_code: null },
-        { path: 'Shared/Types.luau', name: 'Types.luau', kind: 'shared_module', source_code: 'export type ModuleContext = { [string]: any }\nreturn {}\n' },
+        { path: 'Shared/Main.module', name: 'Main.module', kind: 'shared_module', source_code: getNewModuleScriptSource('shared_module') },
         { path: 'UI', name: 'UI', kind: 'folder', source_code: null },
-        { path: 'module.json', name: 'module.json', kind: 'manifest', source_code: JSON.stringify(manifest, null, 2) + '\n' },
     ].map((row) => ({ ...row, module_id: module.id, revision: 1 }));
 
     const { error } = await client.from('addon_module_files').upsert(rows, { onConflict: 'module_id,path', ignoreDuplicates: true });
@@ -233,7 +237,7 @@ async function ensureModuleProject(module: AddonModuleOwnerRow) {
             .single();
         if (inserted.error) throw new Error(inserted.error.message);
         project = inserted.data as ProjectRow;
-        await insertDefaultProjectFiles(module, manifest);
+        await insertDefaultProjectFiles(module);
     }
 
     const { data: files, error: filesError } = await client
@@ -313,12 +317,12 @@ export function validateModuleProject(input: {
 
     for (const [context, entrypoint] of Object.entries(input.manifest.entrypoints)) {
         if (entrypoint && !paths.has(entrypoint)) {
-            problems.push({ severity: 'error', file: 'module.json', code: 'missing_entrypoint', message: `${context} entrypoint ${entrypoint} does not exist.` });
+            problems.push({ severity: 'error', file: 'Module settings', code: 'missing_entrypoint', message: `${context} entrypoint ${entrypoint} does not exist.` });
         }
     }
 
     if (!input.manifest.entrypoints.server) {
-        problems.push({ severity: 'error', file: 'module.json', code: 'missing_server_entrypoint', message: 'A server entrypoint is required for legacy runtime compatibility.' });
+        problems.push({ severity: 'error', file: 'Module settings', code: 'missing_server_entrypoint', message: 'A server entrypoint is required for legacy runtime compatibility.' });
     }
 
     for (const file of scriptFiles) {
@@ -364,10 +368,10 @@ function stableJson(value: unknown): string {
 export function buildModuleProjectPackage(input: Awaited<ReturnType<typeof ensureOwnedModuleProject>>) {
     if (!input) throw new Error('Module project not found.');
     const files = input.files
-        .filter((file) => file.kind !== 'folder' && file.kind !== 'manifest')
+        .filter((file) => file.kind !== 'folder' && isModuleIdeVisibleFile(file))
         .sort((left, right) => left.path.localeCompare(right.path))
         .map((file) => ({
-            path: file.path,
+            path: normalizeModuleScriptPath(file.path, file.kind),
             kind: file.kind,
             sourceCode: file.sourceCode,
             uiTree: file.uiTree,
@@ -381,7 +385,10 @@ export function buildModuleProjectPackage(input: Awaited<ReturnType<typeof ensur
         version: input.project.manifest.version,
         requiredRuntimeVersion: input.project.requiredRuntimeVersion,
         projectRevision: input.project.revision,
-        entrypoints: input.project.manifest.entrypoints,
+        entrypoints: {
+            server: input.project.manifest.entrypoints.server ? normalizeModuleScriptPath(input.project.manifest.entrypoints.server, 'server_script') : undefined,
+            client: input.project.manifest.entrypoints.client ? normalizeModuleScriptPath(input.project.manifest.entrypoints.client, 'client_script') : undefined,
+        },
         capabilities: input.project.manifest.capabilities,
         dependencies: input.project.manifest.dependencies,
         files,
@@ -390,7 +397,7 @@ export function buildModuleProjectPackage(input: Awaited<ReturnType<typeof ensur
     return {
         packagePayload,
         packageHash: createHash('sha256').update(serialized, 'utf8').digest('hex'),
-        legacySource: files.find((file) => file.path === input.project.manifest.entrypoints.server)?.sourceCode || '',
+        legacySource: files.find((file) => file.path === packagePayload.entrypoints.server)?.sourceCode || '',
     };
 }
 
@@ -412,7 +419,7 @@ export async function publishModuleProject(moduleId: string, discordUserId: stri
             ok: false as const,
             problems: [...problems, {
                 severity: 'error' as const,
-                file: 'module.json',
+                file: 'Module settings',
                 code: 'invalid_version',
                 message: 'Version must use three numeric parts, such as 1.0.0 or 1.0.01.',
             }],
@@ -426,7 +433,7 @@ export async function publishModuleProject(moduleId: string, discordUserId: stri
             ok: false as const,
             problems: [...problems, {
                 severity: 'error' as const,
-                file: 'module.json',
+                file: 'Module settings',
                 code: 'version_not_increased',
                 message: `Update version ${version} must be greater than the current published version ${currentVersion}.`,
             }],
@@ -439,9 +446,9 @@ export async function publishModuleProject(moduleId: string, discordUserId: stri
             ok: false as const,
             problems: [...problems, {
                 severity: 'error' as const,
-                file: 'module.json',
+                file: 'Module settings',
                 code: 'version_already_published',
-                message: `Version ${version} is immutable and already exists. Increase the version in module.json before publishing again.`,
+                message: `Version ${version} is immutable and already exists. Increase the version in module settings before publishing again.`,
             }],
         };
     }

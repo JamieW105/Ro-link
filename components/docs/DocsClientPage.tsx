@@ -1230,7 +1230,7 @@ print(result.user.robloxUsername, result.roles.serverStaff, result.presence.inGa
                     id="module-api-project-v2"
                     eyebrow="Module Project v2"
                     title="Build in the browser, synchronize with Studio"
-                    description="Open the Module IDE from the Creator Dashboard. Projects keep independent Server, Client, Shared, UI, and module.json data with file-level draft revisions. Connect Studio with the one-time code shown by the IDE, then use the standalone Ro-Link Module IDE plugin to browse live instances, edit Studio scripts safely, import selected UI, or sync the validated project into the place."
+                    description="Open the Module IDE from the Creator Dashboard. Projects keep independent Server, Client, Shared, and UI content with file-level draft revisions; module metadata is managed outside the explorer. Connect Studio with the one-time code shown by the IDE, then use the standalone Ro-Link Module IDE plugin to browse live instances, edit Studio scripts safely, import selected UI, or sync the validated project into the place."
                 >
                     <InfoGrid
                         items={[

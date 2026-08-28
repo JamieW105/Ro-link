@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { bumpModuleProjectRevision, ensureOwnedModuleProject, MODULE_PROJECT_FORMAT_VERSION, normalizeModuleProjectPath } from '@/lib/moduleIde';
+import { bumpModuleProjectRevision, ensureOwnedModuleProject, MODULE_PROJECT_FORMAT_VERSION, normalizeModuleProjectPath, normalizeModuleScriptPath } from '@/lib/moduleIde';
 import { requireModuleIdeUser, noStoreJson } from '@/lib/moduleIdeAuth';
 import { parseModuleCategory } from '@/lib/moduleCategories';
 import { trimModuleString } from '@/lib/modules';
@@ -31,8 +31,8 @@ export async function PATCH(req: Request, context: Context) {
             description: trimModuleString(rawManifest.description ?? project.module.description, 2000),
             requiredRuntimeVersion: trimModuleString(rawManifest.requiredRuntimeVersion || project.project.requiredRuntimeVersion, 32),
             entrypoints: {
-                server: normalizeModuleProjectPath(rawEntrypoints.server) || undefined,
-                client: normalizeModuleProjectPath(rawEntrypoints.client) || undefined,
+                server: rawEntrypoints.server ? normalizeModuleScriptPath(normalizeModuleProjectPath(rawEntrypoints.server) || '', 'server_script') || undefined : undefined,
+                client: rawEntrypoints.client ? normalizeModuleScriptPath(normalizeModuleProjectPath(rawEntrypoints.client) || '', 'client_script') || undefined : undefined,
             },
             capabilities: Array.isArray(rawManifest.capabilities) ? rawManifest.capabilities.map((value) => trimModuleString(value, 64)).filter(Boolean).slice(0, 64) : [],
             dependencies: rawManifest.dependencies && typeof rawManifest.dependencies === 'object' && !Array.isArray(rawManifest.dependencies) ? rawManifest.dependencies : {},

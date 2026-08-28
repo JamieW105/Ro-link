@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { ensureOwnedModuleProject } from '@/lib/moduleIde';
 import { requireModuleIdeUser, noStoreJson } from '@/lib/moduleIdeAuth';
+import { isModuleIdeVisibleFile } from '@/lib/moduleFileRules';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export async function GET(_req: Request, context: Context) {
         const { moduleId } = await context.params;
         const project = await ensureOwnedModuleProject(moduleId, auth.discordUserId);
         if (!project) return NextResponse.json({ error: 'Module not found.' }, { status: 404 });
-        return noStoreJson(project);
+        return noStoreJson({ ...project, files: project.files.filter(isModuleIdeVisibleFile) });
     } catch (error) {
         return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to load module project.' }, { status: 500 });
     }

@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { buildModuleProjectPackage, normalizeModuleProjectPath, validateModuleProject, type ModuleProjectFile, type ModuleProjectManifest } from '../lib/moduleIde';
+import { buildModuleProjectPackage, normalizeModuleProjectPath, normalizeModuleScriptPath, validateModuleProject, type ModuleProjectFile, type ModuleProjectManifest } from '../lib/moduleIde';
 import { MODULE_CATEGORIES, parseModuleCategory } from '../lib/moduleCategories';
 import { validateBridgeEvent } from '../lib/moduleStudioBridge';
 import { validateModuleUiTree } from '../lib/moduleUiSchema';
 import { canCreatorUseUnpublishedModule, normalizeAddonModule } from '../lib/modules';
 import { canRestoreApprovedModuleVersion, getModulePackageServerSource, getModuleVersionKey } from '../lib/moduleApprovedVersion';
+import { getNewModuleScriptSource, isModuleIdeVisibleFile } from '../lib/moduleFileRules';
 import { compareModuleVersions, isModuleVersionGreater, MODULE_VERSION_PATTERN, suggestNextModuleVersion } from '../lib/moduleVersions';
 
 const manifest: ModuleProjectManifest = {
@@ -16,14 +17,15 @@ const manifest: ModuleProjectManifest = {
     version: '1.2.3',
     description: 'Fixture',
     requiredRuntimeVersion: '2.2.0',
-    entrypoints: { server: 'Server/Main.server.luau', client: 'Client/Main.client.luau' },
+    entrypoints: { server: 'Server/Main.server', client: 'Client/Main.client' },
     capabilities: [],
     dependencies: {},
 };
 
 const files: ModuleProjectFile[] = [
-    { id: '1', path: 'Server/Main.server.luau', name: 'Main.server.luau', kind: 'server_script', sourceCode: 'return {}', uiTree: null, revision: 2, createdAt: '', updatedAt: '' },
-    { id: '2', path: 'Client/Main.client.luau', name: 'Main.client.luau', kind: 'client_script', sourceCode: 'return {}', uiTree: null, revision: 3, createdAt: '', updatedAt: '' },
+    { id: '1', path: 'Server/Main.server', name: 'Main.server', kind: 'server_script', sourceCode: '', uiTree: null, revision: 2, createdAt: '', updatedAt: '' },
+    { id: '2', path: 'Client/Main.client', name: 'Main.client', kind: 'client_script', sourceCode: '', uiTree: null, revision: 3, createdAt: '', updatedAt: '' },
+    { id: '3', path: 'Shared/Main.module', name: 'Main.module', kind: 'shared_module', sourceCode: 'local module = {}\n\nreturn module\n', uiTree: null, revision: 1, createdAt: '', updatedAt: '' },
 ];
 
 test('project paths reject traversal and preserve canonical project paths', () => {
@@ -31,6 +33,24 @@ test('project paths reject traversal and preserve canonical project paths', () =
     assert.equal(normalizeModuleProjectPath('../Server/Main.server.luau'), null);
     assert.equal(normalizeModuleProjectPath('Server//Main.server.luau'), null);
     assert.equal(normalizeModuleProjectPath('/Server/Main.server.luau'), null);
+});
+
+test('script paths use Roblox-style suffixes without .luau', () => {
+    assert.equal(normalizeModuleScriptPath('Server/Main.server.luau', 'server_script'), 'Server/Main.server');
+    assert.equal(normalizeModuleScriptPath('Client/Main.luau', 'client_script'), 'Client/Main.client');
+    assert.equal(normalizeModuleScriptPath('Shared/Helpers.module.luau', 'shared_module'), 'Shared/Helpers.module');
+});
+
+test('new scripts are empty except for the module starter', () => {
+    assert.equal(getNewModuleScriptSource('server_script'), '');
+    assert.equal(getNewModuleScriptSource('client_script'), '');
+    assert.equal(getNewModuleScriptSource('shared_module'), 'local module = {}\n\nreturn module\n');
+});
+
+test('JSON metadata never appears as an IDE project file', () => {
+    assert.equal(isModuleIdeVisibleFile({ kind: 'manifest', path: 'module.json' }), false);
+    assert.equal(isModuleIdeVisibleFile({ kind: 'shared_module', path: 'Shared/config.json' }), false);
+    assert.equal(isModuleIdeVisibleFile({ kind: 'shared_module', path: 'Shared/Config.module' }), true);
 });
 
 test('project validation detects missing entrypoints', () => {
@@ -57,7 +77,7 @@ test('package hash and ordering are deterministic', () => {
     const first = buildModuleProjectPackage(base as never);
     const second = buildModuleProjectPackage({ ...base, files: [...files].reverse() } as never);
     assert.equal(first.packageHash, second.packageHash);
-    assert.deepEqual(first.packagePayload.files.map((file) => file.path), ['Client/Main.client.luau', 'Server/Main.server.luau']);
+    assert.deepEqual(first.packagePayload.files.map((file) => file.path), ['Client/Main.client', 'Server/Main.server', 'Shared/Main.module']);
     assert.equal('remotes' in first.packagePayload, false);
 });
 

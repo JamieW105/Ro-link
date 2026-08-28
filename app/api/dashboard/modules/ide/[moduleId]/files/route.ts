@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { bumpModuleProjectRevision, ensureOwnedModuleProject, isModuleFileKind, MAX_MODULE_FILE_BYTES, MAX_MODULE_FILES, normalizeModuleProjectPath } from '@/lib/moduleIde';
+import { bumpModuleProjectRevision, ensureOwnedModuleProject, isModuleFileKind, MAX_MODULE_FILE_BYTES, MAX_MODULE_FILES, normalizeModuleProjectPath, normalizeModuleScriptPath } from '@/lib/moduleIde';
 import { requireModuleIdeUser, noStoreJson } from '@/lib/moduleIdeAuth';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -32,11 +32,12 @@ export async function POST(req: Request, context: Context) {
         const client = getSupabaseAdmin();
 
         if (action === 'create') {
-            const path = normalizeModuleProjectPath(body?.path);
             const kind = body?.kind;
-            if (!path || !isModuleFileKind(kind)) return NextResponse.json({ error: 'A valid path and file kind are required.' }, { status: 400 });
+            const requestedPath = normalizeModuleProjectPath(body?.path);
+            if (!requestedPath || !isModuleFileKind(kind)) return NextResponse.json({ error: 'A valid path and file kind are required.' }, { status: 400 });
+            const path = normalizeModuleScriptPath(requestedPath, kind);
             if (project.files.length >= MAX_MODULE_FILES) return NextResponse.json({ error: `Projects are limited to ${MAX_MODULE_FILES} files and folders.` }, { status: 400 });
-            if (kind === 'manifest' || path === 'module.json') return NextResponse.json({ error: 'The project manifest already exists and must be edited through module.json.' }, { status: 400 });
+            if (kind === 'manifest' || requestedPath.toLowerCase().endsWith('.json')) return NextResponse.json({ error: 'JSON files are not part of Module IDE projects.' }, { status: 400 });
             if (!hasParentFolder(project.files, path)) return NextResponse.json({ error: 'Create the destination folder before adding this file.' }, { status: 400 });
             if (kind === 'ui' && !path.startsWith('UI/')) return NextResponse.json({ error: 'Imported UI must be stored under UI/.' }, { status: 400 });
             const sourceCode = typeof body?.sourceCode === 'string' ? body.sourceCode : null;
@@ -91,12 +92,15 @@ export async function POST(req: Request, context: Context) {
 
         if (action === 'move' || action === 'rename') {
             const id = String(body?.id || '');
-            const targetPath = normalizeModuleProjectPath(body?.path);
-            if (!id || !targetPath) return NextResponse.json({ error: 'File id and destination path are required.' }, { status: 400 });
+            const requestedPath = normalizeModuleProjectPath(body?.path);
+            if (!id || !requestedPath) return NextResponse.json({ error: 'File id and destination path are required.' }, { status: 400 });
+            if (requestedPath.toLowerCase().endsWith('.json')) return NextResponse.json({ error: 'JSON files are not part of Module IDE projects.' }, { status: 400 });
             const { data: current, error: currentError } = await client.from('addon_module_files').select('*').eq('id', id).eq('module_id', moduleId).maybeSingle();
             if (currentError) throw new Error(currentError.message);
             if (!current) return NextResponse.json({ error: 'File not found.' }, { status: 404 });
-            const currentPath = String(current.path || '');
+            const normalizedCurrent = project.files.find((file) => file.id === id);
+            const currentPath = normalizedCurrent?.path || String(current.path || '');
+            const targetPath = normalizeModuleScriptPath(requestedPath, normalizedCurrent?.kind || 'folder');
             if (['Server', 'Client', 'Shared', 'UI', 'module.json'].includes(currentPath)) return NextResponse.json({ error: 'Project roots cannot be moved or renamed.' }, { status: 400 });
             if (targetPath === currentPath || targetPath.startsWith(`${currentPath}/`)) return NextResponse.json({ error: 'A folder cannot be moved inside itself.' }, { status: 400 });
             const subtreeIds = new Set(project.files.filter((file) => file.path === currentPath || file.path.startsWith(`${currentPath}/`)).map((file) => file.id));
@@ -126,20 +130,24 @@ export async function POST(req: Request, context: Context) {
 
         if (action === 'duplicate') {
             const id = String(body?.id || '');
-            const targetPath = normalizeModuleProjectPath(body?.path);
-            if (!id || !targetPath) return NextResponse.json({ error: 'File id and destination path are required.' }, { status: 400 });
+            const requestedPath = normalizeModuleProjectPath(body?.path);
+            if (!id || !requestedPath) return NextResponse.json({ error: 'File id and destination path are required.' }, { status: 400 });
+            if (requestedPath.toLowerCase().endsWith('.json')) return NextResponse.json({ error: 'JSON files are not part of Module IDE projects.' }, { status: 400 });
             const { data: current, error: currentError } = await client.from('addon_module_files').select('*').eq('id', id).eq('module_id', moduleId).maybeSingle();
             if (currentError) throw new Error(currentError.message);
             if (!current) return NextResponse.json({ error: 'File not found.' }, { status: 404 });
-            const currentPath = String(current.path || '');
+            const normalizedCurrent = project.files.find((file) => file.id === id);
+            if (!normalizedCurrent) return NextResponse.json({ error: 'File not found.' }, { status: 404 });
+            const currentPath = normalizedCurrent.path;
+            const targetPath = normalizeModuleScriptPath(requestedPath, normalizedCurrent.kind);
             if (!hasParentFolder(project.files, targetPath)) return NextResponse.json({ error: 'The destination parent folder does not exist.' }, { status: 400 });
             const descendants = project.files.filter((file) => file.path.startsWith(`${currentPath}/`));
-            const originals = [current as Record<string, unknown>, ...descendants.map((file) => ({
+            const originals = [normalizedCurrent, ...descendants].map((file) => ({
                 path: file.path,
                 kind: file.kind,
                 source_code: file.sourceCode,
                 ui_tree: file.uiTree,
-            }))];
+            }));
             const rows = originals.map((row) => {
                 const originalPath = String(row.path || '');
                 const path = `${targetPath}${originalPath.slice(currentPath.length)}`;
