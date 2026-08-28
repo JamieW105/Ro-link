@@ -867,7 +867,7 @@ export default function ModuleIdeClient() {
                                     onClick={() => setModuleVisibility((current) => current === 'PUBLISHED' ? 'PRIVATE' : 'PUBLISHED')}
                                     className={`relative h-6 w-11 rounded-full border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-40 ${moduleVisibility === 'PUBLISHED' ? 'border-sky-400/60 bg-sky-500/35' : 'border-white/15 bg-slate-800'}`}
                                 >
-                                    <span className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow transition-transform ${moduleVisibility === 'PUBLISHED' ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                                    <span className={`absolute left-0.5 top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow transition-transform ${moduleVisibility === 'PUBLISHED' ? 'translate-x-5' : 'translate-x-0'}`} />
                                 </button>
                                 <span className={`text-[10px] font-bold uppercase tracking-wider ${moduleVisibility === 'PUBLISHED' ? 'text-sky-200' : 'text-slate-600'}`}>Published</span>
                             </div>
