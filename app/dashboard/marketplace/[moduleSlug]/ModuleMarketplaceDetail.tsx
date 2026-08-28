@@ -12,11 +12,13 @@ import {
     LogOut as LucideLogOut,
     MessageSquareText,
     Package2,
+    Reply,
     Settings2,
     ShieldAlert,
     Star,
     Store,
     Tag,
+    Trash2,
     UserRound,
     X,
 } from 'lucide-react';
@@ -74,9 +76,12 @@ interface ModuleReview {
     reviewerAvatarUrl: string;
     rating: number;
     comment: string;
+    ownerReply: string;
+    ownerReplyAt: string | null;
     createdAt: string;
     updatedAt: string;
     isOwn: boolean;
+    canDelete: boolean;
     verifiedInstall: boolean;
 }
 
@@ -131,6 +136,12 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
     const [reviewSubmitting, setReviewSubmitting] = useState(false);
     const [reviewError, setReviewError] = useState<string | null>(null);
     const [reviewMessage, setReviewMessage] = useState<string | null>(null);
+    const [reviewContextMenu, setReviewContextMenu] = useState<{ reviewId: string; x: number; y: number } | null>(null);
+    const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+    const [replyingToReviewId, setReplyingToReviewId] = useState<string | null>(null);
+    const [replyDraft, setReplyDraft] = useState('');
+    const [replySubmitting, setReplySubmitting] = useState(false);
+    const [replyError, setReplyError] = useState<string | null>(null);
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
 
     const addon = useMemo(() => {
@@ -154,6 +165,25 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
     useEffect(() => {
         setActiveThumbnailIndex(0);
     }, [addon?.id]);
+
+    useEffect(() => {
+        if (!reviewContextMenu) return;
+
+        const closeMenu = () => setReviewContextMenu(null);
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') closeMenu();
+        };
+        window.addEventListener('click', closeMenu);
+        window.addEventListener('resize', closeMenu);
+        window.addEventListener('scroll', closeMenu, true);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('click', closeMenu);
+            window.removeEventListener('resize', closeMenu);
+            window.removeEventListener('scroll', closeMenu, true);
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [reviewContextMenu]);
 
     useEffect(() => {
         if (status !== 'authenticated') return;
@@ -294,6 +324,87 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
             setReviewError(submitError instanceof Error ? submitError.message : 'Failed to save review.');
         } finally {
             setReviewSubmitting(false);
+        }
+    }
+
+    function openReviewContextMenu(reviewId: string, x: number, y: number) {
+        setReviewContextMenu({
+            reviewId,
+            x: Math.min(x, window.innerWidth - 180),
+            y: Math.min(y, window.innerHeight - 64),
+        });
+    }
+
+    async function deleteReview(reviewId: string) {
+        if (!addon || deletingReviewId || !window.confirm('Delete this review? This cannot be undone.')) return;
+
+        const review = reviews.find((candidate) => candidate.id === reviewId);
+        if (!review) return;
+
+        setReviewContextMenu(null);
+        setDeletingReviewId(reviewId);
+        setReviewError(null);
+        setReviewMessage(null);
+
+        try {
+            const response = await fetch(`/api/dashboard/marketplace/${encodeURIComponent(addon.id)}/reviews`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reviewId }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(String(payload.error || 'Failed to delete the review.'));
+
+            const nextCount = Math.max(0, reviewCount - 1);
+            const nextTotal = Math.max(0, (averageRating * reviewCount) - review.rating);
+            setReviews((current) => current.filter((candidate) => candidate.id !== reviewId));
+            setReviewCount(nextCount);
+            setAverageRating(nextCount ? nextTotal / nextCount : 0);
+            if (review.isOwn) {
+                setReviewRating(0);
+                setReviewComment('');
+            }
+            if (replyingToReviewId === reviewId) setReplyingToReviewId(null);
+            setReviewMessage('Review deleted.');
+        } catch (deleteError) {
+            setReviewError(deleteError instanceof Error ? deleteError.message : 'Failed to delete the review.');
+        } finally {
+            setDeletingReviewId(null);
+        }
+    }
+
+    function beginReply(review: ModuleReview) {
+        setReplyingToReviewId(review.id);
+        setReplyDraft(review.ownerReply || '');
+        setReplyError(null);
+    }
+
+    async function submitOwnerReply(event: FormEvent<HTMLFormElement>, reviewId: string) {
+        event.preventDefault();
+        if (!addon || replySubmitting) return;
+
+        setReplySubmitting(true);
+        setReplyError(null);
+        try {
+            const response = await fetch(`/api/dashboard/marketplace/${encodeURIComponent(addon.id)}/reviews`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reviewId, reply: replyDraft }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(String(payload.error || 'Failed to publish the reply.'));
+
+            setReviews((current) => current.map((review) => review.id === reviewId ? {
+                ...review,
+                ownerReply: String(payload.reply || ''),
+                ownerReplyAt: String(payload.ownerReplyAt || ''),
+            } : review));
+            setReplyingToReviewId(null);
+            setReplyDraft('');
+        } catch (submitError) {
+            setReplyError(submitError instanceof Error ? submitError.message : 'Failed to publish the reply.');
+        } finally {
+            setReplySubmitting(false);
         }
     }
 
@@ -550,7 +661,22 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                                 ) : (
                                                     <div className="mt-5 divide-y divide-slate-800">
                                                         {reviews.map((review) => (
-                                                            <article key={review.id} className="py-5 first:pt-0 last:pb-0">
+                                                            <article
+                                                                key={review.id}
+                                                                className="py-5 first:pt-0 last:pb-0"
+                                                                tabIndex={review.canDelete ? 0 : undefined}
+                                                                onContextMenu={review.canDelete ? (event) => {
+                                                                    event.preventDefault();
+                                                                    openReviewContextMenu(review.id, event.clientX, event.clientY);
+                                                                } : undefined}
+                                                                onKeyDown={review.canDelete ? (event) => {
+                                                                    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+                                                                        event.preventDefault();
+                                                                        const rect = event.currentTarget.getBoundingClientRect();
+                                                                        openReviewContextMenu(review.id, rect.left + 24, rect.top + 24);
+                                                                    }
+                                                                } : undefined}
+                                                            >
                                                                 <div className="flex items-start gap-3">
                                                                     {review.reviewerAvatarUrl ? (
                                                                         <img src={getDiscordMediaProxyUrl(review.reviewerAvatarUrl)} alt="" className="h-9 w-9 shrink-0 rounded-full border border-slate-700 object-cover" />
@@ -569,6 +695,36 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                                                             {Array.from({ length: 5 }, (_, index) => <Star key={index} size={14} fill={index < review.rating ? 'currentColor' : 'none'} aria-hidden="true" />)}
                                                                         </div>
                                                                         {review.comment && <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-400">{review.comment}</p>}
+                                                                        {review.ownerReply && (
+                                                                            <div className="mt-4 rounded-lg border border-sky-500/15 bg-sky-500/[0.06] px-4 py-3">
+                                                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                                                    <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-sky-300"><Reply size={12} aria-hidden="true" />Reply from {creatorName}</p>
+                                                                                    {review.ownerReplyAt && <time dateTime={review.ownerReplyAt} className="text-[10px] text-slate-600">{formatDate(review.ownerReplyAt)}</time>}
+                                                                                </div>
+                                                                                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{review.ownerReply}</p>
+                                                                            </div>
+                                                                        )}
+                                                                        {reviewIsCreator && replyingToReviewId !== review.id && (
+                                                                            <button type="button" onClick={() => beginReply(review)} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-sky-400 transition-colors hover:text-sky-300">
+                                                                                <Reply size={13} aria-hidden="true" />
+                                                                                {review.ownerReply ? 'Edit reply' : 'Reply'}
+                                                                            </button>
+                                                                        )}
+                                                                        {reviewIsCreator && replyingToReviewId === review.id && (
+                                                                            <form onSubmit={(event) => submitOwnerReply(event, review.id)} className="mt-4 rounded-lg border border-slate-800 bg-slate-950/55 p-3">
+                                                                                <label>
+                                                                                    <span className="sr-only">Reply to {review.reviewerName}</span>
+                                                                                    <textarea value={replyDraft} onChange={(event) => setReplyDraft(event.target.value.slice(0, 1000))} rows={3} maxLength={1000} autoFocus placeholder={`Reply to ${review.reviewerName}...`} className="w-full resize-y rounded-lg border border-slate-800 bg-[#080b0f] px-3 py-2.5 text-sm leading-6 text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10" />
+                                                                                </label>
+                                                                                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                                                                    <span className="text-xs text-red-300">{replyError}</span>
+                                                                                    <div className="flex gap-2">
+                                                                                        <button type="button" onClick={() => { setReplyingToReviewId(null); setReplyError(null); }} disabled={replySubmitting} className="h-8 rounded-lg border border-slate-700 px-3 text-xs font-bold text-slate-300 hover:border-slate-500 disabled:opacity-50">Cancel</button>
+                                                                                        <button type="submit" disabled={replySubmitting || !replyDraft.trim()} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-sky-400/30 bg-sky-500 px-3 text-xs font-bold text-slate-950 hover:bg-sky-400 disabled:opacity-50">{replySubmitting && <LoaderCircle size={12} className="animate-spin" aria-hidden="true" />}{review.ownerReply ? 'Update reply' : 'Publish reply'}</button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </form>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             </article>
@@ -715,6 +871,14 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                 </div>
                             )}
                         </div>
+                    </div>
+                )}
+                {reviewContextMenu && (
+                    <div role="menu" aria-label="Review actions" className="fixed z-[120] min-w-44 rounded-lg border border-slate-700 bg-slate-950 p-1.5 shadow-2xl shadow-black/60" style={{ left: reviewContextMenu.x, top: reviewContextMenu.y }} onClick={(event) => event.stopPropagation()}>
+                        <button type="button" role="menuitem" onClick={() => deleteReview(reviewContextMenu.reviewId)} disabled={Boolean(deletingReviewId)} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-bold text-red-300 transition-colors hover:bg-red-500/10 hover:text-red-200 disabled:opacity-50">
+                            {deletingReviewId === reviewContextMenu.reviewId ? <LoaderCircle size={14} className="animate-spin" aria-hidden="true" /> : <Trash2 size={14} aria-hidden="true" />}
+                            Delete review
+                        </button>
                     </div>
                 )}
             </main>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { hasPermission } from '@/lib/management';
 import { trimModuleString } from '@/lib/modules';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -26,6 +27,9 @@ type ReviewRow = {
     reviewer_avatar_url: string;
     rating: number;
     comment: string;
+    owner_reply: string;
+    owner_reply_at: string | null;
+    owner_reply_by_discord_id: string | null;
     created_at: string;
     updated_at: string;
 };
@@ -39,16 +43,19 @@ function getReviewClient() {
     return getSupabaseAdmin();
 }
 
-function normalizeReview(row: ReviewRow, userId: string) {
+function normalizeReview(row: ReviewRow, userId: string, canModerate: boolean) {
     return {
         id: row.id,
         reviewerName: row.reviewer_name || 'Ro-Link user',
         reviewerAvatarUrl: row.reviewer_avatar_url || '',
         rating: Number(row.rating || 0),
         comment: row.comment || '',
+        ownerReply: row.owner_reply || '',
+        ownerReplyAt: row.owner_reply_at,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         isOwn: row.reviewer_discord_id === userId,
+        canDelete: row.reviewer_discord_id === userId || canModerate,
         verifiedInstall: true,
     };
 }
@@ -103,10 +110,11 @@ export async function GET(_req: Request, context: RouteContext) {
         if (!access) return NextResponse.json({ error: 'Module not found.' }, { status: 404 });
 
         const client = getReviewClient();
+        const canModerate = await hasPermission(userId, 'MANAGE_MODULES');
         const [{ data: reviewRows, error: reviewsError }, { data: ratingRows, error: ratingsError }] = await Promise.all([
             client
                 .from('addon_module_reviews')
-                .select('id, reviewer_discord_id, reviewer_name, reviewer_avatar_url, rating, comment, created_at, updated_at')
+                .select('id, reviewer_discord_id, reviewer_name, reviewer_avatar_url, rating, comment, owner_reply, owner_reply_at, owner_reply_by_discord_id, created_at, updated_at')
                 .eq('module_id', moduleId)
                 .order('created_at', { ascending: false })
                 .limit(50),
@@ -120,7 +128,7 @@ export async function GET(_req: Request, context: RouteContext) {
         if (ratingsError) throw new Error(ratingsError.message);
 
         const ratings = (ratingRows || []).map((row: { rating?: number }) => Number(row.rating || 0)).filter((rating: number) => rating >= 1 && rating <= 5);
-        const reviews = ((reviewRows || []) as ReviewRow[]).map((row) => normalizeReview(row, userId));
+        const reviews = ((reviewRows || []) as ReviewRow[]).map((row) => normalizeReview(row, userId, canModerate));
 
         return NextResponse.json({
             reviews,
@@ -128,6 +136,7 @@ export async function GET(_req: Request, context: RouteContext) {
             averageRating: ratings.length ? ratings.reduce((total: number, rating: number) => total + rating, 0) / ratings.length : 0,
             canReview: access.canReview,
             isCreator: access.isCreator,
+            canModerateReviews: canModerate,
             yourReview: reviews.find((review) => review.isOwn) || null,
         });
     } catch (error) {
@@ -172,12 +181,101 @@ export async function POST(req: Request, context: RouteContext) {
                 comment,
                 updated_at: now,
             }, { onConflict: 'module_id,reviewer_discord_id' })
-            .select('id, reviewer_discord_id, reviewer_name, reviewer_avatar_url, rating, comment, created_at, updated_at')
+            .select('id, reviewer_discord_id, reviewer_name, reviewer_avatar_url, rating, comment, owner_reply, owner_reply_at, owner_reply_by_discord_id, created_at, updated_at')
             .single();
 
         if (error) throw new Error(error.message);
-        return NextResponse.json({ review: normalizeReview(data as ReviewRow, userId) });
+        const canModerate = await hasPermission(userId, 'MANAGE_MODULES');
+        return NextResponse.json({ review: normalizeReview(data as ReviewRow, userId, canModerate) });
     } catch (error) {
         return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to save review.' }, { status: 500 });
+    }
+}
+
+export async function PATCH(req: Request, context: RouteContext) {
+    const session = await getServerSession(authOptions);
+    const user = session?.user as SessionUser | undefined;
+    const userId = String(user?.id || '');
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { moduleId } = await context.params;
+    if (!UUID_PATTERN.test(moduleId)) {
+        return NextResponse.json({ error: 'Invalid module ID.' }, { status: 400 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const reviewId = String(body.reviewId || '');
+    const reply = trimModuleString(body.reply, 1000);
+    if (!UUID_PATTERN.test(reviewId)) return NextResponse.json({ error: 'Invalid review ID.' }, { status: 400 });
+    if (!reply) return NextResponse.json({ error: 'Enter a reply before publishing it.' }, { status: 400 });
+
+    try {
+        const access = await getModuleReviewAccess(moduleId, userId);
+        if (!access) return NextResponse.json({ error: 'Module not found.' }, { status: 404 });
+        if (!access.isCreator) return NextResponse.json({ error: 'Only the module owner can reply to reviews.' }, { status: 403 });
+
+        const ownerReplyAt = new Date().toISOString();
+        const { data, error } = await getReviewClient()
+            .from('addon_module_reviews')
+            .update({
+                owner_reply: reply,
+                owner_reply_at: ownerReplyAt,
+                owner_reply_by_discord_id: userId,
+            })
+            .eq('id', reviewId)
+            .eq('module_id', moduleId)
+            .select('id')
+            .maybeSingle();
+
+        if (error) throw new Error(error.message);
+        if (!data) return NextResponse.json({ error: 'Review not found.' }, { status: 404 });
+        return NextResponse.json({ reply, ownerReplyAt });
+    } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to publish the reply.' }, { status: 500 });
+    }
+}
+
+export async function DELETE(req: Request, context: RouteContext) {
+    const session = await getServerSession(authOptions);
+    const user = session?.user as SessionUser | undefined;
+    const userId = String(user?.id || '');
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { moduleId } = await context.params;
+    if (!UUID_PATTERN.test(moduleId)) {
+        return NextResponse.json({ error: 'Invalid module ID.' }, { status: 400 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const reviewId = String(body.reviewId || '');
+    if (!UUID_PATTERN.test(reviewId)) return NextResponse.json({ error: 'Invalid review ID.' }, { status: 400 });
+
+    try {
+        const client = getReviewClient();
+        const { data: review, error: reviewError } = await client
+            .from('addon_module_reviews')
+            .select('id, reviewer_discord_id')
+            .eq('id', reviewId)
+            .eq('module_id', moduleId)
+            .maybeSingle();
+
+        if (reviewError) throw new Error(reviewError.message);
+        if (!review) return NextResponse.json({ error: 'Review not found.' }, { status: 404 });
+
+        const canModerate = await hasPermission(userId, 'MANAGE_MODULES');
+        if (review.reviewer_discord_id !== userId && !canModerate) {
+            return NextResponse.json({ error: 'You do not have permission to delete this review.' }, { status: 403 });
+        }
+
+        const { error: deleteError } = await client
+            .from('addon_module_reviews')
+            .delete()
+            .eq('id', reviewId)
+            .eq('module_id', moduleId);
+
+        if (deleteError) throw new Error(deleteError.message);
+        return NextResponse.json({ deleted: true });
+    } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to delete the review.' }, { status: 500 });
     }
 }

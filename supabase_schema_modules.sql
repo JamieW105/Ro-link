@@ -129,6 +129,11 @@ CREATE TABLE IF NOT EXISTS public.addon_module_reviews (
     UNIQUE (module_id, reviewer_discord_id)
 );
 
+ALTER TABLE public.addon_module_reviews
+    ADD COLUMN IF NOT EXISTS owner_reply TEXT NOT NULL DEFAULT '' CHECK (char_length(owner_reply) <= 1000),
+    ADD COLUMN IF NOT EXISTS owner_reply_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS owner_reply_by_discord_id TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_addon_module_reviews_module_created
     ON public.addon_module_reviews(module_id, created_at DESC);
 
