@@ -52,6 +52,8 @@ interface MarketplaceModule {
     sourceChecksum: string;
     configSchema: Record<string, ModuleConfigField>;
     authorDiscordId: string | null;
+    creatorName: string;
+    creatorAvatarUrl: string;
     moderationNote: string;
     createdAt: string | null;
     updatedAt: string | null;
@@ -140,13 +142,12 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
     }, [moduleSlug, modules]);
 
     const isCurrentUserCreator = addon?.authorDiscordId === sessionUserId;
-    const creatorName = addon?.isOfficial
-        ? 'Ro-Link'
-        : isCurrentUserCreator
+    const creatorName = addon?.creatorName
+        || (isCurrentUserCreator
             ? session?.user?.name || 'You'
             : addon?.creatorIsVerified
                 ? 'Verified creator'
-                : 'Community creator';
+                : 'Community creator');
     const thumbnailUrls = addon?.thumbnailUrls?.length ? addon.thumbnailUrls : addon?.thumbnailUrl ? [addon.thumbnailUrl] : [];
     const activeThumbnailUrl = thumbnailUrls[activeThumbnailIndex] || thumbnailUrls[0] || '';
 
@@ -592,10 +593,10 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
 
                                 <section className="rounded-xl border border-slate-800 bg-[#0d1116] p-5">
                                     <div className="flex items-center gap-3 border-b border-slate-800 pb-5">
-                                        {isCurrentUserCreator && session?.user?.image ? (
+                                        {addon.creatorAvatarUrl ? (
+                                            <img src={addon.creatorAvatarUrl} alt="" className="h-11 w-11 rounded-full border border-slate-700 object-cover" />
+                                        ) : isCurrentUserCreator && session?.user?.image ? (
                                             <img src={getDiscordMediaProxyUrl(session.user.image)} alt="" className="h-11 w-11 rounded-full border border-slate-700 object-cover" />
-                                        ) : addon.isOfficial ? (
-                                            <span className="flex h-11 w-11 items-center justify-center rounded-full border border-sky-500/25 bg-sky-500/10"><img src="/Media/Ro-LinkIcon.png" alt="" className="h-7 w-7 object-contain" /></span>
                                         ) : (
                                             <span className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-400"><UserRound size={19} aria-hidden="true" /></span>
                                         )}
@@ -603,7 +604,17 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                             <p className="text-xs text-slate-500">Created by</p>
                                             <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm font-bold text-white">
                                                 {creatorName}
-                                                {(addon.isOfficial || addon.creatorIsVerified) && <CheckCircle2 size={14} className="shrink-0 text-sky-400" aria-label="Verified creator" />}
+                                                {addon.isOfficial ? (
+                                                    <span className="group/official relative shrink-0" aria-label="Official">
+                                                        <img src="/Media/Ro-LinkIcon.png" alt="" className="h-4 w-4 rounded object-cover" />
+                                                        <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover/official:opacity-100">Official</span>
+                                                    </span>
+                                                ) : addon.creatorIsVerified ? (
+                                                    <span className="group/verified relative shrink-0 text-sky-400" aria-label="Verified creator">
+                                                        <CheckCircle2 size={14} aria-hidden="true" />
+                                                        <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover/verified:opacity-100">Verified creator</span>
+                                                    </span>
+                                                ) : null}
                                             </p>
                                         </div>
                                     </div>
