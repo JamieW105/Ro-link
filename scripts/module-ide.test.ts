@@ -7,6 +7,7 @@ import { MODULE_CATEGORIES, parseModuleCategory } from '../lib/moduleCategories'
 import { validateBridgeEvent } from '../lib/moduleStudioBridge';
 import { validateModuleUiTree } from '../lib/moduleUiSchema';
 import { canCreatorUseUnpublishedModule, normalizeAddonModule } from '../lib/modules';
+import { compareModuleVersions, isModuleVersionGreater, MODULE_VERSION_PATTERN, suggestNextModuleVersion } from '../lib/moduleVersions';
 
 const manifest: ModuleProjectManifest = {
     formatVersion: 2,
@@ -63,6 +64,15 @@ test('Studio bridge accepts known events and rejects unknown or oversized payloa
     assert.equal(validateBridgeEvent({ type: 'script.request', requestId: '1', payload: { instanceId: 'abc' } }).type, 'script.request');
     assert.throws(() => validateBridgeEvent({ type: 'database.secret', payload: {} }), /Unsupported Studio event type/);
     assert.throws(() => validateBridgeEvent({ type: 'sync.error', payload: { message: 'x'.repeat(513 * 1024) } }), /too large/);
+});
+
+test('module updates require a numerically greater version and allow leading-zero increments', () => {
+    assert.equal(MODULE_VERSION_PATTERN.test('1.0.01'), true);
+    assert.equal(isModuleVersionGreater('1.0.01', '1.0.0'), true);
+    assert.equal(isModuleVersionGreater('1.0.1', '1.0.01'), false);
+    assert.equal(isModuleVersionGreater('1.1.0', '1.0.999'), true);
+    assert.equal(compareModuleVersions('2.0.0', '1.999.999'), 1);
+    assert.equal(suggestNextModuleVersion('1.0.0'), '1.0.1');
 });
 
 test('denied modules remain private testable projects for their uploader', () => {

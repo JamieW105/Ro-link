@@ -11,6 +11,7 @@ import {
 
 import ModuleIdeEditor, { type IdeDiagnostic } from '@/components/dashboard/ModuleIdeEditor';
 import { MODULE_CATEGORIES } from '@/lib/moduleCategories';
+import { isModuleVersionGreater, MODULE_VERSION_PATTERN, suggestNextModuleVersion } from '@/lib/moduleVersions';
 
 type ModuleFileKind = 'folder' | 'server_script' | 'client_script' | 'shared_module' | 'ui' | 'manifest';
 type ModuleSummary = { id: string; slug: string; name: string; description: string; thumbnail_url?: string; thumbnail_urls?: unknown; version: string; category: string; status: string; updated_at: string; published_at?: string | null };
@@ -29,6 +30,7 @@ type BridgeEvent = { id: number; type: string; requestId?: string; revision?: st
 type PublishCheck = { ready: boolean; problems: ProjectProblem[]; summary: { scripts: number; uiRoots: number; warnings: number; errors: number } };
 type Conflict = { kind: 'project' | 'studio'; title: string; fileId?: string; browserSource: string; serverSource: string; serverRevision: number | string };
 type ModuleThumbnailDraft = { id: string; url: string; file?: File };
+type UpdateVersionPrompt = { currentVersion: string; value: string; error: string };
 
 class ApiError extends Error {
     status: number;
@@ -136,6 +138,7 @@ export default function ModuleIdeClient() {
     const [conflict, setConflict] = useState<Conflict | null>(null);
     const [publishCheck, setPublishCheck] = useState<PublishCheck | null>(null);
     const [publishing, setPublishing] = useState(false);
+    const [updateVersionPrompt, setUpdateVersionPrompt] = useState<UpdateVersionPrompt | null>(null);
     const [quickMode, setQuickMode] = useState<'files' | 'commands' | null>(null);
     const [quickQuery, setQuickQuery] = useState('');
     const [moduleInfoOpen, setModuleInfoOpen] = useState(false);
@@ -266,6 +269,7 @@ export default function ModuleIdeClient() {
     }, [moduleId, tabs]);
 
     const selectedModule = modules.find((item) => item.id === moduleId);
+    const isModuleUpdate = Boolean(project?.module.publishedAt || selectedModule?.published_at || selectedModule?.status === 'PUBLISHED');
     const selectedFile = project?.files.find((file) => file.id === selectedFileId) || null;
     const activeProjectId = activeTab.startsWith('project:') ? activeTab.slice(8) : '';
     const activeFile = project?.files.find((file) => file.id === activeProjectId) || null;
@@ -639,12 +643,51 @@ export default function ModuleIdeClient() {
         setTabs((current) => { const index = current.indexOf(key); const next = current.filter((item) => item !== key); if (activeTabRef.current === key) setActiveTab(next[Math.max(0, index - 1)] || ''); return next; });
     }, [studioScript?.dirty]);
 
-    const preparePublish = useCallback(async () => {
-        if (!await saveAll()) return;
+    const validateForPublish = useCallback(async () => {
         try {
             const check = await api<PublishCheck>(`/api/dashboard/modules/ide/${moduleId}/validate`); setServerProblems(check.problems); setPublishCheck(check); setBottomTab('problems');
         } catch (reason) { setError(reason instanceof Error ? reason.message : 'Validation failed.'); }
-    }, [moduleId, saveAll]);
+    }, [moduleId]);
+    const preparePublish = useCallback(async () => {
+        if (!await saveAll()) return;
+        try {
+            if (isModuleUpdate) {
+                const result = await api<{ versions: Array<{ version: string }> }>(`/api/dashboard/modules/ide/${moduleId}/versions`);
+                const currentVersion = String(result.versions[0]?.version || projectRef.current?.module.version || '1.0.0');
+                setUpdateVersionPrompt({ currentVersion, value: suggestNextModuleVersion(currentVersion), error: '' });
+                return;
+            }
+            await validateForPublish();
+        } catch (reason) { setError(reason instanceof Error ? reason.message : 'Validation failed.'); }
+    }, [isModuleUpdate, moduleId, saveAll, validateForPublish]);
+    const confirmUpdateVersion = useCallback(async () => {
+        if (!updateVersionPrompt || !projectRef.current) return;
+        const nextVersion = updateVersionPrompt.value.trim();
+        if (!MODULE_VERSION_PATTERN.test(nextVersion)) {
+            setUpdateVersionPrompt((current) => current ? { ...current, error: 'Use three numeric parts, such as 1.0.1 or 1.0.01.' } : current);
+            return;
+        }
+        if (!isModuleVersionGreater(nextVersion, updateVersionPrompt.currentVersion)) {
+            setUpdateVersionPrompt((current) => current ? { ...current, error: `Enter a version greater than ${current.currentVersion}.` } : current);
+            return;
+        }
+        const manifestFile = projectRef.current.files.find((file) => file.kind === 'manifest');
+        const manifestDraft = manifestFile ? draftsRef.current[manifestFile.id] : null;
+        if (!manifestFile || !manifestDraft) {
+            setUpdateVersionPrompt((current) => current ? { ...current, error: 'module.json could not be found.' } : current);
+            return;
+        }
+        try {
+            const manifest = JSON.parse(manifestDraft.value) as Record<string, unknown>;
+            const value = JSON.stringify({ ...manifest, version: nextVersion }, null, 2) + '\n';
+            setDrafts((current) => ({ ...current, [manifestFile.id]: { ...current[manifestFile.id], value, dirty: true, status: 'dirty' } }));
+            if (!await saveProjectFile(manifestFile.id)) return;
+            setUpdateVersionPrompt(null);
+            await validateForPublish();
+        } catch {
+            setUpdateVersionPrompt((current) => current ? { ...current, error: 'module.json is not valid JSON. Fix it before updating.' } : current);
+        }
+    }, [saveProjectFile, setDrafts, updateVersionPrompt, validateForPublish]);
     const publish = useCallback(async () => {
         setPublishing(true);
         try {
@@ -675,7 +718,7 @@ export default function ModuleIdeClient() {
     const expiresIn = pairing ? Math.max(0, Math.ceil((new Date(pairing.expiresAt).getTime() - Date.now()) / 60000)) : 0;
     const quickFiles = project?.files.filter((file) => file.kind !== 'folder' && file.path.toLowerCase().includes(quickQuery.toLowerCase())).slice(0, 20) || [];
     const commands = [
-        { label: 'Save all files', run: () => void saveAll() }, { label: 'Publish module', run: () => void preparePublish() },
+        { label: 'Save all files', run: () => void saveAll() }, { label: isModuleUpdate ? 'Update module' : 'Publish module', run: () => void preparePublish() },
         { label: 'Edit module info', run: openModuleInfo },
         { label: 'Create server script', run: () => setNewItem({ kind: 'server_script', name: '' }) }, { label: 'Create client script', run: () => setNewItem({ kind: 'client_script', name: '' }) },
         { label: 'Connect Roblox Studio', run: () => void api<{ code: string; expiresAt: string }>(`/api/dashboard/modules/ide/${moduleId}/studio/pair`, { method: 'POST' }).then(setPairing) },
@@ -717,7 +760,7 @@ export default function ModuleIdeClient() {
                 <span title={connected ? 'Paired Studio session is active' : 'Studio is not connected'} className={`hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold lg:flex ${connected ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-white/10 text-slate-400'}`}>{connected ? <PlugZap className="h-3.5 w-3.5" /> : <Unplug className="h-3.5 w-3.5" />} Studio {connected ? 'Connected' : 'Disconnected'}</span>
                 <button type="button" disabled={!moduleId} onClick={() => api<{ code: string; expiresAt: string }>(`/api/dashboard/modules/ide/${moduleId}/studio/pair`, { method: 'POST' }).then((value) => { setPairing(value); log('Created a one-time Studio pairing code.', 'studio'); }).catch((reason) => setError(reason.message))} className="rl-button">Connect Studio</button>
                 <button type="button" onClick={() => void saveAll()} disabled={!hasDirty} className="rl-button"><Save className="h-3.5 w-3.5" /><span className="max-[980px]:hidden">{saveLabel}</span></button>
-                <button type="button" onClick={() => void preparePublish()} disabled={!project || publishing} className="rl-button rl-button-primary">Publish</button>
+                <button type="button" onClick={() => void preparePublish()} disabled={!project || publishing} className="rl-button rl-button-primary">{isModuleUpdate ? 'Update' : 'Publish'}</button>
             </div>
         </header>
         {pairing && !connected && <div className="flex shrink-0 items-center justify-center gap-4 border-b border-sky-400/15 bg-sky-400/[0.06] px-4 py-2 text-sm"><Cable className="h-4 w-4 text-sky-300" /><span>Enter this one-time code in the standalone Studio plugin:</span><code className="rounded-md bg-black/35 px-3 py-1 font-mono text-lg font-bold tracking-[0.25em] text-white">{pairing.code}</code><span className="text-xs text-slate-400">expires in about {expiresIn} min</span><button onClick={() => setPairing(null)} aria-label="Dismiss pairing code"><X className="h-4 w-4" /></button></div>}
@@ -766,7 +809,8 @@ export default function ModuleIdeClient() {
         {contextMenu && <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)} onContextMenu={(event) => { event.preventDefault(); setContextMenu(null); }}><div style={{ left: contextMenu.x, top: contextMenu.y }} className="absolute w-44 rounded-md border border-white/10 bg-[#151d29] p-1 text-xs shadow-2xl"><button onClick={() => openProjectFile(contextMenu.file)} className="w-full rounded px-2 py-1.5 text-left hover:bg-white/8">Open</button>{contextMenu.file.kind === 'folder' && <button onClick={() => { setSelectedFileId(contextMenu.file.id); setNewItem({ kind: 'shared_module', name: '' }); }} className="w-full rounded px-2 py-1.5 text-left hover:bg-white/8">New child…</button>}<button onClick={() => void navigator.clipboard.writeText(contextMenu.file.path)} className="w-full rounded px-2 py-1.5 text-left hover:bg-white/8">Copy path</button>{!['Server', 'Client', 'Shared', 'UI', 'module.json'].includes(contextMenu.file.path) && <><button onClick={() => renameFile(contextMenu.file)} className="w-full rounded px-2 py-1.5 text-left hover:bg-white/8">Rename…</button><button onClick={() => duplicateFile(contextMenu.file)} className="w-full rounded px-2 py-1.5 text-left hover:bg-white/8">Duplicate…</button><button onClick={() => deleteFile(contextMenu.file)} className="w-full rounded px-2 py-1.5 text-left text-red-300 hover:bg-red-400/10">Delete</button></>}</div></div>}
         {quickMode && <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/45 pt-[12vh]" onMouseDown={() => setQuickMode(null)}><div onMouseDown={(event) => event.stopPropagation()} className="w-[min(620px,90vw)] overflow-hidden rounded-lg border border-white/12 bg-[#111722] shadow-2xl"><div className="flex items-center gap-3 border-b border-white/8 px-4"><Search className="h-4 w-4 text-slate-500" /><input autoFocus value={quickQuery} onChange={(event) => setQuickQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') setQuickMode(null); }} placeholder={quickMode === 'files' ? 'Go to file…' : 'Run a command…'} className="h-12 flex-1 bg-transparent text-sm outline-none" /><kbd className="text-[10px] text-slate-600">ESC</kbd></div><div className="max-h-96 overflow-y-auto p-2">{quickMode === 'files' ? quickFiles.map((file) => <button key={file.id} onClick={() => { openProjectFile(file); setQuickMode(null); }} className="flex w-full items-center gap-3 rounded px-3 py-2 text-left text-sm text-slate-300 hover:bg-white/[0.05]">{fileIcon(file)}<span>{file.name}</span><span className="ml-auto text-xs text-slate-600">{file.path}</span></button>) : commands.map((command) => <button key={command.label} onClick={() => { command.run(); setQuickMode(null); }} className="flex w-full items-center gap-3 rounded px-3 py-2 text-left text-sm text-slate-300 hover:bg-white/[0.05]"><Settings2 className="h-4 w-4 text-sky-300" />{command.label}</button>)}</div></div></div>}
         {conflict && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"><div className="w-[min(1000px,95vw)] rounded-lg border border-red-400/20 bg-[#111722] shadow-2xl"><div className="flex items-center gap-3 border-b border-white/8 p-4"><GitCompare className="h-5 w-5 text-amber-300" /><div><p className="font-semibold">Revision conflict: {conflict.title}</p><p className="text-xs text-slate-500">Compare both versions before choosing which source should continue.</p></div></div><div className="grid max-h-[60vh] grid-cols-2 divide-x divide-white/8"><div className="min-w-0"><p className="border-b border-white/8 px-4 py-2 text-xs font-bold text-sky-300">Browser version</p><pre className="max-h-[52vh] overflow-auto whitespace-pre-wrap p-4 text-xs leading-5 text-slate-300">{conflict.browserSource}</pre></div><div className="min-w-0"><p className="border-b border-white/8 px-4 py-2 text-xs font-bold text-emerald-300">{conflict.kind === 'studio' ? 'Studio version' : 'Server version'}</p><pre className="max-h-[52vh] overflow-auto whitespace-pre-wrap p-4 text-xs leading-5 text-slate-300">{conflict.serverSource}</pre></div></div><div className="flex justify-end gap-2 border-t border-white/8 p-4"><button onClick={() => { if (conflict.kind === 'project' && conflict.fileId) { const id = conflict.fileId; setDrafts((current) => ({ ...current, [id]: { value: conflict.serverSource, revision: Number(conflict.serverRevision), dirty: false, status: 'saved' } })); setProject((current) => current ? { ...current, files: current.files.map((file) => file.id === id ? { ...file, sourceCode: conflict.serverSource, revision: Number(conflict.serverRevision) } : file) } : current); } else setStudioScript((current) => current ? { ...current, source: conflict.serverSource, revision: String(conflict.serverRevision), dirty: false } : current); setConflict(null); }} className="rounded border border-white/10 px-3 py-2 text-xs">Use {conflict.kind === 'studio' ? 'Studio' : 'server'} version</button><button onClick={() => { if (conflict.kind === 'project' && conflict.fileId) { const id = conflict.fileId; setDrafts((current) => ({ ...current, [id]: { ...current[id], revision: Number(conflict.serverRevision), dirty: true, status: 'dirty' } })); } else { setStudioScript((current) => current ? { ...current, revision: String(conflict.serverRevision), dirty: true } : current); window.setTimeout(() => void saveStudioScript(String(conflict.serverRevision)), 0); } setConflict(null); }} className="rounded bg-sky-500 px-3 py-2 text-xs font-bold">Keep browser version</button></div></div></div>}
-        {publishCheck && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"><div className="w-[min(560px,94vw)] rounded-lg border border-white/10 bg-[#111722] shadow-2xl"><div className="flex items-center gap-3 border-b border-white/8 p-5">{publishCheck.ready ? <Check className="h-6 w-6 text-emerald-300" /> : <AlertTriangle className="h-6 w-6 text-red-300" />}<div><p className="font-semibold">{publishCheck.ready ? 'Ready to Publish' : 'Publishing is blocked'}</p><p className="text-xs text-slate-500">Validation never publishes automatically.</p></div></div><div className="space-y-2 p-5 text-sm"><p className="text-emerald-300">✓ {publishCheck.summary.scripts} scripts checked</p><p className="text-emerald-300">✓ Module API transport available</p><p className="text-emerald-300">✓ {publishCheck.summary.uiRoots} UI roots bundled</p><p className={publishCheck.summary.errors ? 'text-red-300' : 'text-emerald-300'}>{publishCheck.summary.errors ? '✕' : '✓'} {publishCheck.summary.errors} errors</p><p className={publishCheck.summary.warnings ? 'text-amber-300' : 'text-emerald-300'}>⚠ {publishCheck.summary.warnings} warnings</p>{publishCheck.problems.slice(0, 6).map((problem, index) => <p key={index} className="border-t border-white/6 pt-2 text-xs text-slate-400">{problem.file ? `${problem.file}: ` : ''}{problem.message}</p>)}</div><div className="flex justify-end gap-2 border-t border-white/8 p-4"><button onClick={() => setPublishCheck(null)} className="rounded border border-white/10 px-4 py-2 text-xs">Cancel</button><button onClick={() => void publish()} disabled={!publishCheck.ready || publishing} className="rounded bg-sky-500 px-4 py-2 text-xs font-bold disabled:opacity-40">{publishing ? 'Publishing…' : `Publish v${String(project?.project.manifest.version || project?.module.version || '')}`}</button></div></div></div>}
+        {updateVersionPrompt && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"><form onSubmit={(event) => { event.preventDefault(); void confirmUpdateVersion(); }} className="w-[min(480px,94vw)] rounded-lg border border-white/10 bg-[#111722] shadow-2xl"><div className="border-b border-white/8 p-5"><p className="font-semibold">Update module version</p><p className="mt-1 text-xs text-slate-500">The new version must be greater than the current published version, v{updateVersionPrompt.currentVersion}.</p></div><div className="p-5"><label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">New version</span><input autoFocus required value={updateVersionPrompt.value} onChange={(event) => setUpdateVersionPrompt((current) => current ? { ...current, value: event.target.value, error: '' } : current)} placeholder={suggestNextModuleVersion(updateVersionPrompt.currentVersion)} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 font-mono text-sm outline-none focus:border-sky-400/60" /></label><p className={`mt-2 text-xs ${updateVersionPrompt.error ? 'text-red-300' : 'text-slate-500'}`}>{updateVersionPrompt.error || 'Leading-zero increments are supported, for example 1.0.0 → 1.0.01.'}</p></div><div className="flex justify-end gap-2 border-t border-white/8 p-4"><button type="button" onClick={() => setUpdateVersionPrompt(null)} className="rounded border border-white/10 px-4 py-2 text-xs">Cancel</button><button type="submit" className="rounded bg-sky-500 px-4 py-2 text-xs font-bold">Continue</button></div></form></div>}
+        {publishCheck && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"><div className="w-[min(560px,94vw)] rounded-lg border border-white/10 bg-[#111722] shadow-2xl"><div className="flex items-center gap-3 border-b border-white/8 p-5">{publishCheck.ready ? <Check className="h-6 w-6 text-emerald-300" /> : <AlertTriangle className="h-6 w-6 text-red-300" />}<div><p className="font-semibold">{publishCheck.ready ? `Ready to ${isModuleUpdate ? 'Update' : 'Publish'}` : `${isModuleUpdate ? 'Updating' : 'Publishing'} is blocked`}</p><p className="text-xs text-slate-500">Validation never {isModuleUpdate ? 'updates' : 'publishes'} automatically.</p></div></div><div className="space-y-2 p-5 text-sm"><p className="text-emerald-300">✓ {publishCheck.summary.scripts} scripts checked</p><p className="text-emerald-300">✓ Module API transport available</p><p className="text-emerald-300">✓ {publishCheck.summary.uiRoots} UI roots bundled</p><p className={publishCheck.summary.errors ? 'text-red-300' : 'text-emerald-300'}>{publishCheck.summary.errors ? '✕' : '✓'} {publishCheck.summary.errors} errors</p><p className={publishCheck.summary.warnings ? 'text-amber-300' : 'text-emerald-300'}>⚠ {publishCheck.summary.warnings} warnings</p>{publishCheck.problems.slice(0, 6).map((problem, index) => <p key={index} className="border-t border-white/6 pt-2 text-xs text-slate-400">{problem.file ? `${problem.file}: ` : ''}{problem.message}</p>)}</div><div className="flex justify-end gap-2 border-t border-white/8 p-4"><button onClick={() => setPublishCheck(null)} className="rounded border border-white/10 px-4 py-2 text-xs">Cancel</button><button onClick={() => void publish()} disabled={!publishCheck.ready || publishing} className="rounded bg-sky-500 px-4 py-2 text-xs font-bold disabled:opacity-40">{publishing ? (isModuleUpdate ? 'Updating…' : 'Publishing…') : `${isModuleUpdate ? 'Update' : 'Publish'} v${String(project?.project.manifest.version || project?.module.version || '')}`}</button></div></div></div>}
         {moduleInfoOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-6" onMouseDown={() => { if (!moduleInfoSaving) setModuleInfoOpen(false); }}>
                 <form onSubmit={(event) => { event.preventDefault(); void saveModuleInfo(); }} onMouseDown={(event) => event.stopPropagation()} className="flex max-h-[94vh] w-[min(580px,94vw)] flex-col overflow-hidden rounded-lg border border-white/10 bg-[#111722] shadow-2xl">

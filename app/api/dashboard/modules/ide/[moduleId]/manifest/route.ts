@@ -5,6 +5,7 @@ import { requireModuleIdeUser, noStoreJson } from '@/lib/moduleIdeAuth';
 import { parseModuleCategory } from '@/lib/moduleCategories';
 import { trimModuleString } from '@/lib/modules';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { MODULE_VERSION_PATTERN } from '@/lib/moduleVersions';
 
 export const dynamic = 'force-dynamic';
 type Context = { params: Promise<{ moduleId: string }> };
@@ -36,7 +37,7 @@ export async function PATCH(req: Request, context: Context) {
             capabilities: Array.isArray(rawManifest.capabilities) ? rawManifest.capabilities.map((value) => trimModuleString(value, 64)).filter(Boolean).slice(0, 64) : [],
             dependencies: rawManifest.dependencies && typeof rawManifest.dependencies === 'object' && !Array.isArray(rawManifest.dependencies) ? rawManifest.dependencies : {},
         };
-        if (!manifest.name || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(manifest.version)) return NextResponse.json({ error: 'Manifest requires a name and semantic version such as 1.0.0.' }, { status: 400 });
+        if (!manifest.name || !MODULE_VERSION_PATTERN.test(manifest.version)) return NextResponse.json({ error: 'Manifest requires a name and version such as 1.0.0 or 1.0.01.' }, { status: 400 });
         const client = getSupabaseAdmin();
         const now = new Date().toISOString();
         const nextRevision = await bumpModuleProjectRevision(moduleId, expectedRevision);

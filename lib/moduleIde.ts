@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { checksumModuleSource, parseModuleConfigSchema, trimModuleString } from '@/lib/modules';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { validateModuleUiTree } from '@/lib/moduleUiSchema';
+import { isModuleVersionGreater, MODULE_VERSION_PATTERN } from '@/lib/moduleVersions';
 
 export const MODULE_PROJECT_FORMAT_VERSION = 2;
 export const MODULE_PROJECT_RUNTIME_VERSION = '2.2.0';
@@ -406,6 +407,31 @@ export async function publishModuleProject(moduleId: string, discordUserId: stri
     const now = new Date().toISOString();
     const configSchema = parseModuleConfigSchema(legacySource);
     const version = input.project.manifest.version;
+    if (!MODULE_VERSION_PATTERN.test(version)) {
+        return {
+            ok: false as const,
+            problems: [...problems, {
+                severity: 'error' as const,
+                file: 'module.json',
+                code: 'invalid_version',
+                message: 'Version must use three numeric parts, such as 1.0.0 or 1.0.01.',
+            }],
+        };
+    }
+    const latestVersion = await client.from('addon_module_versions').select('version').eq('module_id', moduleId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (latestVersion.error) throw new Error(latestVersion.error.message);
+    const currentVersion = latestVersion.data?.version ? String(latestVersion.data.version) : null;
+    if (currentVersion && !isModuleVersionGreater(version, currentVersion)) {
+        return {
+            ok: false as const,
+            problems: [...problems, {
+                severity: 'error' as const,
+                file: 'module.json',
+                code: 'version_not_increased',
+                message: `Update version ${version} must be greater than the current published version ${currentVersion}.`,
+            }],
+        };
+    }
     const existingVersion = await client.from('addon_module_versions').select('id, project_revision, package_hash').eq('module_id', moduleId).eq('version', version).maybeSingle();
     if (existingVersion.error) throw new Error(existingVersion.error.message);
     if (existingVersion.data) {
