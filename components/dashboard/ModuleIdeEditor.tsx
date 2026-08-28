@@ -175,15 +175,15 @@ function configureLuau(monaco: typeof Monaco, projectPaths: string[]) {
                 { token: 'operator', foreground: 'C4B5FD' },
             ],
             colors: {
-                'editor.background': '#090d14',
+                'editor.background': '#080b0f',
                 'editor.foreground': '#e2e8f0',
                 'editorLineNumber.foreground': '#475569',
                 'editorLineNumber.activeForeground': '#bae6fd',
-                'editor.selectionBackground': '#0ea5e944',
-                'editor.inactiveSelectionBackground': '#0ea5e922',
-                'editorCursor.foreground': '#7dd3fc',
-                'editorIndentGuide.background1': '#1e293b',
-                'editorIndentGuide.activeBackground1': '#334155',
+                'editor.selectionBackground': '#149cff44',
+                'editor.inactiveSelectionBackground': '#149cff22',
+                'editorCursor.foreground': '#38adff',
+                'editorIndentGuide.background1': '#1b222b',
+                'editorIndentGuide.activeBackground1': '#34404d',
             },
         });
         languageConfigured = true;
