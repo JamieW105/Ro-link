@@ -219,10 +219,6 @@ export default function CreatorModulesPage() {
                                 <div className="motion-list grid gap-2">
                                     {filteredModules.map((addon) => (
                                         <article key={addon.id} className="interactive-lift group relative flex min-w-0 items-center gap-4 rounded-lg border border-slate-800 bg-[#0d1116] p-4 transition-colors hover:border-sky-500/40 hover:bg-[#10161d]">
-                                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-900/70 text-sky-300 transition-colors group-hover:border-sky-500/40 group-hover:bg-sky-500/10">
-                                                <Boxes size={19} aria-hidden="true" />
-                                            </span>
-
                                             <div className="min-w-0 flex-1 pr-12">
                                                 <div className="flex flex-wrap items-center gap-1.5">
                                                     <h2 className="mr-1 break-words text-base font-bold text-white">{addon.name}</h2>
