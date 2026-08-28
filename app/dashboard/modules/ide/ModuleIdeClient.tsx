@@ -132,6 +132,10 @@ export default function ModuleIdeClient() {
     const [moduleInfoOpen, setModuleInfoOpen] = useState(false);
     const [moduleInfo, setModuleInfo] = useState({ title: '', description: '' });
     const [moduleInfoSaving, setModuleInfoSaving] = useState(false);
+    const [moduleName, setModuleNameState] = useState('');
+    const [moduleNameStatus, setModuleNameStatus] = useState<'saved' | 'dirty' | 'saving' | 'failed'>('saved');
+    const moduleNameRef = useRef('');
+    const moduleNameSaveRef = useRef<Promise<boolean> | null>(null);
     const cursorRef = useRef(0);
     const pendingOpenRef = useRef<Map<string, StudioNode>>(new Map());
     const activeTabRef = useRef(activeTab);
@@ -180,6 +184,9 @@ export default function ModuleIdeClient() {
         try {
             const result = await api<ProjectResponse>(`/api/dashboard/modules/ide/${id}`);
             setProject(result);
+            moduleNameRef.current = result.module.name;
+            setModuleNameState(result.module.name);
+            setModuleNameStatus('saved');
             setDrafts((current) => {
                 const next: Record<string, Draft> = {};
                 for (const file of result.files) {
@@ -320,6 +327,63 @@ export default function ModuleIdeClient() {
         for (const [id, draft] of Object.entries(draftsRef.current)) if (draft.dirty && !await saveProjectFile(id)) return false;
         return true;
     }, [saveProjectFile]);
+
+    const saveModuleName = useCallback(() => {
+        if (moduleNameSaveRef.current) return moduleNameSaveRef.current;
+
+        const operation = (async () => {
+            while (projectRef.current && moduleNameRef.current.trim() !== projectRef.current.module.name) {
+                const title = moduleNameRef.current.trim();
+                if (!title) return false;
+                setModuleNameStatus('saving');
+                if (!await saveAll()) {
+                    setModuleNameStatus('failed');
+                    return false;
+                }
+
+                const currentProject = projectRef.current;
+                if (!currentProject) return false;
+                try {
+                    const result = await api<{ manifest: Record<string, unknown>; projectRevision: number }>(`/api/dashboard/modules/ide/${moduleId}/manifest`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({
+                            manifest: { ...currentProject.project.manifest, name: title },
+                            expectedRevision: currentProject.project.revision,
+                        }),
+                    });
+                    const manifestFile = currentProject.files.find((file) => file.kind === 'manifest');
+                    const manifestSource = JSON.stringify(result.manifest, null, 2) + '\n';
+                    setProject((current) => current ? {
+                        ...current,
+                        module: { ...current.module, name: String(result.manifest.name) },
+                        project: { ...current.project, manifest: result.manifest, revision: result.projectRevision },
+                        files: current.files.map((file) => file.id === manifestFile?.id ? { ...file, sourceCode: manifestSource, revision: file.revision + 1, updatedAt: new Date().toISOString() } : file),
+                    } : current);
+                    if (manifestFile) setDrafts((current) => ({ ...current, [manifestFile.id]: { value: manifestSource, revision: manifestFile.revision + 1, dirty: false, status: 'saved' } }));
+                    setModules((current) => current.map((item) => item.id === moduleId ? { ...item, name: String(result.manifest.name) } : item));
+                    setModuleNameStatus(moduleNameRef.current.trim() === title ? 'saved' : 'dirty');
+                    log(`Module renamed to ${title}.`, 'output', 'success');
+                } catch (reason) {
+                    setModuleNameStatus('failed');
+                    setError(reason instanceof Error ? reason.message : 'Module name failed to save.');
+                    return false;
+                }
+            }
+            return true;
+        })();
+
+        moduleNameSaveRef.current = operation;
+        void operation.finally(() => {
+            if (moduleNameSaveRef.current === operation) moduleNameSaveRef.current = null;
+        });
+        return operation;
+    }, [log, moduleId, saveAll, setDrafts, setProject]);
+
+    useEffect(() => {
+        if (!project || !moduleName.trim() || moduleName.trim() === project.module.name) return;
+        const timer = window.setTimeout(() => { void saveModuleName(); }, 800);
+        return () => window.clearTimeout(timer);
+    }, [moduleName, project, saveModuleName]);
 
     const openModuleInfo = useCallback(() => {
         const currentModule = projectRef.current?.module;
@@ -530,7 +594,6 @@ export default function ModuleIdeClient() {
         window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
     }, [activeFile, saveProjectFile, saveStudioScript, studioScript]);
 
-    const switchModule = (id: string) => { if (hasDirty && !window.confirm('Switch modules and discard the remaining unsaved changes?')) return; setModuleId(id); window.history.replaceState(null, '', `/dashboard/modules/ide?module=${encodeURIComponent(id)}`); };
     const beginResize = (kind: 'left' | 'bottom', event: ReactPointerEvent) => {
         event.preventDefault(); const startX = event.clientX; const startY = event.clientY; const initial = kind === 'left' ? leftWidth : bottomHeight;
         const move = (pointer: PointerEvent) => { if (kind === 'left') setLeftWidth(Math.min(440, Math.max(210, initial + pointer.clientX - startX))); else setBottomHeight(Math.min(380, Math.max(110, initial - pointer.clientY + startY))); };
@@ -556,9 +619,28 @@ export default function ModuleIdeClient() {
                 <span className="rl-brand-mark"><Image src="/Media/Ro-LinkIcon.png" alt="" width={25} height={25} /></span>
                 <span>Ro-Link</span>
             </Link>
-            <select aria-label="Module" value={moduleId} onChange={(event) => switchModule(event.target.value)} className="w-44 min-w-0 max-w-64 rounded-lg border border-white/10 bg-[#0b0f17] px-3 py-2 text-sm outline-none focus:border-sky-400/60 max-[700px]:w-32">
-                {!modules.length && <option value="">No modules</option>}{modules.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
+            <label className="relative min-w-0" title="Module name saves automatically">
+                <span className="sr-only">Module name</span>
+                <input
+                    aria-label="Module name"
+                    maxLength={120}
+                    disabled={!project}
+                    value={moduleName}
+                    onChange={(event) => {
+                        moduleNameRef.current = event.target.value;
+                        setModuleNameState(event.target.value);
+                        setModuleNameStatus(event.target.value.trim() === projectRef.current?.module.name ? 'saved' : 'dirty');
+                    }}
+                    onBlur={() => { if (moduleName.trim()) void saveModuleName(); }}
+                    className="h-9 w-44 min-w-0 max-w-64 rounded-lg border border-white/10 bg-[#0b0f17] px-3 pr-8 text-sm font-semibold text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-400/60 disabled:opacity-50 max-[700px]:w-32"
+                    placeholder="Module name"
+                />
+                {moduleNameStatus === 'saving'
+                    ? <RefreshCw aria-label="Saving module name" className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-sky-300" />
+                    : moduleNameStatus === 'saved' && project
+                        ? <Check aria-label="Module name saved" className="absolute right-2.5 top-2.5 h-4 w-4 text-emerald-300" />
+                        : <span aria-label={moduleNameStatus === 'failed' ? 'Module name save failed' : 'Module name has unsaved changes'} className={`absolute right-3 top-3 h-2 w-2 rounded-full ${moduleNameStatus === 'failed' ? 'bg-red-400' : 'bg-amber-300'}`} />}
+            </label>
             <button type="button" onClick={openModuleInfo} disabled={!project} className="rounded-md border border-white/10 p-2 text-slate-400 hover:text-white disabled:opacity-40" aria-label="Edit module info" title="Edit module info"><Settings2 className="h-4 w-4" /></button>
             <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 max-[980px]:hidden">{selectedModule?.status || 'No module'}</span>
             {project?.project.publishedRevision != null && project.project.publishedRevision !== project.project.revision && <span className="hidden text-[10px] font-semibold text-amber-300 lg:inline">Unpublished changes</span>}
