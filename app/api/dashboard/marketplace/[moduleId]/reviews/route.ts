@@ -82,7 +82,7 @@ async function getModuleReviewAccess(moduleId: string, userId: string) {
 
     return {
         addon,
-        canReview: addon.status === 'PUBLISHED' && (isCreator || hasInstalled),
+        canReview: isCreator || (addon.status === 'PUBLISHED' && hasInstalled),
         isCreator,
     };
 }
