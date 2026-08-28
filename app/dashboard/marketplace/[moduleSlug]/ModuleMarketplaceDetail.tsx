@@ -208,15 +208,23 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
             </nav>
 
             <main>
-                <section className="border-b border-slate-800/80 bg-gradient-to-b from-[#0b1016] to-[#080b0f]" aria-labelledby="module-title">
-                    <div className="rl-shell py-8 md:py-10">
+                <section className="relative min-h-[420px] overflow-hidden border-b border-slate-800/80 bg-[#080b0f] md:min-h-[520px]" aria-labelledby="module-title">
+                    {addon?.thumbnailUrl && (
+                        <img
+                            src={addon.thumbnailUrl}
+                            alt=""
+                            className="absolute inset-0 h-full w-full object-cover object-center"
+                        />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#080b0f]/95 via-[#080b0f]/70 to-[#080b0f]/30" aria-hidden="true" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#080b0f] via-transparent to-[#080b0f]/45" aria-hidden="true" />
+                    <div className="rl-shell relative z-10 flex min-h-[420px] flex-col py-8 md:min-h-[520px] md:py-10">
                         <Link href="/dashboard/marketplace" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-sky-300">
                             <ArrowLeft size={14} aria-hidden="true" />
                             Back to Marketplace
                         </Link>
                         {addon && (
-                            <div className={`mt-6 ${addon.thumbnailUrl ? 'grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
-                                <div>
+                            <div className="mt-auto max-w-3xl pt-16">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">{addon.category}</span>
                                     <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">v{addon.version}</span>
@@ -224,10 +232,7 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                     {addon.isOfficial && <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">Official</span>}
                                     {addon.creatorIsVerified && <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">Verified Creator</span>}
                                 </div>
-                                <h1 id="module-title" className="mt-4 text-3xl font-black tracking-tight text-white md:text-4xl">{addon.name}</h1>
-                                <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-slate-400 md:text-base">{addon.description || 'No description provided.'}</p>
-                                </div>
-                                {addon.thumbnailUrl && <img src={addon.thumbnailUrl} alt="" className="aspect-video w-full rounded-xl border border-slate-700/80 object-cover shadow-2xl shadow-black/25" />}
+                                <h1 id="module-title" className="mt-4 text-4xl font-black tracking-tight text-white drop-shadow-lg md:text-5xl">{addon.name}</h1>
                             </div>
                         )}
                     </div>
@@ -244,6 +249,10 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                     </section>
                 ) : (
                     <section className="rl-shell py-8 md:py-10" aria-label={`${addon.name} details`}>
+                        <section className="mb-8" aria-labelledby="module-description-title">
+                            <h2 id="module-description-title" className="text-lg font-bold text-white">Description:</h2>
+                            <p className="mt-3 max-w-4xl text-sm font-medium leading-6 text-slate-400 md:text-base">{addon.description || 'No description provided.'}</p>
+                        </section>
                         <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(0,1fr)_280px]">
                             <section className="rounded-lg border border-slate-800 bg-[#0d1116] p-5 md:p-7">
                                 <h2 className="text-sm font-bold uppercase tracking-widest text-white">Configuration Fields</h2>
