@@ -1,6 +1,20 @@
 'use client';
 
-import { ArrowLeft, LogOut as LucideLogOut, ShieldAlert, Store, X } from 'lucide-react';
+import {
+    ArrowLeft,
+    CalendarDays,
+    CheckCircle2,
+    Code2,
+    Download,
+    LogOut as LucideLogOut,
+    Package2,
+    Settings2,
+    ShieldAlert,
+    Store,
+    Tag,
+    UserRound,
+    X,
+} from 'lucide-react';
 import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { useEffect, useMemo, useState } from 'react';
@@ -31,7 +45,10 @@ interface MarketplaceModule {
     creatorIsVerified: boolean;
     sourceChecksum: string;
     configSchema: Record<string, ModuleConfigField>;
+    authorDiscordId: string | null;
     moderationNote: string;
+    createdAt: string | null;
+    updatedAt: string | null;
     publishedAt: string | null;
 }
 
@@ -59,6 +76,17 @@ function statusLabel(status: string) {
     return status.replace(/_/g, ' ');
 }
 
+function formatDate(value: string | null) {
+    if (!value) return 'Not available';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Not available';
+    return new Intl.DateTimeFormat('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    }).format(date);
+}
+
 export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: string }) {
     const { data: session, status } = useSession();
     const [modules, setModules] = useState<MarketplaceModule[]>([]);
@@ -80,6 +108,15 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
             || candidate.id.toLowerCase() === normalizedSlug
         )) || null;
     }, [moduleSlug, modules]);
+
+    const isCurrentUserCreator = addon?.authorDiscordId === sessionUserId;
+    const creatorName = addon?.isOfficial
+        ? 'Ro-Link'
+        : isCurrentUserCreator
+            ? session?.user?.name || 'You'
+            : addon?.creatorIsVerified
+                ? 'Verified creator'
+                : 'Community creator';
 
     useEffect(() => {
         if (status !== 'authenticated') return;
@@ -207,46 +244,7 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                 </div>
             </nav>
 
-            <main>
-                <section className="relative min-h-[420px] overflow-hidden border-b border-slate-800/80 bg-[#080b0f] md:min-h-[520px]" aria-labelledby="module-title">
-                    {addon?.thumbnailUrl && (
-                        <img
-                            src={addon.thumbnailUrl}
-                            alt=""
-                            className="absolute inset-0 h-full w-full object-cover object-center"
-                        />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#080b0f]/95 via-[#080b0f]/70 to-[#080b0f]/30" aria-hidden="true" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#080b0f] via-transparent to-[#080b0f]/45" aria-hidden="true" />
-                    <div className="rl-shell relative z-10 flex min-h-[420px] flex-col py-8 md:min-h-[520px] md:py-10">
-                        <Link href="/dashboard/marketplace" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-sky-300">
-                            <ArrowLeft size={14} aria-hidden="true" />
-                            Back to Marketplace
-                        </Link>
-                        {addon && (
-                            <div className="mt-auto flex flex-col gap-6 pt-16 md:flex-row md:items-end md:justify-between">
-                                <div className="max-w-3xl">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">{addon.category}</span>
-                                        <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">v{addon.version}</span>
-                                        <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(addon.status)}`}>{statusLabel(addon.status)}</span>
-                                        {addon.isOfficial && <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">Official</span>}
-                                        {addon.creatorIsVerified && <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">Verified Creator</span>}
-                                    </div>
-                                    <h1 id="module-title" className="mt-4 text-4xl font-black tracking-tight text-white drop-shadow-lg md:text-5xl">{addon.name}</h1>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setInstallPickerOpen(true)}
-                                    className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-6 text-xs font-bold uppercase tracking-wider text-sky-200 transition-colors hover:bg-sky-500/15 hover:text-white md:w-auto md:min-w-48"
-                                >
-                                    Install
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </section>
-
+            <main className="border-t border-slate-800/70">
                 {error || !addon ? (
                     <section className="rl-dashboard-content rl-shell">
                         <div className="rl-dashboard-message" data-tone={error ? 'error' : undefined}>
@@ -257,14 +255,61 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                         </div>
                     </section>
                 ) : (
-                    <section className="rl-shell py-8 md:py-10" aria-label={`${addon.name} details`}>
-                        <section className="mb-8" aria-labelledby="module-description-title">
-                            <h2 id="module-description-title" className="text-lg font-bold text-white">Description:</h2>
-                            <p className="mt-3 max-w-4xl text-sm font-medium leading-6 text-slate-400 md:text-base">{addon.description || 'No description provided.'}</p>
-                        </section>
-                        <div>
-                            <section className="rounded-lg border border-slate-800 bg-[#0d1116] p-5 md:p-7">
-                                <h2 className="text-sm font-bold uppercase tracking-widest text-white">Configuration Fields</h2>
+                    <section className="rl-shell py-7 md:py-10" aria-label={`${addon.name} details`}>
+                        <Link href="/dashboard/marketplace" className="inline-flex items-center gap-2 text-xs font-bold text-slate-400 transition-colors hover:text-sky-300">
+                            <ArrowLeft size={15} aria-hidden="true" />
+                            Back to Marketplace
+                        </Link>
+
+                        <header className="mt-8 md:mt-10" aria-labelledby="module-title">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">{addon.category}</span>
+                                <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">v{addon.version}</span>
+                                <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(addon.status)}`}>{statusLabel(addon.status)}</span>
+                                {addon.isOfficial && <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">Official</span>}
+                                {addon.creatorIsVerified && <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">Verified Creator</span>}
+                            </div>
+                            <h1 id="module-title" className="mt-4 max-w-4xl text-3xl font-black tracking-tight text-white sm:text-4xl md:text-5xl">{addon.name}</h1>
+                        </header>
+
+                        <div className="mt-7 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_310px] xl:grid-cols-[minmax(0,1fr)_340px]">
+                            <div className="min-w-0 space-y-6">
+                                <section className="overflow-hidden rounded-xl border border-slate-800 bg-[#0d1116] p-2.5 shadow-2xl shadow-black/20" aria-label="Module preview">
+                                    <div className="relative aspect-video overflow-hidden rounded-lg border border-slate-800 bg-[#080b0f]">
+                                        {addon.thumbnailUrl ? (
+                                            <img src={addon.thumbnailUrl} alt={`${addon.name} preview`} className="h-full w-full object-cover" />
+                                        ) : (
+                                            <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_50%_35%,rgba(14,165,233,0.14),transparent_58%)] text-sky-300/70">
+                                                <Package2 size={64} strokeWidth={1.25} aria-hidden="true" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center justify-between gap-4 px-1 pb-0.5 pt-3">
+                                        <div className="flex min-w-0 items-center gap-2 text-xs text-slate-500">
+                                            <Package2 size={14} className="shrink-0" aria-hidden="true" />
+                                            <span className="truncate">Module preview</span>
+                                        </div>
+                                        <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-slate-600">{addon.category}</span>
+                                    </div>
+                                </section>
+
+                                <section aria-labelledby="module-description-title">
+                                    <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                                        <Code2 size={14} aria-hidden="true" />
+                                        <h2 id="module-description-title">About this module</h2>
+                                    </div>
+                                    <div className="rounded-xl border border-slate-800 bg-[#0d1116] p-5 md:p-7">
+                                        <h3 className="text-sm font-bold text-white">Description</h3>
+                                        <p className="mt-3 whitespace-pre-wrap text-sm font-medium leading-7 text-slate-400 md:text-[15px]">{addon.description || 'No description provided.'}</p>
+                                    </div>
+                                </section>
+
+                                <section aria-labelledby="module-configuration-title">
+                                    <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                                        <Settings2 size={14} aria-hidden="true" />
+                                        <h2 id="module-configuration-title">Configuration</h2>
+                                    </div>
+                                    <div className="rounded-xl border border-slate-800 bg-[#0d1116] p-5 md:p-7">
                                 {Object.values(addon.configSchema || {}).length === 0 ? (
                                     <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-5 text-sm text-slate-500">This module does not expose configurable fields.</div>
                                 ) : (
@@ -288,8 +333,71 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                         ))}
                                     </div>
                                 )}
-                            </section>
+                                    </div>
+                                </section>
+                            </div>
 
+                            <aside className="space-y-4 lg:sticky lg:top-24" aria-label="Module summary">
+                                <button
+                                    type="button"
+                                    onClick={() => setInstallPickerOpen(true)}
+                                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-sky-400/30 bg-sky-500 px-5 text-sm font-bold text-slate-950 transition-colors hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60"
+                                >
+                                    <Download size={16} aria-hidden="true" />
+                                    Install Module
+                                </button>
+
+                                <section className="rounded-xl border border-slate-800 bg-[#0d1116] p-5">
+                                    <div className="flex items-center gap-3 border-b border-slate-800 pb-5">
+                                        {isCurrentUserCreator && session?.user?.image ? (
+                                            <img src={getDiscordMediaProxyUrl(session.user.image)} alt="" className="h-11 w-11 rounded-full border border-slate-700 object-cover" />
+                                        ) : addon.isOfficial ? (
+                                            <span className="flex h-11 w-11 items-center justify-center rounded-full border border-sky-500/25 bg-sky-500/10"><img src="/Media/Ro-LinkIcon.png" alt="" className="h-7 w-7 object-contain" /></span>
+                                        ) : (
+                                            <span className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-400"><UserRound size={19} aria-hidden="true" /></span>
+                                        )}
+                                        <div className="min-w-0">
+                                            <p className="text-xs text-slate-500">Created by</p>
+                                            <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm font-bold text-white">
+                                                {creatorName}
+                                                {(addon.isOfficial || addon.creatorIsVerified) && <CheckCircle2 size={14} className="shrink-0 text-sky-400" aria-label="Verified creator" />}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <dl className="mt-5 space-y-4 text-sm">
+                                        <div className="flex items-center justify-between gap-4">
+                                            <dt className="flex items-center gap-2 text-slate-500"><CalendarDays size={15} aria-hidden="true" />Published</dt>
+                                            <dd className="text-right font-semibold text-slate-200">{formatDate(addon.publishedAt)}</dd>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-4">
+                                            <dt className="flex items-center gap-2 text-slate-500"><CalendarDays size={15} aria-hidden="true" />Updated</dt>
+                                            <dd className="text-right font-semibold text-slate-200">{formatDate(addon.updatedAt)}</dd>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-4">
+                                            <dt className="flex items-center gap-2 text-slate-500"><Package2 size={15} aria-hidden="true" />Version</dt>
+                                            <dd className="font-mono text-xs font-bold text-slate-200">v{addon.version}</dd>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-4">
+                                            <dt className="flex items-center gap-2 text-slate-500"><Settings2 size={15} aria-hidden="true" />Fields</dt>
+                                            <dd className="font-semibold text-slate-200">{Object.keys(addon.configSchema || {}).length}</dd>
+                                        </div>
+                                    </dl>
+                                </section>
+
+                                <section className="rounded-xl border border-slate-800 bg-[#0d1116] p-5">
+                                    <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                                        <Tag size={14} aria-hidden="true" />
+                                        Details
+                                    </div>
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                        <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-300">{addon.category}</span>
+                                        <span className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-xs font-semibold text-slate-300">v{addon.version}</span>
+                                        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClassName(addon.status)}`}>{statusLabel(addon.status)}</span>
+                                        {addon.isOfficial && <span className="rounded-full border border-sky-300/25 bg-sky-300/10 px-3 py-1 text-xs font-semibold text-sky-200">Official</span>}
+                                    </div>
+                                </section>
+                            </aside>
                         </div>
                     </section>
                 )}
