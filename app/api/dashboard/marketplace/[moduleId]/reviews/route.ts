@@ -82,7 +82,7 @@ async function getModuleReviewAccess(moduleId: string, userId: string) {
 
     return {
         addon,
-        canReview: addon.status === 'PUBLISHED' && !isCreator && hasInstalled,
+        canReview: addon.status === 'PUBLISHED' && (isCreator || hasInstalled),
         isCreator,
     };
 }
@@ -156,7 +156,6 @@ export async function POST(req: Request, context: RouteContext) {
     try {
         const access = await getModuleReviewAccess(moduleId, userId);
         if (!access) return NextResponse.json({ error: 'Published module not found.' }, { status: 404 });
-        if (access.isCreator) return NextResponse.json({ error: 'Creators cannot review their own modules.' }, { status: 403 });
         if (!access.canReview) {
             return NextResponse.json({ error: 'Install this module to a server before reviewing it.' }, { status: 403 });
         }

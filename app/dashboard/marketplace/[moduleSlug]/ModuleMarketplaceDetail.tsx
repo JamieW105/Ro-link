@@ -482,7 +482,9 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                                             <div>
                                                                 <h3 className="text-sm font-bold text-white">{reviews.some((review) => review.isOwn) ? 'Update your review' : 'Review this module'}</h3>
-                                                                <p className="mt-1 text-xs leading-5 text-slate-500">Your rating is linked to a verified module install.</p>
+                                                                <p className="mt-1 text-xs leading-5 text-slate-500">
+                                                                    {reviewIsCreator ? 'You are reviewing your own module.' : 'Your rating is linked to a verified module install.'}
+                                                                </p>
                                                             </div>
                                                             <div className="flex items-center gap-1" role="group" aria-label="Choose a rating">
                                                                 {Array.from({ length: 5 }, (_, index) => {
@@ -530,11 +532,9 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                                     </form>
                                                 ) : (
                                                     <div className="rounded-lg border border-slate-800 bg-slate-950/55 px-4 py-3 text-sm text-slate-500">
-                                                        {reviewIsCreator
-                                                            ? 'Creators cannot review their own modules.'
-                                                            : addon.status !== 'PUBLISHED'
-                                                                ? 'Reviews will open when this module is published.'
-                                                                : 'Install this module to one of your servers to leave a verified review.'}
+                                                        {addon.status !== 'PUBLISHED'
+                                                            ? 'Reviews will open when this module is published.'
+                                                            : 'Install this module to one of your servers to leave a verified review.'}
                                                     </div>
                                                 )}
 
