@@ -198,18 +198,6 @@ function formatDate(value: string | null) {
     return new Date(value).toLocaleDateString();
 }
 
-function statusClassName(status: string) {
-    if (status === 'PUBLISHED') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
-    if (status === 'PENDING_REVIEW') return 'border-amber-400/20 bg-amber-400/10 text-amber-300';
-    if (status === 'REJECTED') return 'border-red-400/20 bg-red-400/10 text-red-300';
-    return 'border-slate-700 bg-slate-950 text-slate-500';
-}
-
-function statusLabel(status: string) {
-    if (status === 'PENDING_REVIEW') return 'Awaiting Moderation';
-    return status.replace(/_/g, ' ');
-}
-
 function creatorLabel(addon: MarketplaceModule, sessionUserId?: string, sessionUserName?: string | null) {
     if (addon.authorDiscordId === sessionUserId) return sessionUserName || 'Your module';
     if (addon.isOfficial) return 'Ro-Link';
@@ -473,7 +461,7 @@ export default function DashboardMarketplacePage() {
                                             className="interactive-lift group flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-700/90 bg-[#101418] transition-colors hover:border-sky-500/60 hover:bg-[#11171c] focus-visible:border-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
                                             aria-label={`View ${addon.name}`}
                                         >
-                                            <div className="aspect-video w-full overflow-hidden border-b border-slate-800 bg-[#090d11]">
+                                            <div className="relative aspect-video w-full overflow-hidden border-b border-slate-800 bg-[#090d11]">
                                                 {addon.thumbnailUrl && (
                                                     <img
                                                         src={addon.thumbnailUrl}
@@ -481,24 +469,22 @@ export default function DashboardMarketplacePage() {
                                                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                                                     />
                                                 )}
+                                                {addon.authorDiscordId === sessionUserId && addon.status !== 'PUBLISHED' && (
+                                                    <span className="absolute left-2 top-2 rounded border border-indigo-300/30 bg-[#0b0f14]/90 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-200 shadow-sm backdrop-blur-sm">Yours</span>
+                                                )}
                                             </div>
 
                                             <div className="flex min-w-0 flex-1 flex-col px-3.5 pb-3 pt-3">
-                                                <div className="flex flex-wrap items-center gap-1.5">
-                                                    <span className="rounded border border-sky-500/25 bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-300">{addon.category}</span>
-                                                    <span className="rounded border border-slate-700 bg-slate-950/70 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-300">v{addon.version}</span>
-                                                    <span className={`rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${statusClassName(addon.status)}`}>{statusLabel(addon.status)}</span>
-                                                    {addon.authorDiscordId === sessionUserId && addon.status !== 'PUBLISHED' && (
-                                                        <span className="rounded border border-indigo-400/20 bg-indigo-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-300">Yours</span>
-                                                    )}
+                                                <div className="flex min-w-0 items-center gap-1.5">
+                                                    <h2 className="min-w-0 truncate text-sm font-bold text-sky-400 transition-colors group-hover:text-sky-300">{addon.name}</h2>
                                                     {addon.isOfficial && (
-                                                        <span className="rounded border border-sky-300/30 bg-sky-300/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-200">Official</span>
+                                                        <span className="group/official relative shrink-0" aria-label="Official">
+                                                            <img src="/Media/Ro-LinkIcon.png" alt="" className="h-4 w-4 rounded object-cover" />
+                                                            <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover/official:opacity-100">Official</span>
+                                                        </span>
                                                     )}
-                                                    {addon.creatorIsVerified && (
-                                                        <span className="rounded border border-emerald-300/30 bg-emerald-300/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-200">Verified</span>
-                                                    )}
+                                                    <span className="shrink-0 text-[10px] font-medium text-slate-500">v{addon.version}</span>
                                                 </div>
-                                                <h2 className="mt-3 line-clamp-1 text-sm font-bold text-sky-400 transition-colors group-hover:text-sky-300">{addon.name}</h2>
                                                 <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{addon.description || 'No description provided.'}</p>
                                                 {addon.status === 'PENDING_REVIEW' && (
                                                     <p className="mt-2 text-[10px] font-medium text-slate-500">Submitted {formatDate(addon.submittedAt)}</p>
@@ -516,7 +502,8 @@ export default function DashboardMarketplacePage() {
                                                     </span>
                                                 )}
                                                 <span className="min-w-0 truncate">{creatorLabel(addon, sessionUserId, session?.user?.name)}</span>
-                                                <span className="ml-auto flex shrink-0 items-center gap-1 text-slate-500" title="Configuration fields">
+                                                <span className="ml-auto shrink-0 text-slate-500">{addon.category}</span>
+                                                <span className="flex shrink-0 items-center gap-1 text-slate-500" title="Configuration fields">
                                                     <SlidersHorizontal size={13} aria-hidden="true" />
                                                     {Object.keys(addon.configSchema || {}).length}
                                                 </span>
