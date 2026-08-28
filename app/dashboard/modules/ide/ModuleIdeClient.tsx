@@ -792,7 +792,7 @@ export default function ModuleIdeClient() {
                     })}
                     {project && !flatFiles.length && <p className="p-4 text-xs text-slate-500">No project files match the search.</p>}
                 </div>
-                <div className="border-t border-white/8 p-2"><div className="mb-2 flex items-center justify-between px-1"><span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Studio Explorer</span><button disabled={!connected} onClick={() => void sendEvents([{ type: 'tree.snapshot', payload: {} }])} className="rounded p-1 text-slate-500 hover:text-white disabled:opacity-30"><RefreshCw className="h-3.5 w-3.5" /></button></div>{studioRoots.length ? studioRoots.map((root) => <StudioTreeNode key={root.id} node={root} onOpen={openStudioScript} onExpand={expandStudioNode} />) : <p className="rounded border border-dashed border-white/10 p-3 text-xs leading-5 text-slate-500">Connect Roblox Studio to browse your live game hierarchy.</p>}</div>
+                <div className="border-t border-white/8 p-2"><div className="mb-2 flex items-center justify-between px-1"><span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Studio Explorer</span><button disabled={!connected} onClick={() => void sendEvents([{ type: 'tree.snapshot', payload: {} }])} className="rounded p-1 text-slate-500 hover:text-white disabled:opacity-30"><RefreshCw className="h-3.5 w-3.5" /></button></div>{studioRoots.map((root) => <StudioTreeNode key={root.id} node={root} onOpen={openStudioScript} onExpand={expandStudioNode} />)}</div>
             </aside>
             <div onPointerDown={(event) => beginResize('left', event)} className="cursor-col-resize bg-white/[0.04] hover:bg-sky-400/50" />
 
