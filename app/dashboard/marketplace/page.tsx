@@ -3,6 +3,7 @@
 import {
     ArrowRight,
     Boxes,
+    Check,
     ChevronDown,
     CircleUserRound,
     Clock3,
@@ -17,7 +18,7 @@ import {
 
 import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
-import { useEffect, useMemo, useState } from 'react';
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 
 type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
@@ -60,6 +61,133 @@ type SessionUserWithId = {
 
 type CreatorFilter = 'all' | 'official' | 'verified' | 'community' | 'yours';
 type SortOption = 'latest' | 'oldest' | 'name';
+
+interface MarketplaceSelectOption<T extends string> {
+    value: T;
+    label: string;
+}
+
+interface MarketplaceSelectProps<T extends string> {
+    id: string;
+    label: string;
+    value: T;
+    options: MarketplaceSelectOption<T>[];
+    icon: ReactNode;
+    onChange: (value: T) => void;
+}
+
+function MarketplaceSelect<T extends string>({ id, label, value, options, icon, onChange }: MarketplaceSelectProps<T>) {
+    const [open, setOpen] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(() => Math.max(0, options.findIndex((option) => option.value === value)));
+    const rootRef = useRef<HTMLDivElement>(null);
+    const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+    const selectedOption = options.find((option) => option.value === value) || options[0];
+
+    useEffect(() => {
+        if (!open) return;
+
+        function closeOnOutsidePointer(event: PointerEvent) {
+            if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+        }
+
+        document.addEventListener('pointerdown', closeOnOutsidePointer);
+        return () => document.removeEventListener('pointerdown', closeOnOutsidePointer);
+    }, [open]);
+
+    useEffect(() => {
+        if (!open) return;
+        optionRefs.current[activeIndex]?.focus();
+    }, [activeIndex, open]);
+
+    function openMenu(index = Math.max(0, options.findIndex((option) => option.value === value))) {
+        setActiveIndex(index);
+        setOpen(true);
+    }
+
+    function selectOption(option: MarketplaceSelectOption<T>) {
+        onChange(option.value);
+        setOpen(false);
+        window.requestAnimationFrame(() => document.getElementById(id)?.focus());
+    }
+
+    function handleButtonKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            const selectedIndex = Math.max(0, options.findIndex((option) => option.value === value));
+            const offset = event.key === 'ArrowDown' ? 1 : -1;
+            openMenu((selectedIndex + offset + options.length) % options.length);
+        }
+    }
+
+    function handleOptionKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            setOpen(false);
+            window.requestAnimationFrame(() => document.getElementById(id)?.focus());
+            return;
+        }
+
+        let nextIndex = index;
+        if (event.key === 'ArrowDown') nextIndex = (index + 1) % options.length;
+        else if (event.key === 'ArrowUp') nextIndex = (index - 1 + options.length) % options.length;
+        else if (event.key === 'Home') nextIndex = 0;
+        else if (event.key === 'End') nextIndex = options.length - 1;
+        else return;
+
+        event.preventDefault();
+        setActiveIndex(nextIndex);
+    }
+
+    return (
+        <div ref={rootRef} className="relative min-w-0">
+            <button
+                id={id}
+                type="button"
+                aria-label={label}
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                aria-controls={`${id}-options`}
+                onClick={() => (open ? setOpen(false) : openMenu())}
+                onKeyDown={handleButtonKeyDown}
+                className={`flex h-10 w-full items-center gap-2 rounded-lg border bg-[#0d1116] px-2.5 text-sm font-semibold text-white outline-none transition-colors hover:border-slate-700 focus:ring-2 focus:ring-sky-500/10 ${open ? 'border-sky-500/60' : 'border-slate-800'}`}
+            >
+                <span className="shrink-0 text-slate-500" aria-hidden="true">{icon}</span>
+                <span className="min-w-0 flex-1 truncate text-left">{selectedOption?.label}</span>
+                <ChevronDown size={14} aria-hidden="true" className={`shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+
+            {open && (
+                <div
+                    id={`${id}-options`}
+                    role="listbox"
+                    aria-label={label}
+                    className="absolute left-0 right-0 z-30 mt-1.5 overflow-hidden rounded-lg border border-slate-700 bg-[#111820] p-1 shadow-2xl shadow-black/50"
+                >
+                    {options.map((option, index) => {
+                        const selected = option.value === value;
+                        return (
+                            <button
+                                key={option.value}
+                                ref={(node) => { optionRefs.current[index] = node; }}
+                                type="button"
+                                role="option"
+                                aria-selected={selected}
+                                tabIndex={index === activeIndex ? 0 : -1}
+                                onMouseEnter={() => setActiveIndex(index)}
+                                onClick={() => selectOption(option)}
+                                onKeyDown={(event) => handleOptionKeyDown(event, index)}
+                                className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm outline-none transition-colors ${selected ? 'bg-sky-500/15 font-semibold text-sky-200' : 'text-slate-300 hover:bg-white/[0.06] hover:text-white focus:bg-white/[0.06] focus:text-white'}`}
+                            >
+                                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                                {selected && <Check size={14} className="shrink-0 text-sky-300" aria-hidden="true" />}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
 
 const LogOutIcon = () => (
     <LucideLogOut width="14" height="14" strokeWidth="2" />
@@ -218,7 +346,13 @@ export default function DashboardMarketplacePage() {
                             </button>
                         </div>
                         <div className="rl-dashboard-avatar-wrap">
-                            <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="rl-dashboard-avatar" />
+                            {session?.user?.image ? (
+                                <img src={getDiscordMediaProxyUrl(session.user.image)} alt="" className="rl-dashboard-avatar" />
+                            ) : (
+                                <span className="rl-dashboard-avatar flex items-center justify-center bg-slate-900 text-slate-500" aria-hidden="true">
+                                    <CircleUserRound size={19} />
+                                </span>
+                            )}
                             <button type="button" onClick={handleSignOut} className="rl-dashboard-mobile-signout" aria-label="Sign out">
                                 <LogOutIcon />
                             </button>
@@ -283,54 +417,45 @@ export default function DashboardMarketplacePage() {
                                     />
                                 </label>
 
-                                <label className="relative block" htmlFor="marketplace-creator-filter">
-                                    <span className="sr-only">Filter by creator</span>
-                                    <Shapes size={15} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                    <select
-                                        id="marketplace-creator-filter"
-                                        value={creatorFilter}
-                                        onChange={(event) => setCreatorFilter(event.target.value as CreatorFilter)}
-                                        className="h-10 w-full appearance-none rounded-lg border border-slate-800 bg-[#0d1116] pl-9 pr-9 text-sm font-semibold text-white outline-none transition-colors hover:border-slate-700 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
-                                    >
-                                        <option value="all">All modules</option>
-                                        <option value="official">Official</option>
-                                        <option value="verified">Verified creators</option>
-                                        <option value="community">Community</option>
-                                        <option value="yours">Your modules</option>
-                                    </select>
-                                    <ChevronDown size={14} aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                </label>
+                                <MarketplaceSelect
+                                    id="marketplace-creator-filter"
+                                    label="Filter by creator"
+                                    value={creatorFilter}
+                                    onChange={setCreatorFilter}
+                                    icon={<Shapes size={15} />}
+                                    options={[
+                                        { value: 'all', label: 'All modules' },
+                                        { value: 'official', label: 'Official' },
+                                        { value: 'verified', label: 'Verified creators' },
+                                        { value: 'community', label: 'Community' },
+                                        { value: 'yours', label: 'Your modules' },
+                                    ]}
+                                />
 
-                                <label className="relative block" htmlFor="marketplace-category-filter">
-                                    <span className="sr-only">Filter by category</span>
-                                    <Layers3 size={15} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                    <select
-                                        id="marketplace-category-filter"
-                                        value={categoryFilter}
-                                        onChange={(event) => setCategoryFilter(event.target.value)}
-                                        className="h-10 w-full appearance-none rounded-lg border border-slate-800 bg-[#0d1116] pl-9 pr-9 text-sm font-semibold text-white outline-none transition-colors hover:border-slate-700 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
-                                    >
-                                        <option value="all">All categories</option>
-                                        {categories.map((category) => <option key={category} value={category}>{category}</option>)}
-                                    </select>
-                                    <ChevronDown size={14} aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                </label>
+                                <MarketplaceSelect
+                                    id="marketplace-category-filter"
+                                    label="Filter by category"
+                                    value={categoryFilter}
+                                    onChange={setCategoryFilter}
+                                    icon={<Layers3 size={15} />}
+                                    options={[
+                                        { value: 'all', label: 'All categories' },
+                                        ...categories.map((category) => ({ value: category, label: category })),
+                                    ]}
+                                />
 
-                                <label className="relative block" htmlFor="marketplace-sort">
-                                    <span className="sr-only">Sort modules</span>
-                                    <Clock3 size={15} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                    <select
-                                        id="marketplace-sort"
-                                        value={sortOption}
-                                        onChange={(event) => setSortOption(event.target.value as SortOption)}
-                                        className="h-10 w-full appearance-none rounded-lg border border-slate-800 bg-[#0d1116] pl-9 pr-9 text-sm font-semibold text-white outline-none transition-colors hover:border-slate-700 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
-                                    >
-                                        <option value="latest">Latest</option>
-                                        <option value="oldest">Oldest</option>
-                                        <option value="name">Name A–Z</option>
-                                    </select>
-                                    <ChevronDown size={14} aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                </label>
+                                <MarketplaceSelect
+                                    id="marketplace-sort"
+                                    label="Sort modules"
+                                    value={sortOption}
+                                    onChange={setSortOption}
+                                    icon={<Clock3 size={15} />}
+                                    options={[
+                                        { value: 'latest', label: 'Latest' },
+                                        { value: 'oldest', label: 'Oldest' },
+                                        { value: 'name', label: 'Name A–Z' },
+                                    ]}
+                                />
                             </div>
 
                             {filteredModules.length === 0 ? (
