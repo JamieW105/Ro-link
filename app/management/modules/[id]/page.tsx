@@ -1,694 +1,198 @@
 'use client';
 
-import { Check as LucideCheck, X as LucideX } from 'lucide-react';
-
+import { AlertTriangle, Check, ChevronRight, Code2, FileCode2, FileJson, Folder, Image as ImageIcon, PlugZap, Save, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { LuauCodeBlock, LuauCodeEditor } from '@/components/dashboard/LuauSyntax';
+import ModuleIdeEditor from '@/components/dashboard/ModuleIdeEditor';
 import { runModuleReviewChecks } from '@/lib/moduleReviewChecks';
 
 type ModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
-type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
+type ProjectFile = { id: string; path: string; name: string; kind: 'folder' | 'server_script' | 'client_script' | 'shared_module' | 'ui' | 'manifest'; sourceCode: string | null; revision: number };
+type ReviewProject = {
+    module: { id: string; slug: string; name: string; description: string; thumbnailUrl: string; thumbnailUrls: string[]; version: string; status: ModuleStatus };
+    project: { revision: number; manifest: { entrypoints: { server?: string; client?: string } }; requiredRuntimeVersion: string };
+    files: ProjectFile[];
+    moderationEdits: Array<{ id: string; edit_type: string; target: string; reason: string; moderator_discord_id: string; created_at: string }>;
+    disputes: Array<{ id: string; reason: string; status: string; moderator_response: string; created_at: string }>;
+    auditAvailable: boolean;
+};
 
-interface ModuleConfigField {
-    key: string;
-    label: string;
-    shortDescription: string;
-    type: ModuleConfigFieldType;
-    options: string[];
-    defaultValue: boolean | string | string[] | number | Record<string, unknown>;
+function fileIcon(file: ProjectFile) {
+    if (file.kind === 'folder') return <Folder className="h-3.5 w-3.5 text-sky-300" />;
+    if (file.kind === 'manifest') return <FileJson className="h-3.5 w-3.5 text-amber-300" />;
+    return <FileCode2 className="h-3.5 w-3.5 text-slate-400" />;
 }
 
-interface AddonModule {
-    id: string;
-    slug: string;
-    name: string;
-    description: string;
-    thumbnailUrl: string;
-    version: string;
-    category: string;
-    status: ModuleStatus;
-    isOfficial: boolean;
-    sourceCode?: string;
-    sourceChecksum: string;
-    configSchema?: Record<string, ModuleConfigField>;
-    authorDiscordId: string | null;
-    submittedAt: string | null;
-    reviewedAt: string | null;
-    reviewedByDiscordId: string | null;
-    moderationNote: string;
-    updatedAt: string | null;
-    publishedAt: string | null;
-    creatorHistory?: AddonModule[];
+function statusTone(status: ModuleStatus) {
+    if (status === 'PUBLISHED') return 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300';
+    if (status === 'PENDING_REVIEW') return 'border-amber-400/25 bg-amber-400/10 text-amber-300';
+    if (status === 'REJECTED') return 'border-red-400/25 bg-red-400/10 text-red-300';
+    return 'border-white/10 bg-white/[0.03] text-slate-400';
 }
 
-interface CreatorBlock {
-    discord_id: string;
-    reason: string;
-    active: boolean;
-}
-
-function formatDate(value: string | null | undefined) {
-    if (!value) return 'Never';
-    return new Date(value).toLocaleString();
-}
-
-function statusClassName(status: ModuleStatus) {
-    if (status === 'PUBLISHED') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
-    if (status === 'PENDING_REVIEW') return 'border-amber-400/20 bg-amber-400/10 text-amber-300';
-    if (status === 'REJECTED') return 'border-red-400/20 bg-red-400/10 text-red-300';
-    return 'border-slate-700 bg-slate-950 text-slate-500';
-}
-
-function formatDefaultValue(value: ModuleConfigField['defaultValue']) {
-    if (Array.isArray(value)) {
-        return value.length > 0 ? value.join(', ') : 'None';
-    }
-
-    if (typeof value === 'boolean') {
-        return value ? 'Enabled' : 'Disabled';
-    }
-
-    if (typeof value === 'number') {
-        return String(value);
-    }
-
-    if (value && typeof value === 'object') {
-        return JSON.stringify(value);
-    }
-
-    return value || 'None';
-}
-
-function fieldDescription(field: ModuleConfigField) {
-    if (field.shortDescription) return field.shortDescription;
-    if (field.type === 'bool') return 'Toggle this module setting on or off.';
-    if (field.type === 'dropdown') return 'Choose one available option.';
-    if (field.type === 'checkboxes') return 'Choose any available options.';
-    if (field.type === 'integer') return 'Whole-number value saved for this module.';
-    if (field.type === 'string') return 'Free-form text value saved for this module.';
-    if (field.type === 'group') return 'Grouped inputs sent together for a module action.';
-    if (field.type === 'player') return 'Searchable Roblox player selector.';
-    if (field.type === 'server') return 'Searchable live server selector.';
-    return 'Pick a hex color value.';
-}
-
-function CheckIcon() {
-    return (
-        <LucideCheck aria-hidden="true" className="h-4 w-4" />
-    );
-}
-
-function XIcon() {
-    return (
-        <LucideX aria-hidden="true" className="h-4 w-4" />
-    );
-}
-
-function historyStatusTone(status: ModuleStatus) {
-    if (status === 'PUBLISHED') return 'text-emerald-300';
-    if (status === 'REJECTED' || status === 'ARCHIVED') return 'text-red-300';
-    if (status === 'PENDING_REVIEW') return 'text-amber-300';
-    return 'text-slate-500';
-}
-
-function historyStatusIcon(status: ModuleStatus) {
-    return status === 'PUBLISHED' ? <CheckIcon /> : <XIcon />;
+async function readPayload(response: Response) {
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(String(payload.error || 'Request failed.'));
+    return payload;
 }
 
 export default function ManagementModuleReviewPage() {
     const params = useParams();
     const router = useRouter();
     const moduleId = Array.isArray(params.id) ? params.id[0] : String(params.id || '');
-    const [module, setModule] = useState<AddonModule | null>(null);
-    const [creatorBlocks, setCreatorBlocks] = useState<CreatorBlock[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [data, setData] = useState<ReviewProject | null>(null);
+    const [activeFileId, setActiveFileId] = useState('');
+    const [draft, setDraft] = useState('');
+    const [codeReason, setCodeReason] = useState('');
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [thumbnailUrls, setThumbnailUrls] = useState<string[]>([]);
+    const [metadataReason, setMetadataReason] = useState('');
+    const [decisionReason, setDecisionReason] = useState('');
+    const [pairing, setPairing] = useState<{ code: string; expiresAt: string } | null>(null);
+    const [studioSession, setStudioSession] = useState<{ place_name?: string; place_id?: string } | null>(null);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
-    const [editingSource, setEditingSource] = useState(false);
-    const [editedSourceCode, setEditedSourceCode] = useState('');
-    const [codeEditReason, setCodeEditReason] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [notice, setNotice] = useState('');
+    const [rightTab, setRightTab] = useState<'moderate' | 'history' | 'disputes'>('moderate');
 
-    const history = useMemo(() => module?.creatorHistory || [], [module]);
-    const configFields = useMemo(() => Object.values(module?.configSchema || {}), [module]);
-    const reviewChecks = useMemo(() => {
-        if (!module) return [];
-
-        return runModuleReviewChecks({
-            name: module.name,
-            slug: module.slug,
-            description: module.description,
-            version: module.version,
-            category: module.category,
-            isOfficial: module.isOfficial,
-            sourceCode: editingSource ? editedSourceCode : module.sourceCode || '',
-            moderationNote: module.moderationNote,
-            configSchema: module.configSchema,
-        });
-    }, [editedSourceCode, editingSource, module]);
-    const failedReviewChecks = useMemo(
-        () => reviewChecks.filter((check) => check.status === 'fail'),
-        [reviewChecks],
-    );
-    const creatorBlocked = useMemo(() => {
-        if (!module?.authorDiscordId) return false;
-        return creatorBlocks.some((block) => block.active && block.discord_id === module.authorDiscordId);
-    }, [creatorBlocks, module?.authorDiscordId]);
-
-    const loadModule = useCallback(async () => {
+    const load = useCallback(async () => {
         if (!moduleId) return;
-        setLoading(true);
-        setError(null);
-
+        setLoading(true); setError('');
         try {
-            const [moduleResponse, blocksResponse] = await Promise.all([
-                fetch(`/api/management/modules/${moduleId}`, { cache: 'no-store' }),
-                fetch('/api/management/module-creator-blocks', { cache: 'no-store' }),
-            ]);
-            const modulePayload = await moduleResponse.json().catch(() => ({}));
-            if (!moduleResponse.ok) {
-                throw new Error(String(modulePayload.error || 'Failed to load module.'));
-            }
-            setModule(modulePayload as AddonModule);
-            setEditedSourceCode(String((modulePayload as AddonModule).sourceCode || ''));
-            setCodeEditReason('');
-            setEditingSource(false);
-
-            const blocksPayload = await blocksResponse.json().catch(() => ([]));
-            if (blocksResponse.ok) {
-                setCreatorBlocks(Array.isArray(blocksPayload) ? blocksPayload : []);
-            }
-        } catch (loadError) {
-            setError(loadError instanceof Error ? loadError.message : 'Failed to load module.');
-        } finally {
-            setLoading(false);
-        }
+            const payload = await readPayload(await fetch(`/api/management/modules/${moduleId}/review`, { cache: 'no-store' })) as ReviewProject;
+            setData(payload); setTitle(payload.module.name); setDescription(payload.module.description); setThumbnailUrls(payload.module.thumbnailUrls || []);
+            const firstFile = payload.files.find((file) => file.kind !== 'folder') || null;
+            setActiveFileId((current) => payload.files.some((file) => file.id === current) ? current : firstFile?.id || '');
+        } catch (reason) { setError(reason instanceof Error ? reason.message : 'Failed to load review project.'); }
+        finally { setLoading(false); }
     }, [moduleId]);
 
+    useEffect(() => { void load(); }, [load]);
+    const activeFile = useMemo(() => data?.files.find((file) => file.id === activeFileId) || null, [activeFileId, data]);
+    useEffect(() => { setDraft(activeFile?.sourceCode || ''); setCodeReason(''); }, [activeFile?.id, activeFile?.revision, activeFile?.sourceCode]);
+
     useEffect(() => {
-        loadModule();
-    }, [loadModule]);
+        if (!moduleId || !pairing) return;
+        let cancelled = false;
+        const check = async () => {
+            try {
+                const payload = await readPayload(await fetch(`/api/management/modules/${moduleId}/review/studio`, { cache: 'no-store' }));
+                if (!cancelled && payload.session) setStudioSession(payload.session);
+            } catch { /* a later poll can recover */ }
+        };
+        void check();
+        const timer = window.setInterval(check, 3000);
+        return () => { cancelled = true; window.clearInterval(timer); };
+    }, [moduleId, pairing]);
 
-    async function getNextPendingModuleId(currentModuleId: string) {
-        const response = await fetch('/api/management/modules', { cache: 'no-store' });
-        const payload = await response.json().catch(() => ([]));
-        if (!response.ok || !Array.isArray(payload)) {
-            return null;
-        }
+    const reviewChecks = useMemo(() => {
+        if (!data) return [];
+        const serverPath = data.project.manifest.entrypoints.server;
+        const serverFile = data.files.find((file) => file.path === serverPath);
+        return runModuleReviewChecks({ name: title, slug: data.module.slug, description, version: data.module.version, category: 'module', isOfficial: false, sourceCode: activeFile?.path === serverPath ? draft : serverFile?.sourceCode || '', moderationNote: decisionReason, configSchema: {} });
+    }, [activeFile?.path, data, decisionReason, description, draft, title]);
 
-        const pendingModules = (payload as AddonModule[]).filter((addon) => addon.status === 'PENDING_REVIEW');
-        const currentIndex = pendingModules.findIndex((addon) => addon.id === currentModuleId);
-        if (currentIndex >= 0) {
-            return pendingModules[currentIndex + 1]?.id || null;
-        }
+    const dirtyCode = Boolean(activeFile && draft !== (activeFile.sourceCode || ''));
+    const titleDirty = Boolean(data && title !== data.module.name);
+    const descriptionDirty = Boolean(data && description !== data.module.description);
+    const thumbnailsDirty = Boolean(data && JSON.stringify(thumbnailUrls) !== JSON.stringify(data.module.thumbnailUrls));
 
-        return pendingModules.find((addon) => addon.id !== currentModuleId)?.id || null;
-    }
-
-    async function copySource() {
-        if (!module) return;
-        await navigator.clipboard.writeText(module.sourceCode || '');
-        setSuccess(`Copied ${module.name} source code.`);
-    }
-
-    function startSourceEdit() {
-        if (!module) return;
-        setEditedSourceCode(module.sourceCode || '');
-        setCodeEditReason('');
-        setEditingSource(true);
-        setError(null);
-        setSuccess(null);
-    }
-
-    function cancelSourceEdit() {
-        setEditedSourceCode(module?.sourceCode || '');
-        setCodeEditReason('');
-        setEditingSource(false);
-        setError(null);
-    }
-
-    async function saveSourceEdit() {
-        if (!module) return;
-
-        const nextSourceCode = editedSourceCode.trim();
-        const reason = codeEditReason.trim();
-
-        if (!nextSourceCode) {
-            setError('Module source code is required.');
-            return;
-        }
-
-        if (nextSourceCode === (module.sourceCode || '').trim()) {
-            setError('Change the source code before saving an edit.');
-            return;
-        }
-
-        if (!reason) {
-            setError('A code edit reason is required.');
-            return;
-        }
-
-        setSaving(true);
-        setError(null);
-        setSuccess(null);
-
+    async function saveCode() {
+        if (!activeFile || !dirtyCode) return;
+        setSaving(true); setError(''); setNotice('');
         try {
-            const response = await fetch(`/api/management/modules/${module.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sourceCode: nextSourceCode,
-                    codeEditReason: reason,
-                }),
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(String(payload.error || 'Failed to save source edit.'));
-            }
-
-            setSuccess('Module source updated. The creator was notified.');
-            await loadModule();
-        } catch (saveError) {
-            setError(saveError instanceof Error ? saveError.message : 'Failed to save source edit.');
-        } finally {
-            setSaving(false);
-        }
+            await readPayload(await fetch(`/api/management/modules/${moduleId}/review`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'file', fileId: activeFile.id, sourceCode: draft, expectedRevision: activeFile.revision, reason: codeReason }) }));
+            setNotice(`Saved ${activeFile.path}. The reason was added to the moderation audit.`); await load();
+        } catch (reason) { setError(reason instanceof Error ? reason.message : 'Failed to save code.'); }
+        finally { setSaving(false); }
     }
 
-    async function reviewModule(status: 'PUBLISHED' | 'REJECTED') {
-        if (!module) return;
-        const moderationNote = status === 'REJECTED'
-            ? prompt('Reason for denying this module?') || 'Denied by moderation.'
-            : '';
-
-        setSaving(true);
-        setError(null);
-        setSuccess(null);
-
+    async function saveMetadata(field: 'title' | 'description' | 'thumbnails') {
+        setSaving(true); setError(''); setNotice('');
         try {
-            const nextPendingModuleId = await getNextPendingModuleId(module.id).catch(() => null);
-            const response = await fetch(`/api/management/modules/${module.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status, moderationNote }),
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(String(payload.error || 'Failed to review module.'));
-            }
-
-            if (nextPendingModuleId) {
-                router.replace(`/management/modules/${nextPendingModuleId}`);
-                return;
-            }
-
-            setSuccess(status === 'PUBLISHED'
-                ? 'Module accepted and published. No more modules are awaiting moderation.'
-                : 'Module denied. No more modules are awaiting moderation.');
-            await loadModule();
-        } catch (reviewError) {
-            setError(reviewError instanceof Error ? reviewError.message : 'Failed to review module.');
-        } finally {
-            setSaving(false);
-        }
+            const value = field === 'title' ? title : field === 'description' ? description : thumbnailUrls;
+            await readPayload(await fetch(`/api/management/modules/${moduleId}/review`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'metadata', field, value, reason: metadataReason }) }));
+            setNotice(`${field === 'title' ? 'Title' : field === 'description' ? 'Description' : 'Thumbnails'} updated with an audit reason.`); await load();
+        } catch (reason) { setError(reason instanceof Error ? reason.message : 'Failed to save metadata.'); }
+        finally { setSaving(false); }
     }
 
-    async function blockCreator() {
-        if (!module?.authorDiscordId) {
-            setError('This module does not have a creator Discord ID.');
-            return;
-        }
-
-        const reason = prompt('Reason for blocking this creator from submitting modules?') || 'Repeated module terms violations.';
-        setSaving(true);
-        setError(null);
-        setSuccess(null);
-
+    async function decide(status: 'PUBLISHED' | 'REJECTED') {
+        if (status === 'REJECTED' && decisionReason.trim().length < 20) { setError('Give the uploader a specific denial reason of at least 20 characters.'); return; }
+        setSaving(true); setError(''); setNotice('');
         try {
-            const response = await fetch('/api/management/module-creator-blocks', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ discordId: module.authorDiscordId, reason, active: true }),
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(String(payload.error || 'Failed to block creator.'));
-            }
-
-            setSuccess('Creator blocked from future module submissions.');
-            await loadModule();
-        } catch (blockError) {
-            setError(blockError instanceof Error ? blockError.message : 'Failed to block creator.');
-        } finally {
-            setSaving(false);
-        }
+            await readPayload(await fetch(`/api/management/modules/${moduleId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, moderationNote: decisionReason.trim() }) }));
+            const list = await readPayload(await fetch('/api/management/modules', { cache: 'no-store' })) as Array<{ id: string; status: ModuleStatus }>;
+            const next = list.find((item) => item.id !== moduleId && item.status === 'PENDING_REVIEW');
+            if (next) router.push(`/management/modules/${next.id}`);
+            else { setNotice(status === 'PUBLISHED' ? 'Module approved and published.' : 'Module denied. Its owner can still test, dispute, edit, and resubmit it.'); await load(); }
+        } catch (reason) { setError(reason instanceof Error ? reason.message : 'Failed to record decision.'); }
+        finally { setSaving(false); }
     }
 
-    async function deleteModule() {
-        if (!module || !confirm(`Delete ${module.name}? Installed copies will be removed from servers.`)) return;
+    async function connectStudio() {
+        setError(''); setNotice('');
+        try { const payload = await readPayload(await fetch(`/api/management/modules/${moduleId}/review/studio`, { method: 'POST' })); setPairing(payload); setStudioSession(null); }
+        catch (reason) { setError(reason instanceof Error ? reason.message : 'Failed to create review code.'); }
+    }
 
-        setSaving(true);
-        setError(null);
-        setSuccess(null);
-
+    async function resolveDispute(disputeId: string, status: 'UPHELD' | 'OVERTURNED') {
+        const response = window.prompt(status === 'OVERTURNED'
+            ? 'Explain why the denial is being overturned and the module reopened.'
+            : 'Explain why the original denial is being upheld.')?.trim() || '';
+        if (!response) return;
+        setSaving(true); setError(''); setNotice('');
         try {
-            const response = await fetch(`/api/management/modules/${module.id}`, { method: 'DELETE' });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(String(payload.error || 'Failed to delete module.'));
-            }
-
-            router.push('/management/modules');
-        } catch (deleteError) {
-            setError(deleteError instanceof Error ? deleteError.message : 'Failed to delete module.');
-        } finally {
-            setSaving(false);
-        }
+            await readPayload(await fetch(`/api/management/modules/${moduleId}/review`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'dispute', disputeId, status, reason: response }) }));
+            setNotice(status === 'OVERTURNED' ? 'Dispute accepted and the module reopened for review.' : 'Dispute resolved with the denial upheld.');
+            await load();
+        } catch (reason) { setError(reason instanceof Error ? reason.message : 'Failed to resolve dispute.'); }
+        finally { setSaving(false); }
     }
 
-    if (loading) {
-        return (
-            <div className="flex min-h-[60vh] items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-600 border-t-transparent"></div>
-            </div>
-        );
-    }
+    if (loading && !data) return <div className="flex min-h-[70vh] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" /></div>;
+    if (!data) return <div className="rounded-xl border border-red-400/20 bg-red-400/10 p-5 text-red-200">{error || 'Module not found.'}</div>;
+    const expiresIn = pairing ? Math.max(0, Math.ceil((new Date(pairing.expiresAt).getTime() - Date.now()) / 60000)) : 0;
+    const editableFiles = data.files.filter((file) => file.kind !== 'folder');
 
-    if (!module) {
-        return (
-            <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
-                {error || 'Module not found.'}
-            </div>
-        );
-    }
-
-    return (
-        <div className="space-y-6">
-            <header className="flex flex-col gap-5 border-b border-slate-800 pb-6 xl:flex-row xl:items-start xl:justify-between">
-                <div className="min-w-0">
-                    <Link href="/management/modules" className="text-xs font-bold uppercase tracking-widest text-sky-300 hover:text-sky-200">
-                        Back to modules
-                    </Link>
-                    {module.thumbnailUrl && <img src={module.thumbnailUrl} alt="" className="mt-4 aspect-video w-full max-w-sm rounded-xl border border-slate-700 object-cover" />}
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(module.status)}`}>
-                            {module.status}
-                        </span>
-                        {module.isOfficial && (
-                            <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
-                                Official
-                            </span>
-                        )}
-                        {creatorBlocked && (
-                            <span className="rounded-md border border-red-400/20 bg-red-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-red-300">
-                                Creator blocked
-                            </span>
-                        )}
-                    </div>
-                    <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-white md:text-5xl">{module.name}</h1>
-                    <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">{module.description || 'No description provided.'}</p>
-                    <div className="mt-4 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                        <span>{module.slug}</span>
-                        <span>{module.category}</span>
-                        <span>v{module.version}</span>
-                        <span>{module.sourceChecksum.slice(0, 12)}</span>
-                    </div>
-                </div>
-                <div className="flex flex-wrap gap-2 xl:justify-end">
-                    <button
-                        onClick={copySource}
-                        className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-bold text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
-                    >
-                        Copy Code
-                    </button>
-                    <button
-                        onClick={() => reviewModule('PUBLISHED')}
-                        disabled={saving || module.status === 'PUBLISHED'}
-                        className="rounded-lg border border-emerald-500/30 px-4 py-2 text-xs font-bold text-emerald-300 transition-colors hover:bg-emerald-500/10 disabled:opacity-50"
-                    >
-                        Accept
-                    </button>
-                    <button
-                        onClick={() => reviewModule('REJECTED')}
-                        disabled={saving || module.status === 'REJECTED'}
-                        className="rounded-lg border border-red-500/30 px-4 py-2 text-xs font-bold text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
-                    >
-                        Deny
-                    </button>
-                    <button
-                        onClick={blockCreator}
-                        disabled={saving || !module.authorDiscordId || creatorBlocked}
-                        className="rounded-lg border border-red-500/30 px-4 py-2 text-xs font-bold text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
-                    >
-                        {creatorBlocked ? 'Blocked' : 'Block Creator'}
-                    </button>
-                    <button
-                        onClick={deleteModule}
-                        disabled={saving}
-                        className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-bold text-slate-300 transition-colors hover:border-red-500/50 hover:text-red-300 disabled:opacity-50"
-                    >
-                        Delete
-                    </button>
-                </div>
-            </header>
-
-            {error && (
-                <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
-                    {error}
-                </div>
-            )}
-            {success && (
-                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-5 py-4 text-sm font-medium text-emerald-300">
-                    {success}
-                </div>
-            )}
-
-            <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-                <div className="min-w-0 space-y-6">
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/40">
-                        <div className="flex flex-col gap-3 border-b border-slate-800 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                            <h2 className="text-sm font-bold uppercase tracking-widest text-white">Submitted Source</h2>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-mono text-xs text-slate-500">{(editingSource ? editedSourceCode : module.sourceCode || '').length.toLocaleString()} chars</span>
-                                {editingSource ? (
-                                    <>
-                                        <button
-                                            onClick={cancelSourceEdit}
-                                            disabled={saving}
-                                            className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-bold text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={saveSourceEdit}
-                                            disabled={saving || !editedSourceCode.trim() || !codeEditReason.trim() || editedSourceCode.trim() === (module.sourceCode || '').trim()}
-                                            className="rounded-lg border border-emerald-500/30 px-3 py-2 text-xs font-bold text-emerald-300 transition-colors hover:bg-emerald-500/10 disabled:opacity-50"
-                                        >
-                                            {saving ? 'Saving' : 'Save Code'}
-                                        </button>
-                                    </>
-                                ) : (
-                                    <button
-                                        onClick={startSourceEdit}
-                                        disabled={saving}
-                                        className="rounded-lg border border-sky-500/30 px-3 py-2 text-xs font-bold text-sky-300 transition-colors hover:bg-sky-500/10 disabled:opacity-50"
-                                    >
-                                        Edit Code
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                        {editingSource ? (
-                            <div className="space-y-4 p-5">
-                                <LuauCodeEditor
-                                    value={editedSourceCode}
-                                    onChange={(event) => setEditedSourceCode(event.target.value)}
-                                    minHeightClassName="min-h-[60vh]"
-                                />
-                                <div>
-                                    <label className="text-xs font-bold uppercase tracking-widest text-slate-500">
-                                        Edit Justification
-                                    </label>
-                                    <textarea
-                                        value={codeEditReason}
-                                        onChange={(event) => setCodeEditReason(event.target.value)}
-                                        maxLength={1000}
-                                        placeholder="Explain why moderation changed this code."
-                                        className="mt-2 min-h-24 w-full resize-y rounded-lg border border-slate-800 bg-slate-950 p-3 text-sm leading-relaxed text-slate-200 outline-none transition-colors focus:border-sky-500"
-                                    />
-                                </div>
-                            </div>
-                        ) : (
-                            <LuauCodeBlock
-                                code={module.sourceCode || ''}
-                                emptyFallback="Source was cleared or is unavailable."
-                                className="max-h-[70vh] p-5"
-                            />
-                        )}
-                    </div>
-
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                            <div>
-                                <h2 className="text-sm font-bold uppercase tracking-widest text-white">Available Configs</h2>
-                                <p className="mt-1 text-xs text-slate-500">Parsed from this submission&apos;s top-level CONFIG block.</p>
-                            </div>
-                            <div className="text-xs font-bold uppercase tracking-widest text-slate-500">
-                                {configFields.length} {configFields.length === 1 ? 'field' : 'fields'}
-                            </div>
-                        </div>
-                        {configFields.length > 0 ? (
-                            <div className="mt-4 grid gap-3 md:grid-cols-2">
-                                {configFields.map((field) => (
-                                    <div key={field.key} className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="font-semibold text-white">{field.label}</div>
-                                                <div className="mt-1 break-all font-mono text-xs text-slate-500">{field.key}</div>
-                                            </div>
-                                            <span className="shrink-0 rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                                {field.type}
-                                            </span>
-                                        </div>
-                                        <p className="mt-3 text-xs leading-relaxed text-slate-400">{fieldDescription(field)}</p>
-                                        <div className="mt-4 rounded-md border border-slate-800 bg-black/20 px-3 py-2">
-                                            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Default</div>
-                                            <div className="mt-1 break-words text-xs font-semibold text-slate-300">{formatDefaultValue(field.defaultValue)}</div>
-                                        </div>
-                                        {field.options.length > 0 ? (
-                                            <div className="mt-4">
-                                                <div className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Available Options</div>
-                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                    {field.options.map((option) => (
-                                                        <span key={option} className="rounded-md border border-slate-800 bg-black/30 px-2 py-1 text-[10px] font-semibold text-slate-400">
-                                                            {option}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="mt-4 text-[10px] font-bold uppercase tracking-widest text-slate-600">
-                                                No fixed options
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="mt-3 text-sm text-slate-500">This module does not declare configurable fields.</p>
-                        )}
-                    </div>
-                </div>
-
-                <aside className="space-y-6">
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-                        <div className="flex items-end justify-between gap-3">
-                            <div>
-                                <h2 className="text-sm font-bold uppercase tracking-widest text-white">Automatic Checks</h2>
-                                <p className="mt-1 text-xs text-slate-500">Runs against source, metadata, and config fields.</p>
-                            </div>
-                            <div className={failedReviewChecks.length > 0 ? 'text-2xl font-black text-red-300' : 'text-2xl font-black text-emerald-300'}>
-                                {failedReviewChecks.length}
-                            </div>
-                        </div>
-                        <ul className="mt-4 space-y-2">
-                            {reviewChecks.map((check) => (
-                                <li key={check.id} className="flex min-w-0 items-start gap-2 text-sm leading-5">
-                                    <span className={`mt-0.5 shrink-0 ${check.status === 'pass' ? 'text-emerald-300' : 'text-red-300'}`}>
-                                        {check.status === 'pass' ? <CheckIcon /> : <XIcon />}
-                                    </span>
-                                    <span className="min-w-0 text-slate-400">
-                                        <span className="font-semibold text-white">{check.title}</span>
-                                        <span className="text-slate-600"> - </span>
-                                        {check.status === 'pass' ? (
-                                            <span className="text-emerald-300">Passed</span>
-                                        ) : (
-                                            <span className="text-red-200">
-                                                {check.details.length > 0 ? check.details.join('; ') : 'Failed without a reported reason.'}
-                                            </span>
-                                        )}
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-                        <h2 className="text-sm font-bold uppercase tracking-widest text-white">Creator</h2>
-                        <dl className="mt-4 space-y-4 text-sm">
-                            <div>
-                                <dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Discord ID</dt>
-                                <dd className="mt-1 break-all font-mono text-slate-300">{module.authorDiscordId || 'Unknown'}</dd>
-                            </div>
-                            <div>
-                                <dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Submitted</dt>
-                                <dd className="mt-1 text-slate-300">{formatDate(module.submittedAt)}</dd>
-                            </div>
-                            <div>
-                                <dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Reviewed</dt>
-                                <dd className="mt-1 text-slate-300">{formatDate(module.reviewedAt)}</dd>
-                            </div>
-                            {module.reviewedByDiscordId && (
-                                <div>
-                                    <dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Reviewed By</dt>
-                                    <dd className="mt-1 break-all font-mono text-slate-300">{module.reviewedByDiscordId}</dd>
-                                </div>
-                            )}
-                            {module.moderationNote && (
-                                <div>
-                                    <dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Moderation Note</dt>
-                                    <dd className="mt-1 text-slate-300">{module.moderationNote}</dd>
-                                </div>
-                            )}
-                        </dl>
-                    </div>
-
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-                        <div className="flex items-end justify-between gap-3">
-                            <div>
-                                <h2 className="text-sm font-bold uppercase tracking-widest text-white">Upload History</h2>
-                                <p className="mt-1 text-xs text-slate-500">Past reviewed submissions from this creator.</p>
-                            </div>
-                            <div className="text-2xl font-black text-slate-300">{history.length}</div>
-                        </div>
-                        <ul className="mt-4 space-y-2">
-                            {history.map((item) => (
-                                <li key={item.id}>
-                                    <Link
-                                        href={`/management/modules/${item.id}`}
-                                        className="flex min-w-0 items-start gap-2 text-sm leading-5 transition-colors hover:text-sky-200"
-                                    >
-                                        <span className={`mt-0.5 shrink-0 ${historyStatusTone(item.status)}`}>{historyStatusIcon(item.status)}</span>
-                                        <span className="min-w-0 text-slate-400">
-                                            <span className="font-semibold text-white">{item.name}</span>
-                                            <span className="text-slate-600"> - </span>
-                                            <span className={historyStatusTone(item.status)}>{item.status.replaceAll('_', ' ')}</span>
-                                            <span className="text-slate-600"> - </span>
-                                            <span>v{item.version}</span>
-                                            <span className="text-slate-600"> - </span>
-                                            <span>Reviewed {formatDate(item.reviewedAt)}</span>
-                                            {item.moderationNote && (
-                                                <>
-                                                    <span className="text-slate-600"> - </span>
-                                                    <span>{item.moderationNote}</span>
-                                                </>
-                                            )}
-                                        </span>
-                                    </Link>
-                                </li>
-                            ))}
-                            {history.length === 0 && (
-                                <li className="text-sm text-slate-500">
-                                    No past reviewed module uploads were found for this creator.
-                                </li>
-                            )}
-                        </ul>
-                    </div>
-                </aside>
-            </section>
+    return <div className="-mx-4 -my-6 flex h-[calc(100vh-3.5rem)] min-h-[720px] flex-col overflow-hidden bg-[#070a0f] text-slate-200 sm:-mx-6 lg:-mx-8">
+        <header className="flex h-14 shrink-0 items-center gap-3 overflow-x-auto border-b border-white/8 bg-[#0c1119] px-4">
+            <Link href="/management/modules" className="text-xs font-semibold text-slate-500 hover:text-white">Modules</Link><ChevronRight className="h-3.5 w-3.5 text-slate-700" /><ShieldCheck className="h-4 w-4 text-sky-300" />
+            <div className="hidden min-w-0 sm:block"><p className="truncate text-sm font-bold text-white">{data.module.name}</p><p className="text-[10px] text-slate-600">Moderation Review IDE · v{data.module.version}</p></div>
+            <span className={`ml-2 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest ${statusTone(data.module.status)}`}>{data.module.status.replaceAll('_', ' ')}</span>
+            <div className="ml-auto flex shrink-0 items-center gap-2"><span className={`hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold md:flex ${studioSession ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-white/10 text-slate-500'}`}><PlugZap className="h-3.5 w-3.5" />{studioSession ? `Testing ${studioSession.place_name || studioSession.place_id || 'game'}` : 'Studio offline'}</span><button onClick={() => void connectStudio()} className="whitespace-nowrap rounded-md border border-sky-400/25 bg-sky-400/10 px-3 py-2 text-xs font-bold text-sky-200 hover:bg-sky-400/15">Install in test game</button></div>
+        </header>
+        {pairing && !studioSession && <div className="flex shrink-0 flex-wrap items-center justify-center gap-3 border-b border-sky-400/15 bg-sky-400/[0.06] px-4 py-2 text-xs"><PlugZap className="h-4 w-4 text-sky-300" /><span>Enter this review code in the moderation plugin:</span><code className="rounded bg-black/40 px-3 py-1 font-mono text-lg font-black tracking-[0.25em] text-white">{pairing.code}</code><span className="text-slate-500">expires in about {expiresIn} min</span><button onClick={() => setPairing(null)} aria-label="Dismiss code"><X className="h-4 w-4" /></button></div>}
+        {!data.auditAvailable && <div className="shrink-0 border-b border-amber-400/20 bg-amber-400/10 px-4 py-2 text-xs text-amber-200">Read-only locally: configure the server service-role key to save private moderation audit records.</div>}
+        {(error || notice) && <div className={`shrink-0 border-b px-4 py-2 text-xs ${error ? 'border-red-400/20 bg-red-400/10 text-red-200' : 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200'}`}>{error || notice}</div>}
+        <div className="min-h-0 flex-1 overflow-x-auto">
+        <div className="grid h-full min-w-[920px] grid-cols-[220px_minmax(360px,1fr)_340px]">
+            <aside className="min-h-0 overflow-y-auto border-r border-white/8 bg-[#0b1017] p-2">
+                <div className="mb-2 flex items-center gap-2 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500"><Code2 className="h-3.5 w-3.5" /> Submitted project</div>
+                {data.files.map((file) => <button key={file.id} disabled={file.kind === 'folder'} onClick={() => setActiveFileId(file.id)} className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs ${activeFileId === file.id ? 'bg-sky-400/10 text-sky-100' : file.kind === 'folder' ? 'mt-1 font-bold text-slate-400' : 'text-slate-500 hover:bg-white/[0.04] hover:text-white'}`} style={{ paddingLeft: `${8 + (file.path.split('/').length - 1) * 12}px` }}>{fileIcon(file)}<span className="truncate">{file.name}</span>{file.kind !== 'folder' && <span className="ml-auto text-[9px] text-slate-700">r{file.revision}</span>}</button>)}
+                <div className="mt-4 border-t border-white/8 pt-3"><p className="px-2 text-[10px] font-bold uppercase tracking-widest text-slate-600">Automatic checks</p>{reviewChecks.map((check) => <div key={check.id} className="mt-2 flex gap-2 px-2 text-[11px]"><span className={check.status === 'pass' ? 'text-emerald-300' : 'text-red-300'}>{check.status === 'pass' ? <Check className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}</span><span className="text-slate-500">{check.title}</span></div>)}</div>
+            </aside>
+            <main className="flex min-h-0 min-w-0 flex-col bg-[#090d14]">
+                {activeFile ? <><div className="flex h-10 shrink-0 items-center gap-3 border-b border-white/8 px-3 text-xs"><span className="text-slate-300">{activeFile.path}</span><span className="text-[10px] text-slate-600">revision {activeFile.revision}</span><button onClick={() => void saveCode()} disabled={!dirtyCode || saving || codeReason.trim().length < 10 || activeFile.kind === 'manifest'} className="ml-auto flex items-center gap-1.5 rounded border border-sky-400/25 px-2.5 py-1.5 font-bold text-sky-200 disabled:opacity-30"><Save className="h-3.5 w-3.5" />Save minor edit</button></div><div className="min-h-0 flex-1"><ModuleIdeEditor value={draft} path={activeFile.path} language={activeFile.kind === 'manifest' ? 'json' : 'luau'} projectPaths={editableFiles.map((file) => file.path)} onChange={setDraft} onSave={() => void saveCode()} onDiagnostics={() => undefined} /></div><div className="shrink-0 border-t border-white/8 bg-[#0d131c] p-3"><label className="text-[10px] font-bold uppercase tracking-widest text-slate-500" htmlFor="code-edit-reason">Required justification for code edit</label><input id="code-edit-reason" value={codeReason} onChange={(event) => setCodeReason(event.target.value)} placeholder="Explain the specific defect or safety issue this minor edit corrects…" className="mt-2 w-full rounded-md border border-white/10 bg-black/25 px-3 py-2 text-xs text-white outline-none focus:border-sky-400/40" /></div></> : <div className="flex flex-1 items-center justify-center text-sm text-slate-600">Select a submitted file.</div>}
+            </main>
+            <aside className="min-h-0 overflow-y-auto border-l border-white/8 bg-[#0b1017]">
+                <div className="flex h-10 border-b border-white/8">{(['moderate', 'history', 'disputes'] as const).map((tab) => <button key={tab} onClick={() => setRightTab(tab)} className={`flex-1 border-b-2 text-[9px] font-bold uppercase tracking-wider ${rightTab === tab ? 'border-sky-400 text-sky-300' : 'border-transparent text-slate-600'}`}>{tab}{tab === 'disputes' && data.disputes.length ? ` (${data.disputes.length})` : ''}</button>)}</div>
+                {rightTab === 'moderate' && <div className="space-y-5 p-4">
+                    <section><label className="text-[10px] font-bold uppercase tracking-widest text-slate-500" htmlFor="review-title">Title</label><input id="review-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} className="mt-2 w-full rounded border border-white/10 bg-black/25 px-3 py-2 text-sm text-white" /><button disabled={!titleDirty || saving || metadataReason.trim().length < 10} onClick={() => void saveMetadata('title')} className="mt-2 text-[10px] font-bold text-sky-300 disabled:opacity-30">Save title edit</button></section>
+                    <section><label className="text-[10px] font-bold uppercase tracking-widest text-slate-500" htmlFor="review-description">Description</label><textarea id="review-description" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} rows={5} className="mt-2 w-full resize-y rounded border border-white/10 bg-black/25 px-3 py-2 text-xs leading-5 text-white" /><button disabled={!descriptionDirty || saving || metadataReason.trim().length < 10} onClick={() => void saveMetadata('description')} className="mt-2 text-[10px] font-bold text-sky-300 disabled:opacity-30">Save description edit</button></section>
+                    <section><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500"><ImageIcon className="h-3.5 w-3.5" /> Thumbnails</p><div className="mt-2 grid grid-cols-2 gap-2">{data.module.thumbnailUrls.map((url) => { const kept = thumbnailUrls.includes(url); return <button key={url} onClick={() => setThumbnailUrls((current) => kept ? current.filter((item) => item !== url) : [...current, url])} className={`relative overflow-hidden rounded border ${kept ? 'border-sky-400/40' : 'border-red-400/30 opacity-40'}`}><img src={url} alt="Submitted module thumbnail" className="aspect-video w-full object-cover" /><span className="absolute right-1 top-1 rounded bg-black/70 p-1">{kept ? <Check className="h-3 w-3 text-emerald-300" /> : <X className="h-3 w-3 text-red-300" />}</span></button>; })}</div><button disabled={!thumbnailsDirty || saving || metadataReason.trim().length < 10} onClick={() => void saveMetadata('thumbnails')} className="mt-2 text-[10px] font-bold text-sky-300 disabled:opacity-30">Save thumbnail moderation</button></section>
+                    <section><label className="text-[10px] font-bold uppercase tracking-widest text-slate-500" htmlFor="metadata-reason">Required metadata edit reason</label><textarea id="metadata-reason" value={metadataReason} onChange={(event) => setMetadataReason(event.target.value)} rows={3} placeholder="Explain why this title, description, or thumbnail change is justified…" className="mt-2 w-full rounded border border-white/10 bg-black/25 px-3 py-2 text-xs text-white" /></section>
+                    <section className="border-t border-white/8 pt-4"><label className="text-[10px] font-bold uppercase tracking-widest text-slate-500" htmlFor="decision-reason">Decision reason</label><textarea id="decision-reason" value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} rows={4} placeholder="Required for denial; visible to the uploader…" className="mt-2 w-full rounded border border-white/10 bg-black/25 px-3 py-2 text-xs text-white" /><div className="mt-3 grid grid-cols-2 gap-2"><button onClick={() => void decide('PUBLISHED')} disabled={saving} className="rounded bg-emerald-500 px-3 py-2 text-xs font-black text-emerald-950 disabled:opacity-40">Approve</button><button onClick={() => void decide('REJECTED')} disabled={saving || decisionReason.trim().length < 20} className="rounded bg-red-500 px-3 py-2 text-xs font-black text-white disabled:opacity-40">Deny</button></div><p className="mt-2 text-[10px] leading-4 text-slate-600">Denial removes public listing only. The owner keeps test installs and may dispute, revise, or resubmit.</p></section>
+                </div>}
+                {rightTab === 'history' && <div className="space-y-3 p-4">{data.moderationEdits.map((edit) => <article key={edit.id} className="rounded border border-white/8 bg-black/20 p-3"><div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider"><span className="text-sky-300">{edit.edit_type}</span><span className="text-slate-700">{new Date(edit.created_at).toLocaleString()}</span></div><p className="mt-2 break-all text-[10px] text-slate-500">{edit.target}</p><p className="mt-2 text-xs leading-5 text-slate-300">{edit.reason}</p><p className="mt-2 text-[9px] text-slate-700">Moderator {edit.moderator_discord_id}</p></article>)}{data.moderationEdits.length === 0 && <p className="text-xs text-slate-600">No moderator edits have been made.</p>}</div>}
+                {rightTab === 'disputes' && <div className="space-y-3 p-4">{data.disputes.map((dispute) => <article key={dispute.id} className="rounded border border-amber-400/15 bg-amber-400/[0.04] p-3"><div className="flex justify-between text-[9px] font-bold uppercase tracking-wider"><span className="text-amber-300">{dispute.status}</span><span className="text-slate-700">{new Date(dispute.created_at).toLocaleString()}</span></div><p className="mt-2 text-xs leading-5 text-slate-300">{dispute.reason}</p>{dispute.moderator_response && <p className="mt-2 border-t border-white/8 pt-2 text-xs text-slate-500">{dispute.moderator_response}</p>}{dispute.status === 'OPEN' && <div className="mt-3 grid grid-cols-2 gap-2"><button disabled={saving} onClick={() => void resolveDispute(dispute.id, 'UPHELD')} className="rounded border border-red-400/25 px-2 py-1.5 text-[10px] font-bold text-red-300 disabled:opacity-40">Uphold denial</button><button disabled={saving} onClick={() => void resolveDispute(dispute.id, 'OVERTURNED')} className="rounded border border-emerald-400/25 px-2 py-1.5 text-[10px] font-bold text-emerald-300 disabled:opacity-40">Overturn</button></div>}</article>)}{data.disputes.length === 0 && <p className="text-xs text-slate-600">The uploader has not disputed this decision.</p>}</div>}
+            </aside>
         </div>
-    );
+        </div>
+        <footer className="flex h-7 shrink-0 items-center gap-4 border-t border-white/8 bg-[#0b1017] px-3 text-[10px] font-semibold text-slate-600"><span>Review IDE</span><span>Runtime {data.project.requiredRuntimeVersion}</span><span>{data.files.length} project items</span><span className="ml-auto">Project revision {data.project.revision}</span></footer>
+    </div>;
 }

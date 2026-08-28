@@ -135,6 +135,48 @@ CREATE INDEX IF NOT EXISTS idx_addon_module_reviews_module_created
 CREATE INDEX IF NOT EXISTS idx_addon_module_reviews_module_rating
     ON public.addon_module_reviews(module_id, rating);
 
+-- Moderator changes are intentionally append-only so creators can see what was
+-- changed and why. The application only exposes these rows to the module owner
+-- and staff through authenticated server routes.
+CREATE TABLE IF NOT EXISTS public.addon_module_moderation_edits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    module_id UUID NOT NULL REFERENCES public.addon_modules(id) ON DELETE CASCADE,
+    moderator_discord_id TEXT NOT NULL,
+    edit_type TEXT NOT NULL CHECK (edit_type IN ('CODE', 'TITLE', 'DESCRIPTION', 'THUMBNAILS')),
+    target TEXT NOT NULL DEFAULT '',
+    reason TEXT NOT NULL CHECK (char_length(trim(reason)) >= 10),
+    before_value JSONB,
+    after_value JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_addon_module_moderation_edits_module_created
+    ON public.addon_module_moderation_edits(module_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.addon_module_disputes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    module_id UUID NOT NULL REFERENCES public.addon_modules(id) ON DELETE CASCADE,
+    author_discord_id TEXT NOT NULL,
+    reason TEXT NOT NULL CHECK (char_length(trim(reason)) >= 20),
+    status TEXT NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'UPHELD', 'OVERTURNED', 'CLOSED')),
+    moderator_response TEXT NOT NULL DEFAULT '',
+    reviewed_by_discord_id TEXT,
+    reviewed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_addon_module_disputes_module_created
+    ON public.addon_module_disputes(module_id, created_at DESC);
+
+ALTER TABLE public.addon_module_moderation_edits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.addon_module_disputes ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE public.addon_module_moderation_edits FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.addon_module_disputes FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.addon_module_moderation_edits TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.addon_module_disputes TO service_role;
+
 ALTER TABLE public.addon_module_reviews ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON TABLE public.addon_module_reviews FROM PUBLIC, anon, authenticated, service_role;
@@ -231,19 +273,9 @@ CREATE TRIGGER enforce_server_addon_module_limit
     FOR EACH ROW
     EXECUTE FUNCTION public.enforce_server_addon_module_limit();
 
-UPDATE public.addon_modules
-SET
-    source_code = '',
-    source_checksum = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    config_schema = '{}'::jsonb,
-    updated_at = NOW()
-WHERE status = 'REJECTED'
-  AND (source_code <> '' OR config_schema <> '{}'::jsonb);
-
-DELETE FROM public.server_addon_modules sam
-USING public.addon_modules module
-WHERE sam.module_id = module.id
-  AND module.status = 'REJECTED';
+-- Rejected modules remain private to their creator. Source and existing test
+-- installations are deliberately retained so the creator can test, dispute,
+-- revise, and resubmit without losing work.
 
 UPDATE public.management_roles
 SET permissions = ARRAY(

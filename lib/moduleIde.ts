@@ -47,7 +47,7 @@ export interface ModuleProjectProblem {
     message: string;
 }
 
-interface AddonModuleOwnerRow {
+export interface AddonModuleOwnerRow {
     id: string;
     slug: string;
     name: string;
@@ -175,6 +175,18 @@ export async function getOwnedModule(moduleId: string, discordUserId: string): P
     return (data as AddonModuleOwnerRow | null) || null;
 }
 
+export async function getModuleForReview(moduleId: string): Promise<AddonModuleOwnerRow | null> {
+    const client = getSupabaseAdmin();
+    const { data, error } = await client
+        .from('addon_modules')
+        .select('id, slug, name, description, thumbnail_url, thumbnail_urls, version, status, source_code, author_discord_id, created_at, updated_at, published_at')
+        .eq('id', moduleId)
+        .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    return (data as AddonModuleOwnerRow | null) || null;
+}
+
 async function insertDefaultProjectFiles(module: AddonModuleOwnerRow, manifest: ModuleProjectManifest) {
     const client = getSupabaseAdmin();
     const legacySource = module.source_code || `return {\n    Init = function(context, settings)\n        context.Log("${module.name} loaded")\n    end,\n}\n`;
@@ -193,26 +205,24 @@ async function insertDefaultProjectFiles(module: AddonModuleOwnerRow, manifest: 
     if (error) throw new Error(error.message);
 }
 
-export async function ensureOwnedModuleProject(moduleId: string, discordUserId: string) {
+async function ensureModuleProject(module: AddonModuleOwnerRow) {
     const client = getSupabaseAdmin();
-    const ownedModule = await getOwnedModule(moduleId, discordUserId);
-    if (!ownedModule) return null;
 
     const projectResult = await client
         .from('addon_module_projects')
         .select('*')
-        .eq('module_id', ownedModule.id)
+        .eq('module_id', module.id)
         .maybeSingle();
     let project = projectResult.data as ProjectRow | null;
     const { error } = projectResult;
     if (error) throw new Error(error.message);
 
     if (!project) {
-        const manifest = defaultModuleManifest(ownedModule);
+        const manifest = defaultModuleManifest(module);
         const inserted = await client
             .from('addon_module_projects')
             .insert({
-                module_id: ownedModule.id,
+                module_id: module.id,
                 format_version: MODULE_PROJECT_FORMAT_VERSION,
                 revision: 1,
                 manifest,
@@ -222,48 +232,58 @@ export async function ensureOwnedModuleProject(moduleId: string, discordUserId: 
             .single();
         if (inserted.error) throw new Error(inserted.error.message);
         project = inserted.data as ProjectRow;
-        await insertDefaultProjectFiles(ownedModule, manifest);
+        await insertDefaultProjectFiles(module, manifest);
     }
 
     const { data: files, error: filesError } = await client
         .from('addon_module_files')
         .select('*')
-        .eq('module_id', ownedModule.id)
+        .eq('module_id', module.id)
         .order('path');
     if (filesError) throw new Error(filesError.message);
 
     const normalizedFiles = ((files || []) as Record<string, unknown>[]).map((row) => normalizeFile(row));
 
-    const thumbnailUrls = Array.isArray(ownedModule.thumbnail_urls)
-        ? ownedModule.thumbnail_urls.map((value) => String(value || '').trim()).filter(Boolean).slice(0, 5)
+    const thumbnailUrls = Array.isArray(module.thumbnail_urls)
+        ? module.thumbnail_urls.map((value) => String(value || '').trim()).filter(Boolean).slice(0, 5)
         : [];
-    if (thumbnailUrls.length === 0 && ownedModule.thumbnail_url) thumbnailUrls.push(ownedModule.thumbnail_url);
+    if (thumbnailUrls.length === 0 && module.thumbnail_url) thumbnailUrls.push(module.thumbnail_url);
 
     return {
         module: {
-            id: ownedModule.id,
-            slug: ownedModule.slug,
-            name: ownedModule.name,
-            description: ownedModule.description,
+            id: module.id,
+            slug: module.slug,
+            name: module.name,
+            description: module.description,
             thumbnailUrl: thumbnailUrls[0] || '',
             thumbnailUrls,
-            version: ownedModule.version,
-            status: ownedModule.status,
-            createdAt: ownedModule.created_at,
-            updatedAt: ownedModule.updated_at,
-            publishedAt: ownedModule.published_at || null,
+            version: module.version,
+            status: module.status,
+            createdAt: module.created_at,
+            updatedAt: module.updated_at,
+            publishedAt: module.published_at || null,
         },
         project: {
             formatVersion: Number(project.format_version),
             revision: Number(project.revision),
             publishedRevision: project.published_revision == null ? null : Number(project.published_revision),
             requiredRuntimeVersion: project.required_runtime_version,
-            manifest: normalizeManifest(project.manifest, ownedModule),
+            manifest: normalizeManifest(project.manifest, module),
             createdAt: project.created_at,
             updatedAt: project.updated_at,
         },
         files: normalizedFiles,
     };
+}
+
+export async function ensureOwnedModuleProject(moduleId: string, discordUserId: string) {
+    const ownedModule = await getOwnedModule(moduleId, discordUserId);
+    return ownedModule ? ensureModuleProject(ownedModule) : null;
+}
+
+export async function ensureModuleProjectForReview(moduleId: string) {
+    const moduleRow = await getModuleForReview(moduleId);
+    return moduleRow ? ensureModuleProject(moduleRow) : null;
 }
 
 export async function bumpModuleProjectRevision(moduleId: string, expectedRevision?: number) {

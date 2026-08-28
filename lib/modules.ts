@@ -43,6 +43,11 @@ const VALID_CONFIG_TYPES = new Set<ModuleConfigFieldType>(['bool', 'dropdown', '
 export const MAX_SERVER_ADDON_MODULES = 5;
 export const MAX_SERVER_CUSTOM_MODULES = 20;
 
+export function canCreatorUseUnpublishedModule(status: unknown, authorDiscordId: unknown, discordUserId: unknown) {
+    return String(authorDiscordId || '') === String(discordUserId || '')
+        && ['DRAFT', 'PENDING_REVIEW', 'REJECTED'].includes(String(status || ''));
+}
+
 export function trimModuleString(value: unknown, maxLength = 5000) {
     return String(value ?? '').trim().slice(0, maxLength);
 }

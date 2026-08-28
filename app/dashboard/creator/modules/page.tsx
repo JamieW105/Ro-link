@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
-import { Boxes, LogOut, Pencil, Plus, Search, ShieldAlert } from 'lucide-react';
+import { Boxes, Gavel, LogOut, Pencil, Plus, Search, ShieldAlert } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 
@@ -21,6 +21,7 @@ interface CreatorModule {
     isOfficial: boolean;
     creatorIsVerified: boolean;
     updatedAt: string | null;
+    moderationNote: string;
 }
 
 const moduleFilters: { value: CreatorFilter; label: string }[] = [
@@ -56,6 +57,7 @@ export default function CreatorModulesPage() {
     const [error, setError] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<CreatorFilter>('ALL');
+    const [notice, setNotice] = useState<string | null>(null);
 
     const filteredModules = useMemo(() => {
         const query = search.trim().toLowerCase();
@@ -98,6 +100,25 @@ export default function CreatorModulesPage() {
 
     function handleSignOut() {
         void signOut({ callbackUrl: '/auth/signin' });
+    }
+
+    async function disputeModule(addon: CreatorModule) {
+        const reason = window.prompt(`Explain why the denial of "${addon.name}" should be reviewed. Include specific evidence or context.`)?.trim() || '';
+        if (!reason) return;
+        setError(null);
+        setNotice(null);
+        try {
+            const response = await fetch(`/api/dashboard/creator/modules/${addon.id}/disputes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(String(payload.error || 'Failed to submit dispute.'));
+            setNotice(`Dispute submitted for ${addon.name}. You can still edit, test, or reupload the module while it is reviewed.`);
+        } catch (submitError) {
+            setError(submitError instanceof Error ? submitError.message : 'Failed to submit dispute.');
+        }
     }
 
     if (status === 'loading' || loading) {
@@ -174,6 +195,7 @@ export default function CreatorModulesPage() {
                 </section>
 
                 <section className="rl-shell pb-24 pt-4" aria-label="Your modules">
+                    {notice && <div className="mb-3 rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">{notice}</div>}
                     {error ? (
                         <div className="rl-dashboard-message" data-tone="error">
                             <span className="rl-dashboard-state-icon"><ShieldAlert aria-hidden="true" /></span>
@@ -221,7 +243,7 @@ export default function CreatorModulesPage() {
                                     {filteredModules.map((addon) => (
                                         <article key={addon.id} className="interactive-lift group relative flex min-w-0 items-center gap-4 rounded-lg border border-slate-800 bg-[#0d1116] p-4 transition-colors hover:border-sky-500/40 hover:bg-[#10161d]">
                                             {addon.thumbnailUrl && <img src={addon.thumbnailUrl} alt="" className="h-12 w-20 shrink-0 rounded-lg border border-slate-700 object-cover" />}
-                                            <div className="min-w-0 flex-1 pr-12">
+                                            <div className="min-w-0 flex-1 pr-24">
                                                 <div className="flex flex-wrap items-center gap-1.5">
                                                     <h2 className="mr-1 break-words text-base font-bold text-white">{addon.name}</h2>
                                                     <span className={`rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${statusClassName(addon.status)}`}>
@@ -241,16 +263,13 @@ export default function CreatorModulesPage() {
                                                     <span>{addon.category}</span>
                                                     <span>Updated {formatDate(addon.updatedAt)}</span>
                                                 </div>
+                                                {addon.status === 'REJECTED' && addon.moderationNote && <p className="mt-2 text-xs text-red-200">Denied: {addon.moderationNote}</p>}
                                             </div>
 
-                                            <Link
-                                                href={`/dashboard/modules/ide?module=${encodeURIComponent(addon.id)}`}
-                                                aria-label={`Edit ${addon.name} in the Module IDE`}
-                                                title={`Edit ${addon.name}`}
-                                                className="absolute right-4 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg border border-slate-700 bg-[#080b0f] text-slate-400 transition-colors hover:border-sky-500/60 hover:bg-sky-500/10 hover:text-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
-                                            >
-                                                <Pencil className="h-4 w-4" aria-hidden="true" />
-                                            </Link>
+                                            <div className="absolute right-4 top-1/2 flex -translate-y-1/2 gap-2">
+                                                {addon.status === 'REJECTED' && <button type="button" onClick={() => void disputeModule(addon)} aria-label={`Dispute denial of ${addon.name}`} title="Dispute denial" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-amber-500/30 bg-[#080b0f] text-amber-300 transition-colors hover:bg-amber-500/10"><Gavel className="h-4 w-4" aria-hidden="true" /></button>}
+                                                <Link href={`/dashboard/modules/ide?module=${encodeURIComponent(addon.id)}`} aria-label={`Edit ${addon.name} in the Module IDE`} title={`Edit ${addon.name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 bg-[#080b0f] text-slate-400 transition-colors hover:border-sky-500/60 hover:bg-sky-500/10 hover:text-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"><Pencil className="h-4 w-4" aria-hidden="true" /></Link>
+                                            </div>
                                         </article>
                                     ))}
                                 </div>

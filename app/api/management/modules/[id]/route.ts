@@ -239,6 +239,10 @@ export async function PATCH(req: Request, context: RouteContext) {
     const codeEditReason = 'codeEditReason' in body || 'code_edit_reason' in body
         ? trimModuleString(body.codeEditReason ?? body.code_edit_reason, 1000)
         : '';
+
+    if (input.status === 'REJECTED' && (!moderationNote || moderationNote.length < 20)) {
+        return NextResponse.json({ error: 'A specific denial reason of at least 20 characters is required.' }, { status: 400 });
+    }
     const sourceCodeChanged = input.sourceCode !== undefined && input.sourceCode !== String(existingModule.source_code || '');
 
     if (sourceCodeChanged && !codeEditReason) {
@@ -270,11 +274,6 @@ export async function PATCH(req: Request, context: RouteContext) {
         updates.source_checksum = checksumModuleSource(input.sourceCode);
         updates.config_schema = input.configSchema || {};
     }
-    if (input.status === 'REJECTED') {
-        updates.source_code = '';
-        updates.source_checksum = checksumModuleSource('');
-        updates.config_schema = {};
-    }
     if (input.slug !== undefined || input.name !== undefined) {
         updates.slug = await buildUniqueSlug(input.slug || input.name || 'module', id);
     }
@@ -292,17 +291,6 @@ export async function PATCH(req: Request, context: RouteContext) {
 
     if (!data) {
         return NextResponse.json({ error: 'Module not found' }, { status: 404 });
-    }
-
-    if (input.status === 'REJECTED') {
-        const { error: installCleanupError } = await supabase
-            .from('server_addon_modules')
-            .delete()
-            .eq('module_id', id);
-
-        if (installCleanupError) {
-            return NextResponse.json({ error: installCleanupError.message }, { status: 500 });
-        }
     }
 
     if (

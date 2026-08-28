@@ -6,7 +6,7 @@ import { buildModuleProjectPackage, normalizeModuleProjectPath, validateModulePr
 import { MODULE_CATEGORIES, parseModuleCategory } from '../lib/moduleCategories';
 import { validateBridgeEvent } from '../lib/moduleStudioBridge';
 import { validateModuleUiTree } from '../lib/moduleUiSchema';
-import { normalizeAddonModule } from '../lib/modules';
+import { canCreatorUseUnpublishedModule, normalizeAddonModule } from '../lib/modules';
 
 const manifest: ModuleProjectManifest = {
     formatVersion: 2,
@@ -63,6 +63,12 @@ test('Studio bridge accepts known events and rejects unknown or oversized payloa
     assert.equal(validateBridgeEvent({ type: 'script.request', requestId: '1', payload: { instanceId: 'abc' } }).type, 'script.request');
     assert.throws(() => validateBridgeEvent({ type: 'database.secret', payload: {} }), /Unsupported Studio event type/);
     assert.throws(() => validateBridgeEvent({ type: 'sync.error', payload: { message: 'x'.repeat(513 * 1024) } }), /too large/);
+});
+
+test('denied modules remain private testable projects for their uploader', () => {
+    assert.equal(canCreatorUseUnpublishedModule('REJECTED', 'creator-1', 'creator-1'), true);
+    assert.equal(canCreatorUseUnpublishedModule('REJECTED', 'creator-1', 'someone-else'), false);
+    assert.equal(canCreatorUseUnpublishedModule('ARCHIVED', 'creator-1', 'creator-1'), false);
 });
 
 test('module thumbnails preserve legacy images and cap galleries at five', () => {

@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
 import {
+    canCreatorUseUnpublishedModule,
     checksumModuleSource,
     MAX_SERVER_ADDON_MODULES,
     MAX_SERVER_CUSTOM_MODULES,
@@ -147,7 +148,7 @@ export async function GET(req: Request) {
     const marketplaceModules = labeledModules
         .filter((row) => (
             row.status === 'PUBLISHED'
-            || (row.author_discord_id === auth.userId && (row.status === 'DRAFT' || row.status === 'PENDING_REVIEW'))
+            || canCreatorUseUnpublishedModule(row.status, row.author_discord_id, auth.userId)
         ))
         .map((row) => {
             const installed = installedByModule.get(String(row.id));
@@ -351,8 +352,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: moduleError.message }, { status: 500 });
     }
 
-    const canUseOwnUnpublished = moduleRow?.author_discord_id === auth.userId
-        && (moduleRow.status === 'DRAFT' || moduleRow.status === 'PENDING_REVIEW');
+    const canUseOwnUnpublished = canCreatorUseUnpublishedModule(moduleRow?.status, moduleRow?.author_discord_id, auth.userId);
 
     if (!moduleRow || (moduleRow.status !== 'PUBLISHED' && !canUseOwnUnpublished)) {
         return NextResponse.json({ error: 'Published module not found.' }, { status: 404 });

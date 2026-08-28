@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
 import { getServerByApiKey, isDgsuGameAdminAccessError } from '@/lib/gameAdmin';
-import { normalizeAddonModule, normalizeServerCustomModule, parseModuleConfigSettings, parseStoredModuleConfigSchema } from '@/lib/modules';
+import { canCreatorUseUnpublishedModule, normalizeAddonModule, normalizeServerCustomModule, parseModuleConfigSettings, parseStoredModuleConfigSchema } from '@/lib/modules';
 import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
@@ -153,8 +153,7 @@ export async function GET(req: Request) {
         .map((row: ServerAddonModuleRow) => {
             const moduleRow = Array.isArray(row.module) ? row.module[0] : row.module;
             const canRunCreatorPreview = moduleRow
-                && row.installed_by === moduleRow.author_discord_id
-                && (moduleRow.status === 'DRAFT' || moduleRow.status === 'PENDING_REVIEW');
+                && canCreatorUseUnpublishedModule(moduleRow.status, moduleRow.author_discord_id, row.installed_by);
             if (!moduleRow || (moduleRow.status !== 'PUBLISHED' && !canRunCreatorPreview)) {
                 return null;
             }

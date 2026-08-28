@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS public.module_studio_pairings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     module_id UUID NOT NULL REFERENCES public.addon_modules(id) ON DELETE CASCADE,
     discord_user_id TEXT NOT NULL,
+    purpose TEXT NOT NULL DEFAULT 'OWNER_EDIT' CHECK (purpose IN ('OWNER_EDIT', 'MODERATION_REVIEW')),
     code_hash TEXT NOT NULL UNIQUE,
     expires_at TIMESTAMPTZ NOT NULL,
     used_at TIMESTAMPTZ,
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS public.module_studio_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     module_id UUID NOT NULL REFERENCES public.addon_modules(id) ON DELETE CASCADE,
     discord_user_id TEXT NOT NULL,
+    purpose TEXT NOT NULL DEFAULT 'OWNER_EDIT' CHECK (purpose IN ('OWNER_EDIT', 'MODERATION_REVIEW')),
     plugin_session_id UUID REFERENCES public.studio_plugin_sessions(id) ON DELETE SET NULL,
     credential_hash TEXT NOT NULL UNIQUE,
     protocol_version INTEGER NOT NULL DEFAULT 1,
@@ -129,6 +131,18 @@ ALTER TABLE public.addon_module_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.module_studio_pairings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.module_studio_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.module_studio_events ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.module_studio_pairings
+    ADD COLUMN IF NOT EXISTS purpose TEXT NOT NULL DEFAULT 'OWNER_EDIT';
+ALTER TABLE public.module_studio_sessions
+    ADD COLUMN IF NOT EXISTS purpose TEXT NOT NULL DEFAULT 'OWNER_EDIT';
+
+ALTER TABLE public.module_studio_pairings DROP CONSTRAINT IF EXISTS module_studio_pairings_purpose_check;
+ALTER TABLE public.module_studio_pairings ADD CONSTRAINT module_studio_pairings_purpose_check
+    CHECK (purpose IN ('OWNER_EDIT', 'MODERATION_REVIEW'));
+ALTER TABLE public.module_studio_sessions DROP CONSTRAINT IF EXISTS module_studio_sessions_purpose_check;
+ALTER TABLE public.module_studio_sessions ADD CONSTRAINT module_studio_sessions_purpose_check
+    CHECK (purpose IN ('OWNER_EDIT', 'MODERATION_REVIEW'));
 
 -- Event queues are ephemeral. This function is safe to call from scheduled cleanup.
 CREATE OR REPLACE FUNCTION public.cleanup_module_studio_bridge()

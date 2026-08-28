@@ -1,9 +1,11 @@
 import { createHmac, randomBytes, randomUUID } from 'crypto';
 
-import { getOwnedModule } from '@/lib/moduleIde';
+import { hasPermission } from '@/lib/management';
+import { getModuleForReview, getOwnedModule } from '@/lib/moduleIde';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const MODULE_STUDIO_PROTOCOL_VERSION = 1;
+export type ModuleStudioPurpose = 'OWNER_EDIT' | 'MODERATION_REVIEW';
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 const STUDIO_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const MAX_EVENT_BYTES = 512 * 1024;
@@ -67,15 +69,23 @@ function generateStudioCredential() {
     return `rst_${randomBytes(32).toString('hex')}`;
 }
 
-export async function createModuleStudioPairing(moduleId: string, discordUserId: string) {
-    const ownedModule = await getOwnedModule(moduleId, discordUserId);
-    if (!ownedModule) return null;
+export async function createModuleStudioPairing(
+    moduleId: string,
+    discordUserId: string,
+    purpose: ModuleStudioPurpose = 'OWNER_EDIT',
+) {
+    const moduleRow = purpose === 'MODERATION_REVIEW'
+        ? await getModuleForReview(moduleId)
+        : await getOwnedModule(moduleId, discordUserId);
+    if (!moduleRow) return null;
+    if (purpose === 'MODERATION_REVIEW' && !await hasPermission(discordUserId, 'MANAGE_MODULES')) return null;
     const client = getSupabaseAdmin();
     const code = generatePairingCode();
     const expiresAt = new Date(Date.now() + PAIRING_TTL_MS).toISOString();
     const { data, error } = await client.from('module_studio_pairings').insert({
         module_id: moduleId,
         discord_user_id: discordUserId,
+        purpose,
         code_hash: digest(code),
         expires_at: expiresAt,
     }).select('id').single();
@@ -85,7 +95,8 @@ export async function createModuleStudioPairing(moduleId: string, discordUserId:
         pairingId: String((data as { id: string }).id),
         code,
         expiresAt,
-        module: { id: ownedModule.id, name: ownedModule.name, version: ownedModule.version },
+        purpose,
+        module: { id: moduleRow.id, name: moduleRow.name, version: moduleRow.version },
         protocolVersion: MODULE_STUDIO_PROTOCOL_VERSION,
     };
 }
@@ -102,7 +113,7 @@ export async function claimModuleStudioPairing(pluginSession: PluginSessionIdent
     const now = new Date().toISOString();
     const { data: pairing, error } = await client
         .from('module_studio_pairings')
-        .select('id, module_id, discord_user_id, expires_at, used_at')
+        .select('id, module_id, discord_user_id, purpose, expires_at, used_at')
         .eq('code_hash', digest(input.code.trim().toUpperCase()))
         .eq('discord_user_id', discordUserId)
         .is('used_at', null)
@@ -110,10 +121,14 @@ export async function claimModuleStudioPairing(pluginSession: PluginSessionIdent
         .maybeSingle();
     if (error) throw new Error(error.message);
     if (!pairing) return null;
-    const claimedPairing = pairing as { id: string; module_id: string; discord_user_id: string; expires_at: string; used_at?: string | null };
+    const claimedPairing = pairing as { id: string; module_id: string; discord_user_id: string; purpose?: ModuleStudioPurpose; expires_at: string; used_at?: string | null };
+    const purpose = claimedPairing.purpose === 'MODERATION_REVIEW' ? 'MODERATION_REVIEW' : 'OWNER_EDIT';
 
-    const ownedModule = await getOwnedModule(claimedPairing.module_id, discordUserId);
-    if (!ownedModule) return null;
+    const moduleRow = purpose === 'MODERATION_REVIEW'
+        ? await getModuleForReview(claimedPairing.module_id)
+        : await getOwnedModule(claimedPairing.module_id, discordUserId);
+    if (!moduleRow) return null;
+    if (purpose === 'MODERATION_REVIEW' && !await hasPermission(discordUserId, 'MANAGE_MODULES')) return null;
     const credential = generateStudioCredential();
     const sessionId = randomUUID();
     const expiresAt = new Date(Date.now() + STUDIO_SESSION_TTL_MS).toISOString();
@@ -131,15 +146,17 @@ export async function claimModuleStudioPairing(pluginSession: PluginSessionIdent
     const activeSessions = await client
         .from('module_studio_sessions')
         .update({ revoked_at: now })
-        .eq('module_id', ownedModule.id)
+        .eq('module_id', moduleRow.id)
         .eq('discord_user_id', discordUserId)
+        .eq('purpose', purpose)
         .is('revoked_at', null);
     if (activeSessions.error) throw new Error(activeSessions.error.message);
 
     const sessionInsert = await client.from('module_studio_sessions').insert({
         id: sessionId,
-        module_id: ownedModule.id,
+        module_id: moduleRow.id,
         discord_user_id: discordUserId,
+        purpose,
         plugin_session_id: pluginSession.id,
         credential_hash: digest(credential),
         protocol_version: MODULE_STUDIO_PROTOCOL_VERSION,
@@ -155,7 +172,8 @@ export async function claimModuleStudioPairing(pluginSession: PluginSessionIdent
         credential,
         expiresAt,
         protocolVersion: MODULE_STUDIO_PROTOCOL_VERSION,
-        module: { id: ownedModule.id, name: ownedModule.name, version: ownedModule.version },
+        purpose,
+        module: { id: moduleRow.id, name: moduleRow.name, version: moduleRow.version },
     };
 }
 
@@ -172,13 +190,18 @@ export async function getStudioBridgeSessionByCredential(credential: string) {
     return data || null;
 }
 
-export async function getActiveBrowserStudioSession(moduleId: string, discordUserId: string) {
+export async function getActiveBrowserStudioSession(
+    moduleId: string,
+    discordUserId: string,
+    purpose: ModuleStudioPurpose = 'OWNER_EDIT',
+) {
     const client = getSupabaseAdmin();
     const { data, error } = await client
         .from('module_studio_sessions')
-        .select('id, module_id, discord_user_id, protocol_version, place_id, universe_id, place_name, connected_at, last_seen_at, expires_at')
+        .select('id, module_id, discord_user_id, purpose, protocol_version, place_id, universe_id, place_name, connected_at, last_seen_at, expires_at')
         .eq('module_id', moduleId)
         .eq('discord_user_id', discordUserId)
+        .eq('purpose', purpose)
         .is('revoked_at', null)
         .gt('expires_at', new Date().toISOString())
         .order('last_seen_at', { ascending: false })

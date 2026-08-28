@@ -156,7 +156,7 @@ function isSiteTestingPublicPath(pathname: string) {
         // one-time pairing details or scoped bearer credentials in their route
         // handlers, so they must reach those handlers on the testing domain.
         || pathname.startsWith('/api/plugin/session/')
-        || pathname.startsWith('/api/plugin/modules/ide/')
+        || pathname.startsWith('/api/plugin/modules/')
         || pathname.startsWith('/_next')
         || pathname.startsWith('/Media')
         || pathname === '/favicon.ico'
@@ -248,7 +248,7 @@ function getApiRateLimitRule(pathname: string, method: string): { name: string; 
         };
     }
 
-    if (pathname.startsWith('/api/plugin/modules/ide/')) {
+    if (pathname.startsWith('/api/plugin/modules/')) {
         return {
             name: 'plugin-module-ide',
             rule: { limit: 180, windowMs: 60_000, blockMs: 2 * 60_000 },
