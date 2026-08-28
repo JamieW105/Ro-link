@@ -129,6 +129,17 @@ test('module thumbnails preserve legacy images and cap galleries at five', () =>
     assert.equal(gallery?.thumbnailUrls.length, 5);
 });
 
+test('module deletion stays owner-scoped and requires an explicit UI confirmation', () => {
+    const routeSource = readFileSync(new URL('../app/api/dashboard/modules/ide/[moduleId]/route.ts', import.meta.url), 'utf8');
+    assert.match(routeSource, /export async function DELETE/);
+    assert.match(routeSource, /\.delete\(\)[\s\S]*\.eq\('id', moduleId\)[\s\S]*\.eq\('author_discord_id', auth\.discordUserId\)/);
+
+    const clientSource = readFileSync(new URL('../app/dashboard/modules/ide/ModuleIdeClient.tsx', import.meta.url), 'utf8');
+    assert.match(clientSource, /role="alertdialog"/);
+    assert.match(clientSource, /This cannot be undone\./);
+    assert.match(clientSource, /method: 'DELETE'/);
+});
+
 test('module categories expose the creator choices and reject unknown values', () => {
     assert.deepEqual(MODULE_CATEGORIES, ['General', 'Moderation', 'Misc', 'Fun', 'Troll']);
     assert.equal(parseModuleCategory('Moderation'), 'Moderation');

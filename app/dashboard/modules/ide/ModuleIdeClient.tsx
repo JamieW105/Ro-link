@@ -138,6 +138,9 @@ export default function ModuleIdeClient() {
     const moduleThumbnailInputRef = useRef<HTMLInputElement | null>(null);
     const moduleThumbnailBlobUrlsRef = useRef<Set<string>>(new Set());
     const [moduleInfoSaving, setModuleInfoSaving] = useState(false);
+    const [moduleDeleteConfirmOpen, setModuleDeleteConfirmOpen] = useState(false);
+    const [moduleDeleting, setModuleDeleting] = useState(false);
+    const [moduleDeleteError, setModuleDeleteError] = useState('');
     const [moduleName, setModuleNameState] = useState('');
     const [moduleNameStatus, setModuleNameStatus] = useState<'saved' | 'dirty' | 'saving' | 'failed'>('saved');
     const moduleNameRef = useRef('');
@@ -485,6 +488,41 @@ export default function ModuleIdeClient() {
             setModuleInfoSaving(false);
         }
     }, [loadModules, log, moduleId, moduleInfo, moduleInfoSaving, moduleThumbnails, moduleThumbnailsDirty, moduleVisibility, saveAll, setProject]);
+
+    const deleteModule = useCallback(async () => {
+        if (!moduleId || moduleDeleting) return;
+        setModuleDeleting(true);
+        setModuleDeleteError('');
+        try {
+            await api<{ success: true }>(`/api/dashboard/modules/ide/${moduleId}`, { method: 'DELETE' });
+            moduleThumbnailBlobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+            moduleThumbnailBlobUrlsRef.current.clear();
+
+            const remainingModules = modules.filter((item) => item.id !== moduleId);
+            const nextModuleId = remainingModules[0]?.id || '';
+            setModules(remainingModules);
+            setModuleDeleteConfirmOpen(false);
+            setModuleInfoOpen(false);
+            setProject(null);
+            setDrafts({});
+            setTabs([]);
+            setActiveTab('');
+            setSelectedFileId('');
+            setModuleId(nextModuleId);
+            setLoading(Boolean(nextModuleId));
+
+            const nextUrl = new URL(window.location.href);
+            if (nextModuleId) nextUrl.searchParams.set('module', nextModuleId);
+            else nextUrl.searchParams.delete('module');
+            window.history.replaceState({}, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+            if (nextModuleId) localStorage.setItem('rolink-module-ide-last-module', nextModuleId);
+            else localStorage.removeItem('rolink-module-ide-last-module');
+        } catch (reason) {
+            setModuleDeleteError(reason instanceof Error ? reason.message : 'Module failed to delete.');
+        } finally {
+            setModuleDeleting(false);
+        }
+    }, [moduleDeleting, moduleId, modules, setDrafts, setProject]);
 
     useEffect(() => {
         if (!activeFile || !activeDraft?.dirty || activeDraft.status === 'conflict') return;
@@ -892,8 +930,20 @@ export default function ModuleIdeClient() {
                         <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">Description</span><textarea rows={5} maxLength={2000} value={moduleInfo.description} onChange={(event) => setModuleInfo((current) => ({ ...current, description: event.target.value }))} placeholder="Describe what this module does…" className="w-full resize-y rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm leading-6 outline-none focus:border-sky-400/60" /><span className="mt-1 block text-right text-[10px] text-slate-600">{moduleInfo.description.length} / 2000</span></label>
                         {moduleInfoError && <p role="alert" className="rounded-md border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-200">{moduleInfoError}</p>}
                     </div>
-                    <div className="flex shrink-0 justify-end gap-2 border-t border-white/8 p-4"><button type="button" onClick={() => setModuleInfoOpen(false)} disabled={moduleInfoSaving} className="rounded border border-white/10 px-4 py-2 text-xs disabled:opacity-40">Cancel</button><button disabled={!moduleInfo.title.trim() || moduleInfoSaving} className="rounded bg-sky-500 px-4 py-2 text-xs font-bold text-white hover:bg-sky-400 disabled:opacity-40">{moduleInfoSaving ? 'Saving…' : 'Save changes'}</button></div>
+                    <div className="flex shrink-0 items-center justify-between gap-3 border-t border-white/8 p-4">
+                        <button type="button" onClick={() => { setModuleDeleteError(''); setModuleDeleteConfirmOpen(true); }} disabled={moduleInfoSaving} className="flex items-center gap-1.5 rounded border border-red-400/20 px-3 py-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-400/10 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" />Delete module</button>
+                        <div className="flex gap-2"><button type="button" onClick={() => setModuleInfoOpen(false)} disabled={moduleInfoSaving} className="rounded border border-white/10 px-4 py-2 text-xs disabled:opacity-40">Cancel</button><button disabled={!moduleInfo.title.trim() || moduleInfoSaving} className="rounded bg-sky-500 px-4 py-2 text-xs font-bold text-white hover:bg-sky-400 disabled:opacity-40">{moduleInfoSaving ? 'Saving…' : 'Save changes'}</button></div>
+                    </div>
                 </form>
+            </div>
+        )}
+        {moduleDeleteConfirmOpen && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onMouseDown={() => { if (!moduleDeleting) setModuleDeleteConfirmOpen(false); }}>
+                <div role="alertdialog" aria-modal="true" aria-labelledby="delete-module-title" aria-describedby="delete-module-description" onMouseDown={(event) => event.stopPropagation()} className="w-[min(440px,94vw)] rounded-lg border border-red-400/20 bg-[#111722] p-5 shadow-2xl">
+                    <div className="flex items-start gap-3"><span className="rounded-full bg-red-400/10 p-2 text-red-300"><AlertTriangle className="h-5 w-5" /></span><div><h2 id="delete-module-title" className="font-semibold text-white">Delete {project?.module.name || moduleInfo.title}?</h2><p id="delete-module-description" className="mt-1.5 text-xs leading-5 text-slate-400">This permanently removes the module, its project files, published versions, marketplace listing, reviews, and server installations. This cannot be undone.</p></div></div>
+                    {moduleDeleteError && <p role="alert" className="mt-4 rounded-md border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-200">{moduleDeleteError}</p>}
+                    <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setModuleDeleteConfirmOpen(false)} disabled={moduleDeleting} className="rounded border border-white/10 px-4 py-2 text-xs disabled:opacity-40">Cancel</button><button type="button" onClick={() => void deleteModule()} disabled={moduleDeleting} className="flex items-center gap-1.5 rounded bg-red-500 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-red-400 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" />{moduleDeleting ? 'Deleting…' : 'Delete module'}</button></div>
+                </div>
             </div>
         )}
     </div>;
