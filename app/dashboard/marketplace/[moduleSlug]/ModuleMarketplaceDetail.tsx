@@ -23,6 +23,7 @@ interface MarketplaceModule {
     slug: string;
     name: string;
     description: string;
+    thumbnailUrl: string;
     version: string;
     category: string;
     status: string;
@@ -214,7 +215,8 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                             Back to Marketplace
                         </Link>
                         {addon && (
-                            <div className="mt-6">
+                            <div className={`mt-6 ${addon.thumbnailUrl ? 'grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
+                                <div>
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">{addon.category}</span>
                                     <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">v{addon.version}</span>
@@ -224,6 +226,8 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                 </div>
                                 <h1 id="module-title" className="mt-4 text-3xl font-black tracking-tight text-white md:text-4xl">{addon.name}</h1>
                                 <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-slate-400 md:text-base">{addon.description || 'No description provided.'}</p>
+                                </div>
+                                {addon.thumbnailUrl && <img src={addon.thumbnailUrl} alt="" className="aspect-video w-full rounded-xl border border-slate-700/80 object-cover shadow-2xl shadow-black/25" />}
                             </div>
                         )}
                     </div>

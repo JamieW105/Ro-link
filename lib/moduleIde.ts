@@ -52,6 +52,7 @@ interface AddonModuleOwnerRow {
     slug: string;
     name: string;
     description: string;
+    thumbnail_url: string;
     version: string;
     status: string;
     source_code: string;
@@ -164,7 +165,7 @@ export async function getOwnedModule(moduleId: string, discordUserId: string): P
     const client = getSupabaseAdmin();
     const { data, error } = await client
         .from('addon_modules')
-        .select('id, slug, name, description, version, status, source_code, author_discord_id, created_at, updated_at, published_at')
+        .select('id, slug, name, description, thumbnail_url, version, status, source_code, author_discord_id, created_at, updated_at, published_at')
         .eq('id', moduleId)
         .eq('author_discord_id', discordUserId)
         .maybeSingle();
@@ -238,6 +239,7 @@ export async function ensureOwnedModuleProject(moduleId: string, discordUserId: 
             slug: ownedModule.slug,
             name: ownedModule.name,
             description: ownedModule.description,
+            thumbnailUrl: ownedModule.thumbnail_url || '',
             version: ownedModule.version,
             status: ownedModule.status,
             createdAt: ownedModule.created_at,

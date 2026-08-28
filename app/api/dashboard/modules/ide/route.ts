@@ -25,7 +25,7 @@ export async function GET() {
     const client = getSupabaseAdmin();
     const { data, error } = await client
         .from('addon_modules')
-        .select('id, slug, name, description, version, status, created_at, updated_at, published_at')
+        .select('id, slug, name, description, thumbnail_url, version, status, created_at, updated_at, published_at')
         .eq('author_discord_id', auth.discordUserId)
         .neq('status', 'ARCHIVED')
         .order('updated_at', { ascending: false });
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
         source_checksum: checksumModuleSource(source),
         config_schema: {},
         author_discord_id: auth.discordUserId,
-    }).select('id, slug, name, description, version, status, created_at, updated_at').single();
+    }).select('id, slug, name, description, thumbnail_url, version, status, created_at, updated_at').single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return noStoreJson({ module: data }, { status: 201 });
 }

@@ -100,7 +100,7 @@ export async function GET() {
     const userId = String((session.user as { id?: string }).id || '');
     const query = supabase
         .from('addon_modules')
-        .select('id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
+        .select('id, slug, name, description, thumbnail_url, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
         .order('name', { ascending: true });
 
     const { data, error } = userId
@@ -253,7 +253,7 @@ export async function POST(req: Request) {
             updated_at: now,
             published_at: null,
         })
-        .select('id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
+        .select('id, slug, name, description, thumbnail_url, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
         .single();
 
     if (error) {

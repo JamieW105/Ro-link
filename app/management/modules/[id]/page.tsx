@@ -26,6 +26,7 @@ interface AddonModule {
     slug: string;
     name: string;
     description: string;
+    thumbnailUrl: string;
     version: string;
     category: string;
     status: ModuleStatus;
@@ -391,6 +392,7 @@ export default function ManagementModuleReviewPage() {
                     <Link href="/management/modules" className="text-xs font-bold uppercase tracking-widest text-sky-300 hover:text-sky-200">
                         Back to modules
                     </Link>
+                    {module.thumbnailUrl && <img src={module.thumbnailUrl} alt="" className="mt-4 aspect-video w-full max-w-sm rounded-xl border border-slate-700 object-cover" />}
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                         <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(module.status)}`}>
                             {module.status}

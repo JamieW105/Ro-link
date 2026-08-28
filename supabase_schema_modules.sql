@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS public.addon_modules (
     slug TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
+    thumbnail_url TEXT NOT NULL DEFAULT '',
     version TEXT NOT NULL DEFAULT '1.0.0',
     category TEXT NOT NULL DEFAULT 'General',
     status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'ARCHIVED')),
@@ -28,6 +29,23 @@ CREATE INDEX IF NOT EXISTS idx_addon_modules_category
 
 ALTER TABLE public.addon_modules
     ADD COLUMN IF NOT EXISTS config_schema JSONB NOT NULL DEFAULT '{}';
+
+ALTER TABLE public.addon_modules
+    ADD COLUMN IF NOT EXISTS thumbnail_url TEXT NOT NULL DEFAULT '';
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'module-thumbnails',
+    'module-thumbnails',
+    TRUE,
+    5242880,
+    ARRAY['image/png', 'image/jpeg', 'image/webp']::TEXT[]
+)
+ON CONFLICT (id) DO UPDATE
+SET
+    public = EXCLUDED.public,
+    file_size_limit = EXCLUDED.file_size_limit,
+    allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 ALTER TABLE public.addon_modules
     ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ,

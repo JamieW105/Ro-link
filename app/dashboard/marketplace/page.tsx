@@ -31,6 +31,7 @@ interface MarketplaceModule {
     slug: string;
     name: string;
     description: string;
+    thumbnailUrl: string;
     version: string;
     category: string;
     status: string;
@@ -246,9 +247,7 @@ export default function DashboardMarketplacePage() {
                                             className="interactive-lift group flex min-w-0 items-center gap-4 rounded-lg border border-slate-800 bg-[#0d1116] p-4 transition-colors hover:border-sky-500/40 hover:bg-[#10161d] focus-visible:border-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
                                             aria-label={`View ${addon.name}`}
                                         >
-                                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-900/70 text-sky-300 transition-colors group-hover:border-sky-500/40 group-hover:bg-sky-500/10">
-                                                <Store size={19} aria-hidden="true" />
-                                            </span>
+                                            {addon.thumbnailUrl ? <img src={addon.thumbnailUrl} alt="" className="h-12 w-20 shrink-0 rounded-lg border border-slate-700 object-cover transition-colors group-hover:border-sky-500/40" /> : <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-900/70 text-sky-300 transition-colors group-hover:border-sky-500/40 group-hover:bg-sky-500/10"><Store size={19} aria-hidden="true" /></span>}
 
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-1.5">

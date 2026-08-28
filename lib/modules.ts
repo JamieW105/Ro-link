@@ -974,6 +974,7 @@ export function normalizeAddonModule(row: Record<string, unknown> | null | undef
         slug: String(row.slug || ''),
         name: String(row.name || 'Untitled Module'),
         description: String(row.description || ''),
+        thumbnailUrl: String(row.thumbnail_url || ''),
         version: String(row.version || '1.0.0'),
         category: String(row.category || 'General'),
         status: String(row.status || 'DRAFT') as AddonModuleStatus,

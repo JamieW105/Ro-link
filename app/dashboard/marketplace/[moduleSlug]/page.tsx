@@ -16,6 +16,7 @@ type ModulePreviewRow = {
     name?: string | null;
     description?: string | null;
     category?: string | null;
+    thumbnail_url?: string | null;
 };
 
 function getBaseUrl() {
@@ -32,7 +33,7 @@ async function getPublishedModuleBySlug(moduleSlug: string) {
 
     const { data, error } = await supabase
         .from('addon_modules')
-        .select('slug, name, description, category')
+        .select('slug, name, description, category, thumbnail_url')
         .eq('slug', slug)
         .eq('status', 'PUBLISHED')
         .maybeSingle<ModulePreviewRow>();
@@ -57,6 +58,7 @@ export async function generateMetadata(context: RouteContext): Promise<Metadata>
     const title = `${moduleName} | Ro-Link Dashboard Modules`;
     const description = `${moduleTag}\n${moduleDescription}`;
     const url = buildModuleUrl(addonModule?.slug || moduleSlug);
+    const imageUrl = trimModuleString(addonModule?.thumbnail_url, 2048) || `${getBaseUrl()}/Media/Ro-LinkIcon.png`;
 
     return {
         title,
@@ -72,10 +74,10 @@ export async function generateMetadata(context: RouteContext): Promise<Metadata>
             type: 'website',
             images: [
                 {
-                    url: `${getBaseUrl()}/Media/Ro-LinkIcon.png`,
-                    width: 512,
-                    height: 512,
-                    alt: 'Ro-Link',
+                    url: imageUrl,
+                    width: addonModule?.thumbnail_url ? 1200 : 512,
+                    height: addonModule?.thumbnail_url ? 675 : 512,
+                    alt: addonModule?.thumbnail_url ? `${moduleName} thumbnail` : 'Ro-Link',
                 },
             ],
         },
@@ -83,7 +85,7 @@ export async function generateMetadata(context: RouteContext): Promise<Metadata>
             card: 'summary',
             title,
             description,
-            images: [`${getBaseUrl()}/Media/Ro-LinkIcon.png`],
+            images: [imageUrl],
         },
     };
 }

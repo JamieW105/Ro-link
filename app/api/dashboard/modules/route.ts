@@ -109,7 +109,7 @@ export async function GET(req: Request) {
 
     const moduleQuery = supabase
         .from('addon_modules')
-        .select('id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
+        .select('id, slug, name, description, thumbnail_url, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
         .order('name', { ascending: true });
 
     const [{ data: modules, error: modulesError }, { data: installedRows, error: installedError }, { data: customRows, error: customError }] = await Promise.all([

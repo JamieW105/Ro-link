@@ -6,17 +6,17 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import {
     AlertTriangle, Boxes, Braces, Cable, Check, ChevronDown, ChevronRight, Code2,
     File, FileCode2, FileJson, Folder, FolderOpen, GitCompare, Play, PlugZap,
-    RefreshCw, Save, Search, Server, Settings2, Unplug, X,
+    ImagePlus, RefreshCw, Save, Search, Server, Settings2, Trash2, Unplug, X,
 } from 'lucide-react';
 
 import ModuleIdeEditor, { type IdeDiagnostic } from '@/components/dashboard/ModuleIdeEditor';
 
 type ModuleFileKind = 'folder' | 'server_script' | 'client_script' | 'shared_module' | 'ui' | 'manifest';
-type ModuleSummary = { id: string; slug: string; name: string; description: string; version: string; status: string; updated_at: string; published_at?: string | null };
+type ModuleSummary = { id: string; slug: string; name: string; description: string; thumbnail_url?: string; version: string; status: string; updated_at: string; published_at?: string | null };
 type ProjectFile = { id: string; path: string; name: string; kind: ModuleFileKind; sourceCode: string | null; uiTree: unknown; revision: number; createdAt: string; updatedAt: string };
 type ProjectProblem = { severity: 'error' | 'warning'; file?: string; line?: number; column?: number; message: string; code: string };
 type ProjectResponse = {
-    module: { id: string; slug: string; name: string; description: string; version: string; status: string; createdAt: string; updatedAt: string; publishedAt: string | null };
+    module: { id: string; slug: string; name: string; description: string; thumbnailUrl: string; version: string; status: string; createdAt: string; updatedAt: string; publishedAt: string | null };
     project: { formatVersion: number; revision: number; publishedRevision: number | null; requiredRuntimeVersion: string; manifest: Record<string, unknown>; createdAt: string; updatedAt: string };
     files: ProjectFile[];
 };
@@ -131,6 +131,11 @@ export default function ModuleIdeClient() {
     const [quickQuery, setQuickQuery] = useState('');
     const [moduleInfoOpen, setModuleInfoOpen] = useState(false);
     const [moduleInfo, setModuleInfo] = useState({ title: '', description: '' });
+    const [moduleThumbnailFile, setModuleThumbnailFile] = useState<File | null>(null);
+    const [moduleThumbnailPreview, setModuleThumbnailPreview] = useState('');
+    const [removeModuleThumbnail, setRemoveModuleThumbnail] = useState(false);
+    const [moduleInfoError, setModuleInfoError] = useState('');
+    const moduleThumbnailInputRef = useRef<HTMLInputElement | null>(null);
     const [moduleInfoSaving, setModuleInfoSaving] = useState(false);
     const [moduleName, setModuleNameState] = useState('');
     const [moduleNameStatus, setModuleNameStatus] = useState<'saved' | 'dirty' | 'saving' | 'failed'>('saved');
@@ -155,6 +160,10 @@ export default function ModuleIdeClient() {
     useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
     useEffect(() => { tabsRef.current = tabs; }, [tabs]);
     useEffect(() => { studioScriptRef.current = studioScript; }, [studioScript]);
+    useEffect(() => {
+        if (!moduleThumbnailPreview.startsWith('blob:')) return;
+        return () => URL.revokeObjectURL(moduleThumbnailPreview);
+    }, [moduleThumbnailPreview]);
 
     const log = useCallback((message: string, channel: SyncLog['channel'] = 'output', tone: SyncLog['tone'] = 'normal') => {
         setLogs((items) => [...items.slice(-150), { id: crypto.randomUUID(), time: new Date().toLocaleTimeString(), message, channel, tone }]);
@@ -389,13 +398,34 @@ export default function ModuleIdeClient() {
         const currentModule = projectRef.current?.module;
         if (!currentModule) return;
         setModuleInfo({ title: currentModule.name, description: currentModule.description });
+        setModuleThumbnailFile(null);
+        setModuleThumbnailPreview(currentModule.thumbnailUrl || '');
+        setRemoveModuleThumbnail(false);
+        setModuleInfoError('');
         setModuleInfoOpen(true);
+    }, []);
+
+    const chooseModuleThumbnail = useCallback((file: File | null) => {
+        if (!file) return;
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+            setModuleInfoError('Use a PNG, JPEG, or WebP image.');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            setModuleInfoError('Thumbnail images must be no larger than 5 MB.');
+            return;
+        }
+        setModuleInfoError('');
+        setModuleThumbnailFile(file);
+        setRemoveModuleThumbnail(false);
+        setModuleThumbnailPreview(URL.createObjectURL(file));
     }, []);
 
     const saveModuleInfo = useCallback(async () => {
         const title = moduleInfo.title.trim();
         if (!title || moduleInfoSaving) return;
         setModuleInfoSaving(true);
+        setModuleInfoError('');
         try {
             if (!await saveAll()) return;
             const currentProject = projectRef.current;
@@ -416,15 +446,33 @@ export default function ModuleIdeClient() {
                 files: current.files.map((file) => file.id === manifestFile?.id ? { ...file, sourceCode: manifestSource, revision: file.revision + 1, updatedAt: new Date().toISOString() } : file),
             } : current);
             if (manifestFile) setDrafts((current) => ({ ...current, [manifestFile.id]: { value: manifestSource, revision: manifestFile.revision + 1, dirty: false, status: 'saved' } }));
+
+            let thumbnailUrl = currentProject.module.thumbnailUrl || '';
+            if (moduleThumbnailFile) {
+                const thumbnailBody = new FormData();
+                thumbnailBody.set('thumbnail', moduleThumbnailFile);
+                const thumbnailResponse = await fetch(`/api/dashboard/modules/ide/${moduleId}/thumbnail`, { method: 'POST', body: thumbnailBody });
+                const thumbnailPayload = await thumbnailResponse.json().catch(() => ({})) as Record<string, unknown>;
+                if (!thumbnailResponse.ok) throw new Error(String(thumbnailPayload.error || 'Thumbnail upload failed.'));
+                thumbnailUrl = String(thumbnailPayload.thumbnailUrl || '');
+            } else if (removeModuleThumbnail && thumbnailUrl) {
+                const thumbnailResponse = await fetch(`/api/dashboard/modules/ide/${moduleId}/thumbnail`, { method: 'DELETE' });
+                const thumbnailPayload = await thumbnailResponse.json().catch(() => ({})) as Record<string, unknown>;
+                if (!thumbnailResponse.ok) throw new Error(String(thumbnailPayload.error || 'Thumbnail removal failed.'));
+                thumbnailUrl = '';
+            }
+            setProject((current) => current ? { ...current, module: { ...current.module, thumbnailUrl } } : current);
             void loadModules().catch(() => undefined);
             setModuleInfoOpen(false);
             log('Module info saved.', 'output', 'success');
         } catch (reason) {
-            setError(reason instanceof Error ? reason.message : 'Module info failed to save.');
+            const message = reason instanceof Error ? reason.message : 'Module info failed to save.';
+            setModuleInfoError(message);
+            setError(message);
         } finally {
             setModuleInfoSaving(false);
         }
-    }, [loadModules, log, moduleId, moduleInfo, moduleInfoSaving, saveAll, setDrafts, setProject]);
+    }, [loadModules, log, moduleId, moduleInfo, moduleInfoSaving, moduleThumbnailFile, removeModuleThumbnail, saveAll, setDrafts, setProject]);
 
     useEffect(() => {
         if (!activeFile || !activeDraft?.dirty || activeDraft.status === 'conflict') return;
@@ -698,6 +746,26 @@ export default function ModuleIdeClient() {
         {quickMode && <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/45 pt-[12vh]" onMouseDown={() => setQuickMode(null)}><div onMouseDown={(event) => event.stopPropagation()} className="w-[min(620px,90vw)] overflow-hidden rounded-lg border border-white/12 bg-[#111722] shadow-2xl"><div className="flex items-center gap-3 border-b border-white/8 px-4"><Search className="h-4 w-4 text-slate-500" /><input autoFocus value={quickQuery} onChange={(event) => setQuickQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') setQuickMode(null); }} placeholder={quickMode === 'files' ? 'Go to file…' : 'Run a command…'} className="h-12 flex-1 bg-transparent text-sm outline-none" /><kbd className="text-[10px] text-slate-600">ESC</kbd></div><div className="max-h-96 overflow-y-auto p-2">{quickMode === 'files' ? quickFiles.map((file) => <button key={file.id} onClick={() => { openProjectFile(file); setQuickMode(null); }} className="flex w-full items-center gap-3 rounded px-3 py-2 text-left text-sm text-slate-300 hover:bg-white/[0.05]">{fileIcon(file)}<span>{file.name}</span><span className="ml-auto text-xs text-slate-600">{file.path}</span></button>) : commands.map((command) => <button key={command.label} onClick={() => { command.run(); setQuickMode(null); }} className="flex w-full items-center gap-3 rounded px-3 py-2 text-left text-sm text-slate-300 hover:bg-white/[0.05]"><Settings2 className="h-4 w-4 text-sky-300" />{command.label}</button>)}</div></div></div>}
         {conflict && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"><div className="w-[min(1000px,95vw)] rounded-lg border border-red-400/20 bg-[#111722] shadow-2xl"><div className="flex items-center gap-3 border-b border-white/8 p-4"><GitCompare className="h-5 w-5 text-amber-300" /><div><p className="font-semibold">Revision conflict: {conflict.title}</p><p className="text-xs text-slate-500">Compare both versions before choosing which source should continue.</p></div></div><div className="grid max-h-[60vh] grid-cols-2 divide-x divide-white/8"><div className="min-w-0"><p className="border-b border-white/8 px-4 py-2 text-xs font-bold text-sky-300">Browser version</p><pre className="max-h-[52vh] overflow-auto whitespace-pre-wrap p-4 text-xs leading-5 text-slate-300">{conflict.browserSource}</pre></div><div className="min-w-0"><p className="border-b border-white/8 px-4 py-2 text-xs font-bold text-emerald-300">{conflict.kind === 'studio' ? 'Studio version' : 'Server version'}</p><pre className="max-h-[52vh] overflow-auto whitespace-pre-wrap p-4 text-xs leading-5 text-slate-300">{conflict.serverSource}</pre></div></div><div className="flex justify-end gap-2 border-t border-white/8 p-4"><button onClick={() => { if (conflict.kind === 'project' && conflict.fileId) { const id = conflict.fileId; setDrafts((current) => ({ ...current, [id]: { value: conflict.serverSource, revision: Number(conflict.serverRevision), dirty: false, status: 'saved' } })); setProject((current) => current ? { ...current, files: current.files.map((file) => file.id === id ? { ...file, sourceCode: conflict.serverSource, revision: Number(conflict.serverRevision) } : file) } : current); } else setStudioScript((current) => current ? { ...current, source: conflict.serverSource, revision: String(conflict.serverRevision), dirty: false } : current); setConflict(null); }} className="rounded border border-white/10 px-3 py-2 text-xs">Use {conflict.kind === 'studio' ? 'Studio' : 'server'} version</button><button onClick={() => { if (conflict.kind === 'project' && conflict.fileId) { const id = conflict.fileId; setDrafts((current) => ({ ...current, [id]: { ...current[id], revision: Number(conflict.serverRevision), dirty: true, status: 'dirty' } })); } else { setStudioScript((current) => current ? { ...current, revision: String(conflict.serverRevision), dirty: true } : current); window.setTimeout(() => void saveStudioScript(String(conflict.serverRevision)), 0); } setConflict(null); }} className="rounded bg-sky-500 px-3 py-2 text-xs font-bold">Keep browser version</button></div></div></div>}
         {publishCheck && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"><div className="w-[min(560px,94vw)] rounded-lg border border-white/10 bg-[#111722] shadow-2xl"><div className="flex items-center gap-3 border-b border-white/8 p-5">{publishCheck.ready ? <Check className="h-6 w-6 text-emerald-300" /> : <AlertTriangle className="h-6 w-6 text-red-300" />}<div><p className="font-semibold">{publishCheck.ready ? 'Ready to Publish' : 'Publishing is blocked'}</p><p className="text-xs text-slate-500">Validation never publishes automatically.</p></div></div><div className="space-y-2 p-5 text-sm"><p className="text-emerald-300">✓ {publishCheck.summary.scripts} scripts checked</p><p className="text-emerald-300">✓ Module API transport available</p><p className="text-emerald-300">✓ {publishCheck.summary.uiRoots} UI roots bundled</p><p className={publishCheck.summary.errors ? 'text-red-300' : 'text-emerald-300'}>{publishCheck.summary.errors ? '✕' : '✓'} {publishCheck.summary.errors} errors</p><p className={publishCheck.summary.warnings ? 'text-amber-300' : 'text-emerald-300'}>⚠ {publishCheck.summary.warnings} warnings</p>{publishCheck.problems.slice(0, 6).map((problem, index) => <p key={index} className="border-t border-white/6 pt-2 text-xs text-slate-400">{problem.file ? `${problem.file}: ` : ''}{problem.message}</p>)}</div><div className="flex justify-end gap-2 border-t border-white/8 p-4"><button onClick={() => setPublishCheck(null)} className="rounded border border-white/10 px-4 py-2 text-xs">Cancel</button><button onClick={() => void publish()} disabled={!publishCheck.ready || publishing} className="rounded bg-sky-500 px-4 py-2 text-xs font-bold disabled:opacity-40">{publishing ? 'Publishing…' : `Publish v${String(project?.project.manifest.version || project?.module.version || '')}`}</button></div></div></div>}
-        {moduleInfoOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" onMouseDown={() => { if (!moduleInfoSaving) setModuleInfoOpen(false); }}><form onSubmit={(event) => { event.preventDefault(); void saveModuleInfo(); }} onMouseDown={(event) => event.stopPropagation()} className="w-[min(520px,94vw)] rounded-lg border border-white/10 bg-[#111722] shadow-2xl"><div className="flex items-center gap-3 border-b border-white/8 p-5"><Settings2 className="h-5 w-5 text-sky-300" /><div><p className="font-semibold">Edit Module Info</p><p className="text-xs text-slate-500">Update the details shown for this module.</p></div></div><div className="space-y-4 p-5"><label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">Title</span><input autoFocus required maxLength={120} value={moduleInfo.title} onChange={(event) => setModuleInfo((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-sky-400/60" /></label><label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">Description</span><textarea rows={5} maxLength={2000} value={moduleInfo.description} onChange={(event) => setModuleInfo((current) => ({ ...current, description: event.target.value }))} placeholder="Describe what this module does…" className="w-full resize-y rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm leading-6 outline-none focus:border-sky-400/60" /><span className="mt-1 block text-right text-[10px] text-slate-600">{moduleInfo.description.length} / 2000</span></label></div><div className="flex justify-end gap-2 border-t border-white/8 p-4"><button type="button" onClick={() => setModuleInfoOpen(false)} disabled={moduleInfoSaving} className="rounded border border-white/10 px-4 py-2 text-xs disabled:opacity-40">Cancel</button><button disabled={!moduleInfo.title.trim() || moduleInfoSaving} className="rounded bg-sky-500 px-4 py-2 text-xs font-bold text-white hover:bg-sky-400 disabled:opacity-40">{moduleInfoSaving ? 'Saving…' : 'Save changes'}</button></div></form></div>}
+        {moduleInfoOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-6" onMouseDown={() => { if (!moduleInfoSaving) setModuleInfoOpen(false); }}>
+                <form onSubmit={(event) => { event.preventDefault(); void saveModuleInfo(); }} onMouseDown={(event) => event.stopPropagation()} className="flex max-h-[94vh] w-[min(580px,94vw)] flex-col overflow-hidden rounded-lg border border-white/10 bg-[#111722] shadow-2xl">
+                    <div className="flex shrink-0 items-center gap-3 border-b border-white/8 p-5"><Settings2 className="h-5 w-5 text-sky-300" /><div><p className="font-semibold">Edit Module Info</p><p className="text-xs text-slate-500">Update the details shown for this module.</p></div></div>
+                    <div className="space-y-4 overflow-y-auto p-5">
+                        <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">Title</span><input autoFocus required maxLength={120} value={moduleInfo.title} onChange={(event) => setModuleInfo((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-sky-400/60" /></label>
+                        <div>
+                            <div className="mb-1.5 flex items-end justify-between gap-4"><span className="text-xs font-semibold text-slate-300">Thumbnail</span><span className="text-[10px] text-slate-600">PNG, JPEG or WebP · 5 MB max</span></div>
+                            <input ref={moduleThumbnailInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => { chooseModuleThumbnail(event.currentTarget.files?.[0] || null); event.currentTarget.value = ''; }} />
+                            <div className="group relative h-36 overflow-hidden rounded-lg border border-dashed border-white/12 bg-black/25 sm:h-40">
+                                {moduleThumbnailPreview ? <img src={moduleThumbnailPreview} alt="Module thumbnail preview" className="h-full w-full object-cover" /> : <button type="button" onClick={() => moduleThumbnailInputRef.current?.click()} className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-500 transition-colors hover:bg-white/[0.03] hover:text-sky-300"><ImagePlus className="h-7 w-7" /><span className="text-xs font-semibold">Choose a thumbnail</span><span className="text-[10px] text-slate-600">16:9 recommended</span></button>}
+                                {moduleThumbnailPreview && <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 bg-gradient-to-t from-black/85 to-transparent p-3 pt-8 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"><button type="button" onClick={() => moduleThumbnailInputRef.current?.click()} className="rounded border border-white/15 bg-black/65 px-3 py-1.5 text-[10px] font-bold text-white hover:border-sky-400/60">Replace</button><button type="button" aria-label="Remove thumbnail" onClick={() => { setModuleThumbnailFile(null); setModuleThumbnailPreview(''); setRemoveModuleThumbnail(true); }} className="flex items-center gap-1 rounded border border-red-400/25 bg-black/65 px-3 py-1.5 text-[10px] font-bold text-red-200 hover:bg-red-400/10"><Trash2 className="h-3 w-3" />Remove</button></div>}
+                            </div>
+                        </div>
+                        <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">Description</span><textarea rows={5} maxLength={2000} value={moduleInfo.description} onChange={(event) => setModuleInfo((current) => ({ ...current, description: event.target.value }))} placeholder="Describe what this module does…" className="w-full resize-y rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm leading-6 outline-none focus:border-sky-400/60" /><span className="mt-1 block text-right text-[10px] text-slate-600">{moduleInfo.description.length} / 2000</span></label>
+                        {moduleInfoError && <p role="alert" className="rounded-md border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-200">{moduleInfoError}</p>}
+                    </div>
+                    <div className="flex shrink-0 justify-end gap-2 border-t border-white/8 p-4"><button type="button" onClick={() => setModuleInfoOpen(false)} disabled={moduleInfoSaving} className="rounded border border-white/10 px-4 py-2 text-xs disabled:opacity-40">Cancel</button><button disabled={!moduleInfo.title.trim() || moduleInfoSaving} className="rounded bg-sky-500 px-4 py-2 text-xs font-bold text-white hover:bg-sky-400 disabled:opacity-40">{moduleInfoSaving ? 'Saving…' : 'Save changes'}</button></div>
+                </form>
+            </div>
+        )}
     </div>;
 }

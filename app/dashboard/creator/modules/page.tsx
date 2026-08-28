@@ -14,6 +14,7 @@ interface CreatorModule {
     slug: string;
     name: string;
     description: string;
+    thumbnailUrl: string;
     version: string;
     category: string;
     status: ModuleStatus;
@@ -219,6 +220,7 @@ export default function CreatorModulesPage() {
                                 <div className="motion-list grid gap-2">
                                     {filteredModules.map((addon) => (
                                         <article key={addon.id} className="interactive-lift group relative flex min-w-0 items-center gap-4 rounded-lg border border-slate-800 bg-[#0d1116] p-4 transition-colors hover:border-sky-500/40 hover:bg-[#10161d]">
+                                            {addon.thumbnailUrl && <img src={addon.thumbnailUrl} alt="" className="h-12 w-20 shrink-0 rounded-lg border border-slate-700 object-cover" />}
                                             <div className="min-w-0 flex-1 pr-12">
                                                 <div className="flex flex-wrap items-center gap-1.5">
                                                     <h2 className="mr-1 break-words text-base font-bold text-white">{addon.name}</h2>
