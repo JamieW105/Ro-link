@@ -10,9 +10,10 @@ import {
 } from 'lucide-react';
 
 import ModuleIdeEditor, { type IdeDiagnostic } from '@/components/dashboard/ModuleIdeEditor';
+import { MODULE_CATEGORIES } from '@/lib/moduleCategories';
 
 type ModuleFileKind = 'folder' | 'server_script' | 'client_script' | 'shared_module' | 'ui' | 'manifest';
-type ModuleSummary = { id: string; slug: string; name: string; description: string; thumbnail_url?: string; thumbnail_urls?: unknown; version: string; status: string; updated_at: string; published_at?: string | null };
+type ModuleSummary = { id: string; slug: string; name: string; description: string; thumbnail_url?: string; thumbnail_urls?: unknown; version: string; category: string; status: string; updated_at: string; published_at?: string | null };
 type ProjectFile = { id: string; path: string; name: string; kind: ModuleFileKind; sourceCode: string | null; uiTree: unknown; revision: number; createdAt: string; updatedAt: string };
 type ProjectProblem = { severity: 'error' | 'warning'; file?: string; line?: number; column?: number; message: string; code: string };
 type ProjectResponse = {
@@ -131,7 +132,7 @@ export default function ModuleIdeClient() {
     const [quickMode, setQuickMode] = useState<'files' | 'commands' | null>(null);
     const [quickQuery, setQuickQuery] = useState('');
     const [moduleInfoOpen, setModuleInfoOpen] = useState(false);
-    const [moduleInfo, setModuleInfo] = useState({ title: '', description: '' });
+    const [moduleInfo, setModuleInfo] = useState({ title: '', category: 'General', description: '' });
     const [moduleThumbnails, setModuleThumbnails] = useState<ModuleThumbnailDraft[]>([]);
     const [moduleThumbnailsDirty, setModuleThumbnailsDirty] = useState(false);
     const [moduleInfoError, setModuleInfoError] = useState('');
@@ -398,13 +399,14 @@ export default function ModuleIdeClient() {
     const openModuleInfo = useCallback(() => {
         const currentModule = projectRef.current?.module;
         if (!currentModule) return;
-        setModuleInfo({ title: currentModule.name, description: currentModule.description });
+        const currentCategory = modules.find((item) => item.id === currentModule.id)?.category;
+        setModuleInfo({ title: currentModule.name, category: currentCategory || 'General', description: currentModule.description });
         const thumbnailUrls = currentModule.thumbnailUrls?.length ? currentModule.thumbnailUrls : currentModule.thumbnailUrl ? [currentModule.thumbnailUrl] : [];
         setModuleThumbnails(thumbnailUrls.map((url) => ({ id: url, url })));
         setModuleThumbnailsDirty(false);
         setModuleInfoError('');
         setModuleInfoOpen(true);
-    }, []);
+    }, [modules]);
 
     const chooseModuleThumbnails = useCallback((files: File[]) => {
         if (!files.length) return;
@@ -443,6 +445,7 @@ export default function ModuleIdeClient() {
                 method: 'PATCH',
                 body: JSON.stringify({
                     manifest: { ...currentProject.project.manifest, name: title, description: moduleInfo.description },
+                    category: moduleInfo.category,
                     expectedRevision: currentProject.project.revision,
                 }),
             });
@@ -759,6 +762,7 @@ export default function ModuleIdeClient() {
                     <div className="flex shrink-0 items-center gap-3 border-b border-white/8 p-5"><Settings2 className="h-5 w-5 text-sky-300" /><div><p className="font-semibold">Edit Module Info</p><p className="text-xs text-slate-500">Update the details shown for this module.</p></div></div>
                     <div className="space-y-4 overflow-y-auto p-5">
                         <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">Title</span><input autoFocus required maxLength={120} value={moduleInfo.title} onChange={(event) => setModuleInfo((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-sky-400/60" /></label>
+                        <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-300">Category</span><select value={moduleInfo.category} onChange={(event) => setModuleInfo((current) => ({ ...current, category: event.target.value }))} className="w-full rounded-lg border border-white/10 bg-[#0b1017] px-3 py-2.5 text-sm text-white outline-none focus:border-sky-400/60">{MODULE_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
                         <div>
                             <div className="mb-1.5 flex items-end justify-between gap-4"><span className="text-xs font-semibold text-slate-300">Thumbnails</span><span className="text-[10px] text-slate-600">{moduleThumbnails.length} / 5 · PNG, JPEG or WebP · 5 MB each</span></div>
                             <input ref={moduleThumbnailInputRef} type="file" multiple accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => { chooseModuleThumbnails(Array.from(event.currentTarget.files || [])); event.currentTarget.value = ''; }} />

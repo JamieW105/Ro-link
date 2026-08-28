@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { buildModuleProjectPackage, normalizeModuleProjectPath, validateModuleProject, type ModuleProjectFile, type ModuleProjectManifest } from '../lib/moduleIde';
+import { MODULE_CATEGORIES, parseModuleCategory } from '../lib/moduleCategories';
 import { validateBridgeEvent } from '../lib/moduleStudioBridge';
 import { validateModuleUiTree } from '../lib/moduleUiSchema';
 import { normalizeAddonModule } from '../lib/modules';
@@ -75,6 +76,12 @@ test('module thumbnails preserve legacy images and cap galleries at five', () =>
     });
     assert.equal(gallery?.thumbnailUrl, 'https://example.com/1.png');
     assert.equal(gallery?.thumbnailUrls.length, 5);
+});
+
+test('module categories expose the creator choices and reject unknown values', () => {
+    assert.deepEqual(MODULE_CATEGORIES, ['General', 'Moderation', 'Misc', 'Fun', 'Troll']);
+    assert.equal(parseModuleCategory('Moderation'), 'Moderation');
+    assert.equal(parseModuleCategory('Unknown'), null);
 });
 
 test('Studio runtime uses the shared Module API instead of project remotes', () => {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { bumpModuleProjectRevision, ensureOwnedModuleProject, MODULE_PROJECT_FORMAT_VERSION, normalizeModuleProjectPath } from '@/lib/moduleIde';
 import { requireModuleIdeUser, noStoreJson } from '@/lib/moduleIdeAuth';
+import { parseModuleCategory } from '@/lib/moduleCategories';
 import { trimModuleString } from '@/lib/modules';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -16,6 +17,8 @@ export async function PATCH(req: Request, context: Context) {
         const project = await ensureOwnedModuleProject(moduleId, auth.discordUserId);
         if (!project) return NextResponse.json({ error: 'Module not found.' }, { status: 404 });
         const body = await req.json().catch(() => null) as Record<string, unknown> | null;
+        const category = body && 'category' in body ? parseModuleCategory(body.category) : null;
+        if (body && 'category' in body && !category) return NextResponse.json({ error: 'Select a valid module category.' }, { status: 400 });
         const expectedRevision = Number(body?.expectedRevision || 0);
         if (expectedRevision !== project.project.revision) return noStoreJson({ error: 'Project manifest changed after it was opened.', project }, { status: 409 });
         const rawManifest = body?.manifest && typeof body.manifest === 'object' ? body.manifest as Record<string, unknown> : {};
@@ -40,7 +43,7 @@ export async function PATCH(req: Request, context: Context) {
         if (!nextRevision) return NextResponse.json({ error: 'Project changed while the manifest was being saved.' }, { status: 409 });
         const projectUpdate = await client.from('addon_module_projects').update({ manifest, required_runtime_version: manifest.requiredRuntimeVersion, updated_at: now }).eq('module_id', moduleId);
         if (projectUpdate.error) throw new Error(projectUpdate.error.message);
-        const moduleUpdate = await client.from('addon_modules').update({ name: manifest.name, description: manifest.description, version: manifest.version, updated_at: now }).eq('id', moduleId).eq('author_discord_id', auth.discordUserId);
+        const moduleUpdate = await client.from('addon_modules').update({ name: manifest.name, description: manifest.description, version: manifest.version, ...(category ? { category } : {}), updated_at: now }).eq('id', moduleId).eq('author_discord_id', auth.discordUserId);
         if (moduleUpdate.error) throw new Error(moduleUpdate.error.message);
         const source = JSON.stringify(manifest, null, 2) + '\n';
         const manifestFile = project.files.find((file) => file.kind === 'manifest');
