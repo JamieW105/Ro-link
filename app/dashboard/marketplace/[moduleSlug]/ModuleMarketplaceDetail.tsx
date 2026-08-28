@@ -224,15 +224,24 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                             Back to Marketplace
                         </Link>
                         {addon && (
-                            <div className="mt-auto max-w-3xl pt-16">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">{addon.category}</span>
-                                    <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">v{addon.version}</span>
-                                    <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(addon.status)}`}>{statusLabel(addon.status)}</span>
-                                    {addon.isOfficial && <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">Official</span>}
-                                    {addon.creatorIsVerified && <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">Verified Creator</span>}
+                            <div className="mt-auto flex flex-col gap-6 pt-16 md:flex-row md:items-end md:justify-between">
+                                <div className="max-w-3xl">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">{addon.category}</span>
+                                        <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">v{addon.version}</span>
+                                        <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(addon.status)}`}>{statusLabel(addon.status)}</span>
+                                        {addon.isOfficial && <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">Official</span>}
+                                        {addon.creatorIsVerified && <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">Verified Creator</span>}
+                                    </div>
+                                    <h1 id="module-title" className="mt-4 text-4xl font-black tracking-tight text-white drop-shadow-lg md:text-5xl">{addon.name}</h1>
                                 </div>
-                                <h1 id="module-title" className="mt-4 text-4xl font-black tracking-tight text-white drop-shadow-lg md:text-5xl">{addon.name}</h1>
+                                <button
+                                    type="button"
+                                    onClick={() => setInstallPickerOpen(true)}
+                                    className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-6 text-xs font-bold uppercase tracking-wider text-sky-200 transition-colors hover:bg-sky-500/15 hover:text-white md:w-auto md:min-w-48"
+                                >
+                                    Install
+                                </button>
                             </div>
                         )}
                     </div>
@@ -253,7 +262,7 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                             <h2 id="module-description-title" className="text-lg font-bold text-white">Description:</h2>
                             <p className="mt-3 max-w-4xl text-sm font-medium leading-6 text-slate-400 md:text-base">{addon.description || 'No description provided.'}</p>
                         </section>
-                        <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(0,1fr)_280px]">
+                        <div>
                             <section className="rounded-lg border border-slate-800 bg-[#0d1116] p-5 md:p-7">
                                 <h2 className="text-sm font-bold uppercase tracking-widest text-white">Configuration Fields</h2>
                                 {Object.values(addon.configSchema || {}).length === 0 ? (
@@ -281,15 +290,6 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                 )}
                             </section>
 
-                            <aside className="space-y-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setInstallPickerOpen(true)}
-                                    className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 text-xs font-bold uppercase tracking-wider text-sky-200 transition-colors hover:bg-sky-500/15 hover:text-white"
-                                >
-                                    Select Server To Install
-                                </button>
-                            </aside>
                         </div>
                     </section>
                 )}
