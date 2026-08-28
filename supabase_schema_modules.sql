@@ -116,6 +116,40 @@ CREATE INDEX IF NOT EXISTS idx_server_addon_modules_server
 CREATE INDEX IF NOT EXISTS idx_server_addon_modules_module
     ON public.server_addon_modules(module_id);
 
+CREATE TABLE IF NOT EXISTS public.addon_module_reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    module_id UUID NOT NULL REFERENCES public.addon_modules(id) ON DELETE CASCADE,
+    reviewer_discord_id TEXT NOT NULL,
+    reviewer_name TEXT NOT NULL DEFAULT 'Ro-Link user' CHECK (char_length(reviewer_name) BETWEEN 1 AND 120),
+    reviewer_avatar_url TEXT NOT NULL DEFAULT '' CHECK (char_length(reviewer_avatar_url) <= 2048),
+    rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment TEXT NOT NULL DEFAULT '' CHECK (char_length(comment) <= 1000),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (module_id, reviewer_discord_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_addon_module_reviews_module_created
+    ON public.addon_module_reviews(module_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_addon_module_reviews_module_rating
+    ON public.addon_module_reviews(module_id, rating);
+
+ALTER TABLE public.addon_module_reviews ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE public.addon_module_reviews FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.addon_module_reviews TO service_role;
+
+DROP POLICY IF EXISTS "Service role manages module reviews"
+    ON public.addon_module_reviews;
+
+CREATE POLICY "Service role manages module reviews"
+    ON public.addon_module_reviews
+    FOR ALL
+    TO service_role
+    USING (TRUE)
+    WITH CHECK (TRUE);
+
 CREATE TABLE IF NOT EXISTS public.server_custom_modules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     server_id TEXT NOT NULL REFERENCES public.servers(id) ON DELETE CASCADE,

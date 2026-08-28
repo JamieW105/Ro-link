@@ -8,10 +8,13 @@ import {
     ChevronRight,
     Code2,
     Download,
+    LoaderCircle,
     LogOut as LucideLogOut,
+    MessageSquareText,
     Package2,
     Settings2,
     ShieldAlert,
+    Star,
     Store,
     Tag,
     UserRound,
@@ -19,7 +22,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
-import { useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 
@@ -63,6 +66,18 @@ interface InstallTarget {
     moduleLimit: number;
 }
 
+interface ModuleReview {
+    id: string;
+    reviewerName: string;
+    reviewerAvatarUrl: string;
+    rating: number;
+    comment: string;
+    createdAt: string;
+    updatedAt: string;
+    isOwn: boolean;
+    verifiedInstall: boolean;
+}
+
 type SessionUserWithId = {
     id?: string;
 };
@@ -103,6 +118,17 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
     const [installMessage, setInstallMessage] = useState<string | null>(null);
     const [installError, setInstallError] = useState<string | null>(null);
     const [activeThumbnailIndex, setActiveThumbnailIndex] = useState(0);
+    const [reviews, setReviews] = useState<ModuleReview[]>([]);
+    const [reviewCount, setReviewCount] = useState(0);
+    const [averageRating, setAverageRating] = useState(0);
+    const [canReview, setCanReview] = useState(false);
+    const [reviewIsCreator, setReviewIsCreator] = useState(false);
+    const [reviewsLoading, setReviewsLoading] = useState(false);
+    const [reviewRating, setReviewRating] = useState(0);
+    const [reviewComment, setReviewComment] = useState('');
+    const [reviewSubmitting, setReviewSubmitting] = useState(false);
+    const [reviewError, setReviewError] = useState<string | null>(null);
+    const [reviewMessage, setReviewMessage] = useState<string | null>(null);
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
 
     const addon = useMemo(() => {
@@ -145,6 +171,44 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
             })
             .finally(() => setLoading(false));
     }, [status]);
+
+    useEffect(() => {
+        if (status !== 'authenticated' || !addon?.id) return;
+
+        const controller = new AbortController();
+        setReviewsLoading(true);
+        setReviewError(null);
+
+        fetch(`/api/dashboard/marketplace/${encodeURIComponent(addon.id)}/reviews`, {
+            cache: 'no-store',
+            signal: controller.signal,
+        })
+            .then(async (response) => {
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(String(payload.error || 'Failed to load reviews.'));
+
+                const nextReviews = Array.isArray(payload.reviews) ? payload.reviews : [];
+                setReviews(nextReviews);
+                setReviewCount(Number(payload.reviewCount || 0));
+                setAverageRating(Number(payload.averageRating || 0));
+                setCanReview(payload.canReview === true);
+                setReviewIsCreator(payload.isCreator === true);
+
+                if (payload.yourReview) {
+                    setReviewRating(Number(payload.yourReview.rating || 0));
+                    setReviewComment(String(payload.yourReview.comment || ''));
+                }
+            })
+            .catch((loadError) => {
+                if (loadError instanceof DOMException && loadError.name === 'AbortError') return;
+                setReviewError(loadError instanceof Error ? loadError.message : 'Failed to load reviews.');
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setReviewsLoading(false);
+            });
+
+        return () => controller.abort();
+    }, [addon?.id, status]);
 
     function closeInstallPicker() {
         if (installing) return;
@@ -200,6 +264,38 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
         }
     }
 
+    async function submitReview(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        if (!addon || reviewSubmitting) return;
+
+        setReviewSubmitting(true);
+        setReviewError(null);
+        setReviewMessage(null);
+
+        try {
+            const response = await fetch(`/api/dashboard/marketplace/${encodeURIComponent(addon.id)}/reviews`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rating: reviewRating, comment: reviewComment }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(String(payload.error || 'Failed to save review.'));
+
+            const savedReview = payload.review as ModuleReview;
+            const existingReview = reviews.find((review) => review.isOwn);
+            const nextReviewCount = reviewCount + (existingReview ? 0 : 1);
+            const nextRatingTotal = (averageRating * reviewCount) - (existingReview?.rating || 0) + savedReview.rating;
+            setReviews((current) => [savedReview, ...current.filter((review) => review.id !== savedReview.id)]);
+            setReviewCount(nextReviewCount);
+            setAverageRating(nextReviewCount ? nextRatingTotal / nextReviewCount : 0);
+            setReviewMessage(existingReview ? 'Your review was updated.' : 'Your review was published.');
+        } catch (submitError) {
+            setReviewError(submitError instanceof Error ? submitError.message : 'Failed to save review.');
+        } finally {
+            setReviewSubmitting(false);
+        }
+    }
+
     if (status === 'loading' || (status === 'authenticated' && loading)) {
         return (
             <main className="rl-public-page rl-dashboard-page rl-dashboard-state">
@@ -245,7 +341,11 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                             </button>
                         </div>
                         <div className="rl-dashboard-avatar-wrap">
-                            <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="rl-dashboard-avatar" />
+                            {session?.user?.image ? (
+                                <img src={getDiscordMediaProxyUrl(session.user.image)} alt="" className="rl-dashboard-avatar" />
+                            ) : (
+                                <span className="rl-dashboard-avatar flex items-center justify-center bg-slate-900 text-slate-500"><UserRound size={16} aria-hidden="true" /></span>
+                            )}
                             <button type="button" onClick={() => signOut({ callbackUrl: '/auth/signin' })} className="rl-dashboard-mobile-signout" aria-label="Sign out">
                                 <LucideLogOut width="14" height="14" strokeWidth="2" />
                             </button>
@@ -280,6 +380,20 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                 {addon.creatorIsVerified && <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">Verified Creator</span>}
                             </div>
                             <h1 id="module-title" className="mt-4 max-w-4xl text-3xl font-black tracking-tight text-white sm:text-4xl md:text-5xl">{addon.name}</h1>
+                            <div className="mt-4 flex min-h-6 flex-wrap items-center gap-2 text-sm">
+                                <div className="flex items-center gap-0.5 text-amber-400" aria-label={reviewCount ? `${averageRating.toFixed(1)} out of 5 stars` : 'No ratings yet'}>
+                                    {Array.from({ length: 5 }, (_, index) => (
+                                        <Star key={index} size={16} fill={index < Math.round(averageRating) ? 'currentColor' : 'none'} aria-hidden="true" />
+                                    ))}
+                                </div>
+                                {reviewsLoading ? (
+                                    <span className="flex items-center gap-1.5 text-xs text-slate-500"><LoaderCircle size={13} className="animate-spin" aria-hidden="true" />Loading reviews</span>
+                                ) : reviewCount > 0 ? (
+                                    <span className="font-semibold text-slate-300">{averageRating.toFixed(1)} <span className="font-normal text-slate-500">({reviewCount} review{reviewCount === 1 ? '' : 's'})</span></span>
+                                ) : (
+                                    <span className="text-slate-500">No reviews yet</span>
+                                )}
+                            </div>
                         </header>
 
                         <div className="mt-7 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_310px] xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -343,6 +457,125 @@ export default function ModuleMarketplaceDetail({ moduleSlug }: { moduleSlug: st
                                         ))}
                                     </div>
                                 )}
+                                    </div>
+                                </section>
+
+                                <section aria-labelledby="module-reviews-title">
+                                    <div className="mb-3 flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                                            <MessageSquareText size={14} aria-hidden="true" />
+                                            <h2 id="module-reviews-title">Reviews</h2>
+                                        </div>
+                                        <span className="text-xs text-slate-500">{reviewCount} review{reviewCount === 1 ? '' : 's'}</span>
+                                    </div>
+
+                                    <div className="rounded-xl border border-slate-800 bg-[#0d1116] p-5 md:p-7">
+                                        {reviewsLoading ? (
+                                            <div className="flex min-h-28 items-center justify-center gap-2 text-sm text-slate-500">
+                                                <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+                                                Loading reviews
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {(canReview || reviews.some((review) => review.isOwn)) ? (
+                                                    <form onSubmit={submitReview} className="rounded-lg border border-slate-800 bg-slate-950/55 p-4 md:p-5">
+                                                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                                            <div>
+                                                                <h3 className="text-sm font-bold text-white">{reviews.some((review) => review.isOwn) ? 'Update your review' : 'Review this module'}</h3>
+                                                                <p className="mt-1 text-xs leading-5 text-slate-500">Your rating is linked to a verified module install.</p>
+                                                            </div>
+                                                            <div className="flex items-center gap-1" role="group" aria-label="Choose a rating">
+                                                                {Array.from({ length: 5 }, (_, index) => {
+                                                                    const value = index + 1;
+                                                                    return (
+                                                                        <button
+                                                                            key={value}
+                                                                            type="button"
+                                                                            onClick={() => setReviewRating(value)}
+                                                                            className={`rounded p-1 transition-colors ${value <= reviewRating ? 'text-amber-400' : 'text-slate-700 hover:text-amber-300'}`}
+                                                                            aria-label={`${value} star${value === 1 ? '' : 's'}`}
+                                                                            aria-pressed={value === reviewRating}
+                                                                        >
+                                                                            <Star size={21} fill={value <= reviewRating ? 'currentColor' : 'none'} aria-hidden="true" />
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                        <label className="mt-4 block">
+                                                            <span className="sr-only">Review comment</span>
+                                                            <textarea
+                                                                value={reviewComment}
+                                                                onChange={(event) => setReviewComment(event.target.value.slice(0, 1000))}
+                                                                rows={3}
+                                                                maxLength={1000}
+                                                                placeholder="Share what worked well or what could be improved..."
+                                                                className="w-full resize-y rounded-lg border border-slate-800 bg-[#080b0f] px-3.5 py-3 text-sm leading-6 text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
+                                                            />
+                                                        </label>
+                                                        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                            <div className="min-h-5 text-xs">
+                                                                {reviewError && <span className="text-red-300">{reviewError}</span>}
+                                                                {reviewMessage && <span className="text-emerald-300">{reviewMessage}</span>}
+                                                            </div>
+                                                            <button
+                                                                type="submit"
+                                                                disabled={reviewSubmitting || reviewRating < 1}
+                                                                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-sky-400/30 bg-sky-500 px-4 text-xs font-bold text-slate-950 transition-colors hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+                                                            >
+                                                                {reviewSubmitting && <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />}
+                                                                {reviews.some((review) => review.isOwn) ? 'Update Review' : 'Publish Review'}
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                ) : (
+                                                    <div className="rounded-lg border border-slate-800 bg-slate-950/55 px-4 py-3 text-sm text-slate-500">
+                                                        {reviewIsCreator
+                                                            ? 'Creators cannot review their own modules.'
+                                                            : addon.status !== 'PUBLISHED'
+                                                                ? 'Reviews will open when this module is published.'
+                                                                : 'Install this module to one of your servers to leave a verified review.'}
+                                                    </div>
+                                                )}
+
+                                                {reviewError && !canReview && <div className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">{reviewError}</div>}
+
+                                                {reviews.length === 0 ? (
+                                                    <div className="py-10 text-center">
+                                                        <MessageSquareText size={24} className="mx-auto text-slate-700" aria-hidden="true" />
+                                                        <p className="mt-3 text-sm font-semibold text-slate-400">No reviews yet</p>
+                                                        <p className="mt-1 text-xs text-slate-600">Be the first verified installer to share feedback.</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="mt-5 divide-y divide-slate-800">
+                                                        {reviews.map((review) => (
+                                                            <article key={review.id} className="py-5 first:pt-0 last:pb-0">
+                                                                <div className="flex items-start gap-3">
+                                                                    {review.reviewerAvatarUrl ? (
+                                                                        <img src={getDiscordMediaProxyUrl(review.reviewerAvatarUrl)} alt="" className="h-9 w-9 shrink-0 rounded-full border border-slate-700 object-cover" />
+                                                                    ) : (
+                                                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-500"><UserRound size={16} aria-hidden="true" /></span>
+                                                                    )}
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                                                                            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                                                                <h3 className="truncate text-sm font-bold text-white">{review.reviewerName}</h3>
+                                                                                <span className="rounded border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-300">Verified install</span>
+                                                                            </div>
+                                                                            <time dateTime={review.updatedAt} className="text-[11px] text-slate-600">{formatDate(review.updatedAt)}</time>
+                                                                        </div>
+                                                                        <div className="mt-1.5 flex items-center gap-0.5 text-amber-400" aria-label={`${review.rating} out of 5 stars`}>
+                                                                            {Array.from({ length: 5 }, (_, index) => <Star key={index} size={14} fill={index < review.rating ? 'currentColor' : 'none'} aria-hidden="true" />)}
+                                                                        </div>
+                                                                        {review.comment && <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-400">{review.comment}</p>}
+                                                                    </div>
+                                                                </div>
+                                                            </article>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 </section>
                             </div>
