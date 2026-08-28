@@ -76,7 +76,7 @@ export default function ManagementModuleReviewPage() {
     useEffect(() => { setDraft(activeFile?.sourceCode || ''); setCodeReason(''); }, [activeFile?.id, activeFile?.revision, activeFile?.sourceCode]);
 
     useEffect(() => {
-        if (!moduleId || !pairing) return;
+        if (!moduleId || !pairing || studioSession || new Date(pairing.expiresAt).getTime() <= Date.now()) return;
         let cancelled = false;
         const check = async () => {
             try {
@@ -85,9 +85,9 @@ export default function ManagementModuleReviewPage() {
             } catch { /* a later poll can recover */ }
         };
         void check();
-        const timer = window.setInterval(check, 3000);
+        const timer = window.setInterval(check, 5000);
         return () => { cancelled = true; window.clearInterval(timer); };
-    }, [moduleId, pairing]);
+    }, [moduleId, pairing, studioSession]);
 
     const reviewChecks = useMemo(() => {
         if (!data) return [];
