@@ -95,6 +95,8 @@ function moduleTimestamp(addon: MarketplaceModule) {
     return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
+const MODULE_CATEGORIES = ['Moderation', 'Misc', 'Fun', 'Troll'];
+
 export default function DashboardMarketplacePage() {
     const { data: session, status } = useSession();
     const [modules, setModules] = useState<MarketplaceModule[]>([]);
@@ -107,7 +109,10 @@ export default function DashboardMarketplacePage() {
     const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
 
     const categories = useMemo(() => (
-        Array.from(new Set(modules.map((addon) => addon.category).filter(Boolean)))
+        Array.from(new Set([
+            ...MODULE_CATEGORIES,
+            ...modules.map((addon) => addon.category).filter(Boolean),
+        ]))
             .sort((left, right) => left.localeCompare(right))
     ), [modules]);
 
