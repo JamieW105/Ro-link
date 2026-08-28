@@ -11,6 +11,7 @@ import {
 
 import ModuleIdeEditor, { type IdeDiagnostic } from '@/components/dashboard/ModuleIdeEditor';
 import { MODULE_CATEGORIES } from '@/lib/moduleCategories';
+import { getNewModuleScriptSource, normalizeModuleScriptPath } from '@/lib/moduleFileRules';
 import { isModuleVersionGreater, MODULE_VERSION_PATTERN, suggestNextModuleVersion } from '@/lib/moduleVersions';
 
 type ModuleFileKind = 'folder' | 'server_script' | 'client_script' | 'shared_module' | 'ui' | 'manifest';
@@ -210,7 +211,7 @@ export default function ModuleIdeClient() {
             const restored = storedTabs.filter((key) => valid.has(key));
             if (!tabsRef.current.length && !activeTabRef.current) {
                 const first = result.files.find((file) => file.path === (result.project.manifest.entrypoints as { server?: string })?.server)
-                    || result.files.find((file) => file.path === 'module.json');
+                    || result.files.find((file) => file.kind !== 'folder');
                 if (restored.length) { setTabs(restored); setActiveTab(restored[0]); }
                 else if (first) openProjectFile(first);
             }
@@ -365,15 +366,11 @@ export default function ModuleIdeClient() {
                             expectedRevision: currentProject.project.revision,
                         }),
                     });
-                    const manifestFile = currentProject.files.find((file) => file.kind === 'manifest');
-                    const manifestSource = JSON.stringify(result.manifest, null, 2) + '\n';
                     setProject((current) => current ? {
                         ...current,
                         module: { ...current.module, name: String(result.manifest.name) },
                         project: { ...current.project, manifest: result.manifest, revision: result.projectRevision },
-                        files: current.files.map((file) => file.id === manifestFile?.id ? { ...file, sourceCode: manifestSource, revision: file.revision + 1, updatedAt: new Date().toISOString() } : file),
                     } : current);
-                    if (manifestFile) setDrafts((current) => ({ ...current, [manifestFile.id]: { value: manifestSource, revision: manifestFile.revision + 1, dirty: false, status: 'saved' } }));
                     setModules((current) => current.map((item) => item.id === moduleId ? { ...item, name: String(result.manifest.name) } : item));
                     setModuleNameStatus(moduleNameRef.current.trim() === title ? 'saved' : 'dirty');
                     log(`Module renamed to ${title}.`, 'output', 'success');
@@ -391,7 +388,7 @@ export default function ModuleIdeClient() {
             if (moduleNameSaveRef.current === operation) moduleNameSaveRef.current = null;
         });
         return operation;
-    }, [log, moduleId, saveAll, setDrafts, setProject]);
+    }, [log, moduleId, saveAll, setProject]);
 
     useEffect(() => {
         if (!project || !moduleName.trim() || moduleName.trim() === project.module.name) return;
@@ -454,15 +451,11 @@ export default function ModuleIdeClient() {
                     expectedRevision: currentProject.project.revision,
                 }),
             });
-            const manifestFile = currentProject.files.find((file) => file.kind === 'manifest');
-            const manifestSource = JSON.stringify(result.manifest, null, 2) + '\n';
             setProject((current) => current ? {
                 ...current,
                 module: { ...current.module, name: String(result.manifest.name), description: String(result.manifest.description || '') },
                 project: { ...current.project, manifest: result.manifest, revision: result.projectRevision },
-                files: current.files.map((file) => file.id === manifestFile?.id ? { ...file, sourceCode: manifestSource, revision: file.revision + 1, updatedAt: new Date().toISOString() } : file),
             } : current);
-            if (manifestFile) setDrafts((current) => ({ ...current, [manifestFile.id]: { value: manifestSource, revision: manifestFile.revision + 1, dirty: false, status: 'saved' } }));
 
             let thumbnailUrl = currentProject.module.thumbnailUrl || '';
             let thumbnailUrls = currentProject.module.thumbnailUrls || (thumbnailUrl ? [thumbnailUrl] : []);
@@ -491,7 +484,7 @@ export default function ModuleIdeClient() {
         } finally {
             setModuleInfoSaving(false);
         }
-    }, [loadModules, log, moduleId, moduleInfo, moduleInfoSaving, moduleThumbnails, moduleThumbnailsDirty, moduleVisibility, saveAll, setDrafts, setProject]);
+    }, [loadModules, log, moduleId, moduleInfo, moduleInfoSaving, moduleThumbnails, moduleThumbnailsDirty, moduleVisibility, saveAll, setProject]);
 
     useEffect(() => {
         if (!activeFile || !activeDraft?.dirty || activeDraft.status === 'conflict') return;
@@ -582,13 +575,13 @@ export default function ModuleIdeClient() {
     const createItem = useCallback(async () => {
         if (!newItem || !project) return;
         const baseParent = selectedFile?.kind === 'folder' ? selectedFile.path : selectedFile ? dirname(selectedFile.path) : newItem.kind === 'server_script' ? 'Server' : newItem.kind === 'client_script' ? 'Client' : newItem.kind === 'shared_module' ? 'Shared' : '';
-        let name = newItem.name.trim().replace(/[\\/]/g, '-');
+        const name = newItem.name.trim().replace(/[\\/]/g, '-');
         if (!name) return;
-        if (newItem.kind === 'server_script' && !name.endsWith('.luau')) name += '.server.luau';
-        if (newItem.kind === 'client_script' && !name.endsWith('.luau')) name += '.client.luau';
-        if (newItem.kind === 'shared_module' && !name.endsWith('.luau')) name += '.luau';
-        const path = baseParent ? `${baseParent}/${name}` : name;
-        const sourceCode = newItem.kind === 'folder' ? null : newItem.kind === 'server_script' ? 'return {\n\tInit = function(context, settings)\n\t\t-- Server startup\n\tend,\n}\n' : newItem.kind === 'client_script' ? 'return {\n\tInit = function(context, settings)\n\t\t-- Client startup\n\tend,\n}\n' : 'local Module = {}\n\nreturn Module\n';
+        const rawPath = baseParent ? `${baseParent}/${name}` : name;
+        const path = normalizeModuleScriptPath(rawPath, newItem.kind);
+        const sourceCode = ['server_script', 'client_script', 'shared_module'].includes(newItem.kind)
+            ? getNewModuleScriptSource(newItem.kind as 'server_script' | 'client_script' | 'shared_module')
+            : null;
         await performFileAction({ action: 'create', path, kind: newItem.kind, sourceCode }); setNewItem(null); setExpanded((current) => new Set(current).add(baseParent));
     }, [newItem, performFileAction, project, selectedFile]);
 
@@ -657,23 +650,26 @@ export default function ModuleIdeClient() {
             setUpdateVersionPrompt((current) => current ? { ...current, error: `Enter a version greater than ${current.currentVersion}.` } : current);
             return;
         }
-        const manifestFile = projectRef.current.files.find((file) => file.kind === 'manifest');
-        const manifestDraft = manifestFile ? draftsRef.current[manifestFile.id] : null;
-        if (!manifestFile || !manifestDraft) {
-            setUpdateVersionPrompt((current) => current ? { ...current, error: 'module.json could not be found.' } : current);
-            return;
-        }
         try {
-            const manifest = JSON.parse(manifestDraft.value) as Record<string, unknown>;
-            const value = JSON.stringify({ ...manifest, version: nextVersion }, null, 2) + '\n';
-            setDrafts((current) => ({ ...current, [manifestFile.id]: { ...current[manifestFile.id], value, dirty: true, status: 'dirty' } }));
-            if (!await saveProjectFile(manifestFile.id)) return;
+            const currentProject = projectRef.current;
+            const result = await api<{ manifest: Record<string, unknown>; projectRevision: number }>(`/api/dashboard/modules/ide/${moduleId}/manifest`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    manifest: { ...currentProject.project.manifest, version: nextVersion },
+                    expectedRevision: currentProject.project.revision,
+                }),
+            });
+            setProject((current) => current ? {
+                ...current,
+                module: { ...current.module, version: nextVersion },
+                project: { ...current.project, manifest: result.manifest, revision: result.projectRevision },
+            } : current);
             setUpdateVersionPrompt(null);
             await validateForPublish();
-        } catch {
-            setUpdateVersionPrompt((current) => current ? { ...current, error: 'module.json is not valid JSON. Fix it before updating.' } : current);
+        } catch (reason) {
+            setUpdateVersionPrompt((current) => current ? { ...current, error: reason instanceof Error ? reason.message : 'Version failed to save.' } : current);
         }
-    }, [saveProjectFile, setDrafts, updateVersionPrompt, validateForPublish]);
+    }, [moduleId, setProject, updateVersionPrompt, validateForPublish]);
     const publish = useCallback(async () => {
         setPublishing(true);
         try {
