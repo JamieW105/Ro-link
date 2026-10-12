@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { resolveDashboardSubdomainFromHostnameCandidates } from '@/lib/customDashboardDomains';
 import { consumeRateLimit, rateLimitHeaders, type RateLimitRule, type RateLimitResult } from '@/lib/rateLimit';
+import { getRequestClientIp } from '@/lib/requestClientIp';
 
 const SITE_TESTING_DOMAIN = 'rolink.site';
 const SITE_TESTING_PERMISSION = 'SITE_TESTING_ACCESS';
@@ -198,16 +199,6 @@ function shouldEnforceHttps(req: NextRequest) {
         : req.nextUrl.protocol !== 'https:';
 }
 
-function getClientIp(req: NextRequest) {
-    if (process.env.TRUST_PROXY_HEADERS !== 'true') {
-        return 'direct-client';
-    }
-    return firstHeaderValue(req.headers.get('cf-connecting-ip'))
-        || firstHeaderValue(req.headers.get('x-real-ip'))
-        || firstHeaderValue(req.headers.get('x-forwarded-for'))
-        || 'unknown';
-}
-
 function applySecurityHeaders(response: NextResponse, req: NextRequest) {
     response.headers.set('X-Content-Type-Options', 'nosniff');
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -366,7 +357,7 @@ export async function proxy(req: NextRequest) {
 
     const apiRateLimit = getApiRateLimitRule(req.nextUrl.pathname, req.method);
     if (apiRateLimit) {
-        const clientIp = getClientIp(req);
+        const clientIp = getRequestClientIp(req.headers);
         const rateLimit = consumeRateLimit(`proxy:${apiRateLimit.name}:${clientIp}`, apiRateLimit.rule);
         if (!rateLimit.allowed) {
             return rateLimitedResponse(rateLimit, req);
