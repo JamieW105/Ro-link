@@ -5,6 +5,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import SignInClient from '@/components/auth/SignInClient';
 import { isAllowedDashboardUrl } from '@/lib/customDashboardDomains';
 import { DGSU_BAN_AUTH_ERROR } from '@/lib/dgsuBanConstants';
+import { getCanonicalAuthOrigin } from '@/lib/authOrigin';
 
 type SignInPageProps = {
     searchParams: Promise<{
@@ -46,5 +47,10 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
         redirect(callbackUrl);
     }
 
-    return <SignInClient callbackUrl={callbackUrl} error={error || session?.error} />;
+    return <SignInClient
+        callbackUrl={callbackUrl}
+        error={error || session?.error}
+        authOrigin={getCanonicalAuthOrigin(callbackUrl)}
+        allowRootAlias={process.env.VERCEL === '1'}
+    />;
 }

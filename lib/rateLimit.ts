@@ -56,7 +56,7 @@ export function consumeRateLimit(key: string, rule: RateLimitRule): RateLimitRes
     cleanupExpiredBuckets(now);
 
     let bucket = buckets.get(key);
-    if (!bucket || bucket.resetAt <= now) {
+    if (!bucket || (bucket.resetAt <= now && bucket.blockedUntil <= now)) {
         bucket = {
             count: 0,
             resetAt: now + rule.windowMs,

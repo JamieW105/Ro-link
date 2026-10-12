@@ -5,51 +5,14 @@ import { signIn } from 'next-auth/react';
 
 import { DGSU_BAN_AUTH_ERROR, DGSU_BAN_ERROR_MESSAGE } from '@/lib/dgsuBanConstants';
 import { DiscordIcon as DiscordBrandIcon } from '@/components/ui/DiscordIcon';
+import { getCanonicalSignInUrl } from '@/lib/signInNavigation';
 
 type SignInClientProps = {
     callbackUrl: string;
     error?: string;
+    authOrigin?: string;
+    allowRootAlias?: boolean;
 };
-
-function getConfiguredRootDomains() {
-    const configured = process.env.NEXT_PUBLIC_ROLINK_ROOT_DOMAINS
-        || process.env.NEXT_PUBLIC_ROLINK_ROOT_DOMAIN
-        || 'rolink.cloud,rolink.site';
-
-    return configured
-        .split(',')
-        .map((domain) => domain.trim().toLowerCase())
-        .filter(Boolean)
-        .map((domain) => domain
-            .replace(/^https?:\/\//, '')
-            .replace(/\/.*$/, '')
-            .replace(/^wildcard\./, ''));
-}
-
-function getCanonicalAuthOrigin(callbackUrl: string) {
-    const configured = process.env.NEXT_PUBLIC_AUTH_BASE_URL
-        || process.env.NEXT_PUBLIC_CANONICAL_AUTH_URL;
-
-    if (configured) {
-        return configured.replace(/\/$/, '');
-    }
-
-    try {
-        const callback = new URL(callbackUrl);
-        const hostname = callback.hostname.toLowerCase();
-        const rootDomain = getConfiguredRootDomains().find((domain) => (
-            hostname === domain || hostname.endsWith(`.${domain}`)
-        ));
-
-        if (rootDomain) {
-            return `${callback.protocol}//${rootDomain}`;
-        }
-    } catch {
-        return null;
-    }
-
-    return null;
-}
 
 function DiscordIcon() {
     return (
@@ -57,11 +20,12 @@ function DiscordIcon() {
     );
 }
 
-export default function SignInClient({ callbackUrl, error }: SignInClientProps) {
+export default function SignInClient({ callbackUrl, error, authOrigin, allowRootAlias }: SignInClientProps) {
     const errorMessage = error === DGSU_BAN_AUTH_ERROR
         ? DGSU_BAN_ERROR_MESSAGE
         : 'Discord sign in could not be completed. Please try again.';
     const [isSigningIn, setIsSigningIn] = useState(false);
+    const [hasRequestError, setHasRequestError] = useState(false);
     const [destination, setDestination] = useState('Ro-Link');
 
     useEffect(() => {
@@ -74,19 +38,25 @@ export default function SignInClient({ callbackUrl, error }: SignInClientProps) 
     }, [callbackUrl]);
 
     useEffect(() => {
-        const canonicalOrigin = getCanonicalAuthOrigin(callbackUrl);
-        if (!canonicalOrigin || canonicalOrigin === window.location.origin) return;
-
-        const nextUrl = new URL('/auth/signin', canonicalOrigin);
-        nextUrl.searchParams.set('callbackUrl', callbackUrl);
-        if (error) nextUrl.searchParams.set('error', error);
-        window.location.replace(nextUrl.toString());
-    }, [callbackUrl, error]);
+        const nextUrl = getCanonicalSignInUrl(window.location.origin, authOrigin, callbackUrl, error, allowRootAlias);
+        if (nextUrl) window.location.replace(nextUrl);
+    }, [callbackUrl, error, authOrigin, allowRootAlias]);
 
     async function handleDiscordSignIn() {
+        const nextUrl = getCanonicalSignInUrl(window.location.origin, authOrigin, callbackUrl, error, allowRootAlias);
+        if (nextUrl) {
+            window.location.replace(nextUrl);
+            return;
+        }
         setIsSigningIn(true);
-        await signIn('discord', { callbackUrl });
-        setIsSigningIn(false);
+        setHasRequestError(false);
+        try {
+            await signIn('discord', { callbackUrl });
+        } catch {
+            setHasRequestError(true);
+        } finally {
+            setIsSigningIn(false);
+        }
     }
 
     return (
@@ -113,7 +83,7 @@ export default function SignInClient({ callbackUrl, error }: SignInClientProps) 
                     <p className="mt-1 truncate text-sm font-semibold text-slate-200">{destination}</p>
                 </div>
 
-                {error ? (
+                {error || hasRequestError ? (
                     <div className="mb-5 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
                         {errorMessage}
                     </div>
