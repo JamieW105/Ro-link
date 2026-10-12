@@ -113,6 +113,8 @@ export const authOptions: AuthOptions = {
         DiscordProvider({
             clientId: discordOAuthConfig.clientId,
             clientSecret: discordOAuthConfig.clientSecret,
+            // Validate Discord's callback iss parameter (RFC 9207).
+            issuer: "https://discord.com",
             authorization: { params: { scope: 'identify guilds' } },
         }),
     ],
