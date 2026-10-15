@@ -111,8 +111,7 @@ async function refreshDiscordAccessToken(token: TokenShape) {
 export const authOptions: AuthOptions = {
     providers: [
         DiscordProvider({
-            clientId: discordOAuthConfig.clientId,
-            clientSecret: discordOAuthConfig.clientSecret,
+            ...discordOAuthConfig,
             authorization: { params: { scope: 'identify guilds' } },
         }),
     ],
