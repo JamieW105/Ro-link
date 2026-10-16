@@ -1,6 +1,7 @@
 .rl-public-page,
 .rl-public-header,
-.rl-public-footer {
+.rl-public-footer,
+.live-panel {
   --rl-bg: #080b0f;
   --rl-raised: #0d1116;
   --rl-soft: #11161c;

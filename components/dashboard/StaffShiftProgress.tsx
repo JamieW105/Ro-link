@@ -71,10 +71,7 @@ export default function StaffShiftProgress({ serverId }: { serverId: string }) {
         }
     }
     return (
-        <section
-            className="w-full rounded-xl border border-slate-800 bg-black/20 p-4 lg:max-w-md"
-            aria-label="Your staff shifts"
-        >
+        <section className="w-full lg:max-w-sm" aria-label="Your staff shifts">
             <div className="flex justify-between gap-4 text-xs font-bold text-white">
                 <span>Your staff shifts</span>
                 <span
@@ -100,7 +97,7 @@ export default function StaffShiftProgress({ serverId }: { serverId: string }) {
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={progress}
-                        className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-800"
+                        className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800"
                     >
                         <div
                             className="h-full rounded-full bg-yellow-400 transition-all"
@@ -111,11 +108,11 @@ export default function StaffShiftProgress({ serverId }: { serverId: string }) {
                         {shiftHours(staff?.total_seconds || 0)} total hours ·{' '}
                         {staff?.total_shifts || 0} shifts
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                        {report.settings.enabled
-                            ? `Wave ends ${new Date(report.wave.ends_at).toLocaleString()}`
-                            : 'Staff shifts are disabled.'}
-                    </p>
+                    {!report.settings.enabled && (
+                        <p className="mt-1 text-xs text-slate-500">
+                            Staff shifts are disabled.
+                        </p>
+                    )}
                     {report.settings.enabled &&
                         !report.settings.automatic_start && (
                             <button
