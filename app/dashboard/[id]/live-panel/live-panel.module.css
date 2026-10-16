@@ -1,0 +1,45 @@
+.panel {
+  height: 100dvh;
+}
+
+.panel :is(button, a):focus-visible {
+  outline: 2px solid var(--rl-blue);
+  outline-offset: 3px;
+}
+
+.workspace {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.1fr);
+  gap: 16px;
+  padding: 20px 24px 24px;
+}
+
+/* Stack whole panes on smaller screens so neither list collapses or gets clipped. */
+@media (max-width: 1023px) {
+  .panel {
+    overflow-y: auto;
+  }
+
+  .workspace {
+    flex: none;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+  }
+
+  .serversPane,
+  .activityPane {
+    min-height: 480px;
+    max-height: 680px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel *,
+  .panel *::before,
+  .panel *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
