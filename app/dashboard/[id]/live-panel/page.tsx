@@ -21,6 +21,7 @@ import { normalizeDashboardLogs, type NormalizedDashboardLog } from '@/lib/logRe
 import { normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
 import { getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 import type { PlayerPresenceActivity } from '@/lib/playerPresence';
+import StaffShiftProgress from '@/components/dashboard/StaffShiftProgress';
 import { buildRobloxAvatarUrl } from '@/lib/robloxAvatars';
 
 interface LiveServerRecord {
@@ -1393,7 +1394,6 @@ export default function LivePanelPage() {
         return items.slice(0, 8);
     }, [allKnownUsers, availableCommands, commandBarParsed, commandBarValue, logs]);
 
-    const totalPlayers = enrichedServers.reduce((sum, server) => sum + server.visiblePlayerCount, 0);
     const panelUser = selectedProfileUser;
     const panelProfile = panelUser ? profileCache[getUserKey(panelUser)] : null;
     const panelProfileDetails = panelUser ? profileDetailsCache[getUserKey(panelUser)] || null : null;
@@ -2289,26 +2289,7 @@ export default function LivePanelPage() {
                         </div>
                     </div>
 
-                    <div className={`grid gap-2 lg:min-w-[400px] ${canManageReports ? 'grid-cols-4' : 'grid-cols-3'}`}>
-                        <div className="rounded-md border border-[var(--rl-line)] bg-[var(--rl-raised)] px-4 py-3">
-                            <p className="text-[11px] font-semibold text-[var(--rl-muted)]">Servers</p>
-                            <p className="mt-1 text-2xl font-semibold text-white">{enrichedServers.length}</p>
-                        </div>
-                        <div className="rounded-md border border-[var(--rl-line)] bg-[var(--rl-raised)] px-4 py-3">
-                            <p className="text-[11px] font-semibold text-[var(--rl-muted)]">Users</p>
-                            <p className="mt-1 text-2xl font-semibold text-emerald-400">{totalPlayers}</p>
-                        </div>
-                        <div className="rounded-md border border-[var(--rl-line)] bg-[var(--rl-raised)] px-4 py-3">
-                            <p className="text-[11px] font-semibold text-[var(--rl-muted)]">Logs</p>
-                            <p className="mt-1 text-2xl font-semibold text-sky-300">{logs.length}</p>
-                        </div>
-                        {canManageReports && (
-                            <div className="rounded-md border border-[var(--rl-line)] bg-[var(--rl-raised)] px-4 py-3">
-                                <p className="text-[11px] font-semibold text-[var(--rl-muted)]">Reports</p>
-                                <p className="mt-1 text-2xl font-semibold text-amber-300">{pendingReports.length}</p>
-                            </div>
-                        )}
-                    </div>
+                    <StaffShiftProgress serverId={guildId} />
                 </div>
             </header>
 

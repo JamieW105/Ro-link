@@ -69,3 +69,36 @@ Only the Discord Server Owner can run `/setup` to link a game.
 For detailed installation and configuration instructions, please read the [**Setup Guide**](guide.md).
 
 The setup guide also includes the marketplace **Module Developer API** for add-on authors, including `SendBotMessage`, lifecycle hooks, `CreateUI`, command registration, and player/helper functions.
+
+### Staff shifts
+
+Apply `supabase/migrations/20261016000137_staff_shifts.sql` to the target Supabase
+project before deploying this feature. It extends `dashboard_roles` and creates
+private shift settings, wave history, shift history, and service-role-only RPCs.
+The server must have `SUPABASE_SERVICE_ROLE_KEY`; browser credentials cannot access
+shift data. Existing root-level schema scripts remain the baseline for a new database.
+
+In **Settings → Roles**, grant **View Staff Shifts** and/or **Manage Staff Shift
+Settings** independently. Open **Staff Shifts** from the server picker or dashboard,
+and use its settings icon to enable shifts, choose automatic starts, and set the
+wave length (default seven days) and per-person quota (default five hours).
+Wave length and quota changes take effect in the next wave. Disabling shifts ends
+active shifts and preserves history. A zero-hour quota means no quota.
+
+A staff member must link their Roblox account and have a configured dashboard role
+permission (or Discord administrator/server-management access). The authenticated
+linked game's roster starts automatic shifts and confirms their time. Leaving the
+game ends the shift; a missing heartbeat expires after two minutes and caps time at
+the last confirmed heartbeat. Existing game polling is sufficient; no plugin update
+is required. If automatic start is off, staff can start/end their own shifts from
+the live panel while playing. Shift eligibility refreshes from Discord every minute.
+
+Reports cover a rolling day, week, 30 days, six calendar months, or the current
+wave. Overlapping game sessions count time only once; sessions crossing a reporting
+or wave boundary contribute only time within it. New waves start with zero hours
+without deleting historical shifts. The live panel shows the signed-in staff
+member's yellow quota bar, lifetime confirmed hours, and total shift count.
+
+Run `npm run test:staff-shifts` for isolated PostgreSQL tests using PGlite. They
+exercise the actual migration, accounting, wave rollover, manual mode, pagination,
+server/self scoping, and database permissions without changing a remote database.

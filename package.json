@@ -14,7 +14,8 @@
     "sync:script-editor-api": "node scripts/sync-script-editor-api.mjs",
     "start": "concurrently \"next start\" \"node scripts/bot.js\"",
     "lint": "eslint",
-    "bot": "node scripts/bot.js"
+    "bot": "node scripts/bot.js",
+    "test:staff-shifts": "tsx --test scripts/staff-shifts.test.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -32,6 +33,7 @@
     "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
     "@tailwindcss/postcss": "^4",
     "@types/crypto-js": "^4.2.2",
     "@types/node": "^20",

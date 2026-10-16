@@ -59,6 +59,8 @@ interface Guild {
 }
 
 interface GuildDashboardPermissions {
+    can_view_staff_shifts: boolean;
+    can_manage_staff_shifts: boolean;
     can_access_dashboard: boolean;
     can_access_live_panel: boolean;
     is_admin: boolean;
@@ -338,6 +340,9 @@ export default function Dashboard() {
                                 <h3>{guild.name}</h3>
 
                                 <div className="rl-dashboard-card-footer">
+                                    {guild.hasBot && (guildPermissions[guild.id]?.is_admin || guildPermissions[guild.id]?.can_view_staff_shifts || guildPermissions[guild.id]?.can_manage_staff_shifts) && (
+                                        <Link href={`/dashboard/${guild.id}/staff-shifts`} className="rl-dashboard-live-link">Staff Shifts</Link>
+                                    )}
                                     {guild.hasBot ? (
                                         canOpenLivePanelAction(guildPermissions[guild.id]) ? (
                                             <Link
