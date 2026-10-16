@@ -79,7 +79,11 @@ export default function StaffShiftProgress({ serverId }: { serverId: string }) {
                         staff?.active ? 'text-emerald-400' : 'text-slate-400'
                     }
                 >
-                    {staff?.active ? 'On shift' : 'Off shift'}
+                    {report?.control?.state === 'break'
+                        ? 'On break'
+                        : staff?.active
+                          ? 'On shift'
+                          : 'Off shift'}
                 </span>
             </div>
             {report ? (
@@ -125,7 +129,9 @@ export default function StaffShiftProgress({ serverId }: { serverId: string }) {
                                     ? 'Updating…'
                                     : staff?.active
                                       ? 'End shift'
-                                      : 'Start shift'}
+                                      : report.control?.state === 'break'
+                                        ? 'Resume shift'
+                                        : 'Start shift'}
                             </button>
                         )}
                 </>
