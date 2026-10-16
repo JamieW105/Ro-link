@@ -19,6 +19,8 @@ export interface DashboardPermissions {
     can_view_logs: boolean;
     can_view_runtime_logs: boolean;
     can_manage_staff_notes: boolean;
+    can_view_staff_shifts: boolean;
+    can_manage_staff_shifts: boolean;
     allowed_misc_cmds: string[];
     is_admin: boolean;
 }
@@ -65,6 +67,8 @@ interface DashboardRoleRecord {
     can_view_logs?: boolean | null;
     can_view_runtime_logs?: boolean | null;
     can_manage_staff_notes?: boolean | null;
+    can_view_staff_shifts?: boolean | null;
+    can_manage_staff_shifts?: boolean | null;
     allowed_misc_cmds?: string[] | null;
 }
 
@@ -122,6 +126,8 @@ export function emptyDashboardPermissions(): DashboardPermissions {
         can_view_logs: false,
         can_view_runtime_logs: false,
         can_manage_staff_notes: false,
+        can_view_staff_shifts: false,
+        can_manage_staff_shifts: false,
         allowed_misc_cmds: [],
         is_admin: false,
     };
@@ -140,6 +146,8 @@ function hasPanelAccess(perms: DashboardPermissions) {
         || perms.can_view_logs
         || perms.can_view_runtime_logs
         || perms.can_manage_staff_notes
+        || perms.can_view_staff_shifts
+        || perms.can_manage_staff_shifts
         || perms.allowed_misc_cmds.length > 0;
 }
 
@@ -198,6 +206,8 @@ export function aggregateDashboardPermissions(isAdmin: boolean, dashboardRoles: 
             can_view_logs: true,
             can_view_runtime_logs: true,
             can_manage_staff_notes: true,
+            can_view_staff_shifts: true,
+            can_manage_staff_shifts: true,
             allowed_misc_cmds: ['*'],
             is_admin: true,
         } satisfies DashboardPermissions;
@@ -218,6 +228,8 @@ export function aggregateDashboardPermissions(isAdmin: boolean, dashboardRoles: 
         if (role.can_view_logs) finalPerms.can_view_logs = true;
         if (role.can_view_runtime_logs) finalPerms.can_view_runtime_logs = true;
         if (role.can_manage_staff_notes) finalPerms.can_manage_staff_notes = true;
+        if (role.can_view_staff_shifts) finalPerms.can_view_staff_shifts = true;
+        if (role.can_manage_staff_shifts) finalPerms.can_manage_staff_shifts = true;
 
         for (const command of normalizeAdminPanelCommandList(role.allowed_misc_cmds)) {
             if (!finalPerms.allowed_misc_cmds.includes(command)) {

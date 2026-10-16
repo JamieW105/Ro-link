@@ -29,6 +29,8 @@ interface DashboardPermissions {
     can_view_logs: boolean;
     can_view_runtime_logs: boolean;
     can_manage_staff_notes: boolean;
+    can_view_staff_shifts: boolean;
+    can_manage_staff_shifts: boolean;
     can_manage_settings: boolean;
     allowed_misc_cmds: string[];
     is_admin: boolean;
@@ -46,6 +48,9 @@ function isDashboardPermissions(value: unknown): value is DashboardPermissions {
 }
 
 function canAccessDashboardRoute(perms: DashboardPermissions, pathname: string) {
+    if (pathname.includes('/staff-shifts')) {
+        return perms.is_admin || perms.can_view_staff_shifts || perms.can_manage_staff_shifts;
+    }
     const livePanelRoute = pathname.includes('/live-panel');
     const profileRoute = pathname.includes('/players/');
 
@@ -521,6 +526,12 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     }
 
     const utilityItems = [
+        {
+            label: "Staff Shifts",
+            icon: <RolesIcon />,
+            href: `/dashboard/${id}/staff-shifts`,
+            hide: !(userPermissions.is_admin || userPermissions.can_view_staff_shifts || userPermissions.can_manage_staff_shifts),
+        },
         { label: "Home", icon: <HomeIcon />, href: `/dashboard/${id}`, hide: !canUseStandardDashboard },
         { label: "Live Panel", icon: <LivePanelIcon />, href: `/dashboard/${id}/live-panel`, hide: !canUseLivePanel },
         {

@@ -20,6 +20,7 @@ import { normalizeDashboardLogs, type NormalizedDashboardLog } from '@/lib/logRe
 import { normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
 import { getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 import type { PlayerPresenceActivity } from '@/lib/playerPresence';
+import StaffShiftProgress from '@/components/dashboard/StaffShiftProgress';
 import { buildRobloxAvatarUrl } from '@/lib/robloxAvatars';
 
 interface LiveServerRecord {
@@ -1392,7 +1393,6 @@ export default function LivePanelPage() {
         return items.slice(0, 8);
     }, [allKnownUsers, availableCommands, commandBarParsed, commandBarValue, logs]);
 
-    const totalPlayers = enrichedServers.reduce((sum, server) => sum + server.visiblePlayerCount, 0);
     const panelUser = selectedProfileUser;
     const panelProfile = panelUser ? profileCache[getUserKey(panelUser)] : null;
     const panelProfileDetails = panelUser ? profileDetailsCache[getUserKey(panelUser)] || null : null;
@@ -2290,26 +2290,7 @@ export default function LivePanelPage() {
                         </div>
                     </div>
 
-                    <div className={`grid gap-3 lg:min-w-[390px] ${canManageReports ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
-                        <div className="rounded-xl border border-slate-800 bg-black/20 px-4 py-3">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Servers</p>
-                            <p className="mt-1 text-2xl font-black text-white">{enrichedServers.length}</p>
-                        </div>
-                        <div className="rounded-xl border border-slate-800 bg-black/20 px-4 py-3">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Users</p>
-                            <p className="mt-1 text-2xl font-black text-emerald-400">{totalPlayers}</p>
-                        </div>
-                        <div className="rounded-xl border border-slate-800 bg-black/20 px-4 py-3">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Logs</p>
-                            <p className="mt-1 text-2xl font-black text-sky-300">{logs.length}</p>
-                        </div>
-                        {canManageReports && (
-                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Reports</p>
-                                <p className="mt-1 text-2xl font-black text-amber-300">{pendingReports.length}</p>
-                            </div>
-                        )}
-                    </div>
+                    <StaffShiftProgress serverId={guildId} />
                 </div>
             </header>
 
