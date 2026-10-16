@@ -23,8 +23,11 @@ export function SiteBannerGate() {
     const pathname = usePathname();
     const [banners, setBanners] = useState<SiteBanner[]>([]);
     const isPublic = isPublicSiteRoute(pathname);
+    const isLivePanel = /^\/dashboard\/[^/]+\/live-panel(?:\/|$)/.test(pathname);
 
     useEffect(() => {
+        if (isLivePanel) return;
+
         const controller = new AbortController();
 
         fetch('/api/site-banners', { cache: 'no-store', signal: controller.signal })
@@ -35,7 +38,7 @@ export function SiteBannerGate() {
             });
 
         return () => controller.abort();
-    }, [pathname]);
+    }, [pathname, isLivePanel]);
 
     const visibleBanners = banners.filter((banner) => (
         banner.placement === 'ALL'
@@ -43,7 +46,7 @@ export function SiteBannerGate() {
         || (banner.placement === 'DASHBOARD' && !isPublic)
     ));
 
-    if (visibleBanners.length === 0) return null;
+    if (isLivePanel || visibleBanners.length === 0) return null;
 
     return (
         <section className="rl-site-banners" aria-label="Site notices">
