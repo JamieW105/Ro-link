@@ -187,6 +187,7 @@ const RESERVED_SUBDOMAINS = new Set([
     'dashboard',
     'docs',
     'help',
+    'join',
     'mail',
     'status',
     'support',

@@ -364,6 +364,10 @@ async function enforceSiteTestingAccess(req: NextRequest) {
 }
 
 export async function proxy(req: NextRequest) {
+    if (normalizeHostname(getRequestHost(req)) === 'join.rolink.cloud') {
+        return applySecurityHeaders(NextResponse.redirect('https://discord.gg/C3n4nAwYMw', 302), req);
+    }
+
     if (shouldEnforceHttps(req)) {
         const url = req.nextUrl.clone();
         url.protocol = 'https:';
