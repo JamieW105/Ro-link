@@ -30,6 +30,7 @@ export interface StaffShiftSummary {
     total_seconds: number;
     total_shifts: number;
     active: boolean;
+    on_break?: boolean;
 }
 export interface StaffShift {
     id: string;
@@ -42,6 +43,8 @@ export interface StaffShift {
     active: boolean;
 }
 export interface ShiftReport {
+    control?: { state: 'break' | 'stopped'; since: string } | null;
+    current_shift_seconds?: number;
     settings: ShiftSettings;
     wave: ShiftWave;
     staff: StaffShiftSummary[];

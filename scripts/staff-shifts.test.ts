@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { after, before, beforeEach, test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
+import { handleStaffShiftCommand } from '../lib/discordStaffShifts';
+import { normalizeLivePlayerList } from '../lib/livePlayers';
 import {
     aggregateDashboardPermissions,
     emptyDashboardPermissions,
@@ -65,7 +67,9 @@ async function count() {
 before(async () => {
     await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
         CREATE TABLE public.servers(id text PRIMARY KEY);
-        CREATE TABLE public.dashboard_roles(id text);`);
+        CREATE TABLE public.dashboard_roles(id text);
+        CREATE TABLE public.verified_users(discord_id text PRIMARY KEY, roblox_id text, roblox_username text);
+        CREATE TABLE public.live_servers(id text PRIMARY KEY, server_id text REFERENCES public.servers(id) ON DELETE CASCADE, players jsonb, updated_at timestamptz);`);
     await db.exec(
         await readFile(
             new URL(
@@ -75,10 +79,19 @@ before(async () => {
             'utf8',
         ),
     );
+    await db.exec(
+        await readFile(
+            new URL(
+                '../supabase/migrations/20261016002647_staff_shift_commands.sql',
+                import.meta.url,
+            ),
+            'utf8',
+        ),
+    );
 });
 beforeEach(async () => {
     await db.exec(
-        `TRUNCATE public.servers CASCADE; INSERT INTO public.servers VALUES ('server-1'), ('server-2');`,
+        `TRUNCATE public.servers CASCADE; TRUNCATE public.verified_users; INSERT INTO public.servers VALUES ('server-1'), ('server-2');`,
     );
 });
 after(async () => {
@@ -299,4 +312,282 @@ test('report periods use rolling UTC time and clamp six-month month-end dates', 
     assert.equal(shiftPeriodStart('30-days', now), '2026-08-01T12:30:00.000Z');
     assert.equal(shiftPeriodStart('6-months', now), '2026-02-28T12:30:00.000Z');
     assert.equal(shiftPeriodStart('latest-wave', now), null);
+});
+
+// Exercise the shared Discord handler against the real SQL, with a small
+// PostgREST-shaped adapter instead of remote credentials or a live bot.
+class CommandQuery {
+    fields = '*';
+    values: unknown[] = [];
+    filters: string[] = [];
+    ordering = '';
+    constructor(readonly table: string) {}
+    select(fields: string) {
+        this.fields = fields;
+        return this;
+    }
+    eq(field: string, value: unknown) {
+        this.values.push(value);
+        this.filters.push(`${field} = $${this.values.length}`);
+        return this;
+    }
+    gte(field: string, value: unknown) {
+        this.values.push(value);
+        this.filters.push(`${field} >= $${this.values.length}`);
+        return this;
+    }
+    order(field: string, { ascending }: { ascending: boolean }) {
+        this.ordering = ` ORDER BY ${field} ${ascending ? 'ASC' : 'DESC'}`;
+        return this;
+    }
+    async execute() {
+        const { rows } = await db.query<Record<string, unknown>>(
+            `SELECT ${this.fields} FROM public.${this.table}${this.filters.length ? ` WHERE ${this.filters.join(' AND ')}` : ''}${this.ordering}`,
+            this.values,
+        );
+        return { data: rows, error: null };
+    }
+    async maybeSingle() {
+        const result = await this.execute();
+        return { data: result.data[0] || null, error: null };
+    }
+    then<
+        TResult1 = Awaited<ReturnType<CommandQuery['execute']>>,
+        TResult2 = never,
+    >(
+        resolve?:
+            | ((
+                  value: Awaited<ReturnType<CommandQuery['execute']>>,
+              ) => TResult1 | PromiseLike<TResult1>)
+            | null,
+        reject?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+    ) {
+        return this.execute().then(resolve, reject);
+    }
+}
+const commandDb = {
+    from(table: string) {
+        return new CommandQuery(table);
+    },
+    async rpc(name: string, args: Record<string, unknown>) {
+        try {
+            const keys = Object.keys(args);
+            const { rows } = await db.query<{ result: unknown }>(
+                `SELECT public.${name}(${keys.map((key, i) => `${key} => $${i + 1}`).join(', ')}) result`,
+                Object.values(args),
+            );
+            return { data: rows[0].result, error: null };
+        } catch (error) {
+            return { data: null, error: { message: (error as Error).message } };
+        }
+    },
+};
+async function command(
+    name: string,
+    action?: string,
+    userId = 'discord-1',
+    permissions = aggregateDashboardPermissions(false, [
+        { can_access_live_panel: true },
+    ]),
+    page = 1,
+) {
+    return handleStaffShiftCommand(
+        { serverId: 'server-1', userId, command: name, action, page },
+        {
+            db: commandDb,
+            permissions,
+            normalizePlayers: normalizeLivePlayerList,
+        },
+    );
+}
+async function linkedInGame() {
+    await db.exec(`INSERT INTO public.verified_users VALUES ('discord-1','roblox-1','StaffOne');
+        INSERT INTO public.live_servers VALUES ('job-1','server-1','[{"userId":"roblox-1","username":"StaffOne"}]',now());`);
+}
+
+test('Discord leaderboard requires View Staff Shifts, independently of settings and staff access', async () => {
+    await configure();
+    await sync();
+    for (const permissions of [
+        emptyDashboardPermissions(),
+        aggregateDashboardPermissions(false, [
+            { can_manage_staff_shifts: true },
+        ]),
+        aggregateDashboardPermissions(false, [{ can_access_live_panel: true }]),
+    ]) {
+        const denied = await command(
+            'shift-leaderboard',
+            undefined,
+            'discord-1',
+            permissions,
+        );
+        assert.match(denied.content, /View Staff Shifts permission/);
+        assert.equal(denied.embeds, undefined);
+    }
+    const allowed = await command(
+        'shift-leaderboard',
+        undefined,
+        'discord-1',
+        aggregateDashboardPermissions(false, [{ can_view_staff_shifts: true }]),
+    );
+    assert.match(JSON.stringify(allowed.embeds), /StaffOne/);
+    assert.equal(allowed.flags, 64);
+    assert.deepEqual(allowed.allowed_mentions, { parse: [] });
+});
+
+test('Discord shift start requires staff access, a linked account, and fresh presence in this server', async () => {
+    await configure();
+    assert.match(
+        (
+            await command(
+                'shift-manage',
+                'start',
+                'discord-1',
+                emptyDashboardPermissions(),
+            )
+        ).content,
+        /staff role/,
+    );
+    assert.match(
+        (await command('shift-manage', 'start')).content,
+        /Link your Roblox account/,
+    );
+    await linkedInGame();
+    await db.exec(
+        `UPDATE public.live_servers SET updated_at = now()-interval '3 minutes';`,
+    );
+    assert.match(
+        (await command('shift-manage', 'start')).content,
+        /Join the linked game/,
+    );
+    await db.exec(
+        `UPDATE public.live_servers SET updated_at = now(), server_id = 'server-2';`,
+    );
+    assert.match(
+        (await command('shift-manage', 'start')).content,
+        /Join the linked game/,
+    );
+    assert.equal(await count(), 0);
+});
+
+test('Discord break suppresses automatic starts, excludes break time, and resumes the same logical shift', async () => {
+    await configure();
+    await linkedInGame();
+    assert.match((await command('shift-manage', 'start')).content, /on shift/);
+    await db.exec(
+        `UPDATE public.staff_shifts SET started_at = now()-interval '1 hour', last_seen_at = now();`,
+    );
+    assert.match((await command('shift-manage', 'break')).content, /on break/);
+    await sync();
+    let result = await report('server-1', 'discord-1');
+    assert.equal(result.staff[0].active, false);
+    assert.match(JSON.stringify((await command('shift')).embeds), /On break/);
+    await db.exec(
+        `UPDATE public.staff_shifts SET started_at = now()-interval '90 minutes', last_seen_at = now()-interval '30 minutes', ended_at = now()-interval '30 minutes';`,
+    );
+    await command('shift-manage', 'start');
+    await db.exec(
+        `UPDATE public.staff_shifts SET started_at = now()-interval '10 minutes', last_seen_at = now() WHERE ended_at IS NULL;`,
+    );
+    result = await report('server-1', 'discord-1', '2000-01-01');
+    assert.equal(result.staff[0].total_seconds, 4200);
+    assert.equal(result.staff[0].total_shifts, 1);
+    assert.equal(result.staff[0].shift_count, 1);
+    const status = await command('shift');
+    assert.match(JSON.stringify(status.embeds), /1.17h/);
+    assert.match(JSON.stringify(status.embeds), /On shift/);
+});
+
+test('Discord stop persists across heartbeats and the next game join can start automatically', async () => {
+    await configure();
+    await linkedInGame();
+    await sync();
+    assert.match((await command('shift-manage', 'stop')).content, /has ended/);
+    await sync();
+    assert.equal((await report()).staff[0].active, false);
+    assert.match(JSON.stringify((await command('shift')).embeds), /Off shift/);
+    await sync('server-1', 'job-1', []);
+    await sync();
+    assert.equal((await report()).staff[0].active, true);
+    assert.equal((await report()).staff[0].total_shifts, 2);
+});
+
+test('Discord shift errors cover disabled shifts, inactive breaks, invalid actions and DMs', async () => {
+    await linkedInGame();
+    assert.match((await command('shift-manage', 'start')).content, /disabled/);
+    await configure();
+    assert.match(
+        (await command('shift-manage', 'break')).content,
+        /Start a shift before/,
+    );
+    assert.match(
+        (await command('shift-manage', 'invalid')).content,
+        /Choose start, stop, or break/,
+    );
+    assert.match(
+        (
+            await handleStaffShiftCommand(
+                { serverId: '', userId: 'discord-1', command: 'shift' },
+                {
+                    db: commandDb,
+                    permissions: emptyDashboardPermissions(),
+                    normalizePlayers: normalizeLivePlayerList,
+                },
+            )
+        ).content,
+        /Discord server/,
+    );
+});
+
+test('Discord leaderboard ranks time, paginates, and personal quota output stays scoped to the caller', async () => {
+    await configure();
+    await db.exec(
+        "UPDATE public.staff_shift_waves SET starts_at = now()-interval '1 day', ends_at = now()+interval '6 days'",
+    );
+    await db.exec(`INSERT INTO public.staff_shifts(server_id,job_id,discord_id,roblox_user_id,username,started_at,last_seen_at,ended_at)
+        SELECT 'server-1','job-'||n,'discord-'||n,'roblox-'||n,'Staff'||n,now()-make_interval(hours=>n),now(),now()
+        FROM generate_series(1,12) n;`);
+    const viewer = aggregateDashboardPermissions(false, [
+        { can_view_staff_shifts: true },
+    ]);
+    const first = JSON.stringify(
+        (await command('shift-leaderboard', undefined, 'discord-1', viewer))
+            .embeds,
+    );
+    assert.ok(first.indexOf('Staff12') < first.indexOf('Staff11'));
+    assert.match(first, /Page 1\/2/);
+    const second = JSON.stringify(
+        (await command('shift-leaderboard', undefined, 'discord-1', viewer, 2))
+            .embeds,
+    );
+    assert.match(second, /Staff1/);
+    assert.doesNotMatch(second, /Staff12/);
+    assert.match(
+        (await command('shift-leaderboard', undefined, 'discord-1', viewer, 3))
+            .content,
+        /does not exist/,
+    );
+    const personal = JSON.stringify((await command('shift')).embeds);
+    assert.match(personal, /1.00 \/ 5h/);
+    assert.match(personal, /20%/);
+    assert.match(personal, /4.00h remaining/);
+    assert.doesNotMatch(personal, /Staff12/);
+});
+
+test('break controls and action RPC remain restricted to service-role access', async () => {
+    await db.exec('SET ROLE authenticated');
+    try {
+        await assert.rejects(
+            db.query('SELECT * FROM public.staff_shift_controls'),
+            /permission denied/,
+        );
+        await assert.rejects(
+            db.query(
+                "SELECT staff_shift_action('server-1','job','discord-1','roblox-1','StaffOne','stop')",
+            ),
+            /permission denied/,
+        );
+    } finally {
+        await db.exec('RESET ROLE');
+    }
 });

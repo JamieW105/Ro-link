@@ -102,3 +102,28 @@ member's yellow quota bar, lifetime confirmed hours, and total shift count.
 Run `npm run test:staff-shifts` for isolated PostgreSQL tests using PGlite. They
 exercise the actual migration, accounting, wave rollover, manual mode, pagination,
 server/self scoping, and database permissions without changing a remote database.
+
+### Discord shift commands
+
+Apply `supabase/migrations/20261016002647_staff_shift_commands.sql` after the staff
+shifts migration, and restart the standalone bot to register the updated slash
+command definitions. Both the bot and signed interaction endpoint use the same
+command handler. The standalone bot also needs `SUPABASE_SERVICE_ROLE_KEY` for the
+private shift records.
+
+- `/shift-manage start`: start a shift, or resume after a break, while in the linked
+  game. This works with automatic shifts enabled or disabled.
+- `/shift-manage break`: pause the current shift. Break time does not count toward
+  quota; resuming keeps the same shift count.
+- `/shift-manage stop`: end the current shift. Automatic heartbeats respect the
+  stopped state until the user starts again or leaves and rejoins.
+- `/shift`: privately view current shift time, status, wave quota progress, and
+  lifetime totals.
+- `/shift-leaderboard [period] [page]`: privately rank confirmed staff time for the
+  selected period (default latest wave), ten staff per page. Requires **View Staff
+  Shifts**; **Manage Staff Shift Settings** alone does not grant access.
+
+Shift commands require a staff role and work only in Discord servers. Starting or
+resuming also requires a linked Roblox account and a recent game roster. Replies
+are private and cannot ping users or roles. The dashboard marks staff on break
+without adding extra controls to its compact layout.

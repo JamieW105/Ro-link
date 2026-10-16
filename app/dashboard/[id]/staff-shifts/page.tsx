@@ -244,11 +244,13 @@ export default function StaffShiftsPage() {
                                                 <span
                                                     role="img"
                                                     aria-label={
-                                                        staff.active
-                                                            ? 'On shift'
-                                                            : 'Off shift'
+                                                        staff.on_break
+                                                            ? 'On break'
+                                                            : staff.active
+                                                              ? 'On shift'
+                                                              : 'Off shift'
                                                     }
-                                                    className={`h-1.5 w-1.5 rounded-full ${staff.active ? 'bg-emerald-400' : 'bg-slate-600'}`}
+                                                    className={`h-1.5 w-1.5 rounded-full ${staff.on_break ? 'bg-amber-400' : staff.active ? 'bg-emerald-400' : 'bg-slate-600'}`}
                                                 />
                                                 {staff.username}
                                             </span>
@@ -281,11 +283,13 @@ export default function StaffShiftsPage() {
                                             <span
                                                 role="img"
                                                 aria-label={
-                                                    staff.active
-                                                        ? 'On shift'
-                                                        : 'Off shift'
+                                                    staff.on_break
+                                                        ? 'On break'
+                                                        : staff.active
+                                                          ? 'On shift'
+                                                          : 'Off shift'
                                                 }
-                                                className={`h-1.5 w-1.5 rounded-full ${staff.active ? 'bg-emerald-400' : 'bg-slate-600'}`}
+                                                className={`h-1.5 w-1.5 rounded-full ${staff.on_break ? 'bg-amber-400' : staff.active ? 'bg-emerald-400' : 'bg-slate-600'}`}
                                             />
                                             {staff.username}
                                         </h2>
