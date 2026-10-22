@@ -1,5 +1,9 @@
 'use client';
 
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+
+
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -163,7 +167,7 @@ export default function DashboardSetupPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold uppercase text-slate-500 tracking-widest pl-1 block">Place ID</label>
-                                    <input
+                                    <Input
                                         type="text"
                                         required
                                         placeholder="Place ID"
@@ -174,7 +178,7 @@ export default function DashboardSetupPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold uppercase text-slate-500 tracking-widest pl-1 block">Universe ID</label>
-                                    <input
+                                    <Input
                                         type="text"
                                         required
                                         placeholder="Universe ID"
@@ -187,7 +191,7 @@ export default function DashboardSetupPage() {
 
                             <div className="space-y-2">
                                 <label className="text-[10px] font-bold uppercase text-slate-500 tracking-widest pl-1 block">Open Cloud API Key</label>
-                                <input
+                                <Input
                                     type="password"
                                     required
                                     placeholder="Enter Roblox API Key"
@@ -199,7 +203,7 @@ export default function DashboardSetupPage() {
 
                             {error ? <p className="text-red-500 text-[10px] font-bold uppercase tracking-wider">{error}</p> : null}
 
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 type="submit"
                                 disabled={loading}
                                 className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3.5 rounded-lg transition-all shadow-lg shadow-sky-900/10 text-xs disabled:opacity-50 flex items-center justify-center gap-3"
@@ -209,7 +213,7 @@ export default function DashboardSetupPage() {
                                 ) : (
                                     "REQUEST AUTH KEY"
                                 )}
-                            </button>
+                            </Button>
                         </form>
                     </div>
                 ) : (
@@ -236,12 +240,12 @@ export default function DashboardSetupPage() {
                                             <code className="flex-1 bg-slate-900 px-4 py-3 rounded-lg font-mono text-[11px] text-sky-500 break-all border border-slate-800 shadow-inner">
                                                 {apiKey}
                                             </code>
-                                            <button
+                                            <Button variant="unstyled" size="unstyled"
                                                 onClick={() => navigator.clipboard.writeText(apiKey)}
                                                 className="p-3.5 bg-slate-800 hover:bg-slate-700 transition-all font-bold rounded-lg border border-slate-700"
                                             >
                                                 <CopyIcon />
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
 
@@ -308,7 +312,7 @@ export default function DashboardSetupPage() {
                         </div>
 
                         <div className="mt-10 pt-6 border-t border-slate-800">
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 onClick={() => {
                                     setStep(1);
                                     setPlaceId("");
@@ -317,7 +321,7 @@ export default function DashboardSetupPage() {
                             >
                                 <RefreshIcon />
                                 Reset Bridge Handshake
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 )}

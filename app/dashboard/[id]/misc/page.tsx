@@ -1,5 +1,9 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+
+
 import { Search as LucideSearch, User as LucideUser, WandSparkles as LucideWandSparkles } from 'lucide-react';
 
 import Link from "next/link";
@@ -205,14 +209,14 @@ export default function MiscPage() {
                 {instantActions.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                         {instantActions.map((action) => (
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 key={action}
                                 disabled={actionLoading === `${target}-${action}`}
                                 onClick={() => handleAction(target, action)}
                                 className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all border disabled:opacity-50 ${getActionButtonClasses(action)}`}
                             >
                                 {actionLoading === `${target}-${action}` ? "..." : getCommandLabel(action)}
-                            </button>
+                            </Button>
                         ))}
                     </div>
                 )}
@@ -220,14 +224,14 @@ export default function MiscPage() {
                 {promptedActions.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                         {promptedActions.map((action) => (
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 key={action}
                                 disabled={actionLoading === `${target}-${action}`}
                                 onClick={() => handleAction(target, action)}
                                 className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all border disabled:opacity-50 ${getActionButtonClasses(action)}`}
                             >
                                 {actionLoading === `${target}-${action}` ? "..." : getCommandLabel(action)}
-                            </button>
+                            </Button>
                         ))}
                     </div>
                 )}
@@ -263,7 +267,7 @@ export default function MiscPage() {
                         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-500">
                             <SearchIcon />
                         </div>
-                        <input
+                        <Input
                             type="text"
                             placeholder="Search live players or enter a username for a manual target..."
                             value={searchQuery}

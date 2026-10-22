@@ -1,5 +1,12 @@
 'use client';
 
+import { Checkbox } from '@/components/ui/checkbox';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
@@ -95,12 +102,12 @@ export default function CreateMarketplaceModulePage() {
             <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-6 text-center">
                 <h1 className="text-2xl font-bold mb-2 tracking-tight">Sign in required</h1>
                 <p className="text-slate-400 mb-8 max-w-sm text-sm">Authenticate with Discord before submitting a marketplace module.</p>
-                <button
+                <Button variant="unstyled" size="unstyled"
                     onClick={() => signIn('discord')}
                     className="bg-sky-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-sky-500 transition-all text-sm"
                 >
                     Sign In with Discord
-                </button>
+                </Button>
             </div>
         );
     }
@@ -121,13 +128,13 @@ export default function CreateMarketplaceModulePage() {
                             Submit a Luau module for moderation. You can install and use your own module while it waits for review.
                         </p>
                     </div>
-                    <button
+                    <Button variant="unstyled" size="unstyled"
                         type="submit"
                         disabled={saving}
                         className="rounded-xl bg-sky-600 px-5 py-4 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
                     >
                         {saving ? 'Submitting' : 'Submit for Moderation'}
-                    </button>
+                    </Button>
                 </header>
 
                 {error && (
@@ -140,7 +147,7 @@ export default function CreateMarketplaceModulePage() {
                     <section className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
                         <div>
                             <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Name</label>
-                            <input
+                            <Input
                                 value={form.name}
                                 onChange={(event) => updateForm('name', event.target.value)}
                                 required
@@ -151,7 +158,7 @@ export default function CreateMarketplaceModulePage() {
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Slug</label>
-                                <input
+                                <Input
                                     value={form.slug}
                                     onChange={(event) => updateForm('slug', event.target.value)}
                                     placeholder="auto"
@@ -160,7 +167,7 @@ export default function CreateMarketplaceModulePage() {
                             </div>
                             <div>
                                 <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Version</label>
-                                <input
+                                <Input
                                     value={form.version}
                                     onChange={(event) => updateForm('version', event.target.value)}
                                     className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
@@ -170,7 +177,7 @@ export default function CreateMarketplaceModulePage() {
 
                         <div>
                             <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Category</label>
-                            <input
+                            <Input
                                 value={form.category}
                                 onChange={(event) => updateForm('category', event.target.value)}
                                 className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
@@ -179,7 +186,7 @@ export default function CreateMarketplaceModulePage() {
 
                         <div>
                             <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Description</label>
-                            <textarea
+                            <Textarea
                                 value={form.description}
                                 onChange={(event) => updateForm('description', event.target.value)}
                                 required
@@ -189,7 +196,7 @@ export default function CreateMarketplaceModulePage() {
 
                         <div>
                             <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Upload Source</label>
-                            <input
+                            <Input
                                 type="file"
                                 accept=".lua,.luau,.txt"
                                 onChange={handleFileUpload}
@@ -199,19 +206,17 @@ export default function CreateMarketplaceModulePage() {
 
                         <div className="space-y-3 border-t border-slate-800 pt-4">
                             <label className="flex items-start gap-3 text-xs leading-relaxed text-slate-300">
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     checked={acceptedCreatorTerms}
-                                    onChange={(event) => setAcceptedCreatorTerms(event.target.checked)}
+                                    onCheckedChange={(checked) => setAcceptedCreatorTerms(checked === true)}
                                     className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 accent-sky-500"
                                 />
                                 <span>I agree to the <Link href="/terms/modules/create" className="text-sky-300 hover:text-sky-200">module creator terms</Link>.</span>
                             </label>
                             <label className="flex items-start gap-3 text-xs leading-relaxed text-slate-300">
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     checked={acceptedUseTerms}
-                                    onChange={(event) => setAcceptedUseTerms(event.target.checked)}
+                                    onCheckedChange={(checked) => setAcceptedUseTerms(checked === true)}
                                     className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 accent-sky-500"
                                 />
                                 <span>I understand the <Link href="/terms/modules/use" className="text-sky-300 hover:text-sky-200">module use and UGC terms</Link>.</span>

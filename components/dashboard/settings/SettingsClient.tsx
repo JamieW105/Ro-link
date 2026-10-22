@@ -1,5 +1,16 @@
 'use client';
 
+import { Switch } from '@/components/ui/switch';
+
+import { Checkbox } from '@/components/ui/checkbox';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+
+
+import { Select } from '@/components/ui/select';
+
 import { ArrowRight as LucideArrowRight, Check as LucideCheck, ChevronDown as LucideChevronDown, FileText as LucideFileText, TriangleAlert as LucideTriangleAlert, X as LucideX } from 'lucide-react';
 
 import { useParams, useRouter } from "next/navigation";
@@ -905,7 +916,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                     : 'bg-slate-500/10 text-slate-400 border-slate-500/20 group-hover:border-slate-500/40';
 
                                 return (
-                                    <button
+                                    <Button variant="unstyled" size="unstyled"
                                         key={tile.href}
                                         type="button"
                                         onClick={() => router.push(tile.href)}
@@ -921,7 +932,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                             </div>
                                             <LucideArrowRight className="mt-0.5 shrink-0 text-slate-600 transition-colors group-hover:text-white" width="18" height="18" strokeWidth="2.5" />
                                         </div>
-                                    </button>
+                                    </Button>
                                 );
                             })}
                         </div>
@@ -942,36 +953,31 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     </p>
                                 </div>
                             </div>
-                            <button className={`p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-all transform ${isRolesCollapsed ? 'rotate-180' : ''}`}>
+                            <Button variant="unstyled" size="unstyled" className={`p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-all transform ${isRolesCollapsed ? 'rotate-180' : ''}`}>
                                 <LucideChevronDown width="20" height="20" strokeWidth="2" />
-                            </button>
+                            </Button>
                         </div>
 
                         {!isRolesCollapsed && (
                             <div className="animate-in fade-in slide-in-from-top-4 duration-300">
                                 {/* Add Role Section */}
                                 <div className="flex gap-4 mb-8 bg-slate-950/50 p-4 rounded-xl border border-slate-800/60">
-                                    <select
+                                    <Select
                                         value={selectedRoleForAdd}
-                                        onChange={(e) => setSelectedRoleForAdd(e.target.value)}
+                                        onValueChange={(nextValue) => setSelectedRoleForAdd(nextValue)}
                                         className="flex-1 bg-black/40 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500 transition-all font-medium"
-                                    >
-                                        <option value="">Select a Discord Role...</option>
-                                        {discordRoles
+                                        aria-label="Discord role"
+                                        options={[{ value: '', label: 'Select a Discord Role...' }, ...discordRoles
                                             .filter(dr => !dashboardRoles.some(dbr => dbr.discord_role_id === dr.id) && dr.name !== '@everyone')
-                                            .map(role => (
-                                                <option key={role.id} value={role.id} style={{ color: role.color ? `#${role.color.toString(16)}` : 'white' }}>
-                                                    {role.name}
-                                                </option>
-                                            ))}
-                                    </select>
-                                    <button
+                                            .map(role => ({ value: role.id, label: role.name }))]}
+                                    />
+                                    <Button variant="unstyled" size="unstyled"
                                         onClick={handleAddRole}
                                         disabled={!selectedRoleForAdd || addingRole}
                                         className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-2 rounded-lg text-xs transition-all shadow-lg shadow-purple-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {addingRole ? "Adding..." : "Add Role"}
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 {/* Roles List */}
@@ -985,7 +991,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                         return (
                                         <div key={role.id} className="bg-slate-950/40 border border-slate-800 rounded-xl p-6 transition-all hover:bg-slate-900/40">
                                             <div className={`flex items-center justify-between ${roleCardCollapsed ? '' : 'mb-6 border-b border-slate-800/50 pb-4'}`}>
-                                                <button
+                                                <Button variant="unstyled" size="unstyled"
                                                     type="button"
                                                     onClick={() => toggleRoleCollapsed(role.id)}
                                                     className="flex min-w-0 flex-1 items-center gap-3 text-left"
@@ -999,23 +1005,23 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                             {permissionCount} permission{permissionCount === 1 ? '' : 's'}
                                                         </div>
                                                     </div>
-                                                </button>
+                                                </Button>
                                                 <div className="ml-4 flex items-center gap-2">
-                                                    <button
+                                                    <Button variant="unstyled" size="unstyled"
                                                         type="button"
                                                         onClick={() => toggleRoleCollapsed(role.id)}
                                                         className={`p-2 rounded-lg bg-slate-900 text-slate-400 hover:text-white transition-all transform ${roleCardCollapsed ? 'rotate-180' : ''}`}
                                                         title={roleCardCollapsed ? "Expand Role" : "Collapse Role"}
                                                     >
                                                         <LucideChevronDown width="16" height="16" strokeWidth="2" />
-                                                    </button>
-                                                    <button
+                                                    </Button>
+                                                    <Button variant="unstyled" size="unstyled"
                                                         onClick={() => handleDeleteRole(role.id)}
                                                         className="text-slate-500 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-500/10"
                                                         title="Remove Configuration"
                                                     >
                                                         <TrashIcon />
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             </div>
 
@@ -1025,18 +1031,10 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-3 xl:gap-4">
                                                         {ROLE_PERMISSION_OPTIONS.map((perm) => (
                                                             <label key={perm.key} className="flex items-center gap-3 cursor-pointer group select-none">
-                                                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
-                                                                    role[perm.key] ? 'bg-purple-600 border-purple-500' : 'bg-slate-900 border-slate-700 group-hover:border-slate-500'
-                                                                    }`}>
-                                                                    {role[perm.key] && (
-                                                                            <LucideCheck width="12" height="12" strokeWidth="3" className="text-white" />
-                                                                        )}
-                                                                </div>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="hidden"
+                                                                <Checkbox
+                                                                    className="size-5 data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-500"
                                                                     checked={role[perm.key]}
-                                                                    onChange={(e) => handleUpdateRole(role, perm.key, e.target.checked)}
+                                                                    onCheckedChange={(checked) => handleUpdateRole(role, perm.key, checked === true)}
                                                                 />
                                                                 <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${
                                                                     role[perm.key] ? 'text-white' : 'text-slate-500 group-hover:text-slate-400'
@@ -1057,7 +1055,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                                     Choose exactly which Ro-Link in-game panel commands this role can run. The dashboard and live Roblox panel both use this same command list.
                                                                 </p>
                                                             </div>
-                                                            <button
+                                                            <Button variant="unstyled" size="unstyled"
                                                                 type="button"
                                                                 onClick={() => handleToggleRoleAllCommands(role)}
                                                                 className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-[0.18em] transition-all border ${
@@ -1067,7 +1065,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                                 }`}
                                                             >
                                                                 {hasAllCommands ? 'All Commands Enabled' : 'Enable All Commands'}
-                                                            </button>
+                                                            </Button>
                                                         </div>
 
                                                         <div className="space-y-4">
@@ -1090,7 +1088,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                                                 const enabled = hasAllCommands || hasAdminPanelCommandAccess(roleCommands, command.id);
 
                                                                                 return (
-                                                                                    <button
+                                                                                    <Button variant="unstyled" size="unstyled"
                                                                                         key={command.id}
                                                                                         type="button"
                                                                                         onClick={() => handleToggleRoleCommand(role, command.id)}
@@ -1119,7 +1117,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                                                                 </p>
                                                                                             </div>
                                                                                         </div>
-                                                                                    </button>
+                                                                                    </Button>
                                                                                 );
                                                                             })}
                                                                         </div>
@@ -1163,7 +1161,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                 <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
                                     <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Dashboard Subdomain</label>
                                     <div className="flex rounded-xl border border-slate-800 bg-black/30 focus-within:border-amber-500">
-                                        <input
+                                        <Input
                                             value={customDashboardSubdomain}
                                             onChange={(e) => setCustomDashboardSubdomain(e.target.value)}
                                             placeholder="my-community"
@@ -1189,7 +1187,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     <div className="space-y-6">
                                         <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
                                             <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Dashboard Title</label>
-                                            <input
+                                            <Input
                                                 value={customDashboardMetadata.title}
                                                 onChange={(e) => updateCustomDashboardMetadata('title', e.target.value)}
                                                 placeholder="Community Staff Dashboard"
@@ -1200,7 +1198,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                                         <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
                                             <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Description</label>
-                                            <textarea
+                                            <Textarea
                                                 value={customDashboardMetadata.description}
                                                 onChange={(e) => updateCustomDashboardMetadata('description', e.target.value)}
                                                 placeholder="Sign in with Discord to access this community dashboard."
@@ -1212,7 +1210,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                             <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
                                                 <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Logo URL</label>
-                                                <input
+                                                <Input
                                                     value={customDashboardMetadata.logoUrl}
                                                     onChange={(e) => updateCustomDashboardMetadata('logoUrl', e.target.value)}
                                                     placeholder="https://..."
@@ -1222,7 +1220,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                                             <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
                                                 <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Support URL</label>
-                                                <input
+                                                <Input
                                                     value={customDashboardMetadata.supportUrl}
                                                     onChange={(e) => updateCustomDashboardMetadata('supportUrl', e.target.value)}
                                                     placeholder="https://discord.gg/..."
@@ -1242,7 +1240,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                             </div>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                 {CUSTOM_DASHBOARD_LAYOUTS.map((layout) => (
-                                    <button
+                                    <Button variant="unstyled" size="unstyled"
                                         key={layout.id}
                                         type="button"
                                         onClick={() => setCustomDashboardLayout(layout.id)}
@@ -1257,7 +1255,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                             )}
                                         </div>
                                         <p className="mt-2 text-xs leading-relaxed text-slate-500">{layout.description}</p>
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         </div>
@@ -1269,7 +1267,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                             </div>
                             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                                 {CUSTOM_DASHBOARD_THEMES.map((theme) => (
-                                    <button
+                                    <Button variant="unstyled" size="unstyled"
                                         key={theme.id}
                                         type="button"
                                         onClick={() => setCustomDashboardTheme(theme.id)}
@@ -1288,7 +1286,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                 <span className="h-2 w-2 rounded-full" style={{ background: theme.accent }} />
                                             )}
                                         </span>
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         </div>
@@ -1316,12 +1314,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     <h4 className="text-sm font-bold text-slate-200 uppercase tracking-tight">Admin Commands</h4>
                                     <p className="text-[11px] text-slate-500 font-medium mt-1">Kick, Ban, Unban, Shutdown, Update</p>
                                 </div>
-                                <button
-                                    onClick={() => setAdminCmds(!adminCmds)}
-                                    className={`w-14 h-7 rounded-full transition-all duration-500 relative border-2 ${adminCmds ? 'bg-sky-600/20 border-sky-500 shadow-[0_0_15px_rgba(2,132,199,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
-                                >
-                                    <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${adminCmds ? 'left-8 bg-sky-500' : 'left-1.5 bg-slate-500'}`} />
-                                </button>
+                                <Switch checked={adminCmds} onCheckedChange={setAdminCmds} aria-label="Admin commands" />
                             </div>
 
                             {/* Misc Commands Toggle */}
@@ -1330,12 +1323,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     <h4 className="text-sm font-bold text-slate-200 uppercase tracking-tight">Misc Commands</h4>
                                     <p className="text-[11px] text-slate-500 font-medium mt-1">Fly, Noclip, Heal, Teleport, etc.</p>
                                 </div>
-                                <button
-                                    onClick={() => setMiscCmds(!miscCmds)}
-                                    className={`w-14 h-7 rounded-full transition-all duration-500 relative border-2 ${miscCmds ? 'bg-sky-600/20 border-sky-500 shadow-[0_0_15px_rgba(2,132,199,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
-                                >
-                                    <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${miscCmds ? 'left-8 bg-sky-500' : 'left-1.5 bg-slate-500'}`} />
-                                </button>
+                                <Switch checked={miscCmds} onCheckedChange={setMiscCmds} aria-label="Miscellaneous commands" />
                             </div>
                         </div>
                     </div>
@@ -1356,18 +1344,13 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                         <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
                             <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Logging Channel</label>
-                            <select
+                            <Select
                                 value={loggingChannelId}
-                                onChange={(e) => setLoggingChannelId(e.target.value)}
+                                onValueChange={(nextValue) => setLoggingChannelId(nextValue)}
                                 className="w-full bg-black/40 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all font-medium"
-                            >
-                                <option value="">Disabled (No Logging)</option>
-                                {channels.map(channel => (
-                                    <option key={channel.id} value={channel.id}>
-                                        #{channel.name}
-                                    </option>
-                                ))}
-                            </select>
+                                aria-label="Audit logging channel"
+                                options={[{ value: '', label: 'Disabled (No Logging)' }, ...channels.map(channel => ({ value: channel.id, label: '#' + channel.name }))]}
+                            />
                             {!isLoggingChannelAccessible && (
                                 <p className="mt-3 text-[11px] font-medium text-amber-400">
                                     The saved logging channel is no longer accessible to the bot. Pick a visible channel the bot can send to, then save again.
@@ -1398,28 +1381,18 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                         {reportsEnabled ? 'ENABLED' : 'DISABLED'}
                                     </span>
                                 </div>
-                                <button
-                                    onClick={() => setReportsEnabled(!reportsEnabled)}
-                                    className={`w-14 h-7 rounded-full transition-all duration-500 relative border-2 ${reportsEnabled ? 'bg-red-600/20 border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
-                                >
-                                    <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${reportsEnabled ? 'left-8 bg-red-500' : 'left-1.5 bg-slate-500'}`} />
-                                </button>
+                                <Switch checked={reportsEnabled} onCheckedChange={setReportsEnabled} aria-label="Player reports" />
                             </div>
 
                             <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
                                 <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-1">Reports Channel</label>
-                                <select
+                                <Select
                                     value={reportsChannelId}
-                                    onChange={(e) => setReportsChannelId(e.target.value)}
+                                    onValueChange={(nextValue) => setReportsChannelId(nextValue)}
                                     className="w-full bg-black/40 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500 transition-all font-medium"
-                                >
-                                    <option value="">None (Dashboard Only)</option>
-                                    {channels.map(channel => (
-                                        <option key={channel.id} value={channel.id}>
-                                            #{channel.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                    aria-label="Reports channel"
+                                    options={[{ value: '', label: 'None (Dashboard Only)' }, ...channels.map(channel => ({ value: channel.id, label: '#' + channel.name }))]}
+                                />
                                 {!isReportsChannelAccessible && (
                                     <p className="mt-3 text-[11px] font-medium text-amber-400">
                                         The saved reports channel is no longer accessible to the bot. Choose a different channel or restore the bot’s permissions there.
@@ -1467,7 +1440,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     </p>
                                 </div>
                             </div>
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 type="button"
                                 onClick={() => {
                                     setRemoveBotOption(true);
@@ -1479,7 +1452,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                             >
                                 <TrashIcon />
                                 Remove Ro-Link
-                            </button>
+                            </Button>
                         </div>
                     </div>
                     )}
@@ -1522,7 +1495,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                 <p className="mt-0.5 text-xs font-medium text-slate-400">You have unsaved changes on this page.</p>
                             </div>
                         </div>
-                        <button
+                        <Button variant="unstyled" size="unstyled"
                             type="button"
                             onClick={handleSave}
                             disabled={saving}
@@ -1536,7 +1509,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     Save Settings
                                 </>
                             )}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}
@@ -1552,18 +1525,18 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     Choose what should happen for this server. You can remove the bot, wipe the saved Ro-Link data, or perform both actions together.
                                 </p>
                             </div>
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 type="button"
                                 onClick={closeRemoveModal}
                                 disabled={removingRoLink}
                                 className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-slate-500 hover:text-white transition-colors disabled:opacity-50"
                             >
                                 <LucideX width="18" height="18" strokeWidth="2.5" />
-                            </button>
+                            </Button>
                         </div>
 
                         <div className="space-y-5 px-8 py-8">
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 type="button"
                                 onClick={() => setRemoveBotOption((current) => !current)}
                                 className={`w-full rounded-2xl border p-5 text-left transition-all ${removeBotOption ? 'border-red-500/40 bg-red-500/10' : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'}`}
@@ -1579,9 +1552,9 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                         </p>
                                     </div>
                                 </div>
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 type="button"
                                 onClick={() => setDeleteDataOption((current) => !current)}
                                 className={`w-full rounded-2xl border p-5 text-left transition-all ${deleteDataOption ? 'border-red-500/40 bg-red-500/10' : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'}`}
@@ -1597,7 +1570,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                         </p>
                                     </div>
                                 </div>
-                            </button>
+                            </Button>
 
                             <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-5 py-4 text-sm text-amber-200">
                                 Deleting data is permanent. If you want a full disconnect, enable both options before confirming.
@@ -1611,15 +1584,15 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         </div>
 
                         <div className="flex flex-col-reverse gap-3 border-t border-slate-800 px-8 py-6 sm:flex-row sm:items-center sm:justify-end">
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 type="button"
                                 onClick={closeRemoveModal}
                                 disabled={removingRoLink}
                                 className="px-5 py-3 text-sm font-semibold text-slate-400 hover:text-white transition-colors disabled:opacity-50"
                             >
                                 Cancel
-                            </button>
-                            <button
+                            </Button>
+                            <Button variant="unstyled" size="unstyled"
                                 type="button"
                                 onClick={handleRemoveRoLink}
                                 disabled={removingRoLink || (!removeBotOption && !deleteDataOption)}
@@ -1631,7 +1604,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     <TrashIcon />
                                 )}
                                 Confirm Removal
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

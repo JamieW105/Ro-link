@@ -1,5 +1,8 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+
+
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -129,14 +132,14 @@ export default function CustomDashboardLandingPage() {
                                 : 'If this is a mistake, please contact the server owner.'}
                     </p>
                     {(requiresSignIn || temporarilyUnavailable) && (
-                        <button
+                        <Button variant="unstyled" size="unstyled"
                             type="button"
                             onClick={() => requiresSignIn ? handleSignIn() : window.location.reload()}
                             className="mt-6 w-full rounded-xl px-5 py-3 text-sm font-bold text-white transition-all hover:brightness-110"
                             style={{ backgroundColor: theme.accent }}
                         >
                             {requiresSignIn ? 'Sign in with Discord' : 'Try again'}
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -167,13 +170,13 @@ export default function CustomDashboardLandingPage() {
                         Contact Support
                     </a>
                 )}
-                <button
+                <Button variant="unstyled" size="unstyled"
                     onClick={handleSignIn}
                     className="mt-6 w-full rounded-xl px-5 py-3 text-sm font-bold text-white transition-all hover:brightness-110"
                     style={{ backgroundColor: theme.accent }}
                 >
                     Sign in with Discord
-                </button>
+                </Button>
             </div>
         </div>
     );

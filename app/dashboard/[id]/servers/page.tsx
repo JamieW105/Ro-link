@@ -1,5 +1,12 @@
 'use client';
 
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+
+
+import { Select } from '@/components/ui/select';
+
 import { Power as LucidePower, RefreshCw as LucideRefreshCw } from 'lucide-react';
 
 import Link from "next/link";
@@ -229,18 +236,13 @@ export default function ServersPage() {
                             </div>
                             <div className="w-full xl:max-w-md">
                                 <label className="mb-2 block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Target</label>
-                                <select
+                                <Select
                                     value={selectedTarget}
-                                    onChange={(event) => setSelectedTarget(event.target.value)}
+                                    onValueChange={(nextValue) => setSelectedTarget(nextValue)}
                                     className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
-                                >
-                                    <option value={GLOBAL_TARGET_VALUE}>Global (all live servers)</option>
-                                    {normalizedServers.map((server) => (
-                                        <option key={server.id} value={server.id}>
-                                            Server {formatServerId(server.id)} ({server.visiblePlayerCount} players)
-                                        </option>
-                                    ))}
-                                </select>
+                                    aria-label="Command target"
+                                    options={[{ value: GLOBAL_TARGET_VALUE, label: 'Global (all live servers)' }, ...normalizedServers.map(server => ({ value: server.id, label: `Server ${formatServerId(server.id)} (${server.visiblePlayerCount} players)` }))]}
+                                />
                                 <p className="mt-2 text-xs text-slate-500">
                                     {targetIsGlobal
                                         ? `Applies to ${normalizedServers.length} live servers.`
@@ -267,7 +269,7 @@ export default function ServersPage() {
                                         <h3 className="text-sm font-semibold text-white">Broadcast</h3>
                                         <p className="text-xs text-slate-500">Send one message to the selected live servers.</p>
                                     </div>
-                                    <textarea
+                                    <Textarea
                                         value={broadcastMessage}
                                         onChange={(event) => setBroadcastMessage(event.target.value)}
                                         rows={4}
@@ -276,7 +278,7 @@ export default function ServersPage() {
                                     />
                                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                         <p className="text-xs text-slate-500">Roblox may filter or trim certain announcements.</p>
-                                        <button
+                                        <Button variant="unstyled" size="unstyled"
                                             onClick={() => {
                                                 const message = trimString(broadcastMessage);
                                                 if (!message) {
@@ -289,7 +291,7 @@ export default function ServersPage() {
                                             className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
                                         >
                                             {actionLoading === 'BROADCAST' ? 'Sending...' : 'Send'}
-                                        </button>
+                                        </Button>
                                     </div>
                                 </section>
                             )}
@@ -305,19 +307,19 @@ export default function ServersPage() {
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Gravity</label>
                                                 <div className="flex gap-2">
-                                                    <input
+                                                    <Input
                                                         type="text"
                                                         value={gravityValue}
                                                         onChange={(event) => setGravityValue(event.target.value)}
                                                         className="flex-1 bg-black/40 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
                                                     />
-                                                    <button
+                                                    <Button variant="unstyled" size="unstyled"
                                                         onClick={() => sendCommand('GRAVITY', { amount: trimString(gravityValue) }, undefined, `Gravity queued for ${targetLabel}.`)}
                                                         disabled={actionLoading === 'GRAVITY' || normalizedServers.length === 0}
                                                         className="px-4 py-2.5 bg-slate-800 hover:bg-sky-600 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
                                                     >
                                                         {actionLoading === 'GRAVITY' ? '...' : 'Set'}
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             </div>
                                         )}
@@ -325,19 +327,19 @@ export default function ServersPage() {
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Brightness</label>
                                                 <div className="flex gap-2">
-                                                    <input
+                                                    <Input
                                                         type="text"
                                                         value={brightnessValue}
                                                         onChange={(event) => setBrightnessValue(event.target.value)}
                                                         className="flex-1 bg-black/40 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
                                                     />
-                                                    <button
+                                                    <Button variant="unstyled" size="unstyled"
                                                         onClick={() => sendCommand('BRIGHTNESS', { amount: trimString(brightnessValue) }, undefined, `Brightness queued for ${targetLabel}.`)}
                                                         disabled={actionLoading === 'BRIGHTNESS' || normalizedServers.length === 0}
                                                         className="px-4 py-2.5 bg-slate-800 hover:bg-sky-600 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
                                                     >
                                                         {actionLoading === 'BRIGHTNESS' ? '...' : 'Set'}
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             </div>
                                         )}
@@ -353,37 +355,37 @@ export default function ServersPage() {
                                         {canRestart && (
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Restart message</label>
-                                                <textarea
+                                                <Textarea
                                                     value={restartReason}
                                                     onChange={(event) => setRestartReason(event.target.value)}
                                                     rows={2}
                                                     className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium resize-none"
                                                 />
-                                                <button
+                                                <Button variant="unstyled" size="unstyled"
                                                     onClick={() => sendCommand('UPDATE', { reason: trimString(restartReason) }, `Restart ${targetLabel}? Players will be moved through a reserved server and then back into public servers.`, `Restart queued for ${targetLabel}.`)}
                                                     disabled={actionLoading === 'UPDATE' || normalizedServers.length === 0}
                                                     className="w-full px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
                                                 >
                                                     {actionLoading === 'UPDATE' ? 'Queueing restart...' : 'Restart'}
-                                                </button>
+                                                </Button>
                                             </div>
                                         )}
                                         {canShutdown && (
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Shutdown message</label>
-                                                <textarea
+                                                <Textarea
                                                     value={shutdownReason}
                                                     onChange={(event) => setShutdownReason(event.target.value)}
                                                     rows={2}
                                                     className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium resize-none"
                                                 />
-                                                <button
+                                                <Button variant="unstyled" size="unstyled"
                                                     onClick={() => sendCommand('SHUTDOWN', { reason: trimString(shutdownReason) }, `Shut down ${targetLabel}? Players in the targeted live servers will be disconnected.`, `Shutdown queued for ${targetLabel}.`)}
                                                     disabled={actionLoading === 'SHUTDOWN' || normalizedServers.length === 0}
                                                     className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
                                                 >
                                                     {actionLoading === 'SHUTDOWN' ? 'Queueing shutdown...' : 'Shut down'}
-                                                </button>
+                                                </Button>
                                             </div>
                                         )}
                                     </section>
@@ -427,7 +429,7 @@ export default function ServersPage() {
                             return (
                                 <div key={server.id} className="bg-slate-950/10">
                                     <div className="flex flex-col gap-3 px-5 py-5 transition-all hover:bg-sky-500/5 xl:flex-row xl:items-center xl:justify-between">
-                                        <button
+                                        <Button variant="unstyled" size="unstyled"
                                             type="button"
                                             onClick={() => setExpandedServerId(isExpanded ? null : server.id)}
                                             className="min-w-0 flex-1 text-left"
@@ -474,12 +476,12 @@ export default function ServersPage() {
                                                 </div>
                                             </div>
                                             </div>
-                                        </button>
+                                        </Button>
 
                                         {(canRestart || canShutdown) && (
                                             <div className="flex shrink-0 items-center gap-2">
                                                 {canRestart && (
-                                                    <button
+                                                    <Button variant="unstyled" size="unstyled"
                                                         type="button"
                                                         aria-label={`Restart server ${formatServerId(server.id)}`}
                                                         title={`Restart ${formatServerId(server.id)}`}
@@ -488,10 +490,10 @@ export default function ServersPage() {
                                                         className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-300 transition-all hover:border-amber-300 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
                                                     >
                                                         <RestartIcon />
-                                                    </button>
+                                                    </Button>
                                                 )}
                                                 {canShutdown && (
-                                                    <button
+                                                    <Button variant="unstyled" size="unstyled"
                                                         type="button"
                                                         aria-label={`Shut down server ${formatServerId(server.id)}`}
                                                         title={`Shut down ${formatServerId(server.id)}`}
@@ -500,7 +502,7 @@ export default function ServersPage() {
                                                         className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-500/25 bg-red-500/10 text-red-300 transition-all hover:border-red-300 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
                                                     >
                                                         <ShutdownIcon />
-                                                    </button>
+                                                    </Button>
                                                 )}
                                             </div>
                                         )}

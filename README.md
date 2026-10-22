@@ -69,3 +69,21 @@ Only the Discord Server Owner can run `/setup` to link a game.
 For detailed installation and configuration instructions, please read the [**Setup Guide**](guide.md).
 
 The setup guide also includes the marketplace **Module Developer API** for add-on authors, including `SendBotMessage`, lifecycle hooks, `CreateUI`, command registration, and player/helper functions.
+
+### Dashboard UI
+
+Dashboard features use [Dice UI](https://diceui.com/) with shared shadcn-compatible
+foundations in `components/ui`. See [AGENTS.md](./AGENTS.md) for the requirements
+for future feature changes. The `@diceui` registry is configured in
+`components.json`; copied Dice components retain their source URL and MIT notice.
+
+Run the dashboard interaction checks on desktop and mobile with:
+
+```bash
+npx playwright install chromium
+npm run test:dashboard-ui
+```
+
+To use an installed Chromium instead, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to its
+absolute path. Tests start a Next.js server on port 3100 and mock dashboard API
+responses; they do not write to Discord, Roblox, or the database.

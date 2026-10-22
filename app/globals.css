@@ -8,6 +8,22 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--dice-card);
+  --color-card-foreground: var(--dice-foreground);
+  --color-popover: var(--dice-popover);
+  --color-popover-foreground: var(--dice-foreground);
+  --color-primary: var(--dice-primary);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--dice-secondary);
+  --color-secondary-foreground: var(--dice-foreground);
+  --color-muted: var(--dice-muted);
+  --color-muted-foreground: var(--dice-muted-foreground);
+  --color-accent: var(--dice-accent);
+  --color-accent-foreground: var(--dice-foreground);
+  --color-destructive: #f87171;
+  --color-border: var(--dice-border);
+  --color-input: var(--dice-border);
+  --color-ring: var(--dice-primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -943,4 +959,29 @@ select option {
 
 .custom-dashboard-shell[data-custom-dashboard-themed="true"] [class*="rgba(2,132,199"] {
   box-shadow: 0 0 20px color-mix(in srgb, var(--custom-dashboard-accent) 24%, transparent) !important;
+}
+
+/* Dice UI / shadcn semantic tokens. Portals inherit the active dashboard theme. */
+:root {
+  --dice-card: #0f172a;
+  --dice-popover: #0f172a;
+  --dice-foreground: #f8fafc;
+  --dice-primary: #0284c7;
+  --dice-secondary: #1e293b;
+  --dice-muted: #1e293b;
+  --dice-muted-foreground: #94a3b8;
+  --dice-accent: #1e293b;
+  --dice-border: #334155;
+}
+
+.custom-dashboard-shell[data-custom-dashboard-themed="true"] {
+  --dice-card: var(--custom-dashboard-surface);
+  --dice-popover: var(--custom-dashboard-surface-strong);
+  --dice-foreground: var(--custom-dashboard-text);
+  --dice-primary: var(--custom-dashboard-accent);
+  --dice-secondary: var(--custom-dashboard-surface-soft);
+  --dice-muted: var(--custom-dashboard-surface-soft);
+  --dice-muted-foreground: var(--custom-dashboard-text-secondary);
+  --dice-accent: var(--custom-dashboard-surface-soft);
+  --dice-border: var(--custom-dashboard-neutral-border);
 }

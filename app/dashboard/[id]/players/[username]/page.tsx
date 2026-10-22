@@ -1,5 +1,9 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+
+
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -419,7 +423,7 @@ export default function DashboardPlayerPage() {
                                             : 'border-red-500/20 bg-red-500/10 text-red-300';
 
                                     return (
-                                        <button
+                                        <Button variant="unstyled" size="unstyled"
                                             key={command.id}
                                             type="button"
                                             disabled={disabled}
@@ -434,7 +438,7 @@ export default function DashboardPlayerPage() {
                                                 {actionLoading === command.id ? 'Sending...' : command.label}
                                             </p>
                                             <p className="mt-2 text-[11px] font-medium text-current/80">{command.description}</p>
-                                        </button>
+                                        </Button>
                                     );
                                 })}
                             </div>
@@ -462,7 +466,7 @@ export default function DashboardPlayerPage() {
                         {quickTargetCommands.length > 0 ? (
                             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                 {quickTargetCommands.map((command) => (
-                                    <button
+                                    <Button variant="unstyled" size="unstyled"
                                         key={command.id}
                                         type="button"
                                         disabled={actionLoading === command.id || !presence.inGame}
@@ -473,7 +477,7 @@ export default function DashboardPlayerPage() {
                                             {actionLoading === command.id ? 'Sending...' : command.label}
                                         </p>
                                         <p className="mt-2 text-[11px] font-medium text-slate-500">{command.description}</p>
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         ) : (
@@ -489,21 +493,21 @@ export default function DashboardPlayerPage() {
                                         <p className="text-xs font-black uppercase tracking-widest text-white">{setCharCommand.label}</p>
                                         <p className="mt-2 text-[11px] font-medium text-slate-500">{setCharCommand.description}</p>
                                         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                                            <input
+                                            <Input
                                                 type="text"
                                                 value={setCharValue}
                                                 onChange={(event) => setSetCharValue(event.target.value)}
                                                 placeholder="Username to copy avatar from"
                                                 className="flex-1 rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600"
                                             />
-                                            <button
+                                            <Button variant="unstyled" size="unstyled"
                                                 type="button"
                                                 disabled={actionLoading === 'SET_CHAR' || !presence.inGame || !trimString(setCharValue)}
                                                 onClick={() => sendPlayerCommand('SET_CHAR', { char_user: trimString(setCharValue) })}
                                                 className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
                                             >
                                                 {actionLoading === 'SET_CHAR' ? 'Sending...' : 'Apply'}
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
                                 )}
@@ -513,21 +517,21 @@ export default function DashboardPlayerPage() {
                                         <p className="text-xs font-black uppercase tracking-widest text-white">{teamCommand.label}</p>
                                         <p className="mt-2 text-[11px] font-medium text-slate-500">{teamCommand.description}</p>
                                         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                                            <input
+                                            <Input
                                                 type="text"
                                                 value={teamValue}
                                                 onChange={(event) => setTeamValue(event.target.value)}
                                                 placeholder="Roblox team name"
                                                 className="flex-1 rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600"
                                             />
-                                            <button
+                                            <Button variant="unstyled" size="unstyled"
                                                 type="button"
                                                 disabled={actionLoading === 'TEAM' || !presence.inGame || !trimString(teamValue)}
                                                 onClick={() => sendPlayerCommand('TEAM', { team_name: trimString(teamValue) })}
                                                 className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
                                             >
                                                 {actionLoading === 'TEAM' ? 'Sending...' : 'Apply'}
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
                                 )}
@@ -537,21 +541,21 @@ export default function DashboardPlayerPage() {
                                         <p className="text-xs font-black uppercase tracking-widest text-white">{command.label}</p>
                                         <p className="mt-2 text-[11px] font-medium text-slate-500">{command.description}</p>
                                         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                                            <input
+                                            <Input
                                                 type="text"
                                                 value={valueInputs[command.id] || ''}
                                                 onChange={(event) => setValueInputs((current) => ({ ...current, [command.id]: event.target.value }))}
                                                 placeholder={formatCommandTarget(command.id)}
                                                 className="flex-1 rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600"
                                             />
-                                            <button
+                                            <Button variant="unstyled" size="unstyled"
                                                 type="button"
                                                 disabled={actionLoading === command.id || !presence.inGame || !trimString(valueInputs[command.id])}
                                                 onClick={() => sendPlayerCommand(command.id, { amount: trimString(valueInputs[command.id]) })}
                                                 className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
                                             >
                                                 {actionLoading === command.id ? 'Sending...' : 'Apply'}
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
                                 ))}

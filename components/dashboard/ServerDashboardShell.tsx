@@ -1,5 +1,8 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+
+
 import { ArrowLeft as LucideArrowLeft, ChevronDown as LucideChevronDown, FileText as LucideFileText, Home as LucideHome, LayoutDashboard as LucideLayoutDashboard, Menu as LucideMenu, MonitorPlay as LucideMonitorPlay, Package as LucidePackage, Rss as LucideRss, Search as LucideSearch, Server as LucideServer, Settings as LucideSettings, Shield as LucideShield, ShieldCheck as LucideShieldCheck, TriangleAlert as LucideTriangleAlert, UserCheck as LucideUserCheck, WandSparkles as LucideWandSparkles, X as LucideX } from 'lucide-react';
 
 import { useParams, usePathname } from "next/navigation";
@@ -405,12 +408,12 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                     <p className="mt-3 text-sm leading-6 text-slate-400">
                         Sign in with Discord before accessing this Ro-Link dashboard.
                     </p>
-                    <button
+                    <Button variant="unstyled" size="unstyled"
                         onClick={signInFromCustomDashboard}
                         className="mt-6 w-full rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold text-white transition-all hover:bg-sky-500"
                     >
                         Sign in with Discord
-                    </button>
+                    </Button>
                 </div>
             </div>
         );
@@ -438,7 +441,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                 : 'If this is a mistake, please contact the server owner.'}
                     </p>
                     {(requiresSignIn || temporarilyUnavailable) && (
-                        <button
+                        <Button variant="unstyled" size="unstyled"
                             type="button"
                             onClick={() => requiresSignIn
                                 ? signIn('discord', { callbackUrl: window.location.href })
@@ -446,7 +449,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                             className="mt-6 w-full rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold text-white transition-all hover:bg-sky-500"
                         >
                             {requiresSignIn ? 'Sign in with Discord' : 'Try again'}
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -662,9 +665,9 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                             <img src={customDashboardLogo} alt="" className="w-8 h-8 rounded object-cover shadow-lg shadow-sky-500/10" />
                             <span className="truncate text-xl font-black tracking-tighter text-white uppercase italic">{customDashboardBrand}</span>
                         </Link>
-                        <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-slate-500 hover:text-white">
+                        <Button variant="unstyled" size="unstyled" onClick={() => setIsSidebarOpen(false)} className="p-2 text-slate-500 hover:text-white">
                             <CloseIcon />
-                        </button>
+                        </Button>
                     </div>
 
                     <nav className="min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain pr-2 custom-scrollbar">
@@ -931,7 +934,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
                         <div className="flex-1 w-full px-2 flex flex-col items-center gap-5">
                             {/* Utility Category */}
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 onClick={() => setActiveCategory('utility')}
                                 className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 border ${activeCategory === 'utility'
                                     ? 'bg-sky-600/10 text-sky-400 border-sky-500/20 shadow-md shadow-sky-900/5'
@@ -939,11 +942,11 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                 }`}
                             >
                                 <HomeIcon />
-                            </button>
+                            </Button>
 
                             {/* Moderation Category */}
                             {moderationItems.length > 0 && (
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     onClick={() => setActiveCategory('moderation')}
                                     className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 border ${activeCategory === 'moderation'
                                         ? 'bg-sky-600/10 text-sky-400 border-sky-500/20 shadow-md shadow-sky-900/5'
@@ -951,12 +954,12 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                     }`}
                                 >
                                     <ShieldIcon />
-                                </button>
+                                </Button>
                             )}
 
                             {/* Settings Category */}
                             {settingItems.length > 0 && (
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     onClick={() => setActiveCategory('settings')}
                                     className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 border ${activeCategory === 'settings'
                                         ? 'bg-sky-600/10 text-sky-400 border-sky-500/20 shadow-md shadow-sky-900/5'
@@ -964,7 +967,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                     }`}
                                 >
                                     <LucideSettings width="18" height="18" strokeWidth="2" />
-                                </button>
+                                </Button>
                             )}
                         </div>
 
@@ -1055,12 +1058,12 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             <main className={`dashboard-main flex-1 min-w-0 ${mainMarginClass} ${mainPaddingClass} h-screen min-h-0 overflow-hidden flex flex-col`}>
                 <header className="dashboard-topbar sticky top-0 z-50 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-[#020617]/80 px-4 py-3 backdrop-blur-md md:h-16 md:flex-nowrap md:px-10 md:py-0">
                     <div className="flex min-w-0 items-center gap-3 h-full">
-                        <button
+                        <Button variant="unstyled" size="unstyled"
                             onClick={() => setIsSidebarOpen(true)}
                             className="md:hidden p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
                         >
                             <HamburgerIcon />
-                        </button>
+                        </Button>
 
                         {/* Brand Logo & Name (Visible on desktop for top-nav/floating-dock/minimalist-drawer) */}
                         {['spacious', 'floating_dock', 'minimalist_drawer'].includes(customDashboardLayout) && (
@@ -1075,10 +1078,10 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                             <div className="hidden md:flex items-center gap-6 mr-6 h-full">
                                 {/* Utility Menu */}
                                 <div className="relative group h-full flex items-center">
-                                    <button className="flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white transition-colors py-2">
+                                    <Button variant="unstyled" size="unstyled" className="flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white transition-colors py-2">
                                         Utility
                                         <LucideChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-transform duration-200 group-hover:rotate-180" strokeWidth="2.5" />
-                                    </button>
+                                    </Button>
                                     <div className="absolute top-[80%] left-0 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto bg-[#090d16]/95 border border-slate-800/80 backdrop-blur-xl rounded-xl p-2 min-w-[200px] shadow-2xl transition-all duration-200 z-[99] translate-y-2 group-hover:translate-y-0">
                                         {utilityItems.map((item) => {
                                             const isActive = pathname === item.href;
@@ -1103,10 +1106,10 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                 {/* Moderation Menu */}
                                 {moderationItems.length > 0 && (
                                     <div className="relative group h-full flex items-center">
-                                        <button className="flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white transition-colors py-2">
+                                        <Button variant="unstyled" size="unstyled" className="flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white transition-colors py-2">
                                             Moderation
                                             <LucideChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-transform duration-200 group-hover:rotate-180" strokeWidth="2.5" />
-                                        </button>
+                                        </Button>
                                         <div className="absolute top-[80%] left-0 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto bg-[#090d16]/95 border border-slate-800/80 backdrop-blur-xl rounded-xl p-2 min-w-[200px] shadow-2xl transition-all duration-200 z-[99] translate-y-2 group-hover:translate-y-0">
                                             {moderationItems.map((item) => {
                                                 const isActive = pathname === item.href;
@@ -1132,10 +1135,10 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                                 {/* Settings Menu */}
                                 {settingItems.length > 0 && (
                                     <div className="relative group h-full flex items-center">
-                                        <button className="flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white transition-colors py-2">
+                                        <Button variant="unstyled" size="unstyled" className="flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white transition-colors py-2">
                                             Settings
                                             <LucideChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-transform duration-200 group-hover:rotate-180" strokeWidth="2.5" />
-                                        </button>
+                                        </Button>
                                         <div className="absolute top-[80%] left-0 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto bg-[#090d16]/95 border border-slate-800/80 backdrop-blur-xl rounded-xl p-2 min-w-[200px] shadow-2xl transition-all duration-200 z-[99] translate-y-2 group-hover:translate-y-0">
                                             {settingItems.map((item) => {
                                                 const isActive = pathname === item.href;
@@ -1173,13 +1176,13 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
                         {/* Minimalist Drawer Navigation Trigger (minimalist_drawer) */}
                         {customDashboardLayout === 'minimalist_drawer' && (
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 onClick={() => setIsDrawerMenuOpen(true)}
                                 className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/60 border border-slate-850 backdrop-blur-md text-xs font-bold text-slate-300 hover:text-white hover:border-sky-500/30 transition-all mr-4"
                             >
                                 <LucideMenu width="16" height="16" strokeWidth="2.5" />
                                 Navigation Menu
-                            </button>
+                            </Button>
                         )}
 
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -1313,12 +1316,12 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             {/* 6. Minimalist Drawer Navigation Overlay (revealed full-screen when trigger clicked) */}
             {isDrawerMenuOpen && customDashboardLayout === 'minimalist_drawer' && (
                 <div className="fixed inset-0 bg-[#020617]/95 backdrop-blur-2xl z-[99] flex flex-col items-center justify-center p-6 md:p-24 transition-all duration-300 animate-in fade-in zoom-in-95 duration-200">
-                    <button
+                    <Button variant="unstyled" size="unstyled"
                         onClick={() => setIsDrawerMenuOpen(false)}
                         className="absolute top-8 right-8 p-3 rounded-full border border-slate-800 text-slate-400 hover:text-white hover:rotate-90 hover:border-sky-500/30 transition-all duration-300 bg-slate-900/60 backdrop-blur-md"
                     >
                         <CloseIcon />
-                    </button>
+                    </Button>
 
                     <div className="w-full max-w-5xl flex flex-col gap-12">
                         <div className="flex flex-col items-center text-center">

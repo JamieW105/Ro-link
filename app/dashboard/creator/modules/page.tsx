@@ -1,5 +1,12 @@
 'use client';
 
+import { Checkbox } from '@/components/ui/checkbox';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
@@ -350,12 +357,12 @@ export default function CreatorModulesPage() {
                     <Image src="/Media/Ro-LinkIcon.png" alt="" width={48} height={48} className="mx-auto mb-5 h-12 w-12 rounded-xl border border-white/5 object-contain shadow-lg" />
                     <h1 className="text-2xl font-bold">Sign in required</h1>
                     <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-slate-400">Authenticate with Discord before managing creator modules and marketplace submissions.</p>
-                <button
+                <Button variant="unstyled" size="unstyled"
                     onClick={() => signIn('discord')}
                         className="mt-8 rounded-lg bg-sky-600 px-6 py-3 text-sm font-semibold transition-colors hover:bg-sky-500"
                 >
                     Sign In with Discord
-                </button>
+                </Button>
                 </div>
             </div>
         );
@@ -376,13 +383,13 @@ export default function CreatorModulesPage() {
                         >
                             Marketplace
                         </Link>
-                        <button
+                        <Button variant="unstyled" size="unstyled"
                             type="button"
                             onClick={startNewModule}
                             className="rounded-lg bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500"
                         >
                             New Module
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </nav>
@@ -438,7 +445,7 @@ export default function CreatorModulesPage() {
                                     {stats.drafts} drafts
                                 </span>
                             </div>
-                            <input
+                            <Input
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
                                 placeholder="Search name, slug, category..."
@@ -446,30 +453,30 @@ export default function CreatorModulesPage() {
                             />
                             <div className="mt-3 flex flex-wrap gap-2">
                                 {moduleFilters.map((filter) => (
-                                    <button
+                                    <Button variant="unstyled" size="unstyled"
                                         key={filter.value}
                                         type="button"
                                         onClick={() => setStatusFilter(filter.value)}
                                         className={`rounded-md border px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors ${statusFilter === filter.value ? 'border-sky-500/50 bg-sky-500/10 text-sky-200' : 'border-slate-800 bg-slate-950/50 text-slate-500 hover:border-slate-700 hover:text-slate-300'}`}
                                     >
                                         {filter.label}
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         </div>
 
                         <div className="max-h-[68vh] space-y-3 overflow-y-auto pr-1 custom-scrollbar">
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 type="button"
                                 onClick={startNewModule}
                                 className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedModule ? 'border-dashed border-slate-700 bg-slate-900/25 hover:border-sky-500/40' : 'border-sky-500/40 bg-sky-500/10'}`}
                             >
                                 <span className="text-sm font-bold text-white">Create a new module</span>
                                 <span className="mt-1 block text-xs leading-relaxed text-slate-500">Start a draft with fresh metadata and source.</span>
-                            </button>
+                            </Button>
 
                             {filteredModules.map((addon) => (
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     key={addon.id}
                                     type="button"
                                     onClick={() => setSelectedModuleId(addon.id)}
@@ -498,7 +505,7 @@ export default function CreatorModulesPage() {
                                         <span>{addon.slug || 'auto-slug'}</span>
                                         <span>v{addon.version}</span>
                                     </span>
-                                </button>
+                                </Button>
                             ))}
 
                             {filteredModules.length === 0 && (
@@ -544,40 +551,40 @@ export default function CreatorModulesPage() {
                                     </p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:max-w-md lg:justify-end">
-                                    <button
+                                    <Button variant="unstyled" size="unstyled"
                                         type="button"
                                         onClick={() => saveModule('DRAFT')}
                                         disabled={saving}
                                         className="rounded-lg border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
                                     >
                                         {saving ? 'Saving' : 'Save Draft'}
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button variant="unstyled" size="unstyled"
                                         type="submit"
                                         disabled={saving}
                                         className="rounded-lg bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
                                     >
                                         {saving ? 'Submitting' : 'Submit Review'}
-                                    </button>
+                                    </Button>
                                     {selectedModule && selectedModule.status !== 'ARCHIVED' && (
-                                        <button
+                                        <Button variant="unstyled" size="unstyled"
                                             type="button"
                                             onClick={archiveModule}
                                             disabled={saving}
                                             className="rounded-lg border border-amber-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-amber-300 transition-colors hover:bg-amber-500/10 disabled:opacity-50"
                                         >
                                             Archive
-                                        </button>
+                                        </Button>
                                     )}
                                     {selectedModule && (
-                                        <button
+                                        <Button variant="unstyled" size="unstyled"
                                             type="button"
                                             onClick={deleteModule}
                                             disabled={saving}
                                             className="rounded-lg border border-red-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
                                         >
                                             Delete
-                                        </button>
+                                        </Button>
                                     )}
                                 </div>
                             </div>
@@ -599,7 +606,7 @@ export default function CreatorModulesPage() {
                                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                 <div>
                                     <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Name</label>
-                                    <input
+                                    <Input
                                         value={form.name}
                                         onChange={(event) => updateForm('name', event.target.value)}
                                         required
@@ -608,7 +615,7 @@ export default function CreatorModulesPage() {
                                 </div>
                                 <div>
                                     <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Slug</label>
-                                    <input
+                                    <Input
                                         value={form.slug}
                                         onChange={(event) => updateForm('slug', event.target.value)}
                                         placeholder="Auto from name"
@@ -617,7 +624,7 @@ export default function CreatorModulesPage() {
                                 </div>
                                 <div>
                                     <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Version</label>
-                                    <input
+                                    <Input
                                         value={form.version}
                                         onChange={(event) => updateForm('version', event.target.value)}
                                         className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
@@ -625,7 +632,7 @@ export default function CreatorModulesPage() {
                                 </div>
                                 <div>
                                     <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Category</label>
-                                    <input
+                                    <Input
                                         value={form.category}
                                         onChange={(event) => updateForm('category', event.target.value)}
                                         className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
@@ -633,7 +640,7 @@ export default function CreatorModulesPage() {
                                 </div>
                                 <div className="lg:col-span-2">
                                     <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Description</label>
-                                    <textarea
+                                    <Textarea
                                         value={form.description}
                                         onChange={(event) => updateForm('description', event.target.value)}
                                         required
@@ -642,7 +649,7 @@ export default function CreatorModulesPage() {
                                 </div>
                                 <div className="lg:col-span-2">
                                     <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Upload Source</label>
-                                    <input
+                                    <Input
                                         type="file"
                                         accept=".lua,.luau,.txt"
                                         onChange={handleFileUpload}
@@ -700,19 +707,17 @@ export default function CreatorModulesPage() {
                                     </div>
                                     <div className="mt-4 space-y-3">
                                         <label className="flex items-start gap-3 text-xs leading-relaxed text-slate-300">
-                                            <input
-                                                type="checkbox"
+                                            <Checkbox
                                                 checked={acceptedCreatorTerms}
-                                                onChange={(event) => setAcceptedCreatorTerms(event.target.checked)}
+                                                onCheckedChange={(checked) => setAcceptedCreatorTerms(checked === true)}
                                                 className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 accent-sky-500"
                                             />
                                             <span>I agree to the <Link href="/terms/modules/create" className="text-sky-300 hover:text-sky-200">module creator terms</Link>.</span>
                                         </label>
                                         <label className="flex items-start gap-3 text-xs leading-relaxed text-slate-300">
-                                            <input
-                                                type="checkbox"
+                                            <Checkbox
                                                 checked={acceptedUseTerms}
-                                                onChange={(event) => setAcceptedUseTerms(event.target.checked)}
+                                                onCheckedChange={(checked) => setAcceptedUseTerms(checked === true)}
                                                 className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 accent-sky-500"
                                             />
                                             <span>I understand the <Link href="/terms/modules/use" className="text-sky-300 hover:text-sky-200">module use and UGC terms</Link>.</span>

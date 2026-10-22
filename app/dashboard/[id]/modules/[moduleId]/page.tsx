@@ -1,5 +1,13 @@
 'use client';
 
+import { Checkbox } from '@/components/ui/checkbox';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+
+
+import { Select } from '@/components/ui/select';
+
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -274,7 +282,7 @@ function DynamicOptionSelect({
 
     return (
         <div ref={containerRef} className="relative">
-            <button
+            <Button variant="unstyled" size="unstyled"
                 type="button"
                 onClick={() => setOpen((current) => !current)}
                 className="flex h-12 w-full items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 px-4 text-left text-sm text-white outline-none transition-colors hover:border-slate-700 focus:border-sky-500"
@@ -297,12 +305,12 @@ function DynamicOptionSelect({
                     )}
                 </span>
                 <span className="shrink-0 text-slate-500">{open ? '^' : 'v'}</span>
-            </button>
+            </Button>
 
             {open && (
                 <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-800 bg-slate-950 shadow-2xl shadow-slate-950/60">
                     <div className="border-b border-slate-800 p-2">
-                        <input
+                        <Input
                             value={query}
                             autoFocus
                             onChange={(event) => setQuery(event.target.value)}
@@ -322,7 +330,7 @@ function DynamicOptionSelect({
                         {!loading && options.map((option) => {
                             const isSelected = selectedValue && selectedValue === option.value;
                             return (
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     key={`${option.value}-${option.description || ''}`}
                                     type="button"
                                     onClick={() => selectOption(option)}
@@ -339,7 +347,7 @@ function DynamicOptionSelect({
                                         <span className="font-semibold">{option.label}</span>
                                         {option.description && <span className="text-slate-500"> - {option.description}</span>}
                                     </span>
-                                </button>
+                                </Button>
                             );
                         })}
                     </div>
@@ -497,10 +505,9 @@ export default function DashboardModuleConfigPage() {
         if (field.type === 'bool') {
             return (
                 <label className="inline-flex items-center gap-3 text-sm font-medium text-slate-200">
-                    <input
-                        type="checkbox"
+                    <Checkbox
                         checked={value === true}
-                        onChange={(event) => onChange(event.target.checked)}
+                        onCheckedChange={(checked) => onChange(checked === true)}
                         className="h-4 w-4 rounded border-slate-700 bg-slate-950 accent-sky-500"
                     />
                     Enabled
@@ -510,15 +517,13 @@ export default function DashboardModuleConfigPage() {
 
         if (field.type === 'dropdown') {
             return (
-                <select
+                <Select
                     value={String(value ?? field.defaultValue ?? '')}
-                    onChange={(event) => onChange(event.target.value)}
+                    onValueChange={(nextValue) => onChange(nextValue)}
                     className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
-                >
-                    {field.options.map((option) => (
-                        <option key={option} value={option}>{option}</option>
-                    ))}
-                </select>
+                    aria-label={field.label}
+                    options={field.options.map(option => ({ value: option, label: option }))}
+                />
             );
         }
 
@@ -530,11 +535,10 @@ export default function DashboardModuleConfigPage() {
                         const checked = selected.includes(option);
                         return (
                             <label key={option} className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200">
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     checked={checked}
-                                    onChange={(event) => {
-                                        const next = event.target.checked
+                                    onCheckedChange={(checked) => {
+                                        const next = checked === true
                                             ? Array.from(new Set([...selected, option]))
                                             : selected.filter((item) => item !== option);
                                         onChange(next);
@@ -552,13 +556,13 @@ export default function DashboardModuleConfigPage() {
         if (field.type === 'color') {
             return (
                 <div className="flex items-center gap-3">
-                    <input
+                    <Input
                         type="color"
                         value={String(value || field.defaultValue || '#38bdf8')}
                         onChange={(event) => onChange(event.target.value)}
                         className="h-11 w-14 rounded-lg border border-slate-700 bg-slate-950 p-1"
                     />
-                    <input
+                    <Input
                         value={String(value || field.defaultValue || '#38bdf8')}
                         onChange={(event) => onChange(event.target.value)}
                         className="w-32 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 font-mono text-sm text-white outline-none transition-colors focus:border-sky-500"
@@ -569,7 +573,7 @@ export default function DashboardModuleConfigPage() {
 
         if (field.type === 'integer') {
             return (
-                <input
+                <Input
                     type="number"
                     step="1"
                     value={Number(value ?? field.defaultValue ?? 0)}
@@ -596,7 +600,7 @@ export default function DashboardModuleConfigPage() {
         }
 
         return (
-            <input
+            <Input
                 type="text"
                 value={String(value ?? field.defaultValue ?? '')}
                 onChange={(event) => onChange(event.target.value)}
@@ -733,13 +737,13 @@ export default function DashboardModuleConfigPage() {
                         <h2 className="text-lg font-bold text-white">Module Config</h2>
                         <p className="mt-1 text-sm text-slate-500">These values are saved per Discord server and are available in Roblox as <code className="font-mono text-slate-300">context.Settings</code>.</p>
                     </div>
-                    <button
+                    <Button variant="unstyled" size="unstyled"
                         onClick={saveSettings}
                         disabled={saving || savedFields.length === 0}
                         className="rounded-xl bg-sky-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
                     >
                         {saving ? 'Saving' : savedFields.length === 0 ? 'No Saved Config' : module.installed ? 'Save Config' : 'Install And Save'}
-                    </button>
+                    </Button>
                 </div>
 
                 {fields.length === 0 ? (
@@ -782,14 +786,14 @@ export default function DashboardModuleConfigPage() {
                                         </div>
 
                                         {field.live && (
-                                            <button
+                                            <Button variant="unstyled" size="unstyled"
                                                 type="button"
                                                 onClick={() => sendLiveSetting(field)}
                                                 disabled={liveSending === field.key}
                                                 className="rounded-xl bg-emerald-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-emerald-500 disabled:opacity-50 sm:min-w-28"
                                             >
                                                 {liveSending === field.key ? 'Sending' : sendButtonText}
-                                            </button>
+                                            </Button>
                                         )}
                                     </div>
                                 </div>

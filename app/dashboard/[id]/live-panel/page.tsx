@@ -1,5 +1,12 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+
+
+import { Select } from '@/components/ui/select';
+
 import { Ban as LucideBan, Clock3 as LucideClock3, FileText as LucideFileText, LogOut as LucideLogOut, Megaphone as LucideMegaphone, Play as LucidePlay, Power as LucidePower, RefreshCw as LucideRefreshCw, RotateCcw as LucideRotateCcw, Rss as LucideRss, X as LucideX } from 'lucide-react';
 
 import Link from 'next/link';
@@ -703,7 +710,7 @@ function UserAvatarButton({ user, onClick, onContextMenu, compact = false }: { u
     const sizeClass = compact ? 'h-8 w-8' : 'h-10 w-10';
 
     return (
-        <button
+        <Button variant="unstyled" size="unstyled"
             type="button"
             onClick={onClick}
             onContextMenu={onContextMenu}
@@ -727,7 +734,7 @@ function UserAvatarButton({ user, onClick, onContextMenu, compact = false }: { u
                     @{user.username}
                 </span>
             </span>
-        </button>
+        </Button>
     );
 }
 
@@ -754,13 +761,13 @@ function ClickableUserText({ value, onOpen }: { value: string; onOpen: () => voi
     }
 
     return (
-        <button
+        <Button variant="unstyled" size="unstyled"
             type="button"
             onClick={onOpen}
             className="font-semibold text-sky-300 underline decoration-sky-500/30 underline-offset-4 transition-colors hover:text-sky-100"
         >
             {value}
-        </button>
+        </Button>
     );
 }
 
@@ -2336,17 +2343,17 @@ export default function LivePanelPage() {
                         </div>
                         <div className={`mt-4 grid gap-3 ${canRunCommands && canAnnounce ? 'grid-cols-2' : 'grid-cols-1'}`}>
                             {canRunCommands && (
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     type="button"
                                     onClick={() => setPanelModal('command')}
                                     className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white transition-all hover:border-sky-400/50 hover:bg-sky-500/15"
                                 >
                                     <CommandIcon />
                                     Run Command
-                                </button>
+                                </Button>
                             )}
                             {canAnnounce && (
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     type="button"
                                     onClick={() => {
                                         setAnnouncementTargetType('');
@@ -2357,7 +2364,7 @@ export default function LivePanelPage() {
                                 >
                                     <AnnounceIcon />
                                     Announce
-                                </button>
+                                </Button>
                             )}
                             {!canRunCommands && !canAnnounce && (
                                 <div className="rounded-xl border border-slate-800 bg-black/20 px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -2375,7 +2382,7 @@ export default function LivePanelPage() {
                                     <h2 className="text-sm font-black uppercase tracking-widest">Unmoderated Reports</h2>
                                     <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-black text-amber-300">{pendingReports.length}</span>
                                 </div>
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     type="button"
                                     onClick={() => {
                                         clearSelectedProfile();
@@ -2384,7 +2391,7 @@ export default function LivePanelPage() {
                                     className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-200 transition-colors hover:border-amber-300/50 hover:bg-amber-500/20"
                                 >
                                     Manage
-                                </button>
+                                </Button>
                             </div>
 
                             {pendingReports.length === 0 ? (
@@ -2392,7 +2399,7 @@ export default function LivePanelPage() {
                             ) : (
                                 <div className="mt-3 space-y-2">
                                     {pendingReports.slice(0, 3).map((report) => (
-                                        <button
+                                        <Button variant="unstyled" size="unstyled"
                                             key={report.id}
                                             type="button"
                                             onClick={() => {
@@ -2409,10 +2416,10 @@ export default function LivePanelPage() {
                                             </div>
                                             <p className="mt-1 truncate text-xs font-medium text-slate-400">{report.reason}</p>
                                             <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-wider text-slate-600">By {report.reporter_roblox_username || report.reporter_discord_id || 'Unknown'}</p>
-                                        </button>
+                                        </Button>
                                     ))}
                                     {pendingReports.length > 3 && (
-                                        <button
+                                        <Button variant="unstyled" size="unstyled"
                                             type="button"
                                             onClick={() => {
                                                 clearSelectedProfile();
@@ -2422,7 +2429,7 @@ export default function LivePanelPage() {
                                             className="block w-full pt-1 text-right text-[10px] font-black uppercase tracking-widest text-amber-300 transition-colors hover:text-amber-100"
                                         >
                                             View all {pendingReports.length} reports
-                                        </button>
+                                        </Button>
                                     )}
                                 </div>
                             )}
@@ -2435,7 +2442,7 @@ export default function LivePanelPage() {
                                 <h2 className="text-sm font-black uppercase tracking-widest text-white">Live Servers</h2>
                                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Update: 7s</span>
                             </div>
-                            <input
+                            <Input
                                 value={serverSearch}
                                 onChange={(event) => setServerSearch(event.target.value)}
                                 placeholder="Search servers, users, user IDs"
@@ -2456,13 +2463,13 @@ export default function LivePanelPage() {
                                             <div key={server.id} onContextMenu={(event) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, jobId: server.id, user: null }); }} className="m-3 rounded-2xl border border-slate-700/70 bg-slate-950/45 p-4 shadow-inner shadow-black/20 transition-all hover:border-sky-400/40 hover:bg-sky-500/5">
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="min-w-0">
-                                                        <button
+                                                        <Button variant="unstyled" size="unstyled"
                                                             type="button"
                                                             onClick={() => setServerSearch(server.id)}
                                                             className="block max-w-full truncate text-left font-mono text-xs font-black uppercase tracking-wider text-white hover:text-sky-200"
                                                         >
                                                             {formatServerId(server.id)}
-                                                        </button>
+                                                        </Button>
                                                         <p className="mt-1 text-[11px] font-medium text-slate-500">
                                                             {server.visiblePlayerCount} player{server.visiblePlayerCount === 1 ? '' : 's'} active, last pulse {formatTime(server.updated_at)}
                                                         </p>
@@ -2477,17 +2484,17 @@ export default function LivePanelPage() {
                                                                 <ActionTooltip label="Join Server" />
                                                             </a>
                                                         ) : (
-                                                            <button
+                                                            <Button variant="unstyled" size="unstyled"
                                                                 type="button"
                                                                 disabled
                                                                 className="group relative flex h-10 w-10 shrink-0 cursor-not-allowed items-center justify-center rounded-xl border border-slate-800 bg-slate-950 text-slate-600"
                                                             >
                                                                 <PlayIcon />
                                                                 <ActionTooltip label="Set Place ID to Join" />
-                                                            </button>
+                                                            </Button>
                                                         )}
                                                         {canRestartServers && (
-                                                            <button
+                                                            <Button variant="unstyled" size="unstyled"
                                                                 type="button"
                                                                 aria-label={`Restart server ${formatServerId(server.id)}`}
                                                                 onClick={() => sendServerLifecycleCommand(server.id, 'UPDATE')}
@@ -2496,10 +2503,10 @@ export default function LivePanelPage() {
                                                             >
                                                                 <ServerRestartIcon />
                                                                 <ActionTooltip label="Restart Server" />
-                                                            </button>
+                                                            </Button>
                                                         )}
                                                         {canShutdownServers && (
-                                                            <button
+                                                            <Button variant="unstyled" size="unstyled"
                                                                 type="button"
                                                                 aria-label={`Shut down server ${formatServerId(server.id)}`}
                                                                 onClick={() => sendServerLifecycleCommand(server.id, 'SHUTDOWN')}
@@ -2508,7 +2515,7 @@ export default function LivePanelPage() {
                                                             >
                                                                 <ServerShutdownIcon />
                                                                 <ActionTooltip label="Shut Down Server" />
-                                                            </button>
+                                                            </Button>
                                                         )}
                                                     </div>
                                                 </div>
@@ -2547,13 +2554,13 @@ export default function LivePanelPage() {
                                     <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">User Profile</p>
                                     <h2 className="mt-1 text-xl font-black text-white">Live Panel Profile</h2>
                                 </div>
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     type="button"
                                     onClick={clearSelectedProfile}
                                     className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-500 transition-colors hover:text-white"
                                 >
                                     <CloseIcon />
-                                </button>
+                                </Button>
                             </div>
 
                             <div className="space-y-4">
@@ -2626,7 +2633,7 @@ export default function LivePanelPage() {
                                             {quickActions.map((action) => {
                                                 const disabled = (action.command === 'KICK' || action.command === 'REFRESH' || action.command === 'RESET') && panelUser.presence !== 'live';
                                                 return (
-                                                    <button
+                                                    <Button variant="unstyled" size="unstyled"
                                                         key={action.command}
                                                         type="button"
                                                         disabled={disabled || actionLoading === action.command}
@@ -2635,7 +2642,7 @@ export default function LivePanelPage() {
                                                     >
                                                         {action.icon}
                                                         <ActionTooltip label={action.label} />
-                                                    </button>
+                                                    </Button>
                                                 );
                                             })}
                                         </div>
@@ -2645,32 +2652,18 @@ export default function LivePanelPage() {
                                 <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
                                     <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Misc / Module Command</p>
                                     <div className="space-y-3">
-                                        <select
+                                        <Select
                                             value={profileCommand}
-                                            onChange={(event) => {
-                                                setProfileCommand(event.target.value);
+                                            onValueChange={(nextValue) => {
+                                                setProfileCommand(nextValue);
                                                 setProfileCommandValue('');
                                             }}
                                             className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm font-bold text-white outline-none focus:border-sky-500/60"
-                                        >
-                                            <option value="">Choose a command</option>
-                                            {profileCommandOptions.length > 0 && (
-                                                <optgroup label="Misc commands">
-                                                    {profileCommandOptions.map((command) => (
-                                                        <option key={command.id} value={command.id}>{command.label}</option>
-                                                    ))}
-                                                </optgroup>
-                                            )}
-                                            {moduleLiveActions.length > 0 && (
-                                                <optgroup label="Module commands">
-                                                    {moduleLiveActions.map((action) => (
-                                                        <option key={action.id} value={action.id}>{action.moduleName} - {action.label}</option>
-                                                    ))}
-                                                </optgroup>
-                                            )}
-                                        </select>
+                                            aria-label="Profile command"
+                                            options={[{ value: '', label: 'Choose a command' }, ...profileCommandOptions.map(command => ({ value: command.id, label: command.label, group: 'Misc commands' })), ...moduleLiveActions.map(action => ({ value: action.id, label: `${action.moduleName} - ${action.label}`, group: 'Module commands' }))]}
+                                        />
                                         {profileCommandNeedsValue && (
-                                            <input
+                                            <Input
                                                 value={profileCommandValue}
                                                 onChange={(event) => setProfileCommandValue(event.target.value)}
                                                 placeholder={profileCommandDefinition?.id === 'SET_CHAR'
@@ -2683,20 +2676,20 @@ export default function LivePanelPage() {
                                                 className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60"
                                             />
                                         )}
-                                        <button
+                                        <Button variant="unstyled" size="unstyled"
                                             type="button"
                                             disabled={!profileCommand || actionLoading === profileCommand}
                                             onClick={submitProfileCommand}
                                             className="w-full rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-all hover:bg-sky-500/20 disabled:opacity-50"
                                         >
                                             {profileCommand && actionLoading === profileCommand ? 'Running...' : 'Run On User'}
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
 
                                 <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
                                     <h3 className="text-sm font-black uppercase tracking-widest text-white">Staff Note</h3>
-                                    <textarea
+                                    <Textarea
                                         value={noteText}
                                         onChange={(event) => setNoteText(event.target.value)}
                                         rows={3}
@@ -2704,14 +2697,14 @@ export default function LivePanelPage() {
                                         className="mt-3 w-full resize-none rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60"
                                     />
                                     <div className="mt-3 flex justify-end">
-                                        <button
+                                        <Button variant="unstyled" size="unstyled"
                                             type="button"
                                             disabled={actionLoading === 'note'}
                                             onClick={() => saveUserNote('note')}
                                             className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-sky-200 transition-all hover:bg-sky-500/20 disabled:opacity-50"
                                         >
                                             {actionLoading === 'note' ? 'Saving...' : 'Save Note'}
-                                        </button>
+                                        </Button>
                                     </div>
                                     <div className="mt-4 space-y-2">
                                         {staffNotesLoading ? (
@@ -2783,14 +2776,14 @@ export default function LivePanelPage() {
                                     <h2 className="mt-1 truncate text-xl font-black text-white">{runtimeLogTarget.user ? `${runtimeLogTarget.user.username}'s client logs` : `Server ${formatServerId(runtimeLogTarget.jobId)} logs`}</h2>
                                     <p className="mt-1 text-xs font-medium text-slate-500">Refreshing every 7 seconds. Press Esc to return to live commands.</p>
                                 </div>
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     type="button"
                                     onClick={() => { setRuntimeLogTarget(null); setRightPaneMode('lookup'); }}
                                     className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-500 transition-colors hover:text-white"
                                     aria-label="Return to live commands"
                                 >
                                     <CloseIcon />
-                                </button>
+                                </Button>
                             </div>
                             <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto bg-black/35 p-4 font-mono text-xs leading-6">
                                 {runtimeLogsLoading && runtimeLogs.length === 0 ? (
@@ -2813,17 +2806,17 @@ export default function LivePanelPage() {
                                         <h2 className="mt-1 text-xl font-black text-white">Live Reports</h2>
                                         <p className="mt-1 text-xs font-medium text-slate-500">Review player reports without leaving live operations.</p>
                                     </div>
-                                    <button
+                                    <Button variant="unstyled" size="unstyled"
                                         type="button"
                                         onClick={() => setRightPaneMode('lookup')}
                                         className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-300 transition-colors hover:border-sky-400/50 hover:text-white"
                                     >
                                         Lookup
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 <div className="mt-4">
-                                    <input
+                                    <Input
                                         value={reportSearch}
                                         onChange={(event) => setReportSearch(event.target.value)}
                                         placeholder="Search reports"
@@ -2853,7 +2846,7 @@ export default function LivePanelPage() {
                                                 const status = getReportStatus(report);
                                                 const selected = selectedReportId === report.id;
                                                 return (
-                                                    <button
+                                                    <Button variant="unstyled" size="unstyled"
                                                         key={report.id}
                                                         type="button"
                                                         onClick={() => setSelectedReportId(report.id)}
@@ -2873,7 +2866,7 @@ export default function LivePanelPage() {
                                                             <span className="min-w-0 truncate">By {getReportReporterLabel(report)}</span>
                                                             <span className="shrink-0">{formatTime(report.created_at)}</span>
                                                         </div>
-                                                    </button>
+                                                    </Button>
                                                 );
                                             })}
                                         </div>
@@ -2920,14 +2913,14 @@ export default function LivePanelPage() {
                                             <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
                                                 <div className="mb-3 flex items-center justify-between gap-3">
                                                     <h3 className="text-sm font-black uppercase tracking-widest text-white">Report Evidence</h3>
-                                                    <button
+                                                    <Button variant="unstyled" size="unstyled"
                                                         type="button"
                                                         onClick={openReportTargetProfile}
                                                         disabled={!selectedReportTargetUsername}
                                                         className="rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                                                     >
                                                         Target Profile
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                                 <p className="whitespace-pre-wrap rounded-xl border border-slate-800 bg-black/20 p-4 text-sm leading-6 text-slate-300">{selectedReport.reason || 'No reason provided.'}</p>
                                             </div>
@@ -2968,7 +2961,7 @@ export default function LivePanelPage() {
 
                                             <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
                                                 <h3 className="text-sm font-black uppercase tracking-widest text-white">Moderator Note</h3>
-                                                <textarea
+                                                <Textarea
                                                     value={reportModeratorNote}
                                                     onChange={(event) => setReportModeratorNote(event.target.value)}
                                                     rows={3}
@@ -2979,7 +2972,7 @@ export default function LivePanelPage() {
                                                     {(['KICK', 'SOFTBAN', 'BAN'] as const)
                                                         .filter((command) => canUseDashboardCommand(perms, command))
                                                         .map((command) => (
-                                                            <button
+                                                            <Button variant="unstyled" size="unstyled"
                                                                 key={command}
                                                                 type="button"
                                                                 disabled={reportActionLoading !== null}
@@ -2994,37 +2987,37 @@ export default function LivePanelPage() {
                                                                 {reportActionLoading === command
                                                                     ? 'Running...'
                                                                     : `${command === 'SOFTBAN' ? 'Temp Ban' : command.charAt(0) + command.slice(1).toLowerCase()} & Resolve`}
-                                                            </button>
+                                                            </Button>
                                                         ))}
                                                     {selectedReportStatus !== 'RESOLVED' && (
-                                                        <button
+                                                        <Button variant="unstyled" size="unstyled"
                                                             type="button"
                                                             disabled={reportActionLoading !== null}
                                                             onClick={() => updateSelectedReportStatus('RESOLVED')}
                                                             className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                                                         >
                                                             {reportActionLoading === 'RESOLVED' ? 'Saving...' : 'Resolve'}
-                                                        </button>
+                                                        </Button>
                                                     )}
                                                     {selectedReportStatus !== 'DISMISSED' && (
-                                                        <button
+                                                        <Button variant="unstyled" size="unstyled"
                                                             type="button"
                                                             disabled={reportActionLoading !== null}
                                                             onClick={() => updateSelectedReportStatus('DISMISSED')}
                                                             className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-colors hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                                                         >
                                                             {reportActionLoading === 'DISMISSED' ? 'Saving...' : 'Dismiss'}
-                                                        </button>
+                                                        </Button>
                                                     )}
                                                     {selectedReportStatus !== 'PENDING' && (
-                                                        <button
+                                                        <Button variant="unstyled" size="unstyled"
                                                             type="button"
                                                             disabled={reportActionLoading !== null}
                                                             onClick={() => updateSelectedReportStatus('PENDING')}
                                                             className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                                                         >
                                                             {reportActionLoading === 'PENDING' ? 'Saving...' : 'Reopen'}
-                                                        </button>
+                                                        </Button>
                                                     )}
                                                 </div>
                                             </div>
@@ -3077,7 +3070,7 @@ export default function LivePanelPage() {
                             </h2>
                         </div>
                         <div className="relative">
-                            <input
+                            <Input
                                 value={profileSearch}
                                 onChange={(event) => setProfileSearch(event.target.value)}
                                 onKeyDown={(event) => {
@@ -3092,7 +3085,7 @@ export default function LivePanelPage() {
                             {profileSearch.trim() && suggestions.length > 0 && !selectedProfileUser && (
                                 <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-slate-800 bg-slate-950 shadow-2xl shadow-black/40">
                                     {suggestions.map(({ user, reason }) => (
-                                        <button
+                                        <Button variant="unstyled" size="unstyled"
                                             type="button"
                                             key={getUserKey(user)}
                                             onClick={() => selectProfileUser(user)}
@@ -3106,7 +3099,7 @@ export default function LivePanelPage() {
                                             <span className="hidden shrink-0 rounded-lg border border-slate-800 bg-black/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-sky-300 sm:block">
                                                 {reason}
                                             </span>
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                             )}
@@ -3115,7 +3108,7 @@ export default function LivePanelPage() {
                         <h2 className="mb-2 mt-4 text-[11px] font-black uppercase tracking-[0.2em] text-slate-300">
                             Live Logs
                         </h2>
-                        <input
+                        <Input
                             value={logSearch}
                             onChange={(event) => setLogSearch(event.target.value)}
                             placeholder="Search logs by server, user, action, or moderator"
@@ -3164,20 +3157,20 @@ export default function LivePanelPage() {
                         <h3 className="text-xl font-black text-white">{confirmAction.title}</h3>
                         <p className="mt-3 text-sm leading-6 text-slate-400">{confirmAction.body}</p>
                         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 type="button"
                                 onClick={() => setConfirmAction(null)}
                                 className="rounded-xl border border-slate-800 px-4 py-3 text-sm font-bold text-slate-300 transition-colors hover:text-white"
                             >
                                 Cancel
-                            </button>
-                            <button
+                            </Button>
+                            <Button variant="unstyled" size="unstyled"
                                 type="button"
                                 onClick={submitConfirmAction}
                                 className="rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-red-500"
                             >
                                 Confirm
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -3193,14 +3186,14 @@ export default function LivePanelPage() {
                     {contextMenu.user ? (
                         <>
                             <p className="truncate px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500">@{contextMenu.user.username}</p>
-                            {canViewRuntimeLogs && <button type="button" onClick={() => openRuntimeLogs(contextMenu.jobId, contextMenu.user)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-sky-200 hover:bg-sky-500/10">View user&apos;s client logs</button>}
-                            <button type="button" onClick={() => openPlayerMessage(contextMenu.user!)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-200 hover:bg-slate-800">Message</button>
-                            {canUseDashboardCommand(perms, 'KICK') && <button type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('KICK', contextMenu.user!); }} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-amber-300 hover:bg-amber-500/10">Kick</button>}
-                            {canUseDashboardCommand(perms, 'BAN') && <button type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('BAN', contextMenu.user!); }} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-red-300 hover:bg-red-500/10">Ban</button>}
+                            {canViewRuntimeLogs && <Button variant="unstyled" size="unstyled" type="button" onClick={() => openRuntimeLogs(contextMenu.jobId, contextMenu.user)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-sky-200 hover:bg-sky-500/10">View user&apos;s client logs</Button>}
+                            <Button variant="unstyled" size="unstyled" type="button" onClick={() => openPlayerMessage(contextMenu.user!)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-200 hover:bg-slate-800">Message</Button>
+                            {canUseDashboardCommand(perms, 'KICK') && <Button variant="unstyled" size="unstyled" type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('KICK', contextMenu.user!); }} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-amber-300 hover:bg-amber-500/10">Kick</Button>}
+                            {canUseDashboardCommand(perms, 'BAN') && <Button variant="unstyled" size="unstyled" type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('BAN', contextMenu.user!); }} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-red-300 hover:bg-red-500/10">Ban</Button>}
                         </>
                     ) : (
                         canViewRuntimeLogs
-                            ? <button type="button" onClick={() => openRuntimeLogs(contextMenu.jobId)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-sky-200 hover:bg-sky-500/10">View server logs</button>
+                            ? <Button variant="unstyled" size="unstyled" type="button" onClick={() => openRuntimeLogs(contextMenu.jobId)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-sky-200 hover:bg-sky-500/10">View server logs</Button>
                             : <p className="px-3 py-2.5 text-xs font-semibold text-slate-500">No console log access</p>
                     )}
                 </div>
@@ -3214,13 +3207,13 @@ export default function LivePanelPage() {
                                 <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">{panelModal === 'announce' ? 'Announcement' : 'Command Runner'}</p>
                                 <h3 className="mt-1 text-xl font-black text-white">{panelModal === 'announce' ? 'Announce to Live Servers' : 'Run Live Command'}</h3>
                             </div>
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 type="button"
                                 onClick={() => setPanelModal(null)}
                                 className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-500 transition-colors hover:text-white"
                             >
                                 <CloseIcon />
-                            </button>
+                            </Button>
                         </div>
                         <div className="space-y-4 px-6 py-6">
                             {panelModal === 'announce' ? (
@@ -3228,7 +3221,7 @@ export default function LivePanelPage() {
                                     <div className="space-y-3">
                                         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Target</p>
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            <button
+                                            <Button variant="unstyled" size="unstyled"
                                                 type="button"
                                                 onClick={() => {
                                                     setAnnouncementTargetType('global');
@@ -3238,20 +3231,20 @@ export default function LivePanelPage() {
                                             >
                                                 <span className="block text-sm font-black">Global</span>
                                                 <span className="mt-1 block text-xs font-medium text-slate-500">Everybody playing the game, every server.</span>
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button variant="unstyled" size="unstyled"
                                                 type="button"
                                                 onClick={() => setAnnouncementTargetType('user')}
                                                 className={`rounded-xl border px-4 py-3 text-left transition-all ${announcementTargetType === 'user' ? 'border-sky-400/60 bg-sky-500/10 text-white' : 'border-slate-800 bg-slate-950/60 text-slate-300 hover:border-slate-700'}`}
                                             >
                                                 <span className="block text-sm font-black">User</span>
                                                 <span className="mt-1 block text-xs font-medium text-slate-500">One live Roblox player.</span>
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
                                     {announcementTargetType === 'user' && (
                                         <div className="space-y-3">
-                                            <input
+                                            <Input
                                                 value={announcementUser}
                                                 onChange={(event) => setAnnouncementUser(event.target.value)}
                                                 placeholder="Search or type a live Roblox username"
@@ -3260,7 +3253,7 @@ export default function LivePanelPage() {
                                             {announcementUserSuggestions.length > 0 && (
                                                 <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/70 p-2">
                                                     {announcementUserSuggestions.map((user) => (
-                                                        <button
+                                                        <Button variant="unstyled" size="unstyled"
                                                             key={getUserKey(user)}
                                                             type="button"
                                                             onClick={() => setAnnouncementUser(user.username)}
@@ -3271,27 +3264,27 @@ export default function LivePanelPage() {
                                                                 <span className="mt-0.5 block truncate text-xs font-medium text-slate-500">@{user.username}</span>
                                                             </span>
                                                             <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">{formatServerId(user.serverId || '')}</span>
-                                                        </button>
+                                                        </Button>
                                                     ))}
                                                 </div>
                                             )}
                                         </div>
                                     )}
-                                    <textarea
+                                    <Textarea
                                         value={announcement}
                                         onChange={(event) => setAnnouncement(event.target.value)}
                                         rows={5}
                                         placeholder="Message to send"
                                         className="w-full resize-none rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60"
                                     />
-                                    <button
+                                    <Button variant="unstyled" size="unstyled"
                                         type="button"
                                         onClick={submitAnnouncement}
                                         disabled={actionLoading === 'BROADCAST'}
                                         className="w-full rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold uppercase tracking-widest text-white transition-all hover:bg-sky-500 disabled:opacity-50"
                                     >
                                         {actionLoading === 'BROADCAST' ? 'Sending...' : 'Send Announcement'}
-                                    </button>
+                                    </Button>
                                 </>
                             ) : (
                                 <>
@@ -3300,7 +3293,7 @@ export default function LivePanelPage() {
                                             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-sky-300">
                                                 <CommandIcon />
                                             </span>
-                                            <input
+                                            <Input
                                                 autoFocus
                                                 value={commandBarValue}
                                                 onChange={(event) => setCommandBarValue(event.target.value)}
@@ -3324,7 +3317,7 @@ export default function LivePanelPage() {
                                         <div className="max-h-72 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/50">
                                             <div className="custom-scrollbar max-h-72 overflow-y-auto p-2">
                                                 {commandBarSuggestions.map((suggestion, index) => (
-                                                    <button
+                                                    <Button variant="unstyled" size="unstyled"
                                                         key={`${suggestion.kind}-${suggestion.value}-${index}`}
                                                         type="button"
                                                         onClick={() => setCommandBarValue(suggestion.value)}
@@ -3340,19 +3333,19 @@ export default function LivePanelPage() {
                                                         <span className="hidden shrink-0 rounded-lg border border-slate-800 bg-black/30 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400 sm:inline-flex">
                                                             {suggestion.meta}
                                                         </span>
-                                                    </button>
+                                                    </Button>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
-                                    <button
+                                    <Button variant="unstyled" size="unstyled"
                                         type="button"
                                         onClick={submitManualCommand}
                                         disabled={availableCommands.length === 0 || (commandBarParsed.command ? actionLoading === commandBarParsed.command.id : false)}
                                         className="w-full rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold uppercase tracking-widest text-white transition-all hover:bg-sky-500 disabled:opacity-50"
                                     >
                                         {commandBarParsed.command && actionLoading === commandBarParsed.command.id ? 'Sending...' : 'Run Command'}
-                                    </button>
+                                    </Button>
                                 </>
                             )}
                         </div>

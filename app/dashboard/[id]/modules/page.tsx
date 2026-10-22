@@ -1,5 +1,10 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -247,31 +252,31 @@ export default function DashboardModulesPage() {
                         </p>
                     </div>
                     {customUploadTarget && (
-                        <button
+                        <Button variant="unstyled" size="unstyled"
                             type="button"
                             onClick={() => startCustomUpload()}
                             className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
                         >
                             New Upload
-                        </button>
+                        </Button>
                     )}
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
                     <div className="space-y-3">
-                        <input
+                        <Input
                             value={customName}
                             onChange={(event) => setCustomName(event.target.value)}
                             placeholder="Module name"
                             className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
                         />
-                        <input
+                        <Input
                             value={customVersion}
                             onChange={(event) => setCustomVersion(event.target.value)}
                             placeholder="Version"
                             className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
                         />
-                        <textarea
+                        <Textarea
                             value={customDescription}
                             onChange={(event) => setCustomDescription(event.target.value)}
                             placeholder="Description"
@@ -285,21 +290,21 @@ export default function DashboardModulesPage() {
                                 Re-uploading {customUploadTarget.name}. Paste the replacement source below.
                             </div>
                         )}
-                        <textarea
+                        <Textarea
                             value={customSourceCode}
                             onChange={(event) => setCustomSourceCode(event.target.value)}
                             placeholder="Paste Luau module source"
                             rows={10}
                             className="custom-scrollbar w-full resize-y rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 font-mono text-xs text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
                         />
-                        <button
+                        <Button variant="unstyled" size="unstyled"
                             type="button"
                             onClick={submitCustomModule}
                             disabled={uploadingCustom || !customName.trim() || !customSourceCode.trim()}
                             className="rounded-xl bg-sky-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
                         >
                             {uploadingCustom ? 'Uploading' : customUploadTarget ? 'Re-upload Module' : 'Upload Module'}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </section>
@@ -374,31 +379,31 @@ export default function DashboardModulesPage() {
                                 </div>
 
                                 <div className="mt-5 flex flex-wrap items-center gap-2 md:justify-end">
-                                    <button
+                                    <Button variant="unstyled" size="unstyled"
                                         type="button"
                                         onClick={() => setSelectedModuleId(addon.id)}
                                         className="rounded-xl border border-sky-500/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10"
                                     >
                                         Open
-                                    </button>
+                                    </Button>
                                     {!addon.installed ? (
-                                        <button
+                                        <Button variant="unstyled" size="unstyled"
                                             onClick={() => sendAction(addon, 'install')}
                                             disabled={busy}
                                             className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
                                         >
                                             {busy ? 'Saving' : 'Install'}
-                                        </button>
+                                        </Button>
                                     ) : (
                                         <>
                                             {addon.isCustom && (
-                                                <button
+                                                <Button variant="unstyled" size="unstyled"
                                                     onClick={() => startCustomUpload(addon)}
                                                     disabled={busy}
                                                     className="rounded-xl border border-amber-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-amber-200 transition-colors hover:bg-amber-500/10 disabled:opacity-50"
                                                 >
                                                     Re-upload
-                                                </button>
+                                                </Button>
                                             )}
                                             <Link
                                                 href={`/dashboard/${serverId}/modules/${addon.id}`}
@@ -406,20 +411,20 @@ export default function DashboardModulesPage() {
                                             >
                                                 Configure
                                             </Link>
-                                            <button
+                                            <Button variant="unstyled" size="unstyled"
                                                 onClick={() => sendAction(addon, addon.enabled ? 'disable' : 'enable')}
                                                 disabled={busy || (addon.isCustom && addon.status === 'NEEDS_REUPLOAD')}
                                                 className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
                                             >
                                                 {addon.enabled ? 'Disable' : 'Enable'}
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button variant="unstyled" size="unstyled"
                                                 onClick={() => sendAction(addon, 'remove')}
                                                 disabled={busy}
                                                 className="rounded-xl border border-red-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
                                             >
                                                 Remove
-                                            </button>
+                                            </Button>
                                         </>
                                     )}
                                 </div>
@@ -483,14 +488,14 @@ export default function DashboardModulesPage() {
                                     </div>
                                 )}
                             </div>
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 type="button"
                                 onClick={() => setSelectedModuleId(null)}
                                 className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
                                 aria-label="Close module preview"
                             >
                                 x
-                            </button>
+                            </Button>
                         </div>
 
                         <div className="custom-scrollbar max-h-[calc(90vh-180px)] overflow-y-auto px-5 py-6 md:px-7">
@@ -560,18 +565,18 @@ export default function DashboardModulesPage() {
                                             {selectedModule.installed ? 'Open Config' : 'Open Setup'}
                                         </Link>
                                         {!selectedModule.installed ? (
-                                            <button
+                                            <Button variant="unstyled" size="unstyled"
                                                 type="button"
                                                 onClick={() => sendAction(selectedModule, 'install')}
                                                 disabled={savingId === selectedModule.id}
                                                 className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
                                             >
                                                 {savingId === selectedModule.id ? 'Installing' : 'Install Module'}
-                                            </button>
+                                            </Button>
                                         ) : (
                                             <>
                                                 {selectedModule.isCustom && (
-                                                    <button
+                                                    <Button variant="unstyled" size="unstyled"
                                                         type="button"
                                                         onClick={() => {
                                                             startCustomUpload(selectedModule);
@@ -580,16 +585,16 @@ export default function DashboardModulesPage() {
                                                         className="rounded-xl border border-amber-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-amber-200 transition-colors hover:bg-amber-500/10"
                                                     >
                                                         Re-upload Module
-                                                    </button>
+                                                    </Button>
                                                 )}
-                                                <button
+                                                <Button variant="unstyled" size="unstyled"
                                                     type="button"
                                                     onClick={() => sendAction(selectedModule, selectedModule.enabled ? 'disable' : 'enable')}
                                                     disabled={savingId === selectedModule.id || (selectedModule.isCustom && selectedModule.status === 'NEEDS_REUPLOAD')}
                                                     className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
                                                 >
                                                     {selectedModule.enabled ? 'Disable Module' : 'Enable Module'}
-                                                </button>
+                                                </Button>
                                             </>
                                         )}
                                     </div>

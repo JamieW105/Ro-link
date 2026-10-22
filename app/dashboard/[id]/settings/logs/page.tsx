@@ -1,5 +1,10 @@
 'use client';
 
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+
+
 import { ArrowDownUp as LucideArrowDownUp, NotebookText as LucideNotebookText, Search as LucideSearch } from 'lucide-react';
 
 import { useParams } from "next/navigation";
@@ -83,7 +88,7 @@ export default function LogsPage() {
                         <div className="absolute inset-y-0 left-3 flex items-center text-slate-500 group-focus-within:text-sky-500 transition-colors">
                             <SearchIcon />
                         </div>
-                        <input
+                        <Input
                             type="text"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -92,13 +97,13 @@ export default function LogsPage() {
                         />
                     </div>
 
-                    <button
+                    <Button variant="unstyled" size="unstyled"
                         onClick={() => setSortAsc(!sortAsc)}
                         className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all uppercase tracking-wider"
                     >
                         <SortIcon />
                         {sortAsc ? "Oldest First" : "Newest First"}
-                    </button>
+                    </Button>
                 </div>
 
                 <div className="table-responsive custom-scrollbar">
@@ -107,19 +112,19 @@ export default function LogsPage() {
                             No logs found matching your criteria.
                         </div>
                     ) : (
-                        <table className="w-full text-left text-xs min-w-[600px]">
-                            <thead className="text-slate-500 uppercase text-[10px] font-bold tracking-widest bg-slate-800/30">
-                                <tr>
-                                    <th className="px-4 md:px-8 py-3">Action</th>
-                                    <th className="px-4 md:px-8 py-3">Target</th>
-                                    <th className="px-4 md:px-8 py-3">Moderator</th>
-                                    <th className="px-4 md:px-8 py-3 text-right">Time</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/50">
+                        <Table className="w-full text-left text-xs min-w-[600px]">
+                            <TableHeader className="text-slate-500 uppercase text-[10px] font-bold tracking-widest bg-slate-800/30">
+                                <TableRow>
+                                    <TableHead className="px-4 md:px-8 py-3">Action</TableHead>
+                                    <TableHead className="px-4 md:px-8 py-3">Target</TableHead>
+                                    <TableHead className="px-4 md:px-8 py-3">Moderator</TableHead>
+                                    <TableHead className="px-4 md:px-8 py-3 text-right">Time</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody className="divide-y divide-slate-800/50">
                                 {filteredLogs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-sky-500/5 transition-all group">
-                                        <td className="px-4 md:px-8 py-4">
+                                    <TableRow key={log.id} className="hover:bg-sky-500/5 transition-all group">
+                                        <TableCell className="px-4 md:px-8 py-4">
                                             <span className={`px-2 py-0.5 rounded text-[9px] font-bold tracking-tight border inline-block ${log.action === 'BAN' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
                                                 log.action === 'KICK' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
                                                     log.action.includes('LOOKUP') ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' :
@@ -127,17 +132,17 @@ export default function LogsPage() {
                                                 }`}>
                                                 {log.action}
                                             </span>
-                                        </td>
-                                        <td className="px-4 md:px-8 py-4 font-semibold text-white">{log.target}</td>
-                                        <td className="px-4 md:px-8 py-4 text-slate-400 font-medium">{log.moderator}</td>
-                                        <td className="px-4 md:px-8 py-4 text-right text-slate-600 font-mono text-[10px] font-bold">
+                                        </TableCell>
+                                        <TableCell className="px-4 md:px-8 py-4 font-semibold text-white">{log.target}</TableCell>
+                                        <TableCell className="px-4 md:px-8 py-4 text-slate-400 font-medium">{log.moderator}</TableCell>
+                                        <TableCell className="px-4 md:px-8 py-4 text-right text-slate-600 font-mono text-[10px] font-bold">
                                             {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                             <span className="ml-2 text-slate-700">{new Date(log.timestamp).toLocaleDateString()}</span>
-                                        </td>
-                                    </tr>
+                                        </TableCell>
+                                    </TableRow>
                                 ))}
-                            </tbody>
-                        </table>
+                            </TableBody>
+                        </Table>
                     )}
                 </div>
             </div>

@@ -1,5 +1,10 @@
 'use client';
 
+import { Stat, StatDescription, StatIndicator, StatLabel, StatValue } from '@/components/ui/stat';
+
+import { Button } from '@/components/ui/button';
+
+
 import { Activity as LucideActivity, ArrowRight as LucideArrowRight, Copy as LucideCopy, KeyRound as LucideKeyRound, Layers3 as LucideLayers3, Radio as LucideRadio, Server as LucideServer, ShieldCheck as LucideShieldCheck, TriangleAlert as LucideTriangleAlert } from 'lucide-react';
 
 import Link from "next/link";
@@ -230,18 +235,12 @@ function StatTile({
     const styles = toneStyles[tone];
 
     return (
-        <div className={`group rounded-lg border border-slate-800 bg-slate-950/45 p-5 shadow-lg shadow-black/10 transition-all hover:-translate-y-0.5 hover:bg-slate-900/55 ${styles.border}`}>
-            <div className="mb-5 flex items-center justify-between gap-3">
-                <span className={`flex h-9 w-9 items-center justify-center rounded-lg border ${styles.icon}`}>
-                    {icon}
-                </span>
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">
-                    {label}
-                </span>
-            </div>
-            <p className={`text-3xl font-black tracking-tight ${styles.text}`}>{value}</p>
-            <p className="mt-2 text-xs font-medium text-slate-500">{detail}</p>
-        </div>
+        <Stat className={`group border-slate-800 bg-slate-950/45 p-5 shadow-lg shadow-black/10 transition-all hover:-translate-y-0.5 hover:bg-slate-900/55 ${styles.border}`}>
+            <StatLabel className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">{label}</StatLabel>
+            <StatIndicator variant="icon" className={styles.icon}>{icon}</StatIndicator>
+            <StatValue className={`text-3xl font-black tracking-tight ${styles.text}`}>{value}</StatValue>
+            <StatDescription className="mt-2 text-xs font-medium text-slate-500">{detail}</StatDescription>
+        </Stat>
     );
 }
 
@@ -687,7 +686,7 @@ export default function ServerDashboard() {
                                     <code className="min-w-0 flex-1 truncate rounded-md border border-slate-800 bg-black/30 px-3 py-2 font-mono text-xs font-bold text-sky-300">
                                         {maskSecret(config?.api_key)}
                                     </code>
-                                    <button
+                                    <Button variant="unstyled" size="unstyled"
                                         type="button"
                                         onClick={copyApiKey}
                                         disabled={!config?.api_key}
@@ -696,7 +695,7 @@ export default function ServerDashboard() {
                                     >
                                         <CopyIcon />
                                         {copied ? 'Copied' : 'Copy'}
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         )}

@@ -1,5 +1,8 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+
+
 import { FileText as LucideFileText, Funnel as LucideFunnel } from 'lucide-react';
 
 import Link from "next/link";
@@ -71,7 +74,7 @@ export default function ReportsPage() {
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-white uppercase tracking-wider">Pending Reports <span className="ml-2 px-2 py-0.5 bg-sky-500/10 text-sky-500 rounded-full text-[10px]">{reports.length}</span></h3>
-                    <button className="text-slate-500 hover:text-white transition-colors"><FilterIcon /></button>
+                    <Button variant="unstyled" size="unstyled" className="text-slate-500 hover:text-white transition-colors"><FilterIcon /></Button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

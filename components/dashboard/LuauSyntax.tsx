@@ -1,5 +1,8 @@
 'use client';
 
+import { Textarea } from '@/components/ui/textarea';
+
+
 import { ChangeEvent, UIEvent, useMemo, useRef } from 'react';
 
 type LuauTokenType = 'keyword' | 'builtin' | 'string' | 'number' | 'comment' | 'operator' | 'identifier' | 'plain';
@@ -284,13 +287,13 @@ export function LuauCodeEditor({
                     <LuauHighlightedCode code={highlightedValue} />
                 </code>
             </pre>
-            <textarea
+            <Textarea
                 value={value}
                 onChange={onChange}
                 onScroll={syncScroll}
                 required={required}
                 wrap="off"
-                className={`relative z-10 w-full resize-y overflow-auto bg-transparent p-4 font-mono text-xs leading-relaxed text-transparent caret-sky-100 outline-none selection:bg-sky-500/35 ${minHeightClassName}`}
+                className={`relative z-10 w-full border-0 shadow-none focus-visible:ring-0 resize-y overflow-auto bg-transparent p-4 font-mono text-xs leading-relaxed text-transparent caret-sky-100 outline-none selection:bg-sky-500/35 ${minHeightClassName}`}
                 spellCheck={false}
             />
         </div>

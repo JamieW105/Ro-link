@@ -1,5 +1,9 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+
+
 import { ArrowLeft as LucideArrowLeft, ExternalLink as LucideExternalLink, Shield as LucideShield } from 'lucide-react';
 
 import { hasAdminPanelCommandAccess } from "@/lib/adminPanelCommands";
@@ -235,12 +239,12 @@ export default function ReportDetailsPage() {
                         <p className="text-slate-500 text-sm font-medium">Reviewing Pending Report <span className="font-mono text-slate-600">#{report.id.slice(0, 8)}</span></p>
                     </div>
                     <div className="flex gap-3">
-                        <button
+                        <Button variant="unstyled" size="unstyled"
                             onClick={handleDismiss}
                             className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors"
                         >
                             Dismiss
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -442,7 +446,7 @@ export default function ReportDetailsPage() {
                         <div className="space-y-4">
                             <div>
                                 <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Reason for Moderation</label>
-                                <textarea
+                                <Textarea
                                     value={reason}
                                     onChange={(e) => setReason(e.target.value)}
                                     className="w-full bg-black/40 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder:text-slate-700 focus:outline-none focus:border-red-500/50 min-h-[100px]"
@@ -450,27 +454,27 @@ export default function ReportDetailsPage() {
                                 />
                             </div>
 
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                             onClick={() => handleAction('KICK', 'ROBLOX')}
                                 disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'KICK'))}
                                 className="w-full py-3 bg-orange-600/10 border border-orange-500/20 hover:bg-orange-500/20 text-orange-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Kick User
-                            </button>
-                            <button
+                            </Button>
+                            <Button variant="unstyled" size="unstyled"
                                 onClick={() => handleAction('SOFTBAN', 'ROBLOX')}
                                 disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'SOFTBAN'))}
                                 className="w-full py-3 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Soft Ban (12h)
-                            </button>
-                            <button
+                            </Button>
+                            <Button variant="unstyled" size="unstyled"
                                 onClick={() => handleAction('BAN', 'ROBLOX')}
                                 disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'BAN'))}
                                 className="w-full py-3 bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/20 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Permanent Ban
-                            </button>
+                            </Button>
                         </div>
                         <p className="text-[10px] text-slate-600 mt-4 text-center leading-relaxed">
                             Actions will be logged globally. If the user has a linked Discord, they will receive a DM notification from the bot.

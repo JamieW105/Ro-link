@@ -1,5 +1,8 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+
+
 import { LogOut as LucideLogOut, ShieldAlert as LucideShieldAlert } from 'lucide-react';
 
 import Link from 'next/link';
@@ -258,12 +261,12 @@ export default function DashboardMarketplacePage() {
                 </div>
                 <h1 className="text-2xl font-bold mb-2 tracking-tight">Access Denied</h1>
                 <p className="text-slate-400 mb-8 max-w-sm text-sm">Please authenticate with Discord to browse marketplace modules.</p>
-                <button
+                <Button variant="unstyled" size="unstyled"
                     onClick={() => signIn('discord')}
                     className="bg-sky-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-sky-500 transition-all shadow-lg shadow-sky-900/10 text-sm"
                 >
                     Sign In with Discord
-                </button>
+                </Button>
             </div>
         );
     }
@@ -288,10 +291,10 @@ export default function DashboardMarketplacePage() {
                         )}
                         <div className="text-right hidden sm:block">
                             <p className="text-sm font-semibold text-white leading-none mb-1">{session?.user?.name}</p>
-                            <button type="button" onClick={handleSignOut} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
+                            <Button variant="unstyled" size="unstyled" type="button" onClick={handleSignOut} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
                                 <LogOutIcon />
                                 Sign Out
-                            </button>
+                            </Button>
                         </div>
                         <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm" />
                     </div>
@@ -382,13 +385,13 @@ export default function DashboardMarketplacePage() {
                                         <span>{Object.keys(addon.configSchema || {}).length} config fields</span>
                                         {addon.status === 'PENDING_REVIEW' && <span>Submitted {formatDate(addon.submittedAt)}</span>}
                                     </div>
-                                    <button
+                                    <Button variant="unstyled" size="unstyled"
                                         type="button"
                                         onClick={() => openModulePreview(addon)}
                                         className="w-full rounded-xl border border-sky-500/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10"
                                     >
                                         Open Module
-                                    </button>
+                                    </Button>
                                 </div>
                             </article>
                         ))}
@@ -426,14 +429,14 @@ export default function DashboardMarketplacePage() {
                                         {selectedModule.description || 'No description provided.'}
                                     </p>
                                 </div>
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     type="button"
                                     onClick={closeModulePreview}
                                     className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
                                     aria-label="Close module preview"
                                 >
                                     x
-                                </button>
+                                </Button>
                             </div>
 
                             <div className="custom-scrollbar max-h-[calc(90vh-180px)] overflow-y-auto px-5 py-6 md:px-7">
@@ -499,13 +502,13 @@ export default function DashboardMarketplacePage() {
                                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Checksum</p>
                                             <p className="mt-2 break-all font-mono text-xs text-slate-300">{selectedModule.sourceChecksum || 'Unavailable'}</p>
                                         </div>
-                                        <button
+                                        <Button variant="unstyled" size="unstyled"
                                             type="button"
                                             onClick={() => openInstallPicker(selectedModule.id)}
                                             className="inline-flex w-full items-center justify-center rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500"
                                         >
                                             Select Server To Install
-                                        </button>
+                                        </Button>
                                     </aside>
                                 </div>
                             </div>
@@ -524,7 +527,7 @@ export default function DashboardMarketplacePage() {
                                         Click a server to install. Right-click a server to start multi-select.
                                     </p>
                                 </div>
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     type="button"
                                     onClick={closeInstallPicker}
                                     className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition-colors hover:border-slate-500 hover:text-white disabled:opacity-50"
@@ -532,7 +535,7 @@ export default function DashboardMarketplacePage() {
                                     disabled={installing}
                                 >
                                     x
-                                </button>
+                                </Button>
                             </div>
 
                             <div className="custom-scrollbar max-h-[calc(90vh-170px)] overflow-y-auto px-5 py-5">
@@ -558,7 +561,7 @@ export default function DashboardMarketplacePage() {
                                             const full = server.installedModuleCount >= server.moduleLimit;
 
                                             return (
-                                                <button
+                                                <Button variant="unstyled" size="unstyled"
                                                     key={server.id}
                                                     type="button"
                                                     onClick={() => {
@@ -594,7 +597,7 @@ export default function DashboardMarketplacePage() {
                                                             {full ? `${server.installedModuleCount}/${server.moduleLimit} installed` : selected ? 'Selected' : `${server.installedModuleCount}/${server.moduleLimit} installed`}
                                                         </span>
                                                     </span>
-                                                </button>
+                                                </Button>
                                             );
                                         })}
                                     </div>
@@ -607,7 +610,7 @@ export default function DashboardMarketplacePage() {
                                         {selectedServerIds.length} server{selectedServerIds.length === 1 ? '' : 's'} selected
                                     </p>
                                     <div className="flex gap-2">
-                                        <button
+                                        <Button variant="unstyled" size="unstyled"
                                             type="button"
                                             onClick={() => {
                                                 setMultiSelectInstall(false);
@@ -617,15 +620,15 @@ export default function DashboardMarketplacePage() {
                                             className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-slate-500 disabled:opacity-50"
                                         >
                                             Cancel
-                                        </button>
-                                        <button
+                                        </Button>
+                                        <Button variant="unstyled" size="unstyled"
                                             type="button"
                                             onClick={() => installModuleToServers(installPickerModule.id, selectedServerIds)}
                                             disabled={installing || selectedServerIds.length === 0}
                                             className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
                                         >
                                             {installing ? 'Installing' : 'Install Selected'}
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
                             )}

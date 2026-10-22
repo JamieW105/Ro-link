@@ -1,5 +1,10 @@
 'use client';
 
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+
+
 import { Info as LucideInfo, Radar as LucideRadar, Search as LucideSearch, Shield as LucideShield, User as LucideUser } from 'lucide-react';
 
 import { useParams, useSearchParams } from "next/navigation";
@@ -307,7 +312,7 @@ function PlayerLookupContent() {
                         <div className="absolute inset-y-0 left-4 flex items-center text-slate-500 group-focus-within:text-sky-500 transition-colors">
                             <SearchIcon />
                         </div>
-                        <input
+                        <Input
                             type="text"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
@@ -315,13 +320,13 @@ function PlayerLookupContent() {
                             className="w-full bg-black/40 border border-slate-800 rounded-lg pl-12 pr-4 py-3 text-sm text-white placeholder:text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all"
                         />
                     </div>
-                    <button
+                    <Button variant="unstyled" size="unstyled"
                         type="submit"
                         disabled={loading || !query}
                         className="bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-500 text-white px-8 py-3 rounded-lg text-sm font-bold transition-all shadow-lg shadow-sky-900/20 flex items-center justify-center gap-2 w-full sm:w-auto"
                     >
                         {loading ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : "SEARCH"}
-                    </button>
+                    </Button>
                 </form>
             </div>
 
@@ -374,12 +379,12 @@ function PlayerLookupContent() {
                                     <LiveIcon /> JOIN SERVER
                                 </a>
                             ) : (
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     disabled={true}
                                     className="w-full bg-slate-800/50 border border-slate-700 text-slate-500 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all cursor-not-allowed opacity-50"
                                 >
                                     JOIN SERVER (OFFLINE)
-                                </button>
+                                </Button>
                             )}
                         </div>
                     </div>
@@ -454,14 +459,14 @@ function PlayerLookupContent() {
                                             <div className="flex items-start justify-between gap-4">
                                                 <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap flex-1">{note.note}</p>
                                                 {note.can_delete ? (
-                                                    <button
+                                                    <Button variant="unstyled" size="unstyled"
                                                         type="button"
                                                         onClick={() => handleDeleteNote(note.id)}
                                                         disabled={deletingNoteId === note.id}
                                                         className="shrink-0 px-3 py-2 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] font-bold uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                                     >
                                                         {deletingNoteId === note.id ? 'Deleting' : 'Delete'}
-                                                    </button>
+                                                    </Button>
                                                 ) : null}
                                             </div>
                                             <p className="text-[11px] text-slate-500 mt-3 font-medium">
@@ -476,7 +481,7 @@ function PlayerLookupContent() {
                                 </div>
                             )}
                             <form onSubmit={handleAddNote} className="space-y-3">
-                                <textarea
+                                <Textarea
                                     value={noteText}
                                     onChange={(event) => setNoteText(event.target.value)}
                                     rows={3}
@@ -484,13 +489,13 @@ function PlayerLookupContent() {
                                     className="w-full bg-black/40 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all resize-none"
                                     placeholder="Add a staff-only note for this user..."
                                 />
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     type="submit"
                                     disabled={noteSaving || !noteText.trim()}
                                     className="px-5 py-3 bg-yellow-600/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-yellow-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     {noteSaving ? "SAVING..." : "ADD NOTE"}
-                                </button>
+                                </Button>
                             </form>
                         </div>
 
@@ -504,7 +509,7 @@ function PlayerLookupContent() {
                             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_180px] gap-4 mb-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Reason</label>
-                                    <textarea
+                                    <Textarea
                                         value={reasonText}
                                         onChange={(event) => setReasonText(event.target.value)}
                                         rows={3}
@@ -514,7 +519,7 @@ function PlayerLookupContent() {
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Soft Ban Minutes</label>
-                                    <input
+                                    <Input
                                         type="number"
                                         min="1"
                                         value={softBanDurationMinutes}
@@ -527,34 +532,34 @@ function PlayerLookupContent() {
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                                <button
+                                <Button variant="unstyled" size="unstyled"
                                     onClick={() => handleAction('KICK')}
                                     disabled={actionLoading || !hasActionAccess('KICK') || !presence?.inGame}
                                     className="px-6 py-4 bg-orange-600/10 border border-orange-500/20 hover:bg-orange-500/20 text-orange-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     KICK PLAYER
-                                </button>
-                                <button
+                                </Button>
+                                <Button variant="unstyled" size="unstyled"
                                     onClick={() => handleAction('BAN')}
                                     disabled={actionLoading || !hasActionAccess('BAN')}
                                     className="px-6 py-4 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     BAN PLAYER
-                                </button>
-                                <button
+                                </Button>
+                                <Button variant="unstyled" size="unstyled"
                                     onClick={() => handleAction('SOFTBAN')}
                                     disabled={actionLoading || !hasActionAccess('SOFTBAN')}
                                     className="px-6 py-4 bg-rose-600/10 border border-rose-500/20 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     SOFT BAN
-                                </button>
-                                <button
+                                </Button>
+                                <Button variant="unstyled" size="unstyled"
                                     onClick={() => handleAction('UNBAN')}
                                     disabled={actionLoading || !hasActionAccess('UNBAN')}
                                     className="px-6 py-4 bg-emerald-600/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     UNBAN PLAYER
-                                </button>
+                                </Button>
                             </div>
                         </div>
 

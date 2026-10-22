@@ -1,5 +1,8 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+
+
 import { BriefcaseBusiness as LucideBriefcaseBusiness } from 'lucide-react';
 
 import { useSession, signIn, signOut } from "next-auth/react";
@@ -226,12 +229,12 @@ export default function Dashboard() {
                 </div>
                 <h1 className="text-2xl font-bold mb-2 tracking-tight">Access Denied</h1>
                 <p className="text-slate-400 mb-8 max-w-sm text-sm">Please authenticate with Discord to manage your community servers.</p>
-                <button
+                <Button variant="unstyled" size="unstyled"
                     onClick={() => signIn('discord')}
                     className="bg-sky-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-sky-500 transition-all shadow-lg shadow-sky-900/10 text-sm"
                 >
                     Sign In with Discord
-                </button>
+                </Button>
             </div>
         );
     }
@@ -258,21 +261,21 @@ export default function Dashboard() {
                         )}
                         <div className="text-right hidden sm:block">
                             <p className="text-sm font-semibold text-white leading-none mb-1">{session?.user?.name}</p>
-                            <button type="button" onClick={handleSignOut} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
+                            <Button variant="unstyled" size="unstyled" type="button" onClick={handleSignOut} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
                                 <LogOutIcon />
                                 Sign Out
-                            </button>
+                            </Button>
                         </div>
                         <div className="relative group">
                             <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm transition-transform group-hover:scale-105" />
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 type="button"
                                 onClick={handleSignOut}
                                 className="sm:hidden absolute -bottom-1 -right-1 bg-slate-900 border border-slate-700 p-1 rounded-md text-slate-400 hover:text-red-400 shadow-xl"
                                 title="Sign Out"
                             >
                                 <LogOutIcon />
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -313,14 +316,14 @@ export default function Dashboard() {
                         <p className="mt-2 text-sm font-medium text-red-100/80">
                             {needsReauthentication ? 'Sign in with Discord again to refresh your server access.' : guildsError}
                         </p>
-                        <button
+                        <Button variant="unstyled" size="unstyled"
                             onClick={() => needsReauthentication
                                 ? signIn('discord', { callbackUrl: '/dashboard' })
                                 : window.location.reload()}
                             className="mt-6 rounded-lg bg-red-500 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-red-400"
                         >
                             {needsReauthentication ? 'Sign in again' : 'Retry'}
-                        </button>
+                        </Button>
                     </div>
                 ) : sortedGuilds.length === 0 ? (
                     <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-8 text-center">

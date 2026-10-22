@@ -1,4 +1,11 @@
 'use client';
+
+import { Switch } from '@/components/ui/switch';
+
+import { Button } from '@/components/ui/button';
+
+
+import { Select } from '@/components/ui/select';
 import { Info, Save, Shield, UserRoundCheck } from "lucide-react";
 
 import { useParams, useRouter } from "next/navigation";
@@ -134,7 +141,7 @@ export default function VerificationPage() {
                         </div>
                     </div>
 
-                    <button
+                    <Button variant="unstyled" size="unstyled"
                         onClick={handleSave}
                         disabled={saving}
                         className="hidden md:flex bg-sky-600 hover:bg-sky-500 text-white font-bold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-sky-900/20 text-xs disabled:opacity-50 items-center justify-center gap-3 active:scale-95 border border-sky-400/20"
@@ -147,7 +154,7 @@ export default function VerificationPage() {
                                 SAVE CHANGES
                             </>
                         )}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -156,7 +163,7 @@ export default function VerificationPage() {
                 <div className="col-span-12 lg:col-span-8 space-y-8">
                     {/* Primary Config Section */}
                     <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-8 opacity-[0.02] text-white">
+                        <div aria-hidden="true" className="pointer-events-none absolute top-0 right-0 p-8 opacity-[0.02] text-white">
                             <ShieldIcon />
                         </div>
 
@@ -165,12 +172,7 @@ export default function VerificationPage() {
                                 <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Toggle Verification</h3>
                                 <p className="text-sm text-slate-500">Enable or disable the Roblox-to-Discord linking flow for this server.</p>
                             </div>
-                            <button
-                                onClick={() => setEnabled(!enabled)}
-                                className={`w-16 h-8 rounded-full transition-all duration-500 relative border-2 ${enabled ? 'bg-sky-600/20 border-sky-500 shadow-[0_0_20px_rgba(2,132,199,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
-                            >
-                                <div className={`absolute top-1 w-4.5 h-4.5 rounded-full transition-all duration-500 shadow-md ${enabled ? 'left-9 bg-sky-400' : 'left-1.5 bg-slate-500'}`} />
-                            </button>
+                            <Switch checked={enabled} onCheckedChange={setEnabled} aria-label="Roblox verification" />
                         </div>
 
                         <div className={`grid grid-cols-1 md:grid-cols-2 gap-10 transition-all duration-700 ${!enabled ? 'opacity-30 pointer-events-none' : ''}`}>
@@ -180,16 +182,14 @@ export default function VerificationPage() {
                                     Verified Role
                                 </label>
                                 <div className="relative">
-                                    <select
+                                    <Select
                                         className="w-full bg-slate-950/50 border border-slate-800/80 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-600/30 transition-all cursor-pointer hover:border-slate-700"
                                         value={verifiedRole}
-                                        onChange={(e) => setVerifiedRole(e.target.value)}
-                                    >
-                                        <option value="">None (Disabled)</option>
-                                        {roles.map(role => (
-                                            <option key={role.id} value={role.id}>{role.name}</option>
-                                        ))}
-                                    </select>
+                                        onValueChange={(nextValue) => setVerifiedRole(nextValue)}
+                                        disabled={!enabled}
+                                        aria-label="Verified role"
+                                        options={[{ value: '', label: 'None (Disabled)' }, ...roles.map(role => ({ value: role.id, label: role.name }))]}
+                                    />
                                 </div>
                                 <p className="text-[10px] text-slate-500 font-medium pl-2 leading-relaxed italic">Awarded automatically after a successful Roblox link.</p>
                             </div>
@@ -200,16 +200,14 @@ export default function VerificationPage() {
                                     On Join Role
                                 </label>
                                 <div className="relative">
-                                    <select
+                                    <Select
                                         className="w-full bg-slate-950/50 border border-slate-800/80 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-600/30 transition-all cursor-pointer hover:border-slate-700"
                                         value={onJoinRole}
-                                        onChange={(e) => setOnJoinRole(e.target.value)}
-                                    >
-                                        <option value="">None (Disabled)</option>
-                                        {roles.map(role => (
-                                            <option key={role.id} value={role.id}>{role.name}</option>
-                                        ))}
-                                    </select>
+                                        onValueChange={(nextValue) => setOnJoinRole(nextValue)}
+                                        disabled={!enabled}
+                                        aria-label="On join role"
+                                        options={[{ value: '', label: 'None (Disabled)' }, ...roles.map(role => ({ value: role.id, label: role.name }))]}
+                                    />
                                 </div>
                                 <p className="text-[10px] text-slate-500 font-medium pl-2 leading-relaxed italic">Awarded immediately when a member joins the Discord server.</p>
                             </div>
@@ -227,23 +225,18 @@ export default function VerificationPage() {
                                         <p className="text-[11px] text-slate-500 font-medium mt-1">Automatically kick players from the Roblox game if they haven&apos;t linked their Discord account.</p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => setBlockUnverified(!blockUnverified)}
-                                    className={`w-14 h-7 rounded-full transition-all duration-500 relative border-2 ${blockUnverified ? 'bg-red-600/20 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
-                                >
-                                    <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${blockUnverified ? 'left-8 bg-red-500' : 'left-1.5 bg-slate-500'}`} />
-                                </button>
+                                <Switch checked={blockUnverified} onCheckedChange={setBlockUnverified} disabled={!enabled} aria-label="Block unverified joins" />
                             </div>
                         </div>
 
                         <div className="mt-12 md:hidden">
-                            <button
+                            <Button variant="unstyled" size="unstyled"
                                 onClick={handleSave}
                                 disabled={saving}
                                 className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-sky-900/10 text-xs disabled:opacity-50 flex items-center justify-center gap-3 active:scale-95"
                             >
                                 {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "SAVE SETTINGS"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
 
