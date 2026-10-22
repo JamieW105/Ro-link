@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Settings, X } from 'lucide-react';
+import { Settings } from 'lucide-react';
+import Link from 'next/link';
 import { usePermissions } from '@/context/PermissionsContext';
 import {
     shiftHours,
@@ -19,8 +20,6 @@ const periods: Array<{ value: ShiftPeriod; label: string }> = [
     { value: '6-months', label: 'Past 6 months' },
     { value: 'latest-wave', label: 'Latest wave' },
 ];
-const inputClass =
-    'w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white';
 export default function StaffShiftsPage() {
     const { id } = useParams();
     const serverId = String(id);
@@ -34,18 +33,8 @@ export default function StaffShiftsPage() {
         settings: ShiftSettings;
         wave: ShiftWave;
     } | null>(null);
-    const [draft, setDraft] = useState<ShiftSettings | null>(null);
-    const [showSettings, setShowSettings] = useState(false);
-    const settingsButton = useRef<HTMLButtonElement>(null);
-    function closeSettings() {
-        if (saving) return;
-        setShowSettings(false);
-        settingsButton.current?.focus();
-    }
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    const [notice, setNotice] = useState('');
     const load = useCallback(
         async (signal?: AbortSignal) => {
             try {
@@ -91,38 +80,6 @@ export default function StaffShiftsPage() {
             clearInterval(timer);
         };
     }, [load]);
-    async function saveSettings(event: React.FormEvent) {
-        event.preventDefault();
-        if (!draft) return;
-        setSaving(true);
-        setError('');
-        setNotice('');
-        try {
-            const response = await fetch(
-                '/api/dashboard/staff-shifts/settings',
-                {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ serverId, ...draft }),
-                },
-            );
-            const data = await response.json();
-            if (!response.ok)
-                throw new Error(data.error || 'Could not save settings.');
-            setShowSettings(false);
-            settingsButton.current?.focus();
-            setNotice('Shift settings saved.');
-            await load();
-        } catch (error) {
-            setError(
-                error instanceof Error
-                    ? error.message
-                    : 'Could not save settings.',
-            );
-        } finally {
-            setSaving(false);
-        }
-    }
     const shortDate = (value: string) =>
         new Date(value).toLocaleDateString(undefined, {
             month: 'short',
@@ -133,20 +90,14 @@ export default function StaffShiftsPage() {
             <div className="flex items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold text-white">Staff shifts</h1>
                 {canManage && (
-                    <button
-                        type="button"
-                        ref={settingsButton}
+                    <Link
+                        href={`/dashboard/${serverId}/staff-shifts/settings`}
                         aria-label="Manage staff shift settings"
                         title="Manage staff shift settings"
-                        disabled={!config}
-                        onClick={() => {
-                            setDraft({ ...config!.settings });
-                            setShowSettings(true);
-                        }}
-                        className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white disabled:opacity-50"
+                        className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
                     >
                         <Settings size={20} />
-                    </button>
+                    </Link>
                 )}
             </div>
             {error && (
@@ -160,11 +111,6 @@ export default function StaffShiftsPage() {
                     >
                         Retry
                     </button>
-                </p>
-            )}
-            {notice && (
-                <p role="status" className="text-sm text-emerald-300">
-                    {notice}
                 </p>
             )}
             {loading && (
@@ -382,160 +328,6 @@ export default function StaffShiftsPage() {
                     Your role can manage shift settings. Viewing staff time and
                     history requires the View Staff Shifts permission.
                 </p>
-            )}
-            {showSettings && draft && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
-                    onClick={() => {
-                        closeSettings();
-                    }}
-                >
-                    <section
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="shift-settings-title"
-                        onKeyDown={(event) => {
-                            if (event.key === 'Escape') {
-                                event.preventDefault();
-                                closeSettings();
-                            }
-                            if (event.key !== 'Tab') return;
-                            const controls = Array.from(
-                                event.currentTarget.querySelectorAll<HTMLElement>(
-                                    'button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]',
-                                ),
-                            );
-                            const first = controls[0];
-                            const last = controls[controls.length - 1];
-                            if (
-                                event.shiftKey &&
-                                document.activeElement === first
-                            ) {
-                                event.preventDefault();
-                                last?.focus();
-                            } else if (
-                                !event.shiftKey &&
-                                document.activeElement === last
-                            ) {
-                                event.preventDefault();
-                                first?.focus();
-                            }
-                        }}
-                        className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-slate-700 bg-slate-900 p-6"
-                        onClick={(event) => event.stopPropagation()}
-                    >
-                        <div className="mb-5 flex items-center justify-between">
-                            <h2
-                                id="shift-settings-title"
-                                className="text-xl font-bold text-white"
-                            >
-                                Manage staff shifts
-                            </h2>
-                            <button
-                                type="button"
-                                autoFocus
-                                aria-label="Close shift settings"
-                                disabled={saving}
-                                onClick={closeSettings}
-                                className="text-slate-300"
-                            >
-                                <X />
-                            </button>
-                        </div>
-                        <form onSubmit={saveSettings} className="space-y-5">
-                            <label className="flex items-center justify-between gap-4 text-sm text-white">
-                                Staff shifts enabled
-                                <input
-                                    type="checkbox"
-                                    checked={draft.enabled}
-                                    onChange={(event) =>
-                                        setDraft({
-                                            ...draft,
-                                            enabled: event.target.checked,
-                                        })
-                                    }
-                                    className="h-5 w-5 accent-yellow-400"
-                                />
-                            </label>
-                            <label className="flex items-center justify-between gap-4 text-sm text-white">
-                                Automatically start staff shifts when staff join
-                                the game
-                                <input
-                                    type="checkbox"
-                                    checked={draft.automatic_start}
-                                    onChange={(event) =>
-                                        setDraft({
-                                            ...draft,
-                                            automatic_start:
-                                                event.target.checked,
-                                        })
-                                    }
-                                    className="h-5 w-5 accent-yellow-400"
-                                />
-                            </label>
-                            <label className="block text-sm text-slate-300">
-                                Shift wave length (days)
-                                <input
-                                    type="number"
-                                    required
-                                    min={1}
-                                    max={366}
-                                    step={1}
-                                    value={draft.wave_days}
-                                    onChange={(event) =>
-                                        setDraft({
-                                            ...draft,
-                                            wave_days: Number(
-                                                event.target.value,
-                                            ),
-                                        })
-                                    }
-                                    className={`${inputClass} mt-2`}
-                                />
-                            </label>
-                            <label className="block text-sm text-slate-300">
-                                Quota per wave (hours)
-                                <input
-                                    type="number"
-                                    required
-                                    min={0}
-                                    max={8784}
-                                    step="0.25"
-                                    value={draft.quota_hours}
-                                    onChange={(event) =>
-                                        setDraft({
-                                            ...draft,
-                                            quota_hours: Number(
-                                                event.target.value,
-                                            ),
-                                        })
-                                    }
-                                    className={`${inputClass} mt-2`}
-                                />
-                            </label>
-                            <p className="text-xs leading-relaxed text-slate-400">
-                                Wave length and quota changes apply to the next
-                                wave. Disabling shifts ends active shifts and
-                                keeps their history. A quota of zero means no
-                                quota.
-                            </p>
-                            {error && (
-                                <p
-                                    role="alert"
-                                    className="text-sm text-red-300"
-                                >
-                                    {error}
-                                </p>
-                            )}
-                            <button
-                                disabled={saving}
-                                className="w-full rounded-xl bg-yellow-400 p-3 font-bold text-slate-950 disabled:opacity-50"
-                            >
-                                {saving ? 'Saving…' : 'Save shift settings'}
-                            </button>
-                        </form>
-                    </section>
-                </div>
             )}
         </div>
     );

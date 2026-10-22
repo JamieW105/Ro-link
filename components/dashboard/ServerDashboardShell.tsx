@@ -48,6 +48,9 @@ function isDashboardPermissions(value: unknown): value is DashboardPermissions {
 }
 
 function canAccessDashboardRoute(perms: DashboardPermissions, pathname: string) {
+    if (pathname.includes('/staff-shifts/settings')) {
+        return perms.is_admin || perms.can_manage_staff_shifts;
+    }
     if (pathname.includes('/staff-shifts')) {
         return perms.is_admin || perms.can_view_staff_shifts || perms.can_manage_staff_shifts;
     }
