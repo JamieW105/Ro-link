@@ -6,4 +6,4 @@ export const metadata = createSeoMetadata({
     index: false,
 });
 
-export default function CustomDashboardNotFoundLayout({ children }: { children: React.ReactNode }) { return children; }
+export default function CustomDashboardNotFoundLayout({ children }: { children: React.ReactNode }) { return <div className="dice-ui-dashboard contents">{children}</div>; }

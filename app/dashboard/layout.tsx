@@ -36,5 +36,5 @@ export default async function DashboardLayout({
         redirect("/report#appeal");
     }
 
-    return <div className="dice-ui-dashboard dark contents">{children}</div>;
+    return <div className="dice-ui-dashboard contents">{children}</div>;
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 
 import { DGSU_BAN_AUTH_ERROR, DGSU_BAN_ERROR_MESSAGE } from '@/lib/dgsuBanConstants';
-import { DiscordIcon as DiscordBrandIcon } from '@/components/ui/DiscordIcon';
+import { LogIn } from 'lucide-react';
 import { getCanonicalSignInUrl } from '@/lib/signInNavigation';
 import { Button } from '@/components/ui/button';
 
@@ -15,12 +15,6 @@ type SignInClientProps = {
     allowRootAlias?: boolean;
     discordConfigured?: boolean;
 };
-
-function DiscordIcon() {
-    return (
-        <DiscordBrandIcon aria-hidden="true" className="h-5 w-5" />
-    );
-}
 
 export default function SignInClient({ callbackUrl, error, authOrigin, allowRootAlias, discordConfigured = true }: SignInClientProps) {
     const errorMessage = !discordConfigured || error === 'Configuration'
@@ -95,14 +89,14 @@ export default function SignInClient({ callbackUrl, error, authOrigin, allowRoot
                 ) : null}
 
                 <Button
-                    variant="unstyled"
-                    size="unstyled"
+                    variant="default"
+                    size="lg"
                     type="button"
                     onClick={handleDiscordSignIn}
                     disabled={isSigningIn || !discordConfigured}
                     className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#5865F2] px-5 text-sm font-bold text-white transition hover:bg-[#4752C4] disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                    <DiscordIcon />
+                    <LogIn aria-hidden="true" className="h-5 w-5" />
                     {isSigningIn ? 'Opening Discord...' : 'Sign in with Discord'}
                 </Button>
 

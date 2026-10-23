@@ -62,30 +62,30 @@ export default function LogsPage() {
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-[400px]">
-            <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-8 h-8 border-2 border-border border-t-transparent rounded-full animate-spin"></div>
         </div>
     );
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full pb-20">
             {/* Page Header */}
-            <div className="mb-10 pb-8 border-b border-slate-800/60">
+            <div className="mb-10 pb-8 border-b border-border">
                 <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 bg-sky-600/10 rounded-2xl flex items-center justify-center text-sky-500 border border-sky-500/20 shadow-2xl shadow-sky-900/10">
+                    <div className="w-14 h-14 bg-accent rounded-xl flex items-center justify-center text-foreground border border-border">
                         <ScrollIcon />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">Activity Logs</h1>
-                        <p className="text-slate-500 text-sm font-medium mt-1">Real-time audit trail of all server actions.</p>
+                        <h1 className="text-3xl font-semibold tracking-tight text-foreground">Activity Logs</h1>
+                        <p className="text-muted-foreground text-sm font-medium mt-1">Real-time audit trail of all server actions.</p>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-slate-900/40 border border-slate-800 rounded-xl shadow-xl relative overflow-hidden backdrop-blur-md">
+            <div className="bg-card border border-border rounded-xl relative overflow-hidden">
                 {/* Controls */}
-                <div className="px-6 py-5 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="px-6 py-5 border-b border-border flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="relative w-full sm:w-96 group">
-                        <div className="absolute inset-y-0 left-3 flex items-center text-slate-500 group-focus-within:text-sky-500 transition-colors">
+                        <div className="absolute inset-y-0 left-3 flex items-center text-muted-foreground group-focus-within:text-foreground transition-colors">
                             <SearchIcon />
                         </div>
                         <Input
@@ -93,13 +93,13 @@ export default function LogsPage() {
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder="Search logs by user, action..."
-                            className="w-full bg-black/40 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-xs font-bold text-white focus:outline-none focus:border-sky-500 transition-all placeholder:text-slate-600 uppercase tracking-wide"
+                            className="w-full transition-all tracking-wide"
                         />
                     </div>
 
-                    <Button variant="unstyled" size="unstyled"
+                    <Button variant="outline" size="icon"
                         onClick={() => setSortAsc(!sortAsc)}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all uppercase tracking-wider"
+                        className="flex items-center transition-all"
                     >
                         <SortIcon />
                         {sortAsc ? "Oldest First" : "Newest First"}
@@ -108,12 +108,12 @@ export default function LogsPage() {
 
                 <div className="table-responsive custom-scrollbar">
                     {filteredLogs.length === 0 ? (
-                        <div className="p-20 text-center text-slate-600 font-bold uppercase text-[10px] tracking-widest text-nowrap">
+                        <div className="p-20 text-center text-muted-foreground font-medium text-xs text-nowrap">
                             No logs found matching your criteria.
                         </div>
                     ) : (
                         <Table className="w-full text-left text-xs min-w-[600px]">
-                            <TableHeader className="text-slate-500 uppercase text-[10px] font-bold tracking-widest bg-slate-800/30">
+                            <TableHeader className="text-muted-foreground text-xs font-medium bg-muted">
                                 <TableRow>
                                     <TableHead className="px-4 md:px-8 py-3">Action</TableHead>
                                     <TableHead className="px-4 md:px-8 py-3">Target</TableHead>
@@ -121,23 +121,23 @@ export default function LogsPage() {
                                     <TableHead className="px-4 md:px-8 py-3 text-right">Time</TableHead>
                                 </TableRow>
                             </TableHeader>
-                            <TableBody className="divide-y divide-slate-800/50">
+                            <TableBody className="divide-y divide-border">
                                 {filteredLogs.map((log) => (
-                                    <TableRow key={log.id} className="hover:bg-sky-500/5 transition-all group">
+                                    <TableRow key={log.id} className="hover:bg-accent transition-all group">
                                         <TableCell className="px-4 md:px-8 py-4">
-                                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold tracking-tight border inline-block ${log.action === 'BAN' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
-                                                log.action === 'KICK' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
-                                                    log.action.includes('LOOKUP') ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' :
-                                                        'bg-sky-500/10 text-sky-500 border-sky-500/20'
+                                            <span className={`px-2 py-0.5 rounded text-xs font-medium tracking-tight border inline-block ${log.action === 'BAN' ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900' :
+                                                log.action === 'KICK' ? 'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-900' :
+                                                    log.action.includes('LOOKUP') ? 'bg-accent text-foreground border-border' :
+                                                        'bg-accent text-foreground border-border'
                                                 }`}>
                                                 {log.action}
                                             </span>
                                         </TableCell>
-                                        <TableCell className="px-4 md:px-8 py-4 font-semibold text-white">{log.target}</TableCell>
-                                        <TableCell className="px-4 md:px-8 py-4 text-slate-400 font-medium">{log.moderator}</TableCell>
-                                        <TableCell className="px-4 md:px-8 py-4 text-right text-slate-600 font-mono text-[10px] font-bold">
+                                        <TableCell className="px-4 md:px-8 py-4 font-semibold text-foreground">{log.target}</TableCell>
+                                        <TableCell className="px-4 md:px-8 py-4 text-muted-foreground font-medium">{log.moderator}</TableCell>
+                                        <TableCell className="px-4 md:px-8 py-4 text-right text-muted-foreground font-mono text-xs font-medium">
                                             {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                                            <span className="ml-2 text-slate-700">{new Date(log.timestamp).toLocaleDateString()}</span>
+                                            <span className="ml-2 text-muted-foreground">{new Date(log.timestamp).toLocaleDateString()}</span>
                                         </TableCell>
                                     </TableRow>
                                 ))}

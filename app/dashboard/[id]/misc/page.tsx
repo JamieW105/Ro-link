@@ -1,5 +1,7 @@
 'use client';
 
+import { Card } from '@/components/ui/card';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -67,22 +69,22 @@ function getCommandLabel(commandId: string) {
 
 function getActionButtonClasses(commandId: string) {
     if (commandId === 'KILL') {
-        return 'bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20';
+        return 'bg-red-50 dark:bg-red-950/30 hover:bg-red-500 text-red-700 dark:text-red-400 hover:text-foreground border-red-200 dark:border-red-900';
     }
 
     if (commandId === 'HEAL' || commandId === 'UNFREEZE' || commandId === 'FORCEFIELD_ADD') {
-        return 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20';
+        return 'bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-500 text-emerald-700 dark:text-emerald-400 hover:text-foreground border-emerald-200 dark:border-emerald-900';
     }
 
     if (commandId === 'FREEZE' || commandId === 'RAGDOLL' || commandId === 'FORCEFIELD_REMOVE') {
-        return 'bg-amber-500/10 hover:bg-amber-500 text-amber-500 hover:text-white border-amber-500/20';
+        return 'bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-500 text-amber-700 dark:text-amber-400 hover:text-foreground border-amber-200 dark:border-amber-900';
     }
 
     if (VALUE_COMMAND_SET.has(commandId) || commandId === 'SET_CHAR' || commandId === 'TEAM') {
-        return 'bg-violet-500/10 hover:bg-violet-500 text-violet-400 hover:text-white border-violet-500/20';
+        return 'bg-violet-500/10 hover:bg-violet-500 text-violet-400 hover:text-foreground border-violet-500/20';
     }
 
-    return 'bg-slate-800 hover:bg-sky-600 text-white border-slate-700';
+    return 'bg-muted hover:bg-primary text-foreground border-border';
 }
 
 const MagicIcon = () => (
@@ -209,11 +211,11 @@ export default function MiscPage() {
                 {instantActions.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                         {instantActions.map((action) => (
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="outline" size="default"
                                 key={action}
                                 disabled={actionLoading === `${target}-${action}`}
                                 onClick={() => handleAction(target, action)}
-                                className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all border disabled:opacity-50 ${getActionButtonClasses(action)}`}
+                                className={`       transition-all  disabled:opacity-50 ${getActionButtonClasses(action)}`}
                             >
                                 {actionLoading === `${target}-${action}` ? "..." : getCommandLabel(action)}
                             </Button>
@@ -224,11 +226,11 @@ export default function MiscPage() {
                 {promptedActions.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                         {promptedActions.map((action) => (
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="outline" size="default"
                                 key={action}
                                 disabled={actionLoading === `${target}-${action}`}
                                 onClick={() => handleAction(target, action)}
-                                className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all border disabled:opacity-50 ${getActionButtonClasses(action)}`}
+                                className={`       transition-all  disabled:opacity-50 ${getActionButtonClasses(action)}`}
                             >
                                 {actionLoading === `${target}-${action}` ? "..." : getCommandLabel(action)}
                             </Button>
@@ -252,19 +254,19 @@ export default function MiscPage() {
     return (
         <div className="space-y-10 max-w-7xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="flex flex-col gap-1 text-left">
-                <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
-                    <span className="p-2 bg-sky-600/10 rounded-lg text-sky-500 border border-sky-500/10">
+                <h1 className="text-2xl font-medium text-foreground tracking-tight flex items-center gap-3">
+                    <span className="p-2 bg-accent rounded-lg text-foreground border border-border">
                         <MagicIcon />
                     </span>
                     Miscellaneous Actions
                 </h1>
-                <p className="text-slate-500 text-sm font-medium">Run every non-global admin panel command that targets a live player.</p>
+                <p className="text-muted-foreground text-sm font-medium">Run every non-global admin panel command that targets a live player.</p>
             </div>
 
             <div className="w-full">
-                <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4 items-center">
+                <Card className="bg-card border border-border rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4 items-center">
                     <div className="relative flex-1 w-full">
-                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-500">
+                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-muted-foreground">
                             <SearchIcon />
                         </div>
                         <Input
@@ -272,46 +274,46 @@ export default function MiscPage() {
                             placeholder="Search live players or enter a username for a manual target..."
                             value={searchQuery}
                             onChange={(event) => setSearchQuery(event.target.value)}
-                            className="w-full bg-black/40 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-medium"
+                            className="w-full transition-all"
                         />
                     </div>
-                </div>
+                </Card>
 
-                <div className="bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden shadow-xl min-h-[400px]">
-                    <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/20 flex justify-between items-center">
-                        <h2 className="text-xs font-bold text-white uppercase tracking-widest">
+                <div className="bg-card border border-border rounded-xl overflow-hidden min-h-[400px]">
+                    <div className="px-6 py-4 border-b border-border bg-card flex justify-between items-center">
+                        <h2 className="text-xs font-medium text-foreground">
                             {searchQuery ? `Search Results (${filteredPlayers.length})` : `Active Players (${players.length})`}
                         </h2>
                     </div>
 
-                    <div className="divide-y divide-slate-800/50 max-h-[700px] overflow-y-auto custom-scrollbar">
+                    <div className="divide-y divide-border max-h-[700px] overflow-y-auto custom-scrollbar">
                         {isManualTarget && (
-                            <div className="p-6 bg-sky-500/5 border-b border-sky-500/10">
+                            <div className="p-6 bg-accent border-b border-border">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <div className="px-2 py-0.5 bg-sky-600 text-white text-[9px] font-black uppercase rounded">Manual Target</div>
-                                    <h3 className="font-bold text-white text-sm">{searchQuery}</h3>
+                                    <div className="px-2 py-0.5 bg-primary text-foreground text-xs font-semibold rounded">Manual Target</div>
+                                    <h3 className="font-medium text-foreground text-sm">{searchQuery}</h3>
                                 </div>
                                 {renderActions(searchQuery)}
                             </div>
                         )}
 
                         {filteredPlayers.length === 0 && !isManualTarget ? (
-                            <div className="p-20 text-center text-slate-600 font-bold uppercase text-[10px] tracking-widest">
+                            <div className="p-20 text-center text-muted-foreground font-medium text-xs">
                                 {searchQuery ? "No matching players found." : "No players online."}
                             </div>
                         ) : (
                             filteredPlayers.map((player) => (
-                                <div key={`${player.name}-${player.serverId}`} className="p-6 hover:bg-sky-500/5 transition-all">
+                                <div key={`${player.name}-${player.serverId}`} className="p-6 hover:bg-accent transition-all">
                                     <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-6">
                                         <div className="flex items-center gap-4 min-w-0">
                                             {player.avatarUrl ? (
                                                 <img
                                                     src={player.avatarUrl}
                                                     alt={player.name}
-                                                    className="w-10 h-10 rounded-full border border-slate-700 bg-slate-900 object-cover"
+                                                    className="w-10 h-10 rounded-full border border-border bg-card object-cover"
                                                 />
                                             ) : (
-                                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 border border-slate-700">
+                                                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground border border-border">
                                                     <UserIcon />
                                                 </div>
                                             )}
@@ -319,11 +321,11 @@ export default function MiscPage() {
                                             <div className="min-w-0">
                                                 <Link
                                                     href={`/dashboard/${guildId}/players/${encodeURIComponent(player.name)}`}
-                                                    className="font-bold text-white text-sm hover:text-sky-400 transition-colors"
+                                                    className="font-medium text-foreground text-sm hover:text-foreground transition-colors"
                                                 >
                                                     {player.displayName}
                                                 </Link>
-                                                <p className="truncate text-[10px] font-mono text-slate-500 uppercase tracking-tighter">
+                                                <p className="truncate text-xs font-mono text-muted-foreground">
                                                     @{player.name} • {player.userId || 'NO ID'} • SERVER: {player.serverId.substring(0, 8)}...
                                                 </p>
                                             </div>
@@ -348,11 +350,11 @@ export default function MiscPage() {
                     background: transparent;
                 }
                 .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: #1e293b;
+                    background: var(--dice-border);
                     border-radius: 10px;
                 }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: #334155;
+                    background: var(--dice-muted-foreground);
                 }
             `}</style>
         </div>

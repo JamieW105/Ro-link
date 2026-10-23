@@ -1,5 +1,13 @@
 'use client';
 
+import { Stat, StatLabel, StatValue } from '@/components/ui/stat';
+import { Status, StatusIndicator } from '@/components/ui/status';
+import { ArrowLeft as PanelBackIcon } from 'lucide-react';
+
+import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
+
+import { Card } from '@/components/ui/card';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -533,13 +541,13 @@ function getReportStatus(report: Pick<LiveReport, 'status'> | null | undefined):
 function reportStatusClass(status: string | null | undefined) {
     const normalized = trimString(status).toUpperCase();
     if (normalized === 'RESOLVED') {
-        return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300';
+        return 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400';
     }
     if (normalized === 'DISMISSED') {
-        return 'border-slate-700 bg-slate-800/60 text-slate-400';
+        return 'border-border bg-muted text-muted-foreground';
     }
 
-    return 'border-amber-500/25 bg-amber-500/10 text-amber-300';
+    return 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400';
 }
 
 function getReportReporterLabel(report: LiveReport) {
@@ -700,7 +708,7 @@ function getMissingRequiredModuleFields(command: AdminPanelCommandDefinition, ar
 
 function ActionTooltip({ label }: { label: string }) {
     return (
-        <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-200 opacity-0 shadow-xl transition-all group-hover:translate-y-0 group-hover:opacity-100">
+        <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
             {label}
         </span>
     );
@@ -710,27 +718,27 @@ function UserAvatarButton({ user, onClick, onContextMenu, compact = false }: { u
     const sizeClass = compact ? 'h-8 w-8' : 'h-10 w-10';
 
     return (
-        <Button variant="unstyled" size="unstyled"
+        <Button variant="outline" size="default"
             type="button"
             onClick={onClick}
             onContextMenu={onContextMenu}
-            className={`group relative ${sizeClass} shrink-0 rounded-xl border border-slate-700 bg-slate-900 transition-all hover:border-sky-400/60 hover:shadow-lg hover:shadow-sky-950/30`}
+            className={`group relative ${sizeClass} shrink-0     transition-all   `}
         >
-            <span className="block h-full w-full overflow-hidden rounded-[inherit]">
+            <span className="block h-full w-full overflow-hidden rounded-xl">
                 {user.avatarUrl ? (
                     <img src={user.avatarUrl} alt={user.username} className="h-full w-full object-cover" />
                 ) : (
-                    <span className="flex h-full w-full items-center justify-center text-xs font-black uppercase text-slate-400">
+                    <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
                         {user.username.slice(0, 1)}
                     </span>
                 )}
             </span>
-            <span className={`absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full border border-slate-950 ${user.presence === 'live' ? 'bg-emerald-400' : user.presence === 'recently-left' ? 'bg-amber-400' : 'bg-slate-500'}`} />
-            <span className="pointer-events-none absolute left-1/2 top-full z-40 mt-2 min-w-36 -translate-x-1/2 -translate-y-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-left opacity-0 shadow-2xl shadow-black/40 transition-all group-hover:translate-y-0 group-hover:opacity-100">
-                <span className="block truncate text-xs font-black text-white">
+            <span className={`absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full border border-border ${user.presence === 'live' ? 'bg-emerald-400' : user.presence === 'recently-left' ? 'bg-amber-400' : 'bg-muted'}`} />
+            <span className="pointer-events-none absolute left-1/2 top-full z-40 mt-2 min-w-36 -translate-x-1/2 -translate-y-1 rounded-lg border border-border bg-card px-3 py-2 text-left opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
+                <span className="block truncate text-xs font-semibold text-foreground">
                     {user.displayName || user.username}
                 </span>
-                <span className="mt-0.5 block truncate font-mono text-[10px] font-bold text-sky-300">
+                <span className="mt-0.5 block truncate font-mono text-xs font-medium text-foreground">
                     @{user.username}
                 </span>
             </span>
@@ -742,15 +750,15 @@ function UserAvatar({ user, compact = false }: { user: LivePanelUser; compact?: 
     const sizeClass = compact ? 'h-8 w-8' : 'h-10 w-10';
 
     return (
-        <span className={`relative ${sizeClass} shrink-0 overflow-hidden rounded-xl border border-slate-700 bg-slate-900`}>
+        <span className={`relative ${sizeClass} shrink-0 overflow-hidden rounded-xl border border-border bg-card`}>
             {user.avatarUrl ? (
                 <img src={user.avatarUrl} alt={user.username} className="h-full w-full object-cover" />
             ) : (
-                <span className="flex h-full w-full items-center justify-center text-xs font-black uppercase text-slate-400">
+                <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
                     {user.username.slice(0, 1)}
                 </span>
             )}
-            <span className={`absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full border border-slate-950 ${user.presence === 'live' ? 'bg-emerald-400' : user.presence === 'recently-left' ? 'bg-amber-400' : 'bg-slate-500'}`} />
+            <span className={`absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full border border-border ${user.presence === 'live' ? 'bg-emerald-400' : user.presence === 'recently-left' ? 'bg-amber-400' : 'bg-muted'}`} />
         </span>
     );
 }
@@ -761,10 +769,10 @@ function ClickableUserText({ value, onOpen }: { value: string; onOpen: () => voi
     }
 
     return (
-        <Button variant="unstyled" size="unstyled"
+        <Button variant="ghost" size="default"
             type="button"
             onClick={onOpen}
-            className="font-semibold text-sky-300 underline decoration-sky-500/30 underline-offset-4 transition-colors hover:text-sky-100"
+            className="underline decoration-sky-500/30 underline-offset-4 transition-colors"
         >
             {value}
         </Button>
@@ -2243,11 +2251,11 @@ export default function LivePanelPage() {
     }
 
     const quickActions = [
-        { command: 'REFRESH', label: 'Refresh', icon: <RefreshIcon />, tone: 'text-sky-300 hover:border-sky-400/50 hover:bg-sky-500/10' },
-        { command: 'RESET', label: 'Reset', icon: <ResetIcon />, tone: 'text-indigo-300 hover:border-indigo-400/50 hover:bg-indigo-500/10' },
-        { command: 'KICK', label: 'Kick', icon: <KickIcon />, tone: 'text-amber-300 hover:border-amber-400/50 hover:bg-amber-500/10' },
-        { command: 'BAN', label: 'Ban', icon: <BanIcon />, tone: 'text-red-300 hover:border-red-400/50 hover:bg-red-500/10' },
-        { command: 'SOFTBAN', label: 'Temp Ban', icon: <TempBanIcon />, tone: 'text-rose-300 hover:border-rose-400/50 hover:bg-rose-500/10' },
+        { command: 'REFRESH', label: 'Refresh', icon: <RefreshIcon />, tone: 'text-foreground hover:border-border hover:bg-accent' },
+        { command: 'RESET', label: 'Reset', icon: <ResetIcon />, tone: 'text-foreground hover:border-border hover:bg-accent' },
+        { command: 'KICK', label: 'Kick', icon: <KickIcon />, tone: 'text-amber-700 dark:text-amber-400 hover:border-amber-200 hover:bg-amber-50' },
+        { command: 'BAN', label: 'Ban', icon: <BanIcon />, tone: 'text-red-700 dark:text-red-400 hover:border-red-200 hover:bg-red-50' },
+        { command: 'SOFTBAN', label: 'Temp Ban', icon: <TempBanIcon />, tone: 'text-rose-700 dark:text-rose-400 hover:border-rose-200 hover:bg-rose-50' },
     ].filter((action) => canUseDashboardCommand(perms, action.command));
     const selectedReportStatus = getReportStatus(selectedReport);
     const selectedReportTargetUsername = trimString(selectedReportProfile?.roblox_username) || trimString(selectedReport?.reported_roblox_username);
@@ -2260,114 +2268,75 @@ export default function LivePanelPage() {
 
     if (loading) {
         return (
-            <div className="flex h-screen items-center justify-center bg-[#020617]">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+            <div className="flex h-screen items-center justify-center bg-background">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-transparent" />
             </div>
         );
     }
 
     return (
-        <div className="live-panel fixed inset-0 flex flex-col overflow-hidden bg-[#020617] text-slate-200">
-            <header className="shrink-0 border-b border-slate-800 bg-slate-950/80 shadow-2xl shadow-black/20">
-                <div className="grid min-h-12 grid-cols-[1fr_auto_1fr] items-center border-b border-slate-800 bg-slate-900/70 px-4 py-2">
-                    <div />
-                    <div className="text-center text-xs font-black uppercase tracking-[0.28em] text-slate-500">
-                        Live Operations
-                    </div>
-                    <Link
-                        href="/dashboard"
-                        className="justify-self-end rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-300 transition-colors hover:border-sky-400/50 hover:text-white"
-                    >
-                        Exit
-                    </Link>
+        <div className="live-panel fixed inset-0 flex flex-col overflow-hidden bg-background text-foreground">
+            <header className="shrink-0 border-b border-border bg-background">
+                <div className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 md:px-6">
+                    <div className="flex min-w-0 items-center gap-3"><Button asChild variant="ghost" size="icon" className="size-8"><Link href={`/dashboard/${guildId}`} aria-label="Back to dashboard"><PanelBackIcon className="size-4" /></Link></Button><div className="min-w-0"><h1 className="text-base font-semibold tracking-tight">Live panel</h1><p className="truncate text-xs text-muted-foreground">{serverName}</p></div><Status variant="success" className="hidden sm:inline-flex"><StatusIndicator />Live</Status></div>
+                    <div className="flex items-center gap-2"><ThemeToggle /><Button asChild variant="outline" size="sm"><Link href="/dashboard">All servers</Link></Button></div>
                 </div>
-                <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex min-w-0 items-center gap-4">
-                        <img
-                            src={getDiscordMediaProxyUrl(session?.user?.image) || '/Media/Ro-LinkIcon.png'}
-                            alt=""
-                            className="h-16 w-16 rounded-2xl border border-sky-500/25 bg-slate-900 object-cover p-0.5 shadow-lg shadow-sky-950/30"
-                        />
-                        <div className="min-w-0">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">Live Panel</p>
-                            <h1 className="mt-1 text-2xl font-black tracking-tight text-white md:text-3xl">
-                                Welcome {session?.user?.name || 'Moderator'}
-                            </h1>
-                            <p className="mt-1 truncate text-sm font-medium text-slate-400">{serverName}</p>
-                        </div>
-                    </div>
-
-                    <div className={`grid gap-3 lg:min-w-[390px] ${canManageReports ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
-                        <div className="rounded-xl border border-slate-800 bg-black/20 px-4 py-3">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Servers</p>
-                            <p className="mt-1 text-2xl font-black text-white">{enrichedServers.length}</p>
-                        </div>
-                        <div className="rounded-xl border border-slate-800 bg-black/20 px-4 py-3">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Users</p>
-                            <p className="mt-1 text-2xl font-black text-emerald-400">{totalPlayers}</p>
-                        </div>
-                        <div className="rounded-xl border border-slate-800 bg-black/20 px-4 py-3">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Logs</p>
-                            <p className="mt-1 text-2xl font-black text-sky-300">{logs.length}</p>
-                        </div>
-                        {canManageReports && (
-                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Reports</p>
-                                <p className="mt-1 text-2xl font-black text-amber-300">{pendingReports.length}</p>
-                            </div>
-                        )}
-                    </div>
+                <div className={`grid gap-3 border-t border-border bg-muted/20 p-4 md:px-6 ${canManageReports ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+                    <Stat className="gap-y-1 p-3"><StatLabel>Servers</StatLabel><StatValue>{enrichedServers.length}</StatValue></Stat>
+                    <Stat className="gap-y-1 p-3"><StatLabel>Players</StatLabel><StatValue>{totalPlayers}</StatValue></Stat>
+                    <Stat className="gap-y-1 p-3"><StatLabel>Events</StatLabel><StatValue>{logs.length}</StatValue></Stat>
+                    {canManageReports && <Stat className="gap-y-1 p-3"><StatLabel>Pending reports</StatLabel><StatValue>{pendingReports.length}</StatValue></Stat>}
                 </div>
             </header>
 
             {notice && (
                 <div className={`shrink-0 border-b px-4 py-3 text-sm font-semibold ${notice.type === 'success'
-                    ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
-                    : 'border-red-500/20 bg-red-500/10 text-red-300'
+                    ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'
+                    : 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400'
                     }`}>
                     {notice.text}
                 </div>
             )}
 
             <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(300px,0.92fr)_minmax(380px,1.08fr)]">
-                <section className="flex min-h-0 flex-col overflow-hidden border-b border-slate-800 bg-slate-950/20 md:border-b-0 md:border-r">
-                    <div className="shrink-0 border-b border-slate-800 bg-slate-950/30 p-5">
+                <section className="flex min-h-0 flex-col overflow-hidden border-b border-border bg-card md:border-b-0 md:border-r">
+                    <div className="shrink-0 border-b border-border bg-card p-5">
                         <div className="flex items-center justify-between gap-3">
                             <div>
-                                <h2 className="text-sm font-black uppercase tracking-widest text-white">Quick Actions</h2>
-                                <p className="mt-1 text-xs font-medium text-slate-500">Run global tools or target a user from the lists below.</p>
+                                <h2 className="text-sm font-semibold text-foreground">Quick Actions</h2>
+                                <p className="mt-1 text-xs font-medium text-muted-foreground">Run global tools or target a user from the lists below.</p>
                             </div>
-                            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-300">
+                            <span className="rounded-full border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                                 Live
                             </span>
                         </div>
                         <div className={`mt-4 grid gap-3 ${canRunCommands && canAnnounce ? 'grid-cols-2' : 'grid-cols-1'}`}>
                             {canRunCommands && (
-                                <Button variant="unstyled" size="unstyled"
+                                <Button variant="outline" size="default"
                                     type="button"
                                     onClick={() => setPanelModal('command')}
-                                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white transition-all hover:border-sky-400/50 hover:bg-sky-500/15"
+                                    className="flex items-center justify-center transition-all"
                                 >
                                     <CommandIcon />
                                     Run Command
                                 </Button>
                             )}
                             {canAnnounce && (
-                                <Button variant="unstyled" size="unstyled"
+                                <Button variant="outline" size="default"
                                     type="button"
                                     onClick={() => {
                                         setAnnouncementTargetType('');
                                         setAnnouncementUser('');
                                         setPanelModal('announce');
                                     }}
-                                    className="flex items-center justify-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-wider text-sky-100 transition-all hover:border-sky-300/60 hover:bg-sky-500/20"
+                                    className="flex items-center justify-center transition-all"
                                 >
                                     <AnnounceIcon />
                                     Announce
                                 </Button>
                             )}
                             {!canRunCommands && !canAnnounce && (
-                                <div className="rounded-xl border border-slate-800 bg-black/20 px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-slate-500">
+                                <div className="rounded-xl border border-border bg-muted px-4 py-3 text-center text-xs font-medium text-muted-foreground">
                                     No live commands available
                                 </div>
                             )}
@@ -2375,31 +2344,31 @@ export default function LivePanelPage() {
                     </div>
 
                     {canManageReports && (
-                        <div className="shrink-0 border-b border-slate-800 bg-amber-500/[0.03] p-5">
+                        <div className="shrink-0 border-b border-border bg-amber-500/[0.03] p-5">
                             <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2 text-amber-200">
+                                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
                                     <ReportIcon />
-                                    <h2 className="text-sm font-black uppercase tracking-widest">Unmoderated Reports</h2>
-                                    <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-black text-amber-300">{pendingReports.length}</span>
+                                    <h2 className="text-sm font-semibold">Unmoderated Reports</h2>
+                                    <span className="rounded-full border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">{pendingReports.length}</span>
                                 </div>
-                                <Button variant="unstyled" size="unstyled"
+                                <Button variant="outline" size="default"
                                     type="button"
                                     onClick={() => {
                                         clearSelectedProfile();
                                         setRightPaneMode('reports');
                                     }}
-                                    className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-200 transition-colors hover:border-amber-300/50 hover:bg-amber-500/20"
+                                    className="transition-colors"
                                 >
                                     Manage
                                 </Button>
                             </div>
 
                             {pendingReports.length === 0 ? (
-                                <p className="mt-3 text-xs font-medium text-slate-500">No reports are awaiting moderation.</p>
+                                <p className="mt-3 text-xs font-medium text-muted-foreground">No reports are awaiting moderation.</p>
                             ) : (
                                 <div className="mt-3 space-y-2">
                                     {pendingReports.slice(0, 3).map((report) => (
-                                        <Button variant="unstyled" size="unstyled"
+                                        <Button variant="outline" size="default"
                                             key={report.id}
                                             type="button"
                                             onClick={() => {
@@ -2408,25 +2377,25 @@ export default function LivePanelPage() {
                                                 setReportStatusFilter('PENDING');
                                                 setSelectedReportId(report.id);
                                             }}
-                                            className="block w-full rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-2.5 text-left transition-colors hover:border-amber-400/40 hover:bg-amber-500/5"
+                                            className="h-auto min-h-9 justify-start whitespace-normal py-3 block w-full text-left transition-colors"
                                         >
                                             <div className="flex items-center justify-between gap-3">
-                                                <span className="min-w-0 truncate text-xs font-black text-white">{report.reported_roblox_username}</span>
-                                                <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">{formatTime(report.created_at)}</span>
+                                                <span className="min-w-0 truncate text-xs font-semibold text-foreground">{report.reported_roblox_username}</span>
+                                                <span className="shrink-0 font-mono text-xs font-medium text-muted-foreground">{formatTime(report.created_at)}</span>
                                             </div>
-                                            <p className="mt-1 truncate text-xs font-medium text-slate-400">{report.reason}</p>
-                                            <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-wider text-slate-600">By {report.reporter_roblox_username || report.reporter_discord_id || 'Unknown'}</p>
+                                            <p className="mt-1 truncate text-xs font-medium text-muted-foreground">{report.reason}</p>
+                                            <p className="mt-1 truncate text-xs font-medium text-muted-foreground">By {report.reporter_roblox_username || report.reporter_discord_id || 'Unknown'}</p>
                                         </Button>
                                     ))}
                                     {pendingReports.length > 3 && (
-                                        <Button variant="unstyled" size="unstyled"
+                                        <Button variant="ghost" size="default"
                                             type="button"
                                             onClick={() => {
                                                 clearSelectedProfile();
                                                 setRightPaneMode('reports');
                                                 setReportStatusFilter('PENDING');
                                             }}
-                                            className="block w-full pt-1 text-right text-[10px] font-black uppercase tracking-widest text-amber-300 transition-colors hover:text-amber-100"
+                                            className="block w-full text-right transition-colors"
                                         >
                                             View all {pendingReports.length} reports
                                         </Button>
@@ -2437,22 +2406,22 @@ export default function LivePanelPage() {
                     )}
 
                     <div className="flex min-h-0 flex-1 flex-col">
-                        <div className="shrink-0 border-b border-slate-800 p-5">
+                        <div className="shrink-0 border-b border-border p-5">
                             <div className="mb-3 flex items-center justify-between">
-                                <h2 className="text-sm font-black uppercase tracking-widest text-white">Live Servers</h2>
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Update: 7s</span>
+                                <h2 className="text-sm font-semibold text-foreground">Live Servers</h2>
+                                <span className="text-xs font-medium text-muted-foreground">Update: 7s</span>
                             </div>
                             <Input
                                 value={serverSearch}
                                 onChange={(event) => setServerSearch(event.target.value)}
                                 placeholder="Search servers, users, user IDs"
-                                className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm font-medium text-white outline-none transition-all placeholder:text-slate-600 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
+                                className="w-full transition-all"
                             />
                         </div>
 
                         <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
                             {filteredServers.length === 0 ? (
-                                <div className="p-10 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                <div className="p-10 text-center text-xs font-medium text-muted-foreground">
                                     No live servers matched.
                                 </div>
                             ) : (
@@ -2460,17 +2429,17 @@ export default function LivePanelPage() {
                                     {filteredServers.map((server) => {
                                         const joinUrl = buildJoinUrl(placeId, server.id);
                                         return (
-                                            <div key={server.id} onContextMenu={(event) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, jobId: server.id, user: null }); }} className="m-3 rounded-2xl border border-slate-700/70 bg-slate-950/45 p-4 shadow-inner shadow-black/20 transition-all hover:border-sky-400/40 hover:bg-sky-500/5">
+                                            <Card key={server.id} onContextMenu={(event) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, jobId: server.id, user: null }); }} className="m-3 rounded-xl border border-border bg-card p-4 transition-all hover:border-border hover:bg-accent">
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="min-w-0">
-                                                        <Button variant="unstyled" size="unstyled"
+                                                        <Button variant="ghost" size="default"
                                                             type="button"
                                                             onClick={() => setServerSearch(server.id)}
-                                                            className="block max-w-full truncate text-left font-mono text-xs font-black uppercase tracking-wider text-white hover:text-sky-200"
+                                                            className="block max-w-full truncate text-left"
                                                         >
                                                             {formatServerId(server.id)}
                                                         </Button>
-                                                        <p className="mt-1 text-[11px] font-medium text-slate-500">
+                                                        <p className="mt-1 text-xs font-medium text-muted-foreground">
                                                             {server.visiblePlayerCount} player{server.visiblePlayerCount === 1 ? '' : 's'} active, last pulse {formatTime(server.updated_at)}
                                                         </p>
                                                     </div>
@@ -2478,40 +2447,40 @@ export default function LivePanelPage() {
                                                         {joinUrl ? (
                                                             <a
                                                                 href={joinUrl}
-                                                                className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-500/25 bg-emerald-500/15 text-emerald-300 transition-all hover:border-emerald-300 hover:bg-emerald-500/25"
+                                                                className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 transition-all hover:border-emerald-300 hover:bg-emerald-50"
                                                             >
                                                                 <PlayIcon />
                                                                 <ActionTooltip label="Join Server" />
                                                             </a>
                                                         ) : (
-                                                            <Button variant="unstyled" size="unstyled"
+                                                            <Button variant="outline" size="default"
                                                                 type="button"
                                                                 disabled
-                                                                className="group relative flex h-10 w-10 shrink-0 cursor-not-allowed items-center justify-center rounded-xl border border-slate-800 bg-slate-950 text-slate-600"
+                                                                className="group relative flex shrink-0 cursor-not-allowed items-center justify-center"
                                                             >
                                                                 <PlayIcon />
                                                                 <ActionTooltip label="Set Place ID to Join" />
                                                             </Button>
                                                         )}
                                                         {canRestartServers && (
-                                                            <Button variant="unstyled" size="unstyled"
+                                                            <Button variant="outline" size="default"
                                                                 type="button"
                                                                 aria-label={`Restart server ${formatServerId(server.id)}`}
                                                                 onClick={() => sendServerLifecycleCommand(server.id, 'UPDATE')}
                                                                 disabled={actionLoading === 'UPDATE'}
-                                                                className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-300 transition-all hover:border-amber-300 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
+                                                                className="group relative flex shrink-0 items-center justify-center transition-all disabled:cursor-not-allowed"
                                                             >
                                                                 <ServerRestartIcon />
                                                                 <ActionTooltip label="Restart Server" />
                                                             </Button>
                                                         )}
                                                         {canShutdownServers && (
-                                                            <Button variant="unstyled" size="unstyled"
+                                                            <Button variant="outline" size="default"
                                                                 type="button"
                                                                 aria-label={`Shut down server ${formatServerId(server.id)}`}
                                                                 onClick={() => sendServerLifecycleCommand(server.id, 'SHUTDOWN')}
                                                                 disabled={actionLoading === 'SHUTDOWN'}
-                                                                className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-500/25 bg-red-500/10 text-red-300 transition-all hover:border-red-300 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-950 disabled:text-slate-600"
+                                                                className="group relative flex shrink-0 items-center justify-center transition-all disabled:cursor-not-allowed"
                                                             >
                                                                 <ServerShutdownIcon />
                                                                 <ActionTooltip label="Shut Down Server" />
@@ -2532,12 +2501,12 @@ export default function LivePanelPage() {
                                                             />
                                                         ))
                                                     ) : (
-                                                        <span className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-[11px] font-semibold text-slate-500">
+                                                        <span className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
                                                             Legacy bridge payload has no user profiles.
                                                         </span>
                                                     )}
                                                 </div>
-                                            </div>
+                                            </Card>
                                         );
                                     })}
                                 </div>
@@ -2546,99 +2515,99 @@ export default function LivePanelPage() {
                     </div>
                 </section>
 
-                <section className="flex min-h-0 flex-col overflow-hidden bg-slate-950/10">
+                <section className="flex min-h-0 flex-col overflow-hidden bg-card">
                     {panelUser ? (
                         <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-5">
                             <div className="mb-4 flex items-center justify-between gap-3">
                                 <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">User Profile</p>
-                                    <h2 className="mt-1 text-xl font-black text-white">Live Panel Profile</h2>
+                                    <p className="text-xs font-medium text-foreground">User Profile</p>
+                                    <h2 className="mt-1 text-xl font-semibold text-foreground">Live Panel Profile</h2>
                                 </div>
-                                <Button variant="unstyled" size="unstyled"
+                                <Button variant="outline" size="icon"
                                     type="button"
                                     onClick={clearSelectedProfile}
-                                    className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-500 transition-colors hover:text-white"
+                                    className="transition-colors"
                                 >
                                     <CloseIcon />
                                 </Button>
                             </div>
 
                             <div className="space-y-4">
-                                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                                <Card className="rounded-xl border border-border bg-card p-5">
                                     <div className="flex items-center gap-4">
-                                        <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-indigo-500/25 bg-indigo-500/10">
+                                        <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border bg-accent">
                                             {panelProfileDetails?.discordUser?.avatarUrl ? (
                                                 <img src={panelProfileDetails.discordUser.avatarUrl} alt="" className="h-full w-full object-cover" />
                                             ) : (
-                                                <span className="flex h-full w-full items-center justify-center text-xl font-black text-indigo-200">
+                                                <span className="flex h-full w-full items-center justify-center text-xl font-semibold text-foreground">
                                                     {(panelProfileDetails?.discordUser?.globalName || panelProfileDetails?.discordUser?.username || panelUser.username).slice(0, 1).toUpperCase()}
                                                 </span>
                                             )}
                                         </span>
                                         <div className="min-w-0">
-                                            <h3 className="truncate text-lg font-black text-white">
+                                            <h3 className="truncate text-lg font-semibold text-foreground">
                                                 {panelProfileDetails?.discordMember?.nick || panelProfileDetails?.discordUser?.globalName || panelProfileDetails?.discordUser?.username || 'Discord user not linked'}
                                             </h3>
-                                            <p className="truncate text-sm font-semibold text-slate-400">
+                                            <p className="truncate text-sm font-semibold text-muted-foreground">
                                                 {panelProfileDetails?.discordUser?.username ? `@${panelProfileDetails.discordUser.username}` : 'Using Roblox identity only'}
                                             </p>
-                                            <p className="mt-1 truncate font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                            <p className="mt-1 truncate font-mono text-xs font-medium text-muted-foreground">
                                                 {panelProfileDetails?.discordUser?.id || (profileDetailsLoadingKey === getUserKey(panelUser) ? 'Loading Discord info' : 'No Discord ID')}
                                             </p>
                                         </div>
                                     </div>
                                     <div className="mt-4 grid grid-cols-2 gap-3">
-                                        <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Linked</p>
-                                            <p className={`mt-1 text-sm font-black ${panelProfileDetails?.linked ? 'text-emerald-300' : 'text-slate-400'}`}>
+                                        <div className="rounded-xl border border-border bg-muted p-3">
+                                            <p className="text-xs font-medium text-muted-foreground">Linked</p>
+                                            <p className={`mt-1 text-sm font-semibold ${panelProfileDetails?.linked ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>
                                                 {panelProfileDetails?.linked ? 'Verified' : 'Roblox only'}
                                             </p>
                                         </div>
-                                        <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Top Role</p>
-                                            <p className="mt-1 truncate text-sm font-black text-white" style={{ color: panelProfileDetails?.discordMember?.highestRole?.color || undefined }}>
+                                        <div className="rounded-xl border border-border bg-muted p-3">
+                                            <p className="text-xs font-medium text-muted-foreground">Top Role</p>
+                                            <p className="mt-1 truncate text-sm font-semibold text-foreground" style={{ color: panelProfileDetails?.discordMember?.highestRole?.color || undefined }}>
                                                 {panelProfileDetails?.discordMember?.highestRole?.name || 'None'}
                                             </p>
                                         </div>
                                     </div>
-                                </div>
+                                </Card>
 
-                                <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                <Card className="rounded-xl border border-border bg-card p-4">
                                     <div className="flex items-center gap-3">
                                         <UserAvatar user={panelUser} />
                                         <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-black text-white">{panelProfileDetails?.robloxUser?.displayName || panelProfile?.displayName || panelUser.displayName}</p>
-                                            <p className="truncate text-xs font-semibold text-slate-500">@{panelProfileDetails?.robloxUser?.username || panelProfile?.username || panelUser.username}</p>
+                                            <p className="truncate text-sm font-semibold text-foreground">{panelProfileDetails?.robloxUser?.displayName || panelProfile?.displayName || panelUser.displayName}</p>
+                                            <p className="truncate text-xs font-semibold text-muted-foreground">@{panelProfileDetails?.robloxUser?.username || panelProfile?.username || panelUser.username}</p>
                                         </div>
-                                        <span className={`shrink-0 rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${panelUser.presence === 'live' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-slate-800 bg-black/20 text-slate-400'}`}>
+                                        <span className={`shrink-0 rounded-lg border px-2.5 py-1 text-xs font-semibold   ${panelUser.presence === 'live' ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400' : 'border-border bg-muted text-muted-foreground'}`}>
                                             {presenceLabel(panelUser)}
                                         </span>
                                     </div>
                                     <div className="mt-3 grid grid-cols-2 gap-3">
-                                        <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Roblox ID</p>
-                                            <p className="mt-1 truncate font-mono text-xs font-bold text-sky-300">{panelProfileDetails?.robloxUser?.id || panelProfile?.id || panelUser.userId || 'Unknown'}</p>
+                                        <div className="rounded-xl border border-border bg-muted p-3">
+                                            <p className="text-xs font-medium text-muted-foreground">Roblox ID</p>
+                                            <p className="mt-1 truncate font-mono text-xs font-medium text-foreground">{panelProfileDetails?.robloxUser?.id || panelProfile?.id || panelUser.userId || 'Unknown'}</p>
                                         </div>
-                                        <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Server</p>
-                                            <p className="mt-1 truncate font-mono text-xs font-bold text-white">{panelUser.serverId ? formatServerId(panelUser.serverId) : 'Not live'}</p>
+                                        <div className="rounded-xl border border-border bg-muted p-3">
+                                            <p className="text-xs font-medium text-muted-foreground">Server</p>
+                                            <p className="mt-1 truncate font-mono text-xs font-medium text-foreground">{panelUser.serverId ? formatServerId(panelUser.serverId) : 'Not live'}</p>
                                         </div>
                                     </div>
-                                </div>
+                                </Card>
 
                                 {quickActions.length > 0 && (
-                                    <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                                        <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Moderation Actions</p>
+                                    <Card className="rounded-xl border border-border bg-card p-4">
+                                        <p className="mb-3 text-xs font-medium text-muted-foreground">Moderation Actions</p>
                                         <div className="flex flex-wrap gap-2">
                                             {quickActions.map((action) => {
                                                 const disabled = (action.command === 'KICK' || action.command === 'REFRESH' || action.command === 'RESET') && panelUser.presence !== 'live';
                                                 return (
-                                                    <Button variant="unstyled" size="unstyled"
+                                                    <Button variant="outline" size="default"
                                                         key={action.command}
                                                         type="button"
                                                         disabled={disabled || actionLoading === action.command}
                                                         onClick={() => requestPlayerCommand(action.command, panelUser)}
-                                                        className={`group relative flex h-11 w-11 items-center justify-center rounded-xl border border-slate-800 bg-slate-950 transition-all disabled:cursor-not-allowed disabled:opacity-35 ${action.tone}`}
+                                                        className={`group relative flex   items-center justify-center     transition-all disabled:cursor-not-allowed disabled:opacity-35 ${action.tone}`}
                                                     >
                                                         {action.icon}
                                                         <ActionTooltip label={action.label} />
@@ -2646,11 +2615,11 @@ export default function LivePanelPage() {
                                                 );
                                             })}
                                         </div>
-                                    </div>
+                                    </Card>
                                 )}
 
-                                <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                                    <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Misc / Module Command</p>
+                                <Card className="rounded-xl border border-border bg-card p-4">
+                                    <p className="mb-3 text-xs font-medium text-muted-foreground">Misc / Module Command</p>
                                     <div className="space-y-3">
                                         <Select
                                             value={profileCommand}
@@ -2658,7 +2627,7 @@ export default function LivePanelPage() {
                                                 setProfileCommand(nextValue);
                                                 setProfileCommandValue('');
                                             }}
-                                            className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm font-bold text-white outline-none focus:border-sky-500/60"
+                                            className="w-full"
                                             aria-label="Profile command"
                                             options={[{ value: '', label: 'Choose a command' }, ...profileCommandOptions.map(command => ({ value: command.id, label: command.label, group: 'Misc commands' })), ...moduleLiveActions.map(action => ({ value: action.id, label: `${action.moduleName} - ${action.label}`, group: 'Module commands' }))]}
                                         />
@@ -2673,143 +2642,143 @@ export default function LivePanelPage() {
                                                         : profileCommandDefinition?.id === 'BROADCAST'
                                                             ? 'Message'
                                                             : 'Value or note'}
-                                                className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60"
+                                                className="w-full"
                                             />
                                         )}
-                                        <Button variant="unstyled" size="unstyled"
+                                        <Button variant="outline" size="default"
                                             type="button"
                                             disabled={!profileCommand || actionLoading === profileCommand}
                                             onClick={submitProfileCommand}
-                                            className="w-full rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-all hover:bg-sky-500/20 disabled:opacity-50"
+                                            className="w-full transition-all disabled:opacity-50"
                                         >
                                             {profileCommand && actionLoading === profileCommand ? 'Running...' : 'Run On User'}
                                         </Button>
                                     </div>
-                                </div>
+                                </Card>
 
-                                <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Staff Note</h3>
+                                <Card className="rounded-xl border border-border bg-card p-4">
+                                    <h3 className="text-sm font-semibold text-foreground">Staff Note</h3>
                                     <Textarea
                                         value={noteText}
                                         onChange={(event) => setNoteText(event.target.value)}
                                         rows={3}
                                         placeholder={`Write a private staff note for ${panelUser.username}`}
-                                        className="mt-3 w-full resize-none rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60"
+                                        className="mt-3 w-full resize-none"
                                     />
                                     <div className="mt-3 flex justify-end">
-                                        <Button variant="unstyled" size="unstyled"
+                                        <Button variant="outline" size="default"
                                             type="button"
                                             disabled={actionLoading === 'note'}
                                             onClick={() => saveUserNote('note')}
-                                            className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-sky-200 transition-all hover:bg-sky-500/20 disabled:opacity-50"
+                                            className="transition-all disabled:opacity-50"
                                         >
                                             {actionLoading === 'note' ? 'Saving...' : 'Save Note'}
                                         </Button>
                                     </div>
                                     <div className="mt-4 space-y-2">
                                         {staffNotesLoading ? (
-                                            <div className="rounded-xl border border-dashed border-slate-800 p-4 text-center text-xs font-semibold text-slate-500">Loading notes...</div>
+                                            <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs font-semibold text-muted-foreground">Loading notes...</div>
                                         ) : staffNotes.length > 0 ? staffNotes.map((note) => (
-                                            <div key={note.id} className="rounded-xl border border-slate-800 bg-black/20 p-3">
-                                                <p className="whitespace-pre-wrap text-xs leading-5 text-slate-300">{note.note}</p>
-                                                <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                            <div key={note.id} className="rounded-xl border border-border bg-muted p-3">
+                                                <p className="whitespace-pre-wrap text-xs leading-5 text-foreground">{note.note}</p>
+                                                <p className="mt-2 text-xs font-semibold text-muted-foreground">
                                                     By {note.created_by_tag || note.created_by_discord_id || 'Unknown'} on {new Date(note.created_at).toLocaleDateString()}
                                                 </p>
                                             </div>
                                         )) : (
-                                            <div className="rounded-xl border border-dashed border-slate-800 p-4 text-center text-xs font-semibold text-slate-500">No staff notes for this user.</div>
+                                            <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs font-semibold text-muted-foreground">No staff notes for this user.</div>
                                         )}
                                     </div>
-                                </div>
+                                </Card>
 
-                                <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                <Card className="rounded-xl border border-border bg-card p-4">
                                     <div className="mb-3 flex items-center justify-between gap-3">
-                                        <h3 className="text-sm font-black uppercase tracking-widest text-white">User Logs</h3>
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                        <h3 className="text-sm font-semibold text-foreground">User Logs</h3>
+                                        <span className="text-xs font-medium text-muted-foreground">
                                             {profileLogsLoading ? 'Loading' : `${profileLogEntries.length} shown`}
                                         </span>
                                     </div>
                                     <div className="space-y-2">
                                         {panelUser.presence === 'live' && (
-                                            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3">
+                                            <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-3">
                                                 <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-xs font-black uppercase tracking-widest text-emerald-200">Joined</span>
-                                                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">{panelUser.joinedAt ? formatTime(new Date(panelUser.joinedAt).toISOString()) : panelUser.serverId ? formatServerId(panelUser.serverId) : 'Live'}</span>
+                                                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Joined</span>
+                                                    <span className="font-mono text-xs font-medium text-emerald-700 dark:text-emerald-400">{panelUser.joinedAt ? formatTime(new Date(panelUser.joinedAt).toISOString()) : panelUser.serverId ? formatServerId(panelUser.serverId) : 'Live'}</span>
                                                 </div>
                                                 <p className="mt-1 text-xs font-medium text-emerald-100/70">{panelUser.joinedAt ? 'Current join time from the tracked live roster.' : 'Currently connected to a tracked live server.'}</p>
                                             </div>
                                         )}
                                         {panelUser.presence === 'recently-left' && (
-                                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
+                                            <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3">
                                                 <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-xs font-black uppercase tracking-widest text-amber-200">Left</span>
-                                                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-amber-300">{panelUser.leftAt ? formatTime(new Date(panelUser.leftAt).toISOString()) : 'Recent'}</span>
+                                                    <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Left</span>
+                                                    <span className="font-mono text-xs font-medium text-amber-700 dark:text-amber-400">{panelUser.leftAt ? formatTime(new Date(panelUser.leftAt).toISOString()) : 'Recent'}</span>
                                                 </div>
                                                 <p className="mt-1 text-xs font-medium text-amber-100/70">Recently disappeared from the live server roster.</p>
                                             </div>
                                         )}
                                         {profileLogEntries.map((log) => (
-                                            <div key={log.id} className="rounded-xl border border-slate-800 bg-black/20 p-3">
+                                            <div key={log.id} className="rounded-xl border border-border bg-muted p-3">
                                                 <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-xs font-black uppercase tracking-widest text-white">{log.action}</span>
-                                                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">{formatTime(log.timestamp)}</span>
+                                                    <span className="text-xs font-semibold text-foreground">{log.action}</span>
+                                                    <span className="font-mono text-xs font-medium text-muted-foreground">{formatTime(log.timestamp)}</span>
                                                 </div>
-                                                <p className="mt-1 text-xs font-medium text-slate-400">
+                                                <p className="mt-1 text-xs font-medium text-muted-foreground">
                                                     Target <ClickableUserText value={log.target} onOpen={() => selectProfileUser(resolveUserFromText(log.target))} /> by <ClickableUserText value={log.moderator} onOpen={() => selectProfileUser(resolveUserFromText(log.moderator))} />
                                                 </p>
                                             </div>
                                         ))}
                                         {profileLogEntries.length === 0 && (
-                                            <div className="rounded-xl border border-dashed border-slate-800 p-6 text-center text-xs font-semibold text-slate-500">
+                                            <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs font-semibold text-muted-foreground">
                                                 No logs targeting this user were found.
                                             </div>
                                         )}
                                     </div>
-                                </div>
+                                </Card>
                             </div>
                         </div>
                     ) : rightPaneMode === 'runtime-logs' && runtimeLogTarget ? (
-                        <div className="flex min-h-0 flex-1 flex-col bg-[#020617]">
-                            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-800 bg-slate-950/50 p-5">
+                        <div className="flex min-h-0 flex-1 flex-col bg-background">
+                            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border bg-card p-5">
                                 <div className="min-w-0">
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">Live raw console</p>
-                                    <h2 className="mt-1 truncate text-xl font-black text-white">{runtimeLogTarget.user ? `${runtimeLogTarget.user.username}'s client logs` : `Server ${formatServerId(runtimeLogTarget.jobId)} logs`}</h2>
-                                    <p className="mt-1 text-xs font-medium text-slate-500">Refreshing every 7 seconds. Press Esc to return to live commands.</p>
+                                    <p className="text-xs font-medium text-foreground">Live raw console</p>
+                                    <h2 className="mt-1 truncate text-xl font-semibold text-foreground">{runtimeLogTarget.user ? `${runtimeLogTarget.user.username}'s client logs` : `Server ${formatServerId(runtimeLogTarget.jobId)} logs`}</h2>
+                                    <p className="mt-1 text-xs font-medium text-muted-foreground">Refreshing every 7 seconds. Press Esc to return to live commands.</p>
                                 </div>
-                                <Button variant="unstyled" size="unstyled"
+                                <Button variant="outline" size="icon"
                                     type="button"
                                     onClick={() => { setRuntimeLogTarget(null); setRightPaneMode('lookup'); }}
-                                    className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-500 transition-colors hover:text-white"
+                                    className="transition-colors"
                                     aria-label="Return to live commands"
                                 >
                                     <CloseIcon />
                                 </Button>
                             </div>
-                            <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto bg-black/35 p-4 font-mono text-xs leading-6">
+                            <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto bg-muted p-4 font-mono text-xs leading-6">
                                 {runtimeLogsLoading && runtimeLogs.length === 0 ? (
-                                    <div className="p-8 text-center font-sans text-xs font-bold text-slate-500">Loading live console...</div>
+                                    <div className="p-8 text-center font-sans text-xs font-medium text-muted-foreground">Loading live console...</div>
                                 ) : runtimeLogs.length === 0 ? (
-                                    <div className="p-8 text-center font-sans text-xs font-semibold text-slate-500">No runtime logs were reported for this target.</div>
+                                    <div className="p-8 text-center font-sans text-xs font-semibold text-muted-foreground">No runtime logs were reported for this target.</div>
                                 ) : runtimeLogs.slice().reverse().map((log) => (
-                                    <div key={log.id} className={`whitespace-pre-wrap break-words ${log.level === 'error' ? 'text-red-400' : log.level === 'warn' ? 'text-orange-400' : 'text-white'}`}>
-                                        <span className="mr-2 select-none text-slate-600">[{formatTime(log.created_at)}]</span>{log.message}
+                                    <div key={log.id} className={`whitespace-pre-wrap break-words ${log.level === 'error' ? 'text-red-700 dark:text-red-400' : log.level === 'warn' ? 'text-orange-700 dark:text-orange-400' : 'text-foreground'}`}>
+                                        <span className="mr-2 select-none text-muted-foreground">[{formatTime(log.created_at)}]</span>{log.message}
                                     </div>
                                 ))}
                             </div>
                         </div>
                     ) : rightPaneMode === 'reports' && canManageReports ? (
                         <div className="flex min-h-0 flex-1 flex-col">
-                            <div className="shrink-0 border-b border-slate-800 bg-slate-950/30 p-5">
+                            <div className="shrink-0 border-b border-border bg-card p-5">
                                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                                     <div>
-                                        <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-300">Reports Manager</p>
-                                        <h2 className="mt-1 text-xl font-black text-white">Live Reports</h2>
-                                        <p className="mt-1 text-xs font-medium text-slate-500">Review player reports without leaving live operations.</p>
+                                        <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Reports Manager</p>
+                                        <h2 className="mt-1 text-xl font-semibold text-foreground">Live Reports</h2>
+                                        <p className="mt-1 text-xs font-medium text-muted-foreground">Review player reports without leaving live operations.</p>
                                     </div>
-                                    <Button variant="unstyled" size="unstyled"
+                                    <Button variant="outline" size="default"
                                         type="button"
                                         onClick={() => setRightPaneMode('lookup')}
-                                        className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-300 transition-colors hover:border-sky-400/50 hover:text-white"
+                                        className="transition-colors"
                                     >
                                         Lookup
                                     </Button>
@@ -2820,14 +2789,14 @@ export default function LivePanelPage() {
                                         value={reportSearch}
                                         onChange={(event) => setReportSearch(event.target.value)}
                                         placeholder="Search reports"
-                                        className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm font-medium text-white outline-none transition-all placeholder:text-slate-600 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/10"
+                                        className="w-full transition-all"
                                     />
                                 </div>
 
                                 {reportsNotice && (
                                     <div className={`mt-4 rounded-xl border px-4 py-3 text-xs font-semibold ${reportsNotice.type === 'success'
-                                        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
-                                        : 'border-red-500/20 bg-red-500/10 text-red-300'
+                                        ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'
+                                        : 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400'
                                         }`}>
                                         {reportsNotice.text}
                                     </div>
@@ -2835,34 +2804,34 @@ export default function LivePanelPage() {
                             </div>
 
                             <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(240px,0.8fr)_minmax(340px,1.2fr)]">
-                                <div className="custom-scrollbar min-h-0 overflow-y-auto border-b border-slate-800 xl:border-b-0 xl:border-r">
+                                <div className="custom-scrollbar min-h-0 overflow-y-auto border-b border-border xl:border-b-0 xl:border-r">
                                     {reportsLoading ? (
-                                        <div className="p-10 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600">Loading reports...</div>
+                                        <div className="p-10 text-center text-xs font-medium text-muted-foreground">Loading reports...</div>
                                     ) : filteredPanelReports.length === 0 ? (
-                                        <div className="p-10 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600">No reports matched.</div>
+                                        <div className="p-10 text-center text-xs font-medium text-muted-foreground">No reports matched.</div>
                                     ) : (
-                                        <div className="divide-y divide-slate-800/70">
+                                        <div className="divide-y divide-border">
                                             {filteredPanelReports.map((report) => {
                                                 const status = getReportStatus(report);
                                                 const selected = selectedReportId === report.id;
                                                 return (
-                                                    <Button variant="unstyled" size="unstyled"
+                                                    <Button variant="ghost" size="default"
                                                         key={report.id}
                                                         type="button"
                                                         onClick={() => setSelectedReportId(report.id)}
-                                                        className={`block w-full px-5 py-4 text-left transition-colors ${selected ? 'bg-amber-500/10' : 'hover:bg-amber-500/5'}`}
+                                                        className={`h-auto min-h-9 justify-start whitespace-normal py-3 block w-full   text-left transition-colors ${selected ? '' : ''}`}
                                                     >
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div className="min-w-0">
-                                                                <p className="truncate text-sm font-black text-white">{report.reported_roblox_username}</p>
-                                                                <p className="mt-1 truncate font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">#{shortReportId(report.id)}</p>
+                                                                <p className="truncate text-sm font-semibold text-foreground">{report.reported_roblox_username}</p>
+                                                                <p className="mt-1 truncate font-mono text-xs font-medium text-muted-foreground">#{shortReportId(report.id)}</p>
                                                             </div>
-                                                            <span className={`shrink-0 rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${reportStatusClass(status)}`}>
+                                                            <span className={`shrink-0 rounded-lg border px-2 py-0.5 text-xs font-semibold   ${reportStatusClass(status)}`}>
                                                                 {status.toLowerCase()}
                                                             </span>
                                                         </div>
-                                                        <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">{report.reason}</p>
-                                                        <div className="mt-3 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                                                        <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{report.reason}</p>
+                                                        <div className="mt-3 flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
                                                             <span className="min-w-0 truncate">By {getReportReporterLabel(report)}</span>
                                                             <span className="shrink-0">{formatTime(report.created_at)}</span>
                                                         </div>
@@ -2875,55 +2844,55 @@ export default function LivePanelPage() {
 
                                 <div className="custom-scrollbar min-h-0 overflow-y-auto p-5">
                                     {reportDetailLoading ? (
-                                        <div className="flex min-h-72 items-center justify-center text-[10px] font-bold uppercase tracking-widest text-slate-600">Loading report details...</div>
+                                        <div className="flex min-h-72 items-center justify-center text-xs font-medium text-muted-foreground">Loading report details...</div>
                                     ) : selectedReport ? (
                                         <div className="space-y-4">
-                                            <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                                            <Card className="rounded-xl border border-border bg-card p-5">
                                                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                                     <div className="min-w-0">
-                                                        <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-slate-500">Report #{shortReportId(selectedReport.id)}</p>
-                                                        <h3 className="mt-1 truncate text-xl font-black text-white">{selectedReportTargetUsername || 'Unknown target'}</h3>
-                                                        <p className="mt-1 text-xs font-semibold text-slate-500">Submitted {formatDateTime(selectedReport.created_at)}</p>
+                                                        <p className="font-mono text-xs font-medium text-muted-foreground">Report #{shortReportId(selectedReport.id)}</p>
+                                                        <h3 className="mt-1 truncate text-xl font-semibold text-foreground">{selectedReportTargetUsername || 'Unknown target'}</h3>
+                                                        <p className="mt-1 text-xs font-semibold text-muted-foreground">Submitted {formatDateTime(selectedReport.created_at)}</p>
                                                     </div>
-                                                    <span className={`w-fit rounded-lg border px-3 py-1 text-[10px] font-black uppercase tracking-wider ${reportStatusClass(selectedReportStatus)}`}>
+                                                    <span className={`w-fit rounded-lg border px-3 py-1 text-xs font-semibold   ${reportStatusClass(selectedReportStatus)}`}>
                                                         {selectedReportStatus.toLowerCase()}
                                                     </span>
                                                 </div>
 
                                                 <div className="mt-4 grid grid-cols-2 gap-3">
-                                                    <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
-                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Reporter</p>
-                                                        <p className="mt-1 truncate text-sm font-black text-white">{getReportReporterLabel(selectedReport)}</p>
+                                                    <div className="rounded-xl border border-border bg-muted p-3">
+                                                        <p className="text-xs font-medium text-muted-foreground">Reporter</p>
+                                                        <p className="mt-1 truncate text-sm font-semibold text-foreground">{getReportReporterLabel(selectedReport)}</p>
                                                     </div>
-                                                    <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
-                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Roblox ID</p>
-                                                        <p className="mt-1 truncate font-mono text-xs font-bold text-sky-300">{selectedReportTargetId || 'Unknown'}</p>
+                                                    <div className="rounded-xl border border-border bg-muted p-3">
+                                                        <p className="text-xs font-medium text-muted-foreground">Roblox ID</p>
+                                                        <p className="mt-1 truncate font-mono text-xs font-medium text-foreground">{selectedReportTargetId || 'Unknown'}</p>
                                                     </div>
-                                                    <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
-                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Discord</p>
-                                                        <p className="mt-1 truncate font-mono text-xs font-bold text-indigo-300">{selectedReportDiscordId || selectedReport.reported_roblox_username || 'Unknown'}</p>
+                                                    <div className="rounded-xl border border-border bg-muted p-3">
+                                                        <p className="text-xs font-medium text-muted-foreground">Discord</p>
+                                                        <p className="mt-1 truncate font-mono text-xs font-medium text-foreground">{selectedReportDiscordId || selectedReport.reported_roblox_username || 'Unknown'}</p>
                                                     </div>
-                                                    <div className="rounded-xl border border-slate-800 bg-black/20 p-3">
-                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Closed</p>
-                                                        <p className="mt-1 truncate text-xs font-bold text-slate-300">{selectedReport.resolved_at ? formatDateTime(selectedReport.resolved_at) : 'Open'}</p>
+                                                    <div className="rounded-xl border border-border bg-muted p-3">
+                                                        <p className="text-xs font-medium text-muted-foreground">Closed</p>
+                                                        <p className="mt-1 truncate text-xs font-medium text-foreground">{selectedReport.resolved_at ? formatDateTime(selectedReport.resolved_at) : 'Open'}</p>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            </Card>
 
-                                            <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                            <Card className="rounded-xl border border-border bg-card p-4">
                                                 <div className="mb-3 flex items-center justify-between gap-3">
-                                                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Report Evidence</h3>
-                                                    <Button variant="unstyled" size="unstyled"
+                                                    <h3 className="text-sm font-semibold text-foreground">Report Evidence</h3>
+                                                    <Button variant="outline" size="default"
                                                         type="button"
                                                         onClick={openReportTargetProfile}
                                                         disabled={!selectedReportTargetUsername}
-                                                        className="rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                                                        className="transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                                                     >
                                                         Target Profile
                                                     </Button>
                                                 </div>
-                                                <p className="whitespace-pre-wrap rounded-xl border border-slate-800 bg-black/20 p-4 text-sm leading-6 text-slate-300">{selectedReport.reason || 'No reason provided.'}</p>
-                                            </div>
+                                                <p className="whitespace-pre-wrap rounded-xl border border-border bg-muted p-4 text-sm leading-6 text-foreground">{selectedReport.reason || 'No reason provided.'}</p>
+                                            </Card>
 
                                             <div className="grid gap-3 md:grid-cols-2">
                                                 {[
@@ -2938,50 +2907,50 @@ export default function LivePanelPage() {
                                                         joinUrl: selectedReport.reported_join_url,
                                                     },
                                                 ].map((serverContext) => (
-                                                    <div key={serverContext.label} className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{serverContext.label}</p>
+                                                    <Card key={serverContext.label} className="rounded-xl border border-border bg-card p-4">
+                                                        <p className="text-xs font-medium text-muted-foreground">{serverContext.label}</p>
                                                         {serverContext.jobId ? (
                                                             <>
-                                                                <p className="mt-2 break-all font-mono text-xs text-slate-300">{serverContext.jobId}</p>
+                                                                <p className="mt-2 break-all font-mono text-xs text-foreground">{serverContext.jobId}</p>
                                                                 {serverContext.joinUrl && (
                                                                     <a
                                                                         href={serverContext.joinUrl}
-                                                                        className="mt-3 inline-flex rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-emerald-300 transition-colors hover:bg-emerald-500/20"
+                                                                        className="mt-3 inline-flex rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 transition-colors hover:bg-emerald-50"
                                                                     >
                                                                         Join server
                                                                     </a>
                                                                 )}
                                                             </>
                                                         ) : (
-                                                            <p className="mt-2 text-xs font-medium text-slate-500">No live server snapshot was captured.</p>
+                                                            <p className="mt-2 text-xs font-medium text-muted-foreground">No live server snapshot was captured.</p>
                                                         )}
-                                                    </div>
+                                                    </Card>
                                                 ))}
                                             </div>
 
-                                            <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                                                <h3 className="text-sm font-black uppercase tracking-widest text-white">Moderator Note</h3>
+                                            <Card className="rounded-xl border border-border bg-card p-4">
+                                                <h3 className="text-sm font-semibold text-foreground">Moderator Note</h3>
                                                 <Textarea
                                                     value={reportModeratorNote}
                                                     onChange={(event) => setReportModeratorNote(event.target.value)}
                                                     rows={3}
                                                     placeholder="Add an internal note before resolving or dismissing"
-                                                    className="mt-3 w-full resize-none rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500/60"
+                                                    className="mt-3 w-full resize-none"
                                                 />
                                                 <div className="mt-3 flex flex-wrap gap-2">
                                                     {(['KICK', 'SOFTBAN', 'BAN'] as const)
                                                         .filter((command) => canUseDashboardCommand(perms, command))
                                                         .map((command) => (
-                                                            <Button variant="unstyled" size="unstyled"
+                                                            <Button variant="outline" size="default"
                                                                 key={command}
                                                                 type="button"
                                                                 disabled={reportActionLoading !== null}
                                                                 onClick={() => runReportModerationAction(command)}
-                                                                className={`rounded-xl border px-3 py-2.5 text-[10px] font-black uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${command === 'BAN'
-                                                                    ? 'border-red-500/25 bg-red-500/10 text-red-200 hover:bg-red-500/20'
+                                                                className={`        transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${command === 'BAN'
+                                                                    ? '   '
                                                                     : command === 'SOFTBAN'
-                                                                        ? 'border-rose-500/25 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20'
-                                                                        : 'border-amber-500/25 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20'
+                                                                        ? '   '
+                                                                        : '   '
                                                                     }`}
                                                             >
                                                                 {reportActionLoading === command
@@ -2990,51 +2959,51 @@ export default function LivePanelPage() {
                                                             </Button>
                                                         ))}
                                                     {selectedReportStatus !== 'RESOLVED' && (
-                                                        <Button variant="unstyled" size="unstyled"
+                                                        <Button variant="outline" size="default"
                                                             type="button"
                                                             disabled={reportActionLoading !== null}
                                                             onClick={() => updateSelectedReportStatus('RESOLVED')}
-                                                            className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                                            className="transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                                                         >
                                                             {reportActionLoading === 'RESOLVED' ? 'Saving...' : 'Resolve'}
                                                         </Button>
                                                     )}
                                                     {selectedReportStatus !== 'DISMISSED' && (
-                                                        <Button variant="unstyled" size="unstyled"
+                                                        <Button variant="outline" size="default"
                                                             type="button"
                                                             disabled={reportActionLoading !== null}
                                                             onClick={() => updateSelectedReportStatus('DISMISSED')}
-                                                            className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-colors hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                                            className="transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                                                         >
                                                             {reportActionLoading === 'DISMISSED' ? 'Saving...' : 'Dismiss'}
                                                         </Button>
                                                     )}
                                                     {selectedReportStatus !== 'PENDING' && (
-                                                        <Button variant="unstyled" size="unstyled"
+                                                        <Button variant="outline" size="default"
                                                             type="button"
                                                             disabled={reportActionLoading !== null}
                                                             onClick={() => updateSelectedReportStatus('PENDING')}
-                                                            className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                                            className="transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                                                         >
                                                             {reportActionLoading === 'PENDING' ? 'Saving...' : 'Reopen'}
                                                         </Button>
                                                     )}
                                                 </div>
-                                            </div>
+                                            </Card>
 
-                                            <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                                            <Card className="rounded-xl border border-border bg-card p-4">
                                                 <div className="mb-3 flex items-center justify-between gap-3">
-                                                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Target History</h3>
-                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{selectedReportLogs.length} shown</span>
+                                                    <h3 className="text-sm font-semibold text-foreground">Target History</h3>
+                                                    <span className="text-xs font-medium text-muted-foreground">{selectedReportLogs.length} shown</span>
                                                 </div>
                                                 <div className="space-y-2">
                                                     {selectedReportLogs.slice(0, 12).map((log) => (
-                                                        <div key={log.id} className="rounded-xl border border-slate-800 bg-black/20 p-3">
+                                                        <div key={log.id} className="rounded-xl border border-border bg-muted p-3">
                                                             <div className="flex items-center justify-between gap-3">
-                                                                <span className="text-xs font-black uppercase tracking-widest text-white">{log.action}</span>
-                                                                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">{formatTime(log.timestamp)}</span>
+                                                                <span className="text-xs font-semibold text-foreground">{log.action}</span>
+                                                                <span className="font-mono text-xs font-medium text-muted-foreground">{formatTime(log.timestamp)}</span>
                                                             </div>
-                                                            <p className="mt-1 text-xs font-medium text-slate-400">
+                                                            <p className="mt-1 text-xs font-medium text-muted-foreground">
                                                                 Target <ClickableUserText value={log.target} onOpen={() => {
                                                                     setRightPaneMode('lookup');
                                                                     selectProfileUser(resolveUserFromText(log.target));
@@ -3046,15 +3015,15 @@ export default function LivePanelPage() {
                                                         </div>
                                                     ))}
                                                     {selectedReportLogs.length === 0 && (
-                                                        <div className="rounded-xl border border-dashed border-slate-800 p-6 text-center text-xs font-semibold text-slate-500">
+                                                        <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs font-semibold text-muted-foreground">
                                                             No moderation history found for this target.
                                                         </div>
                                                     )}
                                                 </div>
-                                            </div>
+                                            </Card>
                                         </div>
                                     ) : (
-                                        <div className="flex min-h-72 items-center justify-center rounded-2xl border border-dashed border-slate-800 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                        <div className="flex min-h-72 items-center justify-center rounded-xl border border-dashed border-border text-center text-xs font-medium text-muted-foreground">
                                             Select a report to review.
                                         </div>
                                     )}
@@ -3063,9 +3032,9 @@ export default function LivePanelPage() {
                         </div>
                     ) : (
                         <>
-                    <div className="shrink-0 border-b border-slate-800 bg-slate-950/30 p-5">
+                    <div className="shrink-0 border-b border-border bg-card p-5">
                         <div className="mb-2 flex items-center justify-between gap-3">
-                            <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-300">
+                            <h2 className="text-xs font-semibold text-foreground">
                                 Profile / Create Log
                             </h2>
                         </div>
@@ -3080,23 +3049,23 @@ export default function LivePanelPage() {
                                     }
                                 }}
                                 placeholder="Search profile, create a user log, or add a note"
-                                className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm font-medium text-white outline-none transition-all placeholder:text-slate-600 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
+                                className="w-full transition-all"
                             />
                             {profileSearch.trim() && suggestions.length > 0 && !selectedProfileUser && (
-                                <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-slate-800 bg-slate-950 shadow-2xl shadow-black/40">
+                                <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-border bg-card">
                                     {suggestions.map(({ user, reason }) => (
-                                        <Button variant="unstyled" size="unstyled"
+                                        <Button variant="outline" size="default"
                                             type="button"
                                             key={getUserKey(user)}
                                             onClick={() => selectProfileUser(user)}
-                                            className="flex w-full items-center gap-3 border-b border-slate-800/60 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-sky-500/10"
+                                            className="flex w-full items-center text-left transition-colors last:"
                                         >
                                             <UserAvatar user={user} compact />
                                             <span className="min-w-0 flex-1">
-                                                <span className="block truncate text-sm font-bold text-white">{user.displayName}</span>
-                                                <span className="block truncate text-xs font-medium text-slate-500">@{user.username}</span>
+                                                <span className="block truncate text-sm font-medium text-foreground">{user.displayName}</span>
+                                                <span className="block truncate text-xs font-medium text-muted-foreground">@{user.username}</span>
                                             </span>
-                                            <span className="hidden shrink-0 rounded-lg border border-slate-800 bg-black/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-sky-300 sm:block">
+                                            <span className="hidden shrink-0 rounded-lg border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground sm:block">
                                                 {reason}
                                             </span>
                                         </Button>
@@ -3105,40 +3074,40 @@ export default function LivePanelPage() {
                             )}
                         </div>
 
-                        <h2 className="mb-2 mt-4 text-[11px] font-black uppercase tracking-[0.2em] text-slate-300">
+                        <h2 className="mb-2 mt-4 text-xs font-semibold text-foreground">
                             Live Logs
                         </h2>
                         <Input
                             value={logSearch}
                             onChange={(event) => setLogSearch(event.target.value)}
                             placeholder="Search logs by server, user, action, or moderator"
-                            className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm font-medium text-white outline-none transition-all placeholder:text-slate-600 focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
+                            className="w-full transition-all"
                         />
                     </div>
 
                     <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
                         {filteredLogs.length === 0 ? (
-                            <div className="p-16 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                            <div className="p-16 text-center text-xs font-medium text-muted-foreground">
                                 No logs matched.
                             </div>
                         ) : (
-                            <div className="divide-y divide-slate-800/70">
+                            <div className="divide-y divide-border">
                                 {filteredLogs.map((log) => (
-                                    <div key={log.id} className="grid gap-3 px-5 py-3 transition-colors hover:bg-sky-500/5 md:grid-cols-[minmax(0,180px)_minmax(0,1fr)_120px] md:items-center">
+                                    <div key={log.id} className="grid gap-3 px-5 py-3 transition-colors hover:bg-accent md:grid-cols-[minmax(0,180px)_minmax(0,1fr)_120px] md:items-center">
                                         <div className="min-w-0">
-                                            <span className={`inline-flex max-w-full truncate rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${log.action.includes('BAN')
-                                                ? 'border-red-500/20 bg-red-500/10 text-red-300'
+                                            <span className={`inline-flex max-w-full truncate rounded-lg border px-2.5 py-1 text-xs font-semibold   ${log.action.includes('BAN')
+                                                ? 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400'
                                                 : log.action === 'KICK'
-                                                    ? 'border-amber-500/20 bg-amber-500/10 text-amber-300'
-                                                    : 'border-sky-500/20 bg-sky-500/10 text-sky-300'
+                                                    ? 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400'
+                                                    : 'border-border bg-accent text-foreground'
                                                 }`}>
                                                 {log.action}
                                             </span>
                                         </div>
-                                        <p className="min-w-0 text-sm font-medium text-slate-300">
-                                            <ClickableUserText value={log.moderator} onOpen={() => selectProfileUser(resolveUserFromText(log.moderator))} /> used <span className="font-bold text-sky-300">{log.action}</span> on <ClickableUserText value={log.target} onOpen={() => selectProfileUser(resolveUserFromText(log.target))} />
+                                        <p className="min-w-0 text-sm font-medium text-foreground">
+                                            <ClickableUserText value={log.moderator} onOpen={() => selectProfileUser(resolveUserFromText(log.moderator))} /> used <span className="font-medium text-foreground">{log.action}</span> on <ClickableUserText value={log.target} onOpen={() => selectProfileUser(resolveUserFromText(log.target))} />
                                         </p>
-                                        <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500 md:text-right">
+                                        <p className="font-mono text-xs font-medium text-muted-foreground md:text-right">
                                             {formatTime(log.timestamp)}
                                         </p>
                                     </div>
@@ -3152,22 +3121,22 @@ export default function LivePanelPage() {
             </div>
 
             {confirmAction && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-[#020617] p-6 shadow-2xl">
-                        <h3 className="text-xl font-black text-white">{confirmAction.title}</h3>
-                        <p className="mt-3 text-sm leading-6 text-slate-400">{confirmAction.body}</p>
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-md rounded-xl border border-border bg-background p-6">
+                        <h3 className="text-xl font-semibold text-foreground">{confirmAction.title}</h3>
+                        <p className="mt-3 text-sm leading-6 text-muted-foreground">{confirmAction.body}</p>
                         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="outline" size="default"
                                 type="button"
                                 onClick={() => setConfirmAction(null)}
-                                className="rounded-xl border border-slate-800 px-4 py-3 text-sm font-bold text-slate-300 transition-colors hover:text-white"
+                                className="transition-colors"
                             >
                                 Cancel
                             </Button>
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="destructive" size="default"
                                 type="button"
                                 onClick={submitConfirmAction}
-                                className="rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-red-500"
+                                className="transition-colors"
                             >
                                 Confirm
                             </Button>
@@ -3181,36 +3150,36 @@ export default function LivePanelPage() {
                     role="menu"
                     onPointerDown={(event) => event.stopPropagation()}
                     style={{ left: Math.min(contextMenu.x, window.innerWidth - 224), top: Math.min(contextMenu.y, window.innerHeight - 220) }}
-                    className="fixed z-[120] w-52 overflow-hidden rounded-xl border border-slate-700 bg-slate-950 p-1 shadow-2xl shadow-black/60"
+                    className="fixed z-[120] w-52 overflow-hidden rounded-xl border border-border bg-card p-1"
                 >
                     {contextMenu.user ? (
                         <>
-                            <p className="truncate px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500">@{contextMenu.user.username}</p>
-                            {canViewRuntimeLogs && <Button variant="unstyled" size="unstyled" type="button" onClick={() => openRuntimeLogs(contextMenu.jobId, contextMenu.user)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-sky-200 hover:bg-sky-500/10">View user&apos;s client logs</Button>}
-                            <Button variant="unstyled" size="unstyled" type="button" onClick={() => openPlayerMessage(contextMenu.user!)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-slate-200 hover:bg-slate-800">Message</Button>
-                            {canUseDashboardCommand(perms, 'KICK') && <Button variant="unstyled" size="unstyled" type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('KICK', contextMenu.user!); }} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-amber-300 hover:bg-amber-500/10">Kick</Button>}
-                            {canUseDashboardCommand(perms, 'BAN') && <Button variant="unstyled" size="unstyled" type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('BAN', contextMenu.user!); }} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-red-300 hover:bg-red-500/10">Ban</Button>}
+                            <p className="truncate px-3 py-2 text-xs font-semibold text-muted-foreground">@{contextMenu.user.username}</p>
+                            {canViewRuntimeLogs && <Button variant="ghost" size="default" type="button" onClick={() => openRuntimeLogs(contextMenu.jobId, contextMenu.user)} className="w-full text-left">View user&apos;s client logs</Button>}
+                            <Button variant="outline" size="default" type="button" onClick={() => openPlayerMessage(contextMenu.user!)} className="w-full text-left">Message</Button>
+                            {canUseDashboardCommand(perms, 'KICK') && <Button variant="ghost" size="default" type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('KICK', contextMenu.user!); }} className="w-full text-left">Kick</Button>}
+                            {canUseDashboardCommand(perms, 'BAN') && <Button variant="ghost" size="default" type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('BAN', contextMenu.user!); }} className="w-full text-left">Ban</Button>}
                         </>
                     ) : (
                         canViewRuntimeLogs
-                            ? <Button variant="unstyled" size="unstyled" type="button" onClick={() => openRuntimeLogs(contextMenu.jobId)} className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-bold text-sky-200 hover:bg-sky-500/10">View server logs</Button>
-                            : <p className="px-3 py-2.5 text-xs font-semibold text-slate-500">No console log access</p>
+                            ? <Button variant="ghost" size="default" type="button" onClick={() => openRuntimeLogs(contextMenu.jobId)} className="w-full text-left">View server logs</Button>
+                            : <p className="px-3 py-2.5 text-xs font-semibold text-muted-foreground">No console log access</p>
                     )}
                 </div>
             )}
 
             {panelModal && (
-                <div className="fixed inset-0 z-[105] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-800 bg-[#020617] shadow-2xl">
-                        <div className="flex items-start justify-between gap-4 border-b border-slate-800 bg-slate-900/60 px-6 py-5">
+                <div className="fixed inset-0 z-[105] flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-2xl overflow-hidden rounded-xl border border-border bg-background">
+                        <div className="flex items-start justify-between gap-4 border-b border-border bg-card px-6 py-5">
                             <div>
-                                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">{panelModal === 'announce' ? 'Announcement' : 'Command Runner'}</p>
-                                <h3 className="mt-1 text-xl font-black text-white">{panelModal === 'announce' ? 'Announce to Live Servers' : 'Run Live Command'}</h3>
+                                <p className="text-xs font-medium text-foreground">{panelModal === 'announce' ? 'Announcement' : 'Command Runner'}</p>
+                                <h3 className="mt-1 text-xl font-semibold text-foreground">{panelModal === 'announce' ? 'Announce to Live Servers' : 'Run Live Command'}</h3>
                             </div>
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="outline" size="icon"
                                 type="button"
                                 onClick={() => setPanelModal(null)}
-                                className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-500 transition-colors hover:text-white"
+                                className="transition-colors"
                             >
                                 <CloseIcon />
                             </Button>
@@ -3219,26 +3188,26 @@ export default function LivePanelPage() {
                             {panelModal === 'announce' ? (
                                 <>
                                     <div className="space-y-3">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Target</p>
+                                        <p className="text-xs font-medium text-muted-foreground">Target</p>
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            <Button variant="unstyled" size="unstyled"
+                                            <Button variant="outline" size="default"
                                                 type="button"
                                                 onClick={() => {
                                                     setAnnouncementTargetType('global');
                                                     setAnnouncementUser('');
                                                 }}
-                                                className={`rounded-xl border px-4 py-3 text-left transition-all ${announcementTargetType === 'global' ? 'border-sky-400/60 bg-sky-500/10 text-white' : 'border-slate-800 bg-slate-950/60 text-slate-300 hover:border-slate-700'}`}
+                                                className={`    text-left transition-all ${announcementTargetType === 'global' ? '  ' : '   '}`}
                                             >
-                                                <span className="block text-sm font-black">Global</span>
-                                                <span className="mt-1 block text-xs font-medium text-slate-500">Everybody playing the game, every server.</span>
+                                                <span className="block text-sm font-semibold">Global</span>
+                                                <span className="mt-1 block text-xs font-medium text-muted-foreground">Everybody playing the game, every server.</span>
                                             </Button>
-                                            <Button variant="unstyled" size="unstyled"
+                                            <Button variant="outline" size="default"
                                                 type="button"
                                                 onClick={() => setAnnouncementTargetType('user')}
-                                                className={`rounded-xl border px-4 py-3 text-left transition-all ${announcementTargetType === 'user' ? 'border-sky-400/60 bg-sky-500/10 text-white' : 'border-slate-800 bg-slate-950/60 text-slate-300 hover:border-slate-700'}`}
+                                                className={`    text-left transition-all ${announcementTargetType === 'user' ? '  ' : '   '}`}
                                             >
-                                                <span className="block text-sm font-black">User</span>
-                                                <span className="mt-1 block text-xs font-medium text-slate-500">One live Roblox player.</span>
+                                                <span className="block text-sm font-semibold">User</span>
+                                                <span className="mt-1 block text-xs font-medium text-muted-foreground">One live Roblox player.</span>
                                             </Button>
                                         </div>
                                     </div>
@@ -3248,22 +3217,22 @@ export default function LivePanelPage() {
                                                 value={announcementUser}
                                                 onChange={(event) => setAnnouncementUser(event.target.value)}
                                                 placeholder="Search or type a live Roblox username"
-                                                className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm font-bold text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60"
+                                                className="w-full"
                                             />
                                             {announcementUserSuggestions.length > 0 && (
-                                                <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/70 p-2">
+                                                <div className="max-h-52 overflow-y-auto rounded-xl border border-border bg-card p-2">
                                                     {announcementUserSuggestions.map((user) => (
-                                                        <Button variant="unstyled" size="unstyled"
+                                                        <Button variant="ghost" size="default"
                                                             key={getUserKey(user)}
                                                             type="button"
                                                             onClick={() => setAnnouncementUser(user.username)}
-                                                            className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-sky-500/10"
+                                                            className="flex w-full items-center justify-between text-left transition-colors"
                                                         >
                                                             <span className="min-w-0">
-                                                                <span className="block truncate text-sm font-black text-white">{user.displayName || user.username}</span>
-                                                                <span className="mt-0.5 block truncate text-xs font-medium text-slate-500">@{user.username}</span>
+                                                                <span className="block truncate text-sm font-semibold text-foreground">{user.displayName || user.username}</span>
+                                                                <span className="mt-0.5 block truncate text-xs font-medium text-muted-foreground">@{user.username}</span>
                                                             </span>
-                                                            <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">{formatServerId(user.serverId || '')}</span>
+                                                            <span className="shrink-0 font-mono text-xs font-medium text-emerald-700 dark:text-emerald-400">{formatServerId(user.serverId || '')}</span>
                                                         </Button>
                                                     ))}
                                                 </div>
@@ -3275,22 +3244,22 @@ export default function LivePanelPage() {
                                         onChange={(event) => setAnnouncement(event.target.value)}
                                         rows={5}
                                         placeholder="Message to send"
-                                        className="w-full resize-none rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-sky-500/60"
+                                        className="w-full resize-none"
                                     />
-                                    <Button variant="unstyled" size="unstyled"
+                                    <Button variant="default" size="default"
                                         type="button"
                                         onClick={submitAnnouncement}
                                         disabled={actionLoading === 'BROADCAST'}
-                                        className="w-full rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold uppercase tracking-widest text-white transition-all hover:bg-sky-500 disabled:opacity-50"
+                                        className="w-full transition-all disabled:opacity-50"
                                     >
                                         {actionLoading === 'BROADCAST' ? 'Sending...' : 'Send Announcement'}
                                     </Button>
                                 </>
                             ) : (
                                 <>
-                                    <div className="rounded-2xl border border-sky-500/25 bg-slate-950/70 px-4 py-3 shadow-inner shadow-black/30 focus-within:border-sky-400/70">
+                                    <div className="rounded-xl border border-border bg-card px-4 py-3 focus-within:border-border">
                                         <div className="flex items-center gap-3">
-                                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-sky-300">
+                                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground">
                                                 <CommandIcon />
                                             </span>
                                             <Input
@@ -3304,33 +3273,33 @@ export default function LivePanelPage() {
                                                     }
                                                 }}
                                                 placeholder="refresh username"
-                                                className="min-w-0 flex-1 bg-transparent text-base font-bold text-white outline-none placeholder:text-slate-600"
+                                                className="min-w-0 flex-1"
                                             />
                                             {commandBarParsed.command && (
-                                                <span className="hidden rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-sky-200 sm:inline-flex">
+                                                <span className="hidden rounded-lg border border-border bg-accent px-2.5 py-1 text-xs font-semibold text-foreground sm:inline-flex">
                                                     {commandBarParsed.command.id}
                                                 </span>
                                             )}
                                         </div>
                                     </div>
                                     {commandBarSuggestions.length > 0 && (
-                                        <div className="max-h-72 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/50">
+                                        <div className="max-h-72 overflow-hidden rounded-xl border border-border bg-card">
                                             <div className="custom-scrollbar max-h-72 overflow-y-auto p-2">
                                                 {commandBarSuggestions.map((suggestion, index) => (
-                                                    <Button variant="unstyled" size="unstyled"
+                                                    <Button variant="ghost" size="default"
                                                         key={`${suggestion.kind}-${suggestion.value}-${index}`}
                                                         type="button"
                                                         onClick={() => setCommandBarValue(suggestion.value)}
-                                                        className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-sky-500/10"
+                                                        className="flex w-full items-center text-left transition-colors"
                                                     >
-                                                        <span className={`flex h-8 w-10 shrink-0 items-center justify-center rounded-lg border text-[10px] font-black uppercase tracking-wider ${suggestion.kind === 'command' ? 'border-sky-500/30 bg-sky-500/10 text-sky-200' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'}`}>
+                                                        <span className={`flex h-8 w-10 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold   ${suggestion.kind === 'command' ? 'border-border bg-accent text-foreground' : 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'}`}>
                                                             {suggestion.kind === 'command' ? 'CMD' : 'USER'}
                                                         </span>
                                                         <span className="min-w-0 flex-1">
-                                                            <span className="block truncate text-sm font-black text-white">{suggestion.title}</span>
-                                                            <span className="mt-0.5 block truncate text-xs font-medium text-slate-400">{suggestion.detail}</span>
+                                                            <span className="block truncate text-sm font-semibold text-foreground">{suggestion.title}</span>
+                                                            <span className="mt-0.5 block truncate text-xs font-medium text-muted-foreground">{suggestion.detail}</span>
                                                         </span>
-                                                        <span className="hidden shrink-0 rounded-lg border border-slate-800 bg-black/30 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400 sm:inline-flex">
+                                                        <span className="hidden shrink-0 rounded-lg border border-border bg-muted px-2.5 py-1 font-mono text-xs font-medium text-muted-foreground sm:inline-flex">
                                                             {suggestion.meta}
                                                         </span>
                                                     </Button>
@@ -3338,11 +3307,11 @@ export default function LivePanelPage() {
                                             </div>
                                         </div>
                                     )}
-                                    <Button variant="unstyled" size="unstyled"
+                                    <Button variant="default" size="default"
                                         type="button"
                                         onClick={submitManualCommand}
                                         disabled={availableCommands.length === 0 || (commandBarParsed.command ? actionLoading === commandBarParsed.command.id : false)}
-                                        className="w-full rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold uppercase tracking-widest text-white transition-all hover:bg-sky-500 disabled:opacity-50"
+                                        className="w-full transition-all disabled:opacity-50"
                                     >
                                         {commandBarParsed.command && actionLoading === commandBarParsed.command.id ? 'Sending...' : 'Run Command'}
                                     </Button>

@@ -1,5 +1,7 @@
 'use client';
 
+import { Card } from '@/components/ui/card';
+
 import { Checkbox } from '@/components/ui/checkbox';
 
 import { Button } from '@/components/ui/button';
@@ -282,15 +284,15 @@ function DynamicOptionSelect({
 
     return (
         <div ref={containerRef} className="relative">
-            <Button variant="unstyled" size="unstyled"
+            <Button variant="outline" size="default"
                 type="button"
                 onClick={() => setOpen((current) => !current)}
-                className="flex h-12 w-full items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 px-4 text-left text-sm text-white outline-none transition-colors hover:border-slate-700 focus:border-sky-500"
+                className="flex w-full items-center text-left outline-none transition-colors"
             >
                 {field.type === 'player' && selectedIcon && (
                     <span
                         aria-hidden="true"
-                        className="h-7 w-7 shrink-0 rounded-md border border-slate-700 bg-cover bg-center"
+                        className="h-7 w-7 shrink-0 rounded-md border border-border bg-cover bg-center"
                         style={{ backgroundImage: `url(${selectedIcon})` }}
                     />
                 )}
@@ -298,54 +300,54 @@ function DynamicOptionSelect({
                     {selectedLabel ? (
                         <>
                             <span className="font-semibold">{selectedLabel}</span>
-                            {selectedDescription && <span className="text-slate-500"> - {selectedDescription}</span>}
+                            {selectedDescription && <span className="text-muted-foreground"> - {selectedDescription}</span>}
                         </>
                     ) : (
-                        <span className="text-slate-600">{field.type === 'server' ? 'Choose a live server...' : 'Choose a Roblox user...'}</span>
+                        <span className="text-muted-foreground">{field.type === 'server' ? 'Choose a live server...' : 'Choose a Roblox user...'}</span>
                     )}
                 </span>
-                <span className="shrink-0 text-slate-500">{open ? '^' : 'v'}</span>
+                <span className="shrink-0 text-muted-foreground">{open ? '^' : 'v'}</span>
             </Button>
 
             {open && (
-                <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-800 bg-slate-950 shadow-2xl shadow-slate-950/60">
-                    <div className="border-b border-slate-800 p-2">
+                <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-border bg-card">
+                    <div className="border-b border-border p-2">
                         <Input
                             value={query}
                             autoFocus
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={field.type === 'server' ? 'Search live servers...' : source === 'roblox-users' ? 'Search Roblox users...' : 'Search live players...'}
-                            className="h-10 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
+                            className="w-full transition-colors"
                         />
                     </div>
                     <div className="max-h-56 overflow-y-auto py-1">
                         {loading && (
-                            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Loading</div>
+                            <div className="px-3 py-2 text-xs font-semibold text-muted-foreground">Loading</div>
                         )}
                         {!loading && options.length === 0 && (
-                            <div className="px-3 py-2 text-sm text-slate-500">
+                            <div className="px-3 py-2 text-sm text-muted-foreground">
                                 {source === 'roblox-users' && query.trim().length < 2 ? 'Type at least two characters.' : 'No matches found.'}
                             </div>
                         )}
                         {!loading && options.map((option) => {
                             const isSelected = selectedValue && selectedValue === option.value;
                             return (
-                                <Button variant="unstyled" size="unstyled"
+                                <Button variant="outline" size="default"
                                     key={`${option.value}-${option.description || ''}`}
                                     type="button"
                                     onClick={() => selectOption(option)}
-                                    className={`flex h-10 w-full items-center gap-2 px-3 text-left transition-colors hover:bg-slate-900 ${isSelected ? 'bg-sky-500/10' : ''}`}
+                                    className={`flex  w-full items-center   text-left transition-colors  ${isSelected ? '' : ''}`}
                                 >
                                     {field.type === 'player' && option.iconUrl && (
                                         <span
                                             aria-hidden="true"
-                                            className="h-7 w-7 shrink-0 rounded-md border border-slate-700 bg-cover bg-center"
+                                            className="h-7 w-7 shrink-0 rounded-md border border-border bg-cover bg-center"
                                             style={{ backgroundImage: `url(${option.iconUrl})` }}
                                         />
                                     )}
-                                    <span className="min-w-0 flex-1 truncate text-sm text-white">
+                                    <span className="min-w-0 flex-1 truncate text-sm text-foreground">
                                         <span className="font-semibold">{option.label}</span>
-                                        {option.description && <span className="text-slate-500"> - {option.description}</span>}
+                                        {option.description && <span className="text-muted-foreground"> - {option.description}</span>}
                                     </span>
                                 </Button>
                             );
@@ -504,11 +506,11 @@ export default function DashboardModuleConfigPage() {
     ) {
         if (field.type === 'bool') {
             return (
-                <label className="inline-flex items-center gap-3 text-sm font-medium text-slate-200">
+                <label className="inline-flex items-center gap-3 text-sm font-medium text-foreground">
                     <Checkbox
                         checked={value === true}
                         onCheckedChange={(checked) => onChange(checked === true)}
-                        className="h-4 w-4 rounded border-slate-700 bg-slate-950 accent-sky-500"
+                        className="w-4 accent-muted-foreground"
                     />
                     Enabled
                 </label>
@@ -520,7 +522,7 @@ export default function DashboardModuleConfigPage() {
                 <Select
                     value={String(value ?? field.defaultValue ?? '')}
                     onValueChange={(nextValue) => onChange(nextValue)}
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                    className="w-full transition-colors"
                     aria-label={field.label}
                     options={field.options.map(option => ({ value: option, label: option }))}
                 />
@@ -534,7 +536,7 @@ export default function DashboardModuleConfigPage() {
                         const selected = Array.isArray(value) ? value as string[] : [];
                         const checked = selected.includes(option);
                         return (
-                            <label key={option} className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200">
+                            <label key={option} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground">
                                 <Checkbox
                                     checked={checked}
                                     onCheckedChange={(checked) => {
@@ -543,7 +545,7 @@ export default function DashboardModuleConfigPage() {
                                             : selected.filter((item) => item !== option);
                                         onChange(next);
                                     }}
-                                    className="h-4 w-4 rounded border-slate-700 bg-slate-950 accent-sky-500"
+                                    className="w-4 accent-muted-foreground"
                                 />
                                 {option}
                             </label>
@@ -560,12 +562,12 @@ export default function DashboardModuleConfigPage() {
                         type="color"
                         value={String(value || field.defaultValue || '#38bdf8')}
                         onChange={(event) => onChange(event.target.value)}
-                        className="h-11 w-14 rounded-lg border border-slate-700 bg-slate-950 p-1"
+                        className="w-14"
                     />
                     <Input
                         value={String(value || field.defaultValue || '#38bdf8')}
                         onChange={(event) => onChange(event.target.value)}
-                        className="w-32 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 font-mono text-sm text-white outline-none transition-colors focus:border-sky-500"
+                        className="w-32 transition-colors"
                     />
                 </div>
             );
@@ -578,7 +580,7 @@ export default function DashboardModuleConfigPage() {
                     step="1"
                     value={Number(value ?? field.defaultValue ?? 0)}
                     onChange={(event) => onChange(Math.trunc(Number(event.target.value || 0)))}
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 font-mono text-sm text-white outline-none transition-colors focus:border-sky-500"
+                    className="w-full transition-colors"
                 />
             );
         }
@@ -604,7 +606,7 @@ export default function DashboardModuleConfigPage() {
                 type="text"
                 value={String(value ?? field.defaultValue ?? '')}
                 onChange={(event) => onChange(event.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                className="w-full transition-colors"
             />
         );
     }
@@ -622,14 +624,14 @@ export default function DashboardModuleConfigPage() {
         const nextRoots = [recordValue, ...valueRoots];
 
         return (
-            <div key={field.key} className={nested ? 'rounded-lg border border-slate-800 bg-slate-950/60 p-4' : ''}>
+            <Card key={field.key} className={nested ? 'rounded-lg border border-border bg-card p-4' : ''}>
                 {nested && (
                     <div className="mb-3 flex items-start justify-between gap-3">
                         <div>
-                            <label className="text-sm font-bold text-white">{field.label}</label>
-                            <p className="mt-1 text-xs leading-relaxed text-slate-500">{fieldDescription(field)}</p>
+                            <label className="text-sm font-medium text-foreground">{field.label}</label>
+                            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{fieldDescription(field)}</p>
                         </div>
-                        <span className="shrink-0 rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                        <span className="shrink-0 rounded-md border border-border bg-card px-2 py-1 text-xs font-medium text-muted-foreground">
                             {field.type}
                         </span>
                     </div>
@@ -658,21 +660,21 @@ export default function DashboardModuleConfigPage() {
                         ))}
                     </div>
                 )}
-            </div>
+            </Card>
         );
     }
 
     if (loading) {
         return (
             <div className="flex min-h-[420px] items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent"></div>
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-transparent"></div>
             </div>
         );
     }
 
     if (!module) {
         return (
-            <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
+            <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-5 py-4 text-sm font-medium text-red-700 dark:text-red-400">
                 {error || 'Module not found.'}
             </div>
         );
@@ -682,74 +684,74 @@ export default function DashboardModuleConfigPage() {
         <div className="space-y-8">
             <header className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <Link href={`/dashboard/${serverId}/modules`} className="text-xs font-bold uppercase tracking-widest text-sky-300 hover:text-sky-200">
+                    <Link href={`/dashboard/${serverId}/modules`} className="text-xs font-medium text-foreground hover:text-foreground">
                         Back to modules
                     </Link>
-                    <h1 className="mt-3 text-3xl font-black tracking-tight text-white">{module.name}</h1>
+                    <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground">{module.name}</h1>
                     <div className="mt-3 flex flex-wrap gap-2">
                         {module.isOfficial && (
-                            <div className="inline-flex rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+                            <div className="inline-flex rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-foreground">
                                 Official
                             </div>
                         )}
                         {module.creatorIsVerified && (
-                            <div className="inline-flex rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
+                            <div className="inline-flex rounded-md border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                                 Verified Creator
                             </div>
                         )}
                         {module.isCustom && (
-                            <div className="inline-flex rounded-md border border-violet-300/30 bg-violet-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-violet-200">
+                            <div className="inline-flex rounded-md border border-violet-300/30 bg-violet-300/10 px-2 py-1 text-xs font-medium text-violet-200">
                                 Server Custom
                             </div>
                         )}
                     </div>
-                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">{module.description || 'No description provided.'}</p>
+                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">{module.description || 'No description provided.'}</p>
                 </div>
 
-                <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4 text-right">
-                    <div className="font-mono text-xs text-slate-400">v{module.version}</div>
-                    <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">{module.slug}</div>
-                    <div className={`mt-3 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${module.enabled ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : module.installed ? 'border-amber-400/20 bg-amber-400/10 text-amber-300' : 'border-slate-700 bg-slate-950 text-slate-500'}`}>
+                <div className="rounded-xl border border-border bg-card px-5 py-4 text-right">
+                    <div className="font-mono text-xs text-muted-foreground">v{module.version}</div>
+                    <div className="mt-1 text-xs font-medium text-muted-foreground">{module.slug}</div>
+                    <div className={`mt-3 rounded-md border px-2 py-1 text-xs font-medium   ${module.enabled ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400' : module.installed ? 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400' : 'border-border bg-card text-muted-foreground'}`}>
                         {module.installed ? (module.enabled ? 'Enabled' : 'Paused') : 'Not installed'}
                     </div>
                 </div>
             </header>
 
             {error && (
-                <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
+                <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-5 py-4 text-sm font-medium text-red-700 dark:text-red-400">
                     {error}
                 </div>
             )}
             {success && (
-                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-5 py-4 text-sm font-medium text-emerald-300">
+                <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-5 py-4 text-sm font-medium text-emerald-700 dark:text-emerald-400">
                     {success}
                 </div>
             )}
             {module.isCustom && module.status === 'NEEDS_REUPLOAD' && (
-                <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
+                <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-5 py-4 text-sm font-medium text-red-700 dark:text-red-400">
                     This custom module is disabled until it is re-uploaded.
                 </div>
             )}
 
-            <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+            <section className="rounded-xl border border-border bg-card p-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h2 className="text-lg font-bold text-white">Module Config</h2>
-                        <p className="mt-1 text-sm text-slate-500">These values are saved per Discord server and are available in Roblox as <code className="font-mono text-slate-300">context.Settings</code>.</p>
+                        <h2 className="text-lg font-medium text-foreground">Module Config</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">These values are saved per Discord server and are available in Roblox as <code className="font-mono text-foreground">context.Settings</code>.</p>
                     </div>
-                    <Button variant="unstyled" size="unstyled"
+                    <Button variant="default" size="default"
                         onClick={saveSettings}
                         disabled={saving || savedFields.length === 0}
-                        className="rounded-xl bg-sky-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
+                        className="transition-colors disabled:opacity-50"
                     >
                         {saving ? 'Saving' : savedFields.length === 0 ? 'No Saved Config' : module.installed ? 'Save Config' : 'Install And Save'}
                     </Button>
                 </div>
 
                 {fields.length === 0 ? (
-                    <div className="mt-8 rounded-xl border border-slate-800 bg-slate-950/50 p-6 text-sm text-slate-500">
-                        This module does not declare a <code className="font-mono text-slate-300">CONFIG</code> block.
-                    </div>
+                    <Card className="mt-8 rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+                        This module does not declare a <code className="font-mono text-foreground">CONFIG</code> block.
+                    </Card>
                 ) : (
                     <div className="mt-8 grid grid-cols-1 gap-5 xl:grid-cols-2">
                         {fields.map((field) => {
@@ -757,19 +759,19 @@ export default function DashboardModuleConfigPage() {
                             const sendButtonText = field.liveButtonText || 'Send';
 
                             return (
-                                <div key={field.key} className="rounded-xl border border-slate-800 bg-slate-950/50 p-5">
+                                <Card key={field.key} className="rounded-xl border border-border bg-card p-5">
                                     <div className="flex items-start justify-between gap-4">
                                         <div>
-                                            <label className="text-sm font-bold text-white">{field.label}</label>
-                                            <p className="mt-1 text-xs leading-relaxed text-slate-500">{fieldDescription(field)}</p>
+                                            <label className="text-sm font-medium text-foreground">{field.label}</label>
+                                            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{fieldDescription(field)}</p>
                                         </div>
                                         <div className="flex flex-wrap justify-end gap-2">
                                             {field.live && (
-                                                <span className="rounded-md border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-300">
+                                                <span className="rounded-md border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                                                     Live
                                                 </span>
                                             )}
-                                            <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                            <span className="rounded-md border border-border bg-card px-2 py-1 text-xs font-medium text-muted-foreground">
                                                 {field.type}
                                             </span>
                                         </div>
@@ -786,17 +788,17 @@ export default function DashboardModuleConfigPage() {
                                         </div>
 
                                         {field.live && (
-                                            <Button variant="unstyled" size="unstyled"
+                                            <Button variant="ghost" size="default"
                                                 type="button"
                                                 onClick={() => sendLiveSetting(field)}
                                                 disabled={liveSending === field.key}
-                                                className="rounded-xl bg-emerald-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-emerald-500 disabled:opacity-50 sm:min-w-28"
+                                                className="transition-colors disabled:opacity-50 sm:min-w-28"
                                             >
                                                 {liveSending === field.key ? 'Sending' : sendButtonText}
                                             </Button>
                                         )}
                                     </div>
-                                </div>
+                                </Card>
                             );
                         })}
                     </div>

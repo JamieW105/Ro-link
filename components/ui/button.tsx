@@ -15,10 +15,8 @@ const buttonVariants = cva(
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        // Existing dashboard actions carry their context-specific colors and sizing.
-        unstyled: "",
       },
-      size: { default: "h-10 px-4 py-2", sm: "h-8 px-3 text-xs", lg: "h-11 px-8", icon: "size-10", unstyled: "" },
+      size: { default: "h-9 px-4 py-2", sm: "h-8 px-3 text-xs", lg: "h-11 px-8", icon: "size-10" },
     },
     defaultVariants: { variant: "default", size: "default" },
   },
@@ -26,7 +24,7 @@ const buttonVariants = cva(
 
 function Button({ className, variant, size, asChild = false, ...props }: React.ComponentProps<"button"> & VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : "button";
-  return <Comp data-slot="button" className={cn(variant !== "unstyled" && "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium", buttonVariants({ variant, size }), className)} {...props} />;
+  return <Comp data-slot="button" className={cn("inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium", buttonVariants({ variant, size }), className)} {...props} />;
 }
 
 export { Button, buttonVariants };

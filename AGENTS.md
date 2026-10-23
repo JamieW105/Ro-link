@@ -4,7 +4,8 @@
 
 Use [Dice UI](https://diceui.com/) for all new or changed feature UI, including
 server dashboards, settings, live panels, modules, marketplace, custom dashboards,
-and management screens. This requirement applies to future feature changes too.
+and management screens. This requirement applies to future feature changes too. Marketplace modules must have real product pages at
+`/dashboard/marketplace/[moduleSlug]`; preserve deep links and the installation flow.
 
 - Reuse the local components in `components/ui` before adding a new control.
   Dice UI extends shadcn/ui: use the shared shadcn-compatible Button, Input,
@@ -21,12 +22,22 @@ and management screens. This requirement applies to future feature changes too.
 - Use Dice `Stat`, `StatLabel`, `StatValue`, `StatIndicator`, and `StatDescription`
   for dashboard metrics. Use Dice components for other applicable advanced UI
   (dialogs, tables, uploads, color pickers, steppers, and similar interactions).
-- Use the default Button variants for new actions. `variant="unstyled"` and
-  `size="unstyled"` exist for migrated actions that already supply their own
-  layout and semantic colors. Preserve explicit `type="submit"` in forms and
-  use `type="button"` for actions that must not submit a form.
+- Use Dice UI's neutral light and dark themes and semantic tokens across every dashboard.
+  Both modes are required for all new and changed UI. Reuse ThemeToggle and the
+  next-themes provider; persist the choice with `rolink-theme`. Never hard-code a
+  light-only or dark-only page. Check surfaces, text, borders, popups and status
+  colors in both modes, including Servers, Live Panel and marketplace products.
+  Use Card for page panels, Dice Stat for metrics, and Dice Status for state labels.
+  Use Button variants (`default`, `outline`, `secondary`, `ghost`, `destructive`)
+  and the shared controls' standard sizing. Never restore legacy unstyled wrappers,
+  navy/sky gradients, neon glows, oversized controls, all-caps headings, or global
+  CSS that overrides component styling. Feature UI must visibly follow Dice's theme.
+  Use `type="submit"` for submissions and `type="button"` for other form actions.
+- Use Lucide (`lucide-react`) for all interface icons. Import icons directly; do
+  not add hand-drawn SVGs, emoji icons, or another icon pack. Keep `iconLibrary`
+  set to `lucide` in `components.json`.
 - Keep semantic theme tokens in `app/globals.css` and preserve custom-dashboard
-  colors. Portal content must inherit the active dashboard theme. Preserve
+  branding and semantic accent tokens. Portal content must inherit the active dashboard theme. Preserve
   responsive layouts, permissions, loading/error states, and API behavior.
 - Label interactive controls, retain visible keyboard focus, use Checkbox/Switch
   semantics, and verify keyboard selection, disabled states, and mobile layouts.

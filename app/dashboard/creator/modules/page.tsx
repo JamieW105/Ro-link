@@ -1,5 +1,9 @@
 'use client';
 
+import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
+
+import { Card } from '@/components/ui/card';
+
 import { Checkbox } from '@/components/ui/checkbox';
 
 import { Button } from '@/components/ui/button';
@@ -93,11 +97,11 @@ function statusLabel(status: ModuleStatus) {
 }
 
 function statusClassName(status: ModuleStatus) {
-    if (status === 'PUBLISHED') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
-    if (status === 'PENDING_REVIEW') return 'border-amber-400/20 bg-amber-400/10 text-amber-300';
-    if (status === 'REJECTED') return 'border-red-400/20 bg-red-400/10 text-red-300';
-    if (status === 'ARCHIVED') return 'border-slate-700 bg-slate-950 text-slate-500';
-    return 'border-sky-400/20 bg-sky-400/10 text-sky-300';
+    if (status === 'PUBLISHED') return 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400';
+    if (status === 'PENDING_REVIEW') return 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400';
+    if (status === 'REJECTED') return 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400';
+    if (status === 'ARCHIVED') return 'border-border bg-card text-muted-foreground';
+    return 'border-border bg-accent text-foreground';
 }
 
 function formatDate(value: string | null) {
@@ -344,49 +348,49 @@ export default function CreatorModulesPage() {
 
     if (status === 'loading' || loading) {
         return (
-            <div className="min-h-screen bg-[#020617] flex items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent"></div>
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-transparent"></div>
             </div>
         );
     }
 
     if (status === 'unauthenticated') {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-[#020617] p-6 text-center text-white">
-                <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900/35 p-8 shadow-2xl shadow-slate-950/40">
-                    <Image src="/Media/Ro-LinkIcon.png" alt="" width={48} height={48} className="mx-auto mb-5 h-12 w-12 rounded-xl border border-white/5 object-contain shadow-lg" />
-                    <h1 className="text-2xl font-bold">Sign in required</h1>
-                    <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-slate-400">Authenticate with Discord before managing creator modules and marketplace submissions.</p>
-                <Button variant="unstyled" size="unstyled"
+            <div className="flex min-h-screen items-center justify-center bg-background p-6 text-center text-foreground">
+                <Card className="w-full max-w-md rounded-xl border border-border bg-card p-8">
+                    <Image src="/Media/Ro-LinkIcon.png" alt="" width={48} height={48} className="mx-auto mb-5 h-12 w-12 rounded-xl border border-border object-contain" />
+                    <h1 className="text-2xl font-medium">Sign in required</h1>
+                    <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Authenticate with Discord before managing creator modules and marketplace submissions.</p>
+                <Button variant="default" size="default"
                     onClick={() => signIn('discord')}
-                        className="mt-8 rounded-lg bg-sky-600 px-6 py-3 text-sm font-semibold transition-colors hover:bg-sky-500"
+                        className="mt-8 transition-colors"
                 >
                     Sign In with Discord
                 </Button>
-                </div>
+                </Card>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-200">
-            <nav className="sticky top-0 z-50 border-b border-slate-800/80 bg-[#020617]/90 backdrop-blur-md">
+        <div className="min-h-screen bg-background text-foreground">
+            <nav className="sticky top-0 z-50 border-b border-border bg-background">
                 <div className="mx-auto flex min-h-16 max-w-[1500px] items-center justify-between gap-3 px-4 py-3 sm:px-8 md:h-20 md:py-0">
                     <Link href="/dashboard" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
-                        <Image src="/Media/Ro-LinkIcon.png" alt="Ro-Link" width={36} height={36} className="h-8 w-8 rounded-lg border border-white/5 object-contain shadow-lg md:h-9 md:w-9" />
-                        <span className="text-base md:text-xl font-bold text-white">Ro-Link</span>
+                        <Image src="/Media/Ro-LinkIcon.png" alt="Ro-Link" width={36} height={36} className="h-8 w-8 rounded-lg border border-border object-contain md:h-9 md:w-9" />
+                        <span className="text-base md:text-xl font-medium text-foreground">Ro-Link</span>
                     </Link>
                     <div className="flex items-center gap-2">
                         <Link
                             href="/dashboard/marketplace"
-                            className="rounded-lg border border-slate-700/80 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
+                            className="rounded-lg border border-border px-4 py-3 text-xs font-medium text-foreground transition-colors hover:border-border hover:text-foreground"
                         >
                             Marketplace
                         </Link>
-                        <Button variant="unstyled" size="unstyled"
+                        <Button variant="default" size="default"
                             type="button"
                             onClick={startNewModule}
-                            className="rounded-lg bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500"
+                            className="transition-colors"
                         >
                             New Module
                         </Button>
@@ -395,27 +399,28 @@ export default function CreatorModulesPage() {
             </nav>
 
             <main className="mx-auto max-w-[1500px] px-4 py-6 sm:px-8 md:py-10">
-                <header className="mb-6 border-b border-slate-800 pb-6">
+                <header className="mb-6 border-b border-border pb-6">
+                <ThemeToggle />
                     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                         <div className="min-w-0">
-                            <Link href="/dashboard" className="text-xs font-bold uppercase tracking-widest text-sky-300 hover:text-sky-200">
+                            <Link href="/dashboard" className="text-xs font-medium text-foreground hover:text-foreground">
                                 Back to Dashboard
                             </Link>
-                            <h1 className="mt-4 text-3xl font-black text-white md:text-5xl">Creator Dashboard</h1>
-                            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
+                            <h1 className="mt-4 text-3xl font-semibold text-foreground md:text-5xl">Creator Dashboard</h1>
+                            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
                                 Build modules, track review progress, and manage published work from one focused workspace.
                             </p>
                         </div>
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[520px]">
                             {[
-                                ['Total', stats.total, 'text-white'],
-                                ['Published', stats.published, 'text-emerald-300'],
-                                ['In Review', stats.pending, 'text-amber-300'],
-                                ['Needs Work', stats.rejected, 'text-red-300'],
+                                ['Total', stats.total, 'text-foreground'],
+                                ['Published', stats.published, 'text-emerald-700 dark:text-emerald-400'],
+                                ['In Review', stats.pending, 'text-amber-700 dark:text-amber-400'],
+                                ['Needs Work', stats.rejected, 'text-red-700 dark:text-red-400'],
                             ].map(([label, value, color]) => (
-                                <div key={label} className="rounded-lg border border-slate-800 bg-[#020617]/55 px-4 py-4">
-                                    <div className={`text-2xl font-black ${color}`}>{value}</div>
-                                    <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">{label}</div>
+                                <div key={label} className="rounded-lg border border-border bg-background px-4 py-4">
+                                    <div className={`text-2xl font-semibold ${color}`}>{value}</div>
+                                    <div className="mt-1 text-xs font-medium text-muted-foreground">{label}</div>
                                 </div>
                             ))}
                         </div>
@@ -423,25 +428,25 @@ export default function CreatorModulesPage() {
                 </header>
 
                 {error && (
-                    <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
+                    <div className="mb-6 rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-5 py-4 text-sm font-medium text-red-700 dark:text-red-400">
                         {error}
                     </div>
                 )}
                 {success && (
-                    <div className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-5 py-4 text-sm font-medium text-emerald-300">
+                    <div className="mb-6 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-5 py-4 text-sm font-medium text-emerald-700 dark:text-emerald-400">
                         {success}
                     </div>
                 )}
 
                 <div className="grid grid-cols-1 gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
                     <aside className="space-y-4 xl:sticky xl:top-28 xl:self-start">
-                        <div className="rounded-xl border border-slate-800/80 bg-slate-900/35 p-4">
+                        <Card className="rounded-xl border border-border bg-card p-4">
                             <div className="flex items-center justify-between gap-3">
                                 <div>
-                                    <h2 className="text-sm font-bold text-white">Module Library</h2>
-                                    <p className="mt-1 text-xs text-slate-500">{filteredModules.length} of {modules.length} shown</p>
+                                    <h2 className="text-sm font-medium text-foreground">Module Library</h2>
+                                    <p className="mt-1 text-xs text-muted-foreground">{filteredModules.length} of {modules.length} shown</p>
                                 </div>
-                                <span className="rounded-md border border-slate-700 bg-[#020617]/70 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                <span className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground">
                                     {stats.drafts} drafts
                                 </span>
                             </div>
@@ -449,59 +454,59 @@ export default function CreatorModulesPage() {
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
                                 placeholder="Search name, slug, category..."
-                                className="mt-4 w-full rounded-lg border border-slate-800 bg-[#020617]/70 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
+                                className="mt-4 w-full transition-colors"
                             />
                             <div className="mt-3 flex flex-wrap gap-2">
                                 {moduleFilters.map((filter) => (
-                                    <Button variant="unstyled" size="unstyled"
+                                    <Button variant="outline" size="default"
                                         key={filter.value}
                                         type="button"
                                         onClick={() => setStatusFilter(filter.value)}
-                                        className={`rounded-md border px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors ${statusFilter === filter.value ? 'border-sky-500/50 bg-sky-500/10 text-sky-200' : 'border-slate-800 bg-slate-950/50 text-slate-500 hover:border-slate-700 hover:text-slate-300'}`}
+                                        className={`        transition-colors ${statusFilter === filter.value ? '  ' : '    '}`}
                                     >
                                         {filter.label}
                                     </Button>
                                 ))}
                             </div>
-                        </div>
+                        </Card>
 
                         <div className="max-h-[68vh] space-y-3 overflow-y-auto pr-1 custom-scrollbar">
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="outline" size="default"
                                 type="button"
                                 onClick={startNewModule}
-                                className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedModule ? 'border-dashed border-slate-700 bg-slate-900/25 hover:border-sky-500/40' : 'border-sky-500/40 bg-sky-500/10'}`}
+                                className={`w-full    text-left transition-colors ${selectedModule ? '   ' : ' '}`}
                             >
-                                <span className="text-sm font-bold text-white">Create a new module</span>
-                                <span className="mt-1 block text-xs leading-relaxed text-slate-500">Start a draft with fresh metadata and source.</span>
+                                <span className="text-sm font-medium text-foreground">Create a new module</span>
+                                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">Start a draft with fresh metadata and source.</span>
                             </Button>
 
                             {filteredModules.map((addon) => (
-                                <Button variant="unstyled" size="unstyled"
+                                <Button variant="outline" size="default"
                                     key={addon.id}
                                     type="button"
                                     onClick={() => setSelectedModuleId(addon.id)}
-                                    className={`group w-full rounded-xl border p-4 text-left transition-colors ${selectedModuleId === addon.id ? 'border-sky-500/50 bg-sky-500/10 shadow-lg shadow-sky-950/20' : 'border-slate-800 bg-slate-900/35 hover:border-sky-500/40 hover:bg-slate-900/55'}`}
+                                    className={`h-auto min-h-9 justify-start whitespace-normal py-3 group w-full    text-left transition-colors ${selectedModuleId === addon.id ? '   ' : '   '}`}
                                 >
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(addon.status)}`}>
+                                        <span className={`rounded-md border px-2 py-1 text-xs font-medium   ${statusClassName(addon.status)}`}>
                                             {statusLabel(addon.status)}
                                         </span>
                                         {addon.isOfficial && (
-                                            <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+                                            <span className="rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-foreground">
                                                 Official
                                             </span>
                                         )}
                                         {addon.creatorIsVerified && (
-                                            <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
+                                            <span className="rounded-md border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                                                 Verified Creator
                                             </span>
                                         )}
                                     </div>
-                                    <span className="mt-3 block break-words text-sm font-bold text-white group-hover:text-sky-100">{addon.name}</span>
-                                    <span className="mt-2 block line-clamp-2 text-xs leading-relaxed text-slate-500">
+                                    <span className="mt-3 block break-words text-sm font-medium text-foreground group-hover:text-foreground">{addon.name}</span>
+                                    <span className="mt-2 block line-clamp-2 text-xs leading-relaxed text-muted-foreground">
                                         {addon.description || 'No description yet.'}
                                     </span>
-                                    <span className="mt-3 flex flex-wrap gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                    <span className="mt-3 flex flex-wrap gap-2 font-mono text-xs font-medium text-muted-foreground">
                                         <span>{addon.slug || 'auto-slug'}</span>
                                         <span>v{addon.version}</span>
                                     </span>
@@ -509,79 +514,79 @@ export default function CreatorModulesPage() {
                             ))}
 
                             {filteredModules.length === 0 && (
-                                <div className="rounded-xl border border-slate-800 bg-slate-900/35 p-6 text-center text-sm text-slate-500">
+                                <Card className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
                                     {modules.length > 0 ? 'No modules match this view.' : 'No modules yet.'}
-                                </div>
+                                </Card>
                             )}
                         </div>
                     </aside>
 
                     <form onSubmit={submitModule} className="min-w-0 space-y-5">
-                        <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/35">
-                            <div className="flex flex-col gap-5 border-b border-slate-800 bg-[#020617]/35 p-5 md:p-6 lg:flex-row lg:items-start lg:justify-between">
+                        <section className="overflow-hidden rounded-xl border border-border bg-card">
+                            <div className="flex flex-col gap-5 border-b border-border bg-background p-5 md:p-6 lg:flex-row lg:items-start lg:justify-between">
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
                                         {selectedModule ? (
-                                            <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusClassName(selectedModule.status)}`}>
+                                            <span className={`rounded-md border px-2 py-1 text-xs font-medium   ${statusClassName(selectedModule.status)}`}>
                                                 {statusLabel(selectedModule.status)}
                                             </span>
                                         ) : (
-                                            <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">
+                                            <span className="rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-foreground">
                                                 New Draft
                                             </span>
                                         )}
                                         {selectedModule?.sourceChecksum && (
-                                            <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                            <span className="rounded-md border border-border bg-card px-2 py-1 font-mono text-xs font-medium text-muted-foreground">
                                                 checksum {selectedModule.sourceChecksum.slice(0, 12)}
                                             </span>
                                         )}
                                         {selectedModule?.creatorIsVerified && (
-                                            <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
+                                            <span className="rounded-md border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                                                 Verified Creator
                                             </span>
                                         )}
                                     </div>
-                                    <h2 className="mt-3 break-words text-2xl font-black text-white md:text-3xl">
+                                    <h2 className="mt-3 break-words text-2xl font-semibold text-foreground md:text-3xl">
                                         {selectedModule ? selectedModule.name : 'New Module'}
                                     </h2>
-                                    <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                                         {selectedModule
                                             ? `Updated ${formatDate(selectedModule.updatedAt)}. Submitted ${formatDate(selectedModule.submittedAt)}.`
                                             : 'Fill out the details, add source, then save or submit when it is ready.'}
                                     </p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:max-w-md lg:justify-end">
-                                    <Button variant="unstyled" size="unstyled"
+                                    <Button variant="outline" size="default"
                                         type="button"
                                         onClick={() => saveModule('DRAFT')}
                                         disabled={saving}
-                                        className="rounded-lg border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
+                                        className="transition-colors disabled:opacity-50"
                                     >
                                         {saving ? 'Saving' : 'Save Draft'}
                                     </Button>
-                                    <Button variant="unstyled" size="unstyled"
+                                    <Button variant="default" size="default"
                                         type="submit"
                                         disabled={saving}
-                                        className="rounded-lg bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
+                                        className="transition-colors disabled:opacity-50"
                                     >
                                         {saving ? 'Submitting' : 'Submit Review'}
                                     </Button>
                                     {selectedModule && selectedModule.status !== 'ARCHIVED' && (
-                                        <Button variant="unstyled" size="unstyled"
+                                        <Button variant="outline" size="default"
                                             type="button"
                                             onClick={archiveModule}
                                             disabled={saving}
-                                            className="rounded-lg border border-amber-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-amber-300 transition-colors hover:bg-amber-500/10 disabled:opacity-50"
+                                            className="transition-colors disabled:opacity-50"
                                         >
                                             Archive
                                         </Button>
                                     )}
                                     {selectedModule && (
-                                        <Button variant="unstyled" size="unstyled"
+                                        <Button variant="outline" size="default"
                                             type="button"
                                             onClick={deleteModule}
                                             disabled={saving}
-                                            className="rounded-lg border border-red-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+                                            className="transition-colors disabled:opacity-50"
                                         >
                                             Delete
                                         </Button>
@@ -590,7 +595,7 @@ export default function CreatorModulesPage() {
                             </div>
 
                             {selectedModule?.status === 'REJECTED' && selectedModule.moderationNote && (
-                                <div className="mx-5 mt-5 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-200 md:mx-6">
+                                <div className="mx-5 mt-5 rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm leading-relaxed text-red-700 dark:text-red-400 md:mx-6">
                                     {selectedModule.moderationNote}
                                 </div>
                             )}
@@ -598,62 +603,62 @@ export default function CreatorModulesPage() {
                             <div className="p-5 md:p-6">
                                 <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                                     <div>
-                                        <h3 className="text-sm font-bold text-white">Module Details</h3>
-                                        <p className="mt-1 text-xs text-slate-500">Metadata shown in the marketplace and review queue.</p>
+                                        <h3 className="text-sm font-medium text-foreground">Module Details</h3>
+                                        <p className="mt-1 text-xs text-muted-foreground">Metadata shown in the marketplace and review queue.</p>
                                     </div>
-                                    <span className="font-mono text-xs text-slate-500">{form.sourceCode.length.toLocaleString()} source chars</span>
+                                    <span className="font-mono text-xs text-muted-foreground">{form.sourceCode.length.toLocaleString()} source chars</span>
                                 </div>
                                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                 <div>
-                                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Name</label>
+                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Name</label>
                                     <Input
                                         value={form.name}
                                         onChange={(event) => updateForm('name', event.target.value)}
                                         required
-                                        className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                        className="w-full transition-colors"
                                     />
                                 </div>
                                 <div>
-                                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Slug</label>
+                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Slug</label>
                                     <Input
                                         value={form.slug}
                                         onChange={(event) => updateForm('slug', event.target.value)}
                                         placeholder="Auto from name"
-                                        className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
+                                        className="w-full transition-colors"
                                     />
                                 </div>
                                 <div>
-                                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Version</label>
+                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Version</label>
                                     <Input
                                         value={form.version}
                                         onChange={(event) => updateForm('version', event.target.value)}
-                                        className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                        className="w-full transition-colors"
                                     />
                                 </div>
                                 <div>
-                                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Category</label>
+                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Category</label>
                                     <Input
                                         value={form.category}
                                         onChange={(event) => updateForm('category', event.target.value)}
-                                        className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                        className="w-full transition-colors"
                                     />
                                 </div>
                                 <div className="lg:col-span-2">
-                                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Description</label>
+                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Description</label>
                                     <Textarea
                                         value={form.description}
                                         onChange={(event) => updateForm('description', event.target.value)}
                                         required
-                                        className="min-h-28 w-full resize-y rounded-lg border border-slate-800 bg-slate-950/60 p-4 text-sm leading-relaxed text-white outline-none transition-colors focus:border-sky-500"
+                                        className="min-h-28 w-full resize-y leading-relaxed transition-colors"
                                     />
                                 </div>
                                 <div className="lg:col-span-2">
-                                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Upload Source</label>
+                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Upload Source</label>
                                     <Input
                                         type="file"
                                         accept=".lua,.luau,.txt"
                                         onChange={handleFileUpload}
-                                        className="w-full rounded-lg border border-dashed border-slate-700 bg-slate-950/60 px-4 py-3 text-xs text-slate-400 file:mr-4 file:rounded-md file:border-0 file:bg-sky-600 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white hover:border-sky-500"
+                                        className="w-full file:mr-4"
                                     />
                                 </div>
                                 </div>
@@ -661,13 +666,13 @@ export default function CreatorModulesPage() {
                         </section>
 
                         <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-                            <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/35">
-                                <div className="flex items-center justify-between gap-3 border-b border-slate-800 bg-[#020617]/35 px-5 py-4">
+                            <div className="overflow-hidden rounded-xl border border-border bg-card">
+                                <div className="flex items-center justify-between gap-3 border-b border-border bg-background px-5 py-4">
                                     <div>
-                                        <label className="block text-sm font-bold text-white">Source Code</label>
-                                        <p className="mt-1 text-xs text-slate-500">Paste Luau source or upload a `.lua`, `.luau`, or `.txt` file.</p>
+                                        <label className="block text-sm font-medium text-foreground">Source Code</label>
+                                        <p className="mt-1 text-xs text-muted-foreground">Paste Luau source or upload a `.lua`, `.luau`, or `.txt` file.</p>
                                     </div>
-                                    <span className="shrink-0 font-mono text-xs text-slate-500">{form.sourceCode.length.toLocaleString()} chars</span>
+                                    <span className="shrink-0 font-mono text-xs text-muted-foreground">{form.sourceCode.length.toLocaleString()} chars</span>
                                 </div>
                                 <div className="p-4 md:p-5">
                                     <LuauCodeEditor
@@ -680,68 +685,68 @@ export default function CreatorModulesPage() {
                             </div>
 
                             <aside className="space-y-4">
-                                <div className="rounded-xl border border-slate-800 bg-slate-900/35 p-5">
-                                    <h3 className="text-sm font-bold text-white">Review State</h3>
-                                    <dl className="mt-4 divide-y divide-slate-800 text-sm">
+                                <Card className="rounded-xl border border-border bg-card p-5">
+                                    <h3 className="text-sm font-medium text-foreground">Review State</h3>
+                                    <dl className="mt-4 divide-y divide-border text-sm">
                                         <div className="flex items-center justify-between gap-4 py-3 first:pt-0">
-                                            <dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Published</dt>
-                                            <dd className="text-right text-slate-300">{formatDate(selectedModule?.publishedAt || null)}</dd>
+                                            <dt className="text-xs font-medium text-muted-foreground">Published</dt>
+                                            <dd className="text-right text-foreground">{formatDate(selectedModule?.publishedAt || null)}</dd>
                                         </div>
                                         <div className="flex items-center justify-between gap-4 py-3">
-                                            <dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Reviewed</dt>
-                                            <dd className="text-right text-slate-300">{formatDate(selectedModule?.reviewedAt || null)}</dd>
+                                            <dt className="text-xs font-medium text-muted-foreground">Reviewed</dt>
+                                            <dd className="text-right text-foreground">{formatDate(selectedModule?.reviewedAt || null)}</dd>
                                         </div>
                                         <div className="flex items-center justify-between gap-4 py-3 last:pb-0">
-                                            <dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Config Fields</dt>
-                                            <dd className="text-right text-slate-300">{configFields.length}</dd>
+                                            <dt className="text-xs font-medium text-muted-foreground">Config Fields</dt>
+                                            <dd className="text-right text-foreground">{configFields.length}</dd>
                                         </div>
                                     </dl>
-                                </div>
+                                </Card>
 
-                                <div className="rounded-xl border border-slate-800 bg-slate-900/35 p-5">
+                                <Card className="rounded-xl border border-border bg-card p-5">
                                     <div className="flex items-center justify-between gap-3">
-                                        <h3 className="text-sm font-bold text-white">Submit Terms</h3>
-                                        <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${acceptedCreatorTerms && acceptedUseTerms ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-slate-700 bg-slate-950 text-slate-500'}`}>
+                                        <h3 className="text-sm font-medium text-foreground">Submit Terms</h3>
+                                        <span className={`rounded-md border px-2 py-1 text-xs font-medium   ${acceptedCreatorTerms && acceptedUseTerms ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400' : 'border-border bg-card text-muted-foreground'}`}>
                                             {acceptedCreatorTerms && acceptedUseTerms ? 'Ready' : 'Required'}
                                         </span>
                                     </div>
                                     <div className="mt-4 space-y-3">
-                                        <label className="flex items-start gap-3 text-xs leading-relaxed text-slate-300">
+                                        <label className="flex items-start gap-3 text-xs leading-relaxed text-foreground">
                                             <Checkbox
                                                 checked={acceptedCreatorTerms}
                                                 onCheckedChange={(checked) => setAcceptedCreatorTerms(checked === true)}
-                                                className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 accent-sky-500"
+                                                className="mt-1 w-4 accent-muted-foreground"
                                             />
-                                            <span>I agree to the <Link href="/terms/modules/create" className="text-sky-300 hover:text-sky-200">module creator terms</Link>.</span>
+                                            <span>I agree to the <Link href="/terms/modules/create" className="text-foreground hover:text-foreground">module creator terms</Link>.</span>
                                         </label>
-                                        <label className="flex items-start gap-3 text-xs leading-relaxed text-slate-300">
+                                        <label className="flex items-start gap-3 text-xs leading-relaxed text-foreground">
                                             <Checkbox
                                                 checked={acceptedUseTerms}
                                                 onCheckedChange={(checked) => setAcceptedUseTerms(checked === true)}
-                                                className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 accent-sky-500"
+                                                className="mt-1 w-4 accent-muted-foreground"
                                             />
-                                            <span>I understand the <Link href="/terms/modules/use" className="text-sky-300 hover:text-sky-200">module use and UGC terms</Link>.</span>
+                                            <span>I understand the <Link href="/terms/modules/use" className="text-foreground hover:text-foreground">module use and UGC terms</Link>.</span>
                                         </label>
                                     </div>
-                                </div>
+                                </Card>
 
-                                <div className="rounded-xl border border-slate-800 bg-slate-900/35 p-5">
+                                <Card className="rounded-xl border border-border bg-card p-5">
                                     <div className="flex items-center justify-between gap-3">
-                                        <h3 className="text-sm font-bold text-white">Parsed Config</h3>
-                                        <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                        <h3 className="text-sm font-medium text-foreground">Parsed Config</h3>
+                                        <span className="rounded-md border border-border bg-card px-2 py-1 text-xs font-medium text-muted-foreground">
                                             {configFields.length}
                                         </span>
                                     </div>
                                     {configFields.length > 0 ? (
                                         <div className="mt-4 space-y-3">
                                             {configFields.map((field) => (
-                                                <div key={field.key} className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                                                <div key={field.key} className="rounded-lg border border-border bg-card p-3">
                                                     <div className="flex items-start justify-between gap-3">
                                                         <div className="min-w-0">
-                                                            <p className="break-words text-sm font-semibold text-white">{field.label}</p>
-                                                            <p className="mt-1 break-all font-mono text-[10px] text-slate-500">{field.key}</p>
+                                                            <p className="break-words text-sm font-semibold text-foreground">{field.label}</p>
+                                                            <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{field.key}</p>
                                                         </div>
-                                                        <span className="shrink-0 rounded-md border border-slate-700 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                        <span className="shrink-0 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground">
                                                             {field.type}
                                                         </span>
                                                     </div>
@@ -749,9 +754,9 @@ export default function CreatorModulesPage() {
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="mt-3 text-sm text-slate-500">No CONFIG fields are stored for this module yet.</p>
+                                        <p className="mt-3 text-sm text-muted-foreground">No CONFIG fields are stored for this module yet.</p>
                                     )}
-                                </div>
+                                </Card>
                             </aside>
                         </section>
                     </form>

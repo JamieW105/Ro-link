@@ -72,9 +72,12 @@ The setup guide also includes the marketplace **Module Developer API** for add-o
 
 ### Dashboard UI
 
-Dashboard features use [Dice UI](https://diceui.com/) with shared shadcn-compatible
-foundations in `components/ui`. See [AGENTS.md](./AGENTS.md) for the requirements
-for future feature changes. The `@diceui` registry is configured in
+Dashboard features use [Dice UI](https://diceui.com/) with its neutral light/dark themes,
+Lucide icons, and shared shadcn-compatible foundations in `components/ui`. See [AGENTS.md](./AGENTS.md) for the requirements
+for future feature changes. Use the header switcher to choose light or dark mode;
+the selection persists across dashboard and marketplace routes. Modules have
+dedicated product pages at `/dashboard/marketplace/[moduleSlug]`.
+The `@diceui` registry is configured in
 `components.json`; copied Dice components retain their source URL and MIT notice.
 
 Run the dashboard interaction checks on desktop and mobile with:

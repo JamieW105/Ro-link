@@ -1,5 +1,7 @@
 'use client';
 
+import { Card } from '@/components/ui/card';
+
 import { Switch } from '@/components/ui/switch';
 
 import { Checkbox } from '@/components/ui/checkbox';
@@ -31,7 +33,7 @@ import {
     type CustomDashboardTheme,
 } from "@/lib/customDashboardSettings";
 import { useSession } from "next-auth/react";
-import { Command, Info, Save, Settings, Shield, Trash2 } from "lucide-react";
+import { Command, Hash, Info, Save, Settings, Shield, Trash2 } from "lucide-react";
 
 const SettingsIcon = () => <Settings size={24} aria-hidden="true" />;
 const SaveIcon = () => <Save size={18} aria-hidden="true" />;
@@ -785,7 +787,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-[400px]">
-            <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-8 h-8 border-2 border-border border-t-transparent rounded-full animate-spin"></div>
         </div>
     );
 
@@ -878,59 +880,47 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
     return (
         <div className={`animate-in fade-in slide-in-from-bottom-4 duration-700 w-full ${showsSaveButton ? 'pb-32' : 'pb-20'}`}>
-            {/* Page Header */}
-            <div className="mb-10 pb-8 border-b border-slate-800/60">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-5">
-                        <div className="w-14 h-14 bg-sky-600/10 rounded-2xl flex items-center justify-center text-sky-500 border border-sky-500/20 shadow-2xl shadow-sky-900/10">
-                            <SettingsIcon />
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">{pageCopy.title}</h1>
-                            <p className="text-slate-500 text-sm font-medium mt-1">{pageCopy.description}</p>
-                        </div>
-                    </div>
-
-                </div>
+            <div className="mb-7">
+                <h1 className="text-2xl font-semibold tracking-tight">{pageCopy.title}</h1>
+                <p className="mt-1 text-sm text-muted-foreground">{pageCopy.description}</p>
             </div>
 
-            <div className="grid grid-cols-12 gap-6 xl:gap-8">
-                {/* Main Settings Column */}
-                <div className={`col-span-12 space-y-12 ${view === 'overview' ? '' : 'lg:col-span-8'}`}>
+            <div className="space-y-6">
+                <div className="space-y-6">
 
                     {view === 'overview' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             {settingsTiles.map((tile) => {
                                 const toneClass = tile.tone === 'emerald'
-                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 group-hover:border-emerald-500/40'
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900 group-hover:border-emerald-200'
                                     : tile.tone === 'purple'
-                                        ? 'bg-purple-500/10 text-purple-400 border-purple-500/20 group-hover:border-purple-500/40'
+                                        ? 'bg-accent text-foreground border-border group-hover:border-border'
                                         : tile.tone === 'indigo'
-                                            ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 group-hover:border-indigo-500/40'
+                                            ? 'bg-accent text-foreground border-border group-hover:border-border'
                                             : tile.tone === 'red'
-                                                ? 'bg-red-500/10 text-red-400 border-red-500/20 group-hover:border-red-500/40'
+                                                ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900 group-hover:border-red-200'
                                                 : tile.tone === 'amber'
-                                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 group-hover:border-amber-500/40'
+                                                    ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900 group-hover:border-amber-200'
                                                 : tile.tone === 'sky'
-                                                    ? 'bg-sky-500/10 text-sky-400 border-sky-500/20 group-hover:border-sky-500/40'
-                                                    : 'bg-slate-500/10 text-slate-400 border-slate-500/20 group-hover:border-slate-500/40';
+                                                    ? 'bg-accent text-foreground border-border group-hover:border-border'
+                                                    : 'bg-muted text-muted-foreground border-border group-hover:border-border';
 
                                 return (
-                                    <Button variant="unstyled" size="unstyled"
+                                    <Button variant="outline" size="default"
                                         key={tile.href}
                                         type="button"
                                         onClick={() => router.push(tile.href)}
-                                        className="group min-h-44 rounded-[2rem] border border-slate-800 bg-slate-900/40 p-7 text-left transition-all hover:bg-slate-900/70 hover:border-slate-700"
+                                        className="h-auto min-h-9 justify-start whitespace-normal py-3 group min-h-44 text-left transition-all"
                                     >
                                         <div className={`mb-6 inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-colors ${toneClass}`}>
                                             <SettingsIcon />
                                         </div>
                                         <div className="flex items-start justify-between gap-4">
                                             <div>
-                                                <h3 className="text-sm font-black uppercase tracking-[0.16em] text-white">{tile.title}</h3>
-                                                <p className="mt-3 text-sm leading-relaxed text-slate-500">{tile.description}</p>
+                                                <h3 className="text-sm font-semibold text-foreground">{tile.title}</h3>
+                                                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{tile.description}</p>
                                             </div>
-                                            <LucideArrowRight className="mt-0.5 shrink-0 text-slate-600 transition-colors group-hover:text-white" width="18" height="18" strokeWidth="2.5" />
+                                            <LucideArrowRight className="mt-0.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" width="18" height="18" strokeWidth="2.5" />
                                         </div>
                                     </Button>
                                 );
@@ -940,20 +930,20 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* --- ROLE PERMISSIONS SECTION (NEW) --- */}
                     {view === 'roles' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden transition-all duration-300">
+                    <Card className="p-6">
                         <div className="flex items-start justify-between mb-8 cursor-pointer" onClick={() => setIsRolesCollapsed(!isRolesCollapsed)}>
                             <div className="flex items-start gap-6">
-                                <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500 border border-purple-500/10">
+                                <div className="p-3 bg-accent rounded-xl text-foreground border border-border">
                                     <ShieldIcon />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Role Permissions</h3>
-                                    <p className="text-sm text-slate-500 leading-relaxed max-w-lg">
+                                    <h3 className="text-base font-semibold mb-1">Discord roles</h3>
+                                    <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">
                                         Assign specific dashboard and in-game capabilities to Discord roles.
                                     </p>
                                 </div>
                             </div>
-                            <Button variant="unstyled" size="unstyled" className={`p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-all transform ${isRolesCollapsed ? 'rotate-180' : ''}`}>
+                            <Button variant="outline" size="icon" className={`     transition-all transform ${isRolesCollapsed ? 'rotate-180' : ''}`}>
                                 <LucideChevronDown width="20" height="20" strokeWidth="2" />
                             </Button>
                         </div>
@@ -961,24 +951,24 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         {!isRolesCollapsed && (
                             <div className="animate-in fade-in slide-in-from-top-4 duration-300">
                                 {/* Add Role Section */}
-                                <div className="flex gap-4 mb-8 bg-slate-950/50 p-4 rounded-xl border border-slate-800/60">
+                                <Card className="flex flex-col gap-3 mb-6 sm:flex-row">
                                     <Select
                                         value={selectedRoleForAdd}
                                         onValueChange={(nextValue) => setSelectedRoleForAdd(nextValue)}
-                                        className="flex-1 bg-black/40 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500 transition-all font-medium"
+                                        className="flex-1 transition-all"
                                         aria-label="Discord role"
                                         options={[{ value: '', label: 'Select a Discord Role...' }, ...discordRoles
                                             .filter(dr => !dashboardRoles.some(dbr => dbr.discord_role_id === dr.id) && dr.name !== '@everyone')
                                             .map(role => ({ value: role.id, label: role.name }))]}
                                     />
-                                    <Button variant="unstyled" size="unstyled"
+                                    <Button variant="default" size="default"
                                         onClick={handleAddRole}
                                         disabled={!selectedRoleForAdd || addingRole}
-                                        className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-2 rounded-lg text-xs transition-all shadow-lg shadow-purple-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {addingRole ? "Adding..." : "Add Role"}
                                     </Button>
-                                </div>
+                                </Card>
 
                                 {/* Roles List */}
                                 <div className="space-y-4">
@@ -989,35 +979,35 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                         const roleCardCollapsed = collapsedRoleIds.includes(role.id);
 
                                         return (
-                                        <div key={role.id} className="bg-slate-950/40 border border-slate-800 rounded-xl p-6 transition-all hover:bg-slate-900/40">
-                                            <div className={`flex items-center justify-between ${roleCardCollapsed ? '' : 'mb-6 border-b border-slate-800/50 pb-4'}`}>
-                                                <Button variant="unstyled" size="unstyled"
+                                        <Card key={role.id} className="bg-card border border-border rounded-xl p-6 transition-all hover:bg-card">
+                                            <div className={`flex items-center justify-between ${roleCardCollapsed ? '' : 'mb-6 border-b border-border pb-4'}`}>
+                                                <Button variant="ghost" size="default"
                                                     type="button"
                                                     onClick={() => toggleRoleCollapsed(role.id)}
-                                                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                                                    className="h-auto min-h-9 justify-start whitespace-normal py-3 flex min-w-0 flex-1 items-center text-left"
                                                 >
-                                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-700">
-                                                        #
+                                                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground border border-border">
+                                                        <Hash className="size-4" aria-hidden="true" />
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <div className="text-sm font-bold text-white tracking-wide">{role.role_name}</div>
-                                                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                                                        <div className="text-sm font-medium text-foreground tracking-wide">{role.role_name}</div>
+                                                        <div className="text-xs font-medium text-muted-foreground">
                                                             {permissionCount} permission{permissionCount === 1 ? '' : 's'}
                                                         </div>
                                                     </div>
                                                 </Button>
                                                 <div className="ml-4 flex items-center gap-2">
-                                                    <Button variant="unstyled" size="unstyled"
+                                                    <Button variant="outline" size="icon"
                                                         type="button"
                                                         onClick={() => toggleRoleCollapsed(role.id)}
-                                                        className={`p-2 rounded-lg bg-slate-900 text-slate-400 hover:text-white transition-all transform ${roleCardCollapsed ? 'rotate-180' : ''}`}
+                                                        className={`     transition-all transform ${roleCardCollapsed ? 'rotate-180' : ''}`}
                                                         title={roleCardCollapsed ? "Expand Role" : "Collapse Role"}
                                                     >
                                                         <LucideChevronDown width="16" height="16" strokeWidth="2" />
                                                     </Button>
-                                                    <Button variant="unstyled" size="unstyled"
+                                                    <Button variant="ghost" size="icon"
                                                         onClick={() => handleDeleteRole(role.id)}
-                                                        className="text-slate-500 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-500/10"
+                                                        className="transition-colors"
                                                         title="Remove Configuration"
                                                     >
                                                         <TrashIcon />
@@ -1032,12 +1022,12 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                         {ROLE_PERMISSION_OPTIONS.map((perm) => (
                                                             <label key={perm.key} className="flex items-center gap-3 cursor-pointer group select-none">
                                                                 <Checkbox
-                                                                    className="size-5 data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-500"
+                                                                    className="size-5"
                                                                     checked={role[perm.key]}
                                                                     onCheckedChange={(checked) => handleUpdateRole(role, perm.key, checked === true)}
                                                                 />
-                                                                <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${
-                                                                    role[perm.key] ? 'text-white' : 'text-slate-500 group-hover:text-slate-400'
+                                                                <span className={`text-xs font-medium   transition-colors ${
+                                                                    role[perm.key] ? 'text-foreground' : 'text-muted-foreground group-hover:text-muted-foreground'
                                                                     }`}>
                                                                     {perm.label}
                                                                 </span>
@@ -1045,23 +1035,23 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                         ))}
                                                     </div>
 
-                                                    <div className="mt-6 pt-6 border-t border-slate-800/50 space-y-5">
+                                                    <div className="mt-6 pt-6 border-t border-border space-y-5">
                                                         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                                                             <div>
-                                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+                                                                <label className="text-xs font-medium text-muted-foreground mb-2 block">
                                                                     Roblox Admin Panel Commands
                                                                 </label>
-                                                                <p className="text-[11px] text-slate-500 max-w-xl leading-relaxed">
+                                                                <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
                                                                     Choose exactly which Ro-Link in-game panel commands this role can run. The dashboard and live Roblox panel both use this same command list.
                                                                 </p>
                                                             </div>
-                                                            <Button variant="unstyled" size="unstyled"
+                                                            <Button variant="default" size="default"
                                                                 type="button"
                                                                 onClick={() => handleToggleRoleAllCommands(role)}
-                                                                className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-[0.18em] transition-all border ${
+                                                                className={`       transition-all  ${
                                                                     hasAllCommands
-                                                                        ? 'bg-purple-600 text-white border-purple-500 shadow-lg shadow-purple-900/20'
-                                                                        : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-purple-500/50 hover:text-white'
+                                                                        ? '    '
+                                                                        : '    '
                                                                 }`}
                                                             >
                                                                 {hasAllCommands ? 'All Commands Enabled' : 'Enable All Commands'}
@@ -1075,11 +1065,11 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                                     : group.commands.filter((command) => hasAdminPanelCommandAccess(roleCommands, command.id)).length;
 
                                                                 return (
-                                                                    <div key={group.category} className="rounded-xl border border-slate-800/70 bg-slate-950/40 p-4">
+                                                                    <Card key={group.category} className="rounded-xl border border-border bg-card p-4">
                                                                         <div className="flex items-center justify-between mb-4">
                                                                             <div>
-                                                                                <h4 className="text-xs font-bold text-white uppercase tracking-[0.18em]">{group.category}</h4>
-                                                                                <p className="text-[10px] text-slate-600 mt-1">{selectedCount}/{group.commands.length} selected</p>
+                                                                                <h4 className="text-xs font-medium text-foreground">{group.category}</h4>
+                                                                                <p className="text-xs text-muted-foreground mt-1">{selectedCount}/{group.commands.length} selected</p>
                                                                             </div>
                                                                         </div>
 
@@ -1088,31 +1078,31 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                                                 const enabled = hasAllCommands || hasAdminPanelCommandAccess(roleCommands, command.id);
 
                                                                                 return (
-                                                                                    <Button variant="unstyled" size="unstyled"
+                                                                                    <Button variant="outline" size="default"
                                                                                         key={command.id}
                                                                                         type="button"
                                                                                         onClick={() => handleToggleRoleCommand(role, command.id)}
-                                                                                        className={`text-left rounded-xl border px-4 py-3 transition-all ${
+                                                                                        className={`h-auto min-h-9 justify-start whitespace-normal py-3 text-left     transition-all ${
                                                                                             enabled
-                                                                                                ? 'bg-purple-600/10 border-purple-500/40 shadow-[0_0_0_1px_rgba(168,85,247,0.12)]'
-                                                                                                : 'bg-black/20 border-slate-800 hover:border-slate-600'
+                                                                                                ? '  '
+                                                                                                : '  '
                                                                                         }`}
                                                                                     >
                                                                                         <div className="flex items-start gap-3">
                                                                                             <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
                                                                                                 enabled
-                                                                                                    ? 'bg-purple-600 border-purple-500 text-white'
-                                                                                                    : 'bg-slate-900 border-slate-700 text-slate-700'
+                                                                                                    ? 'bg-primary border-border text-foreground'
+                                                                                                    : 'bg-card border-border text-muted-foreground'
                                                                                             }`}>
                                                                                                 {enabled ? (
                                                                                                     <LucideCheck width="12" height="12" strokeWidth="3" />
                                                                                                 ) : null}
                                                                                             </div>
                                                                                             <div className="min-w-0">
-                                                                                                <div className={`text-xs font-bold uppercase tracking-[0.16em] ${enabled ? 'text-white' : 'text-slate-300'}`}>
+                                                                                                <div className={`text-xs font-medium   ${enabled ? 'text-foreground' : 'text-foreground'}`}>
                                                                                                     {command.label}
                                                                                                 </div>
-                                                                                                <p className={`mt-1 text-[11px] leading-relaxed ${enabled ? 'text-slate-300' : 'text-slate-500'}`}>
+                                                                                                <p className={`mt-1 text-xs leading-relaxed ${enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
                                                                                                     {command.description}
                                                                                                 </p>
                                                                                             </div>
@@ -1121,53 +1111,53 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                                                 );
                                                                             })}
                                                                         </div>
-                                                                    </div>
+                                                                    </Card>
                                                                 );
                                                             })}
                                                         </div>
                                                     </div>
                                                 </>
                                             )}
-                                        </div>
+                                        </Card>
                                     )})}
 
                                     {dashboardRoles.length === 0 && (
-                                        <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-xl">
-                                            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">No roles configured yet.</p>
+                                        <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
+                                            <p className="text-muted-foreground text-xs font-medium">No roles configured yet.</p>
                                         </div>
                                     )}
                                 </div>
                             </div>
                         )}
-                    </div>
+                    </Card>
                     )}
 
 
                     {/* Custom Dashboard Config Section */}
                     {view === 'dashboard' && (
                     <div className="space-y-6">
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
+                        <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
                             <div className="flex items-start gap-6 mb-8">
-                                <div className="p-3 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/10">
+                                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
                                     <SettingsIcon />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Custom Dashboard</h3>
-                                    <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Set the custom dashboard address and control how the branded sign-in and dashboard shell appear.</p>
+                                    <h3 className="text-lg font-medium text-foreground mb-2">Custom Dashboard</h3>
+                                    <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">Set the custom dashboard address and control how the branded sign-in and dashboard shell appear.</p>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-6">
-                                <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Dashboard Subdomain</label>
-                                    <div className="flex rounded-xl border border-slate-800 bg-black/30 focus-within:border-amber-500">
+                                <Card className="bg-card p-6 rounded-xl border border-border">
+                                    <label className="text-xs font-medium text-muted-foreground block mb-2">Dashboard Subdomain</label>
+                                    <div className="flex rounded-xl border border-border bg-muted focus-within:border-amber-500">
                                         <Input
                                             value={customDashboardSubdomain}
                                             onChange={(e) => setCustomDashboardSubdomain(e.target.value)}
                                             placeholder="my-community"
-                                            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-white outline-none"
+                                            className="min-w-0 flex-1"
                                         />
-                                        <span className="hidden items-center border-l border-slate-800 px-4 font-mono text-xs text-slate-500 sm:flex">subdomain</span>
+                                        <span className="hidden items-center border-l border-border px-4 font-mono text-xs text-muted-foreground sm:flex">subdomain</span>
                                     </div>
                                     {currentDashboardHostname && (
                                         <div className="mt-4">
@@ -1175,113 +1165,113 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                 href={`https://${currentDashboardHostname}`}
                                                 target="_blank"
                                                 rel="noreferrer"
-                                                className="inline-flex rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 font-mono text-[11px] text-amber-200 hover:border-amber-400/50"
+                                                className="inline-flex rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 font-mono text-xs text-amber-700 dark:text-amber-400 hover:border-amber-200"
                                             >
                                                 {currentDashboardHostname}
                                             </a>
                                         </div>
                                     )}
-                                </div>
+                                </Card>
 
                                 <div className="space-y-6">
                                     <div className="space-y-6">
-                                        <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                                            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Dashboard Title</label>
+                                        <Card className="bg-card p-6 rounded-xl border border-border">
+                                            <label className="text-xs font-medium text-muted-foreground block mb-2">Dashboard Title</label>
                                             <Input
                                                 value={customDashboardMetadata.title}
                                                 onChange={(e) => updateCustomDashboardMetadata('title', e.target.value)}
                                                 placeholder="Community Staff Dashboard"
                                                 maxLength={80}
-                                                className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                                className="w-full transition-colors"
                                             />
-                                        </div>
+                                        </Card>
 
-                                        <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                                            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Description</label>
+                                        <Card className="bg-card p-6 rounded-xl border border-border">
+                                            <label className="text-xs font-medium text-muted-foreground block mb-2">Description</label>
                                             <Textarea
                                                 value={customDashboardMetadata.description}
                                                 onChange={(e) => updateCustomDashboardMetadata('description', e.target.value)}
                                                 placeholder="Sign in with Discord to access this community dashboard."
                                                 maxLength={180}
-                                                className="h-28 w-full resize-none rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                                className="w-full resize-none transition-colors"
                                             />
-                                        </div>
+                                        </Card>
 
                                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Logo URL</label>
+                                            <Card className="bg-card p-6 rounded-xl border border-border">
+                                                <label className="text-xs font-medium text-muted-foreground block mb-2">Logo URL</label>
                                                 <Input
                                                     value={customDashboardMetadata.logoUrl}
                                                     onChange={(e) => updateCustomDashboardMetadata('logoUrl', e.target.value)}
                                                     placeholder="https://..."
-                                                    className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                                    className="w-full transition-colors"
                                                 />
-                                            </div>
+                                            </Card>
 
-                                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Support URL</label>
+                                            <Card className="bg-card p-6 rounded-xl border border-border">
+                                                <label className="text-xs font-medium text-muted-foreground block mb-2">Support URL</label>
                                                 <Input
                                                     value={customDashboardMetadata.supportUrl}
                                                     onChange={(e) => updateCustomDashboardMetadata('supportUrl', e.target.value)}
                                                     placeholder="https://discord.gg/..."
-                                                    className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                                    className="w-full transition-colors"
                                                 />
-                                            </div>
+                                            </Card>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </Card>
 
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm">
+                        <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10">
                             <div className="mb-6">
-                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Layout</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed">Choose how dense the custom-host dashboard shell should feel.</p>
+                                <h3 className="text-lg font-medium text-foreground mb-2">Layout</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed">Choose how dense the custom-host dashboard shell should feel.</p>
                             </div>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                 {CUSTOM_DASHBOARD_LAYOUTS.map((layout) => (
-                                    <Button variant="unstyled" size="unstyled"
+                                    <Button variant="outline" size="default"
                                         key={layout.id}
                                         type="button"
                                         onClick={() => setCustomDashboardLayout(layout.id)}
-                                        className={`rounded-xl border p-5 text-left transition-all ${customDashboardLayout === layout.id ? 'border-amber-500/50 bg-amber-500/10' : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'}`}
+                                        className={`h-auto min-h-9 justify-start whitespace-normal py-3    text-left transition-all ${customDashboardLayout === layout.id ? ' ' : '  '}`}
                                     >
                                         <div className="flex items-center justify-between gap-3">
-                                            <div className="text-sm font-black uppercase tracking-[0.16em] text-white">{layout.name}</div>
+                                            <div className="text-sm font-semibold text-foreground">{layout.name}</div>
                                             {customDashboardLayout === layout.id && (
-                                                <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-amber-200">
+                                                <span className="rounded-md border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
                                                     Selected
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="mt-2 text-xs leading-relaxed text-slate-500">{layout.description}</p>
+                                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{layout.description}</p>
                                     </Button>
                                 ))}
                             </div>
-                        </div>
+                        </Card>
 
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm">
+                        <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10">
                             <div className="mb-6">
-                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Theme</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed">Choose one of seven color schemes for custom dashboard branding.</p>
+                                <h3 className="text-lg font-medium text-foreground mb-2">Theme</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed">Choose one of seven color schemes for custom dashboard branding.</p>
                             </div>
                             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                                 {CUSTOM_DASHBOARD_THEMES.map((theme) => (
-                                    <Button variant="unstyled" size="unstyled"
+                                    <Button variant="outline" size="default"
                                         key={theme.id}
                                         type="button"
                                         onClick={() => setCustomDashboardTheme(theme.id)}
-                                        className={`rounded-xl border p-4 text-left transition-all ${customDashboardTheme === theme.id ? 'border-white/40 bg-white/10' : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'}`}
+                                        className={`   text-left transition-all ${customDashboardTheme === theme.id ? ' ' : '  '}`}
                                     >
                                         <span
                                             className="mb-4 block h-9 w-full rounded-lg border"
                                             style={{
-                                                background: theme.gradient,
+                                                background: "var(--background)",
                                                 borderColor: theme.border,
                                             }}
                                         />
                                         <span className="flex items-center justify-between gap-2">
-                                            <span className="text-xs font-black uppercase tracking-[0.16em] text-white">{theme.name}</span>
+                                            <span className="text-xs font-semibold text-foreground">{theme.name}</span>
                                             {customDashboardTheme === theme.id && (
                                                 <span className="h-2 w-2 rounded-full" style={{ background: theme.accent }} />
                                             )}
@@ -1289,158 +1279,158 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     </Button>
                                 ))}
                             </div>
-                        </div>
+                        </Card>
                     </div>
                     )}
 
 
                     {/* Command Config Section */}
                     {view === 'commands' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
+                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
-                            <div className="p-3 bg-sky-500/10 rounded-xl text-sky-500 border border-sky-500/10">
+                            <div className="p-3 bg-accent rounded-xl text-foreground border border-border">
                                 <CommandIcon />
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Global Command Modules</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Enable or disable specific command categories server-wide. Disabled commands will not function in-game regardless of role.</p>
+                                <h3 className="text-lg font-medium text-foreground mb-2">Global Command Modules</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">Enable or disable specific command categories server-wide. Disabled commands will not function in-game regardless of role.</p>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 gap-6">
                             {/* Admin Commands Toggle */}
-                            <div className="flex items-center justify-between p-6 bg-slate-950/40 border border-slate-800 rounded-2xl">
+                            <Card className="flex items-center justify-between p-6 bg-card border border-border rounded-xl">
                                 <div>
-                                    <h4 className="text-sm font-bold text-slate-200 uppercase tracking-tight">Admin Commands</h4>
-                                    <p className="text-[11px] text-slate-500 font-medium mt-1">Kick, Ban, Unban, Shutdown, Update</p>
+                                    <h4 className="text-sm font-medium text-foreground tracking-tight">Admin Commands</h4>
+                                    <p className="text-xs text-muted-foreground font-medium mt-1">Kick, Ban, Unban, Shutdown, Update</p>
                                 </div>
                                 <Switch checked={adminCmds} onCheckedChange={setAdminCmds} aria-label="Admin commands" />
-                            </div>
+                            </Card>
 
                             {/* Misc Commands Toggle */}
-                            <div className="flex items-center justify-between p-6 bg-slate-950/40 border border-slate-800 rounded-2xl">
+                            <Card className="flex items-center justify-between p-6 bg-card border border-border rounded-xl">
                                 <div>
-                                    <h4 className="text-sm font-bold text-slate-200 uppercase tracking-tight">Misc Commands</h4>
-                                    <p className="text-[11px] text-slate-500 font-medium mt-1">Fly, Noclip, Heal, Teleport, etc.</p>
+                                    <h4 className="text-sm font-medium text-foreground tracking-tight">Misc Commands</h4>
+                                    <p className="text-xs text-muted-foreground font-medium mt-1">Fly, Noclip, Heal, Teleport, etc.</p>
                                 </div>
                                 <Switch checked={miscCmds} onCheckedChange={setMiscCmds} aria-label="Miscellaneous commands" />
-                            </div>
+                            </Card>
                         </div>
-                    </div>
+                    </Card>
                     )}
 
                     {/* Logging Config Section */}
                     {view === 'logging' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
+                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
-                            <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-500 border border-indigo-500/10">
+                            <div className="p-3 bg-accent rounded-xl text-foreground border border-border">
                                 <LucideFileText width="18" height="18" strokeWidth="2" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Audit Logging</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Select a Discord channel where administrative actions (kick, ban, etc) will be logged.</p>
+                                <h3 className="text-lg font-medium text-foreground mb-2">Audit Logging</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">Select a Discord channel where administrative actions (kick, ban, etc) will be logged.</p>
                             </div>
                         </div>
 
-                        <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Logging Channel</label>
+                        <Card className="bg-card p-6 rounded-xl border border-border">
+                            <label className="text-xs font-medium text-muted-foreground block mb-2">Logging Channel</label>
                             <Select
                                 value={loggingChannelId}
                                 onValueChange={(nextValue) => setLoggingChannelId(nextValue)}
-                                className="w-full bg-black/40 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all font-medium"
+                                className="w-full transition-all"
                                 aria-label="Audit logging channel"
                                 options={[{ value: '', label: 'Disabled (No Logging)' }, ...channels.map(channel => ({ value: channel.id, label: '#' + channel.name }))]}
                             />
                             {!isLoggingChannelAccessible && (
-                                <p className="mt-3 text-[11px] font-medium text-amber-400">
+                                <p className="mt-3 text-xs font-medium text-amber-700 dark:text-amber-400">
                                     The saved logging channel is no longer accessible to the bot. Pick a visible channel the bot can send to, then save again.
                                 </p>
                             )}
-                        </div>
-                    </div>
+                        </Card>
+                    </Card>
                     )}
 
                     {/* Report System Config */}
                     {view === 'reports' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
+                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
-                            <div className="p-3 bg-red-500/10 rounded-xl text-red-500 border border-red-500/10">
+                            <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-xl text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900">
                                 <LucideTriangleAlert width="18" height="18" strokeWidth="2" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Report System</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Enable player reports via Discord and configure where they are forwarded.</p>
+                                <h3 className="text-lg font-medium text-foreground mb-2">Report System</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">Enable player reports via Discord and configure where they are forwarded.</p>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60 flex items-center justify-between">
+                            <Card className="bg-card p-6 rounded-xl border border-border flex items-center justify-between">
                                 <div>
-                                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-1">Status</label>
-                                    <span className={`text-sm font-bold ${reportsEnabled ? 'text-red-500' : 'text-slate-500'}`}>
+                                    <label className="text-xs font-medium text-muted-foreground block mb-1">Status</label>
+                                    <span className={`text-sm font-medium ${reportsEnabled ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground'}`}>
                                         {reportsEnabled ? 'ENABLED' : 'DISABLED'}
                                     </span>
                                 </div>
                                 <Switch checked={reportsEnabled} onCheckedChange={setReportsEnabled} aria-label="Player reports" />
-                            </div>
+                            </Card>
 
-                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-1">Reports Channel</label>
+                            <Card className="bg-card p-6 rounded-xl border border-border">
+                                <label className="text-xs font-medium text-muted-foreground block mb-1">Reports Channel</label>
                                 <Select
                                     value={reportsChannelId}
                                     onValueChange={(nextValue) => setReportsChannelId(nextValue)}
-                                    className="w-full bg-black/40 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500 transition-all font-medium"
+                                    className="w-full transition-all"
                                     aria-label="Reports channel"
                                     options={[{ value: '', label: 'None (Dashboard Only)' }, ...channels.map(channel => ({ value: channel.id, label: '#' + channel.name }))]}
                                 />
                                 {!isReportsChannelAccessible && (
-                                    <p className="mt-3 text-[11px] font-medium text-amber-400">
+                                    <p className="mt-3 text-xs font-medium text-amber-700 dark:text-amber-400">
                                         The saved reports channel is no longer accessible to the bot. Choose a different channel or restore the bot’s permissions there.
                                     </p>
                                 )}
-                            </div>
+                            </Card>
                         </div>
-                    </div>
+                    </Card>
                     )}
 
                     {/* Status Box */}
                     {showsSaveButton && (
-                        <div className="p-5 sm:p-6 md:p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
+                        <Card className="p-5 sm:p-6 md:p-8 bg-card border border-border rounded-xl flex items-center justify-between">
                             <div className="flex items-center gap-5">
-                                <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/10">
+                                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
                                     <InfoIcon />
                                 </div>
                                 <div>
-                                    <h4 className="text-xs font-bold text-slate-200 uppercase tracking-tight">System Status</h4>
-                                    <p className="text-[11px] text-slate-500 font-medium tracking-tight mt-0.5">Settings changes propagate to game servers within ~30 seconds.</p>
+                                    <h4 className="text-xs font-medium text-foreground tracking-tight">System Status</h4>
+                                    <p className="text-xs text-muted-foreground font-medium tracking-tight mt-0.5">Settings changes propagate to game servers within ~30 seconds.</p>
                                 </div>
                             </div>
                             {success && (
-                                <div className="flex items-center gap-2 text-emerald-500 animate-in fade-in slide-in-from-right-2 duration-300">
+                                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 animate-in fade-in slide-in-from-right-2 duration-300">
                                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest">Changes Saved</span>
+                                    <span className="text-xs font-medium">Changes Saved</span>
                                 </div>
                             )}
-                            {error && <span className="text-red-500 text-[10px] font-bold uppercase tracking-widest">{error}</span>}
-                        </div>
+                            {error && <span className="text-red-700 dark:text-red-400 text-xs font-medium">{error}</span>}
+                        </Card>
                     )}
 
                     {/* Remove Ro-Link */}
                     {view === 'overview' && (
-                    <div className="bg-red-950/20 border border-red-500/20 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm">
+                    <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl p-5 sm:p-6 md:p-8 xl:p-10">
                         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                             <div className="flex items-start gap-5">
-                                <div className="p-3 bg-red-500/10 rounded-xl text-red-400 border border-red-500/20">
+                                <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-xl text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900">
                                     <TrashIcon />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Remove Ro-Link</h3>
-                                    <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
+                                    <h3 className="text-lg font-medium text-foreground mb-2">Remove Ro-Link</h3>
+                                    <p className="text-sm text-muted-foreground leading-relaxed max-w-xl">
                                         Open a removal panel for this server. You can remove the bot from the Discord server, delete the stored Ro-Link database data, or do both together.
                                     </p>
                                 </div>
                             </div>
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="destructive" size="default"
                                 type="button"
                                 onClick={() => {
                                     setRemoveBotOption(true);
@@ -1448,7 +1438,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     setRemoveActionError(null);
                                     setIsRemoveModalOpen(true);
                                 }}
-                                className="w-full md:w-auto px-8 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-red-900/20 text-xs uppercase tracking-widest flex items-center justify-center gap-3"
+                                className="w-full md:w-auto transition-all flex items-center justify-center"
                             >
                                 <TrashIcon />
                                 Remove Ro-Link
@@ -1458,51 +1448,33 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     )}
                 </div>
 
-                {/* Info Column */}
                 {view !== 'overview' && (
-                <div className="col-span-12 lg:col-span-4 space-y-8">
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8">
-                        <h4 className="text-xs font-bold text-white uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
-                            <span className="w-6 h-px bg-sky-600"></span>
-                            Information
-                        </h4>
-                        <div className="space-y-6">
-                            {infoItems.map((item, i) => (
-                                <div key={i} className="group">
-                                    <h5 className="text-xs font-bold text-sky-500 mb-1 group-hover:text-sky-400 transition-colors uppercase tracking-wide">
-                                        {item.title}
-                                    </h5>
-                                    <p className="text-xs text-slate-500 leading-relaxed group-hover:text-slate-400 transition-colors">
-                                        {item.text}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                    <aside aria-label="Settings information" className="grid gap-6 border-t border-border pt-6 sm:grid-cols-2">
+                        {infoItems.map(item => <div key={item.title}><h3 className="text-sm font-medium">{item.title}</h3><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.text}</p></div>)}
+                    </aside>
                 )}
             </div>
 
             {showsSaveButton && (hasUnsavedSettings || saving) && (
                 <div className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 pointer-events-none">
-                    <div className="pointer-events-auto flex w-full max-w-3xl flex-col gap-4 rounded-2xl border border-sky-500/30 bg-slate-950/95 p-4 shadow-2xl shadow-black/40 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
+                    <Card className="pointer-events-auto flex w-full max-w-3xl flex-col gap-4 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-500/20 bg-sky-500/10 text-sky-300">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-accent text-foreground">
                                 <SaveIcon />
                             </div>
                             <div>
-                                <p className="text-sm font-bold text-white">Save your settings</p>
-                                <p className="mt-0.5 text-xs font-medium text-slate-400">You have unsaved changes on this page.</p>
+                                <p className="text-sm font-medium text-foreground">Save your settings</p>
+                                <p className="mt-0.5 text-xs font-medium text-muted-foreground">You have unsaved changes on this page.</p>
                             </div>
                         </div>
-                        <Button variant="unstyled" size="unstyled"
+                        <Button variant="default" size="default"
                             type="button"
                             onClick={handleSave}
                             disabled={saving}
-                            className="flex min-h-11 items-center justify-center gap-3 rounded-xl border border-sky-400/20 bg-sky-600 px-6 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-sky-950/30 transition-all hover:bg-sky-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="flex min-h-11 items-center justify-center transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {saving ? (
-                                <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin"></div>
+                                <div className="h-4 w-4 rounded-full border-2 border-border border-t-transparent animate-spin"></div>
                             ) : (
                                 <>
                                     <SaveIcon />
@@ -1510,96 +1482,96 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                 </>
                             )}
                         </Button>
-                    </div>
+                    </Card>
                 </div>
             )}
 
             {view === 'overview' && isRemoveModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-2xl rounded-[2rem] border border-red-500/20 bg-[#020617] shadow-2xl overflow-hidden">
-                        <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-8 py-6">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-2xl rounded-xl border border-red-200 dark:border-red-900 bg-background overflow-hidden">
+                        <div className="flex items-start justify-between gap-4 border-b border-border px-8 py-6">
                             <div>
-                                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-red-400">Danger Zone</p>
-                                <h3 className="mt-2 text-2xl font-black tracking-tight text-white uppercase italic">Remove Ro-Link</h3>
-                                <p className="mt-2 text-sm text-slate-400 max-w-xl">
+                                <p className="text-xs font-medium text-red-700 dark:text-red-400">Danger Zone</p>
+                                <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">Remove Ro-Link</h3>
+                                <p className="mt-2 text-sm text-muted-foreground max-w-xl">
                                     Choose what should happen for this server. You can remove the bot, wipe the saved Ro-Link data, or perform both actions together.
                                 </p>
                             </div>
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="outline" size="icon"
                                 type="button"
                                 onClick={closeRemoveModal}
                                 disabled={removingRoLink}
-                                className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-slate-500 hover:text-white transition-colors disabled:opacity-50"
+                                className="transition-colors disabled:opacity-50"
                             >
                                 <LucideX width="18" height="18" strokeWidth="2.5" />
                             </Button>
                         </div>
 
                         <div className="space-y-5 px-8 py-8">
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="outline" size="default"
                                 type="button"
                                 onClick={() => setRemoveBotOption((current) => !current)}
-                                className={`w-full rounded-2xl border p-5 text-left transition-all ${removeBotOption ? 'border-red-500/40 bg-red-500/10' : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'}`}
+                                className={`h-auto min-h-9 justify-start whitespace-normal py-3 w-full    text-left transition-all ${removeBotOption ? ' ' : '  '}`}
                             >
                                 <div className="flex items-start gap-4">
-                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${removeBotOption ? 'border-red-500 bg-red-500 text-white' : 'border-slate-700 bg-slate-950 text-transparent'}`}>
+                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${removeBotOption ? 'border-red-500 bg-red-500 text-foreground' : 'border-border bg-card text-transparent'}`}>
                                         <LucideCheck width="12" height="12" strokeWidth="3" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold uppercase tracking-[0.16em] text-white">Remove Bot from Server</div>
-                                        <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                                        <div className="text-sm font-medium text-foreground">Remove Bot from Server</div>
+                                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                                             Makes Ro-Link leave this Discord server. Existing database data stays unless you also enable the delete option below.
                                         </p>
                                     </div>
                                 </div>
                             </Button>
 
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="outline" size="default"
                                 type="button"
                                 onClick={() => setDeleteDataOption((current) => !current)}
-                                className={`w-full rounded-2xl border p-5 text-left transition-all ${deleteDataOption ? 'border-red-500/40 bg-red-500/10' : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'}`}
+                                className={`h-auto min-h-9 justify-start whitespace-normal py-3 w-full    text-left transition-all ${deleteDataOption ? ' ' : '  '}`}
                             >
                                 <div className="flex items-start gap-4">
-                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${deleteDataOption ? 'border-red-500 bg-red-500 text-white' : 'border-slate-700 bg-slate-950 text-transparent'}`}>
+                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${deleteDataOption ? 'border-red-500 bg-red-500 text-foreground' : 'border-border bg-card text-transparent'}`}>
                                         <LucideCheck width="12" height="12" strokeWidth="3" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold uppercase tracking-[0.16em] text-white">Delete Ro-Link Data</div>
-                                        <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                                        <div className="text-sm font-medium text-foreground">Delete Ro-Link Data</div>
+                                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                                             Deletes this server’s stored Ro-Link setup, logs, live server cache, command queue, reports, and dashboard role configuration from the database.
                                         </p>
                                     </div>
                                 </div>
                             </Button>
 
-                            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-5 py-4 text-sm text-amber-200">
+                            <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-5 py-4 text-sm text-amber-700 dark:text-amber-400">
                                 Deleting data is permanent. If you want a full disconnect, enable both options before confirming.
                             </div>
 
                             {removeActionError && (
-                                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
+                                <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-5 py-4 text-sm font-medium text-red-700 dark:text-red-400">
                                     {removeActionError}
                                 </div>
                             )}
                         </div>
 
-                        <div className="flex flex-col-reverse gap-3 border-t border-slate-800 px-8 py-6 sm:flex-row sm:items-center sm:justify-end">
-                            <Button variant="unstyled" size="unstyled"
+                        <div className="flex flex-col-reverse gap-3 border-t border-border px-8 py-6 sm:flex-row sm:items-center sm:justify-end">
+                            <Button variant="ghost" size="default"
                                 type="button"
                                 onClick={closeRemoveModal}
                                 disabled={removingRoLink}
-                                className="px-5 py-3 text-sm font-semibold text-slate-400 hover:text-white transition-colors disabled:opacity-50"
+                                className="transition-colors disabled:opacity-50"
                             >
                                 Cancel
                             </Button>
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="destructive" size="default"
                                 type="button"
                                 onClick={handleRemoveRoLink}
                                 disabled={removingRoLink || (!removeBotOption && !deleteDataOption)}
-                                className="flex items-center justify-center gap-3 rounded-xl bg-red-600 px-6 py-3 text-sm font-bold uppercase tracking-widest text-white transition-all hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex items-center justify-center transition-all disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {removingRoLink ? (
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    <div className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin"></div>
                                 ) : (
                                     <TrashIcon />
                                 )}

@@ -64,24 +64,24 @@ export default function ReportsPage() {
         <div className="space-y-8 max-w-6xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             {/* Header */}
             <div className="flex flex-col gap-1 mb-8">
-                <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                <h1 className="text-2xl font-medium text-foreground tracking-tight flex items-center gap-2">
                     <ReportIcon /> Reports System
                 </h1>
-                <p className="text-slate-500 text-sm font-medium">Manage and review player reports submitted via Discord.</p>
+                <p className="text-muted-foreground text-sm font-medium">Manage and review player reports submitted via Discord.</p>
             </div>
 
             {/* Reports List */}
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Pending Reports <span className="ml-2 px-2 py-0.5 bg-sky-500/10 text-sky-500 rounded-full text-[10px]">{reports.length}</span></h3>
-                    <Button variant="unstyled" size="unstyled" className="text-slate-500 hover:text-white transition-colors"><FilterIcon /></Button>
+                    <h3 className="text-sm font-medium text-foreground">Pending Reports <span className="ml-2 px-2 py-0.5 bg-accent text-foreground rounded-full text-xs">{reports.length}</span></h3>
+                    <Button variant="ghost" size="icon" className="transition-colors"><FilterIcon /></Button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {loadingReports ? (
-                        <div className="col-span-full text-center py-8 text-slate-500 text-xs uppercase tracking-widest animate-pulse">Loading Reports...</div>
+                        <div className="col-span-full text-center py-8 text-muted-foreground text-xs animate-pulse">Loading Reports...</div>
                     ) : reports.length === 0 ? (
-                        <div className="col-span-full text-center py-12 border-2 border-dashed border-slate-800 rounded-xl text-slate-500 text-xs uppercase tracking-widest">
+                        <div className="col-span-full text-center py-12 border-2 border-dashed border-border rounded-xl text-muted-foreground text-xs">
                             No pending reports
                         </div>
                     ) : (
@@ -89,14 +89,14 @@ export default function ReportsPage() {
                             <Link
                                 key={report.id}
                                 href={`/dashboard/${id}/reports/${report.id}`}
-                                className="block p-4 rounded-xl border bg-slate-900/40 border-slate-800/50 hover:bg-slate-800 hover:border-slate-700 transition-all cursor-pointer group"
+                                className="block p-4 rounded-xl border bg-card border-border hover:bg-muted hover:border-border transition-all cursor-pointer group"
                             >
                                 <div className="flex justify-between items-start mb-2">
-                                    <span className="text-xs font-bold text-white bg-slate-800 px-2 py-0.5 rounded border border-slate-700">{report.reported_roblox_username}</span>
-                                    <span className="text-[10px] font-mono text-slate-500">{new Date(report.created_at).toLocaleDateString()}</span>
+                                    <span className="text-xs font-medium text-foreground bg-muted px-2 py-0.5 rounded border border-border">{report.reported_roblox_username}</span>
+                                    <span className="text-xs font-mono text-muted-foreground">{new Date(report.created_at).toLocaleDateString()}</span>
                                 </div>
-                                <p className="text-slate-400 text-xs line-clamp-2 mb-3">{report.reason}</p>
-                                <div className="flex items-center gap-2 text-[10px] text-slate-600 font-bold uppercase tracking-wider">
+                                <p className="text-muted-foreground text-xs line-clamp-2 mb-3">{report.reason}</p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
                                     <span>By: {report.reporter_roblox_username || report.reporter_discord_id}</span>
                                 </div>
                             </Link>

@@ -1,5 +1,9 @@
 'use client';
 
+import { TriangleAlert } from 'lucide-react';
+
+import { Card } from '@/components/ui/card';
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -66,8 +70,8 @@ function PlayerLookupFallback() {
     return (
         <div className="space-y-8 max-w-5xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-bold text-white tracking-tight">Player Lookup</h1>
-                <p className="text-slate-500 text-sm font-medium">Loading lookup parameters...</p>
+                <h1 className="text-2xl font-medium text-foreground tracking-tight">Player Lookup</h1>
+                <p className="text-muted-foreground text-sm font-medium">Loading lookup parameters...</p>
             </div>
         </div>
     );
@@ -301,15 +305,15 @@ function PlayerLookupContent() {
     return (
         <div className="space-y-8 max-w-5xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-bold text-white tracking-tight">Player Lookup</h1>
-                <p className="text-slate-500 text-sm font-medium">Search for Roblox users using official User API data.</p>
+                <h1 className="text-2xl font-medium text-foreground tracking-tight">Player Lookup</h1>
+                <p className="text-muted-foreground text-sm font-medium">Search for Roblox users using official User API data.</p>
             </div>
 
             {/* Search Bar */}
-            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4 md:p-6 backdrop-blur-md">
+            <Card className="bg-card border border-border rounded-xl p-4 md:p-6">
                 <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
                     <div className="relative flex-1 group">
-                        <div className="absolute inset-y-0 left-4 flex items-center text-slate-500 group-focus-within:text-sky-500 transition-colors">
+                        <div className="absolute inset-y-0 left-4 flex items-center text-muted-foreground group-focus-within:text-foreground transition-colors">
                             <SearchIcon />
                         </div>
                         <Input
@@ -317,56 +321,56 @@ function PlayerLookupContent() {
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             placeholder="Type a Roblox username..."
-                            className="w-full bg-black/40 border border-slate-800 rounded-lg pl-12 pr-4 py-3 text-sm text-white placeholder:text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all"
+                            className="w-full transition-all"
                         />
                     </div>
-                    <Button variant="unstyled" size="unstyled"
+                    <Button variant="default" size="default"
                         type="submit"
                         disabled={loading || !query}
-                        className="bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-500 text-white px-8 py-3 rounded-lg text-sm font-bold transition-all shadow-lg shadow-sky-900/20 flex items-center justify-center gap-2 w-full sm:w-auto"
+                        className="transition-all flex items-center justify-center w-full sm:w-auto"
                     >
-                        {loading ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : "SEARCH"}
+                        {loading ? <div className="w-4 h-4 border-2 border-border border-t-white rounded-full animate-spin"></div> : "SEARCH"}
                     </Button>
                 </form>
-            </div>
+            </Card>
 
             {error && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-6 py-4 rounded-xl text-xs font-bold uppercase tracking-wider animate-in shake duration-300">
-                    ⚠️ {error}
+                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400 px-6 py-4 rounded-xl text-xs font-medium animate-in shake duration-300">
+                    <TriangleAlert className="mr-2 inline size-4" aria-hidden="true" /> {error}
                 </div>
             )}
 
             {player && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Player Card */}
-                    <div className="lg:col-span-1 border border-slate-800 bg-[#020617] rounded-2xl overflow-hidden shadow-2xl h-fit">
-                        <div className={`h-24 bg-gradient-to-r ${player.isBanned ? 'from-red-600 to-rose-900' : 'from-sky-600 to-indigo-600'}`}></div>
+                    <div className="lg:col-span-1 border border-border bg-background rounded-xl overflow-hidden h-fit">
+                        <div className={`h-24  ${player.isBanned ? ' ' : ' '}`}></div>
                         <div className="px-8 pb-8 -mt-12 text-center">
-                            <div className="inline-block p-1.5 bg-[#020617] rounded-full mb-4">
+                            <div className="inline-block p-1.5 bg-background rounded-full mb-4">
                                 <img
                                     src={player.avatarUrl}
                                     alt={player.username}
-                                    className="w-24 h-24 rounded-full border border-slate-800 bg-slate-900 object-cover shadow-xl"
+                                    className="w-24 h-24 rounded-full border border-border bg-card object-cover"
                                 />
                             </div>
-                            <h2 className="text-xl font-bold text-white mb-1">{player.displayName}</h2>
-                            <p className="text-slate-500 text-sm font-semibold mb-6">@{player.username}</p>
+                            <h2 className="text-xl font-medium text-foreground mb-1">{player.displayName}</h2>
+                            <p className="text-muted-foreground text-sm font-semibold mb-6">@{player.username}</p>
 
                             <div className="grid grid-cols-2 gap-3 mb-8">
-                                <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800/50">
-                                    <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest block mb-1">User ID</span>
-                                    <span className="text-xs font-mono font-bold text-sky-500">{player.id}</span>
+                                <div className="bg-card p-3 rounded-xl border border-border">
+                                    <span className="text-xs font-medium text-muted-foreground block mb-1">User ID</span>
+                                    <span className="text-xs font-mono font-medium text-foreground">{player.id}</span>
                                 </div>
-                                <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800/50">
-                                    <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest block mb-1">Status</span>
+                                <div className="bg-card p-3 rounded-xl border border-border">
+                                    <span className="text-xs font-medium text-muted-foreground block mb-1">Status</span>
                                     {presence?.inGame ? (
-                                        <span className="text-[9px] font-bold text-emerald-500 px-2 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20 uppercase flex items-center justify-center gap-1.5">
+                                        <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 rounded-full border border-emerald-200 dark:border-emerald-900 flex items-center justify-center gap-1.5">
                                             <LiveIcon /> IN GAME
                                         </span>
                                     ) : player.isBanned ? (
-                                        <span className="text-[9px] font-bold text-red-500 px-2 py-0.5 bg-red-500/10 rounded-full border border-red-500/20 uppercase tracking-tighter">Banned</span>
+                                        <span className="text-xs font-medium text-red-700 dark:text-red-400 px-2 py-0.5 bg-red-50 dark:bg-red-950/30 rounded-full border border-red-200 dark:border-red-900">Banned</span>
                                     ) : (
-                                        <span className="text-[9px] font-bold text-slate-500 px-2 py-0.5 bg-slate-800 rounded-full border border-slate-700 uppercase tracking-tighter">Offline</span>
+                                        <span className="text-xs font-medium text-muted-foreground px-2 py-0.5 bg-muted rounded-full border border-border">Offline</span>
                                     )}
                                 </div>
                             </div>
@@ -374,14 +378,14 @@ function PlayerLookupContent() {
                             {presence?.inGame && presence.jobId && linkedPlaceId ? (
                                 <a
                                     href={`roblox://placeId=${linkedPlaceId}&gameInstanceId=${presence.jobId}`}
-                                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
+                                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-foreground py-3 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-2"
                                 >
                                     <LiveIcon /> JOIN SERVER
                                 </a>
                             ) : (
-                                <Button variant="unstyled" size="unstyled"
+                                <Button variant="outline" size="default"
                                     disabled={true}
-                                    className="w-full bg-slate-800/50 border border-slate-700 text-slate-500 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all cursor-not-allowed opacity-50"
+                                    className="w-full transition-all cursor-not-allowed opacity-50"
                                 >
                                     JOIN SERVER (OFFLINE)
                                 </Button>
@@ -391,32 +395,32 @@ function PlayerLookupContent() {
 
                     {/* Details & Actions */}
                     <div className="lg:col-span-2 space-y-8">
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8 backdrop-blur-md">
-                            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-3">
-                                <div className="p-2 bg-sky-600/10 rounded-lg text-sky-500 border border-sky-500/10">
+                        <Card className="bg-card border border-border rounded-xl p-8">
+                            <h3 className="text-sm font-medium text-foreground mb-6 flex items-center gap-3">
+                                <div className="p-2 bg-accent rounded-lg text-foreground border border-border">
                                     <UserIcon />
                                 </div>
                                 About Player
                             </h3>
                             <div className="space-y-6">
                                 <div>
-                                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Description</label>
-                                    <p className="text-slate-400 text-sm leading-relaxed italic">
+                                    <label className="text-xs font-medium text-muted-foreground block mb-2">Description</label>
+                                    <p className="text-muted-foreground text-sm leading-relaxed">
                                         &quot;{player.description || "No description provided."}&quot;
                                     </p>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Account Created</label>
-                                    <p className="text-white text-sm font-semibold">
+                                    <label className="text-xs font-medium text-muted-foreground block mb-2">Account Created</label>
+                                    <p className="text-foreground text-sm font-semibold">
                                         {new Date(player.created).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                                     </p>
                                 </div>
                             </div>
-                        </div>
+                        </Card>
 
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8 backdrop-blur-md">
-                            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-3">
-                                <div className="p-2 bg-amber-600/10 rounded-lg text-amber-500 border border-amber-500/10">
+                        <Card className="bg-card border border-border rounded-xl p-8">
+                            <h3 className="text-sm font-medium text-foreground mb-6 flex items-center gap-3">
+                                <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
                                     <ShieldIcon />
                                 </div>
                                 Moderation History
@@ -424,29 +428,29 @@ function PlayerLookupContent() {
                             {logs.length > 0 ? (
                                 <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                                     {logs.map((log) => (
-                                        <div key={log.id} className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4 flex items-center justify-between group hover:bg-slate-800/50 transition-all">
+                                        <div key={log.id} className="bg-muted border border-border rounded-xl p-4 flex items-center justify-between group hover:bg-muted transition-all">
                                             <div className="flex items-center gap-4">
                                                 <div className={`w-2 h-2 rounded-full ${log.action === 'BAN' ? 'bg-red-500' : log.action === 'SOFTBAN' ? 'bg-rose-400' : log.action === 'KICK' ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
                                                 <div>
-                                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">{log.action}</span>
-                                                    <p className="text-[11px] text-slate-500 mt-1 font-medium">By {log.moderator} • {new Date(log.timestamp).toLocaleDateString()}</p>
+                                                    <span className="text-xs font-medium text-foreground">{log.action}</span>
+                                                    <p className="text-xs text-muted-foreground mt-1 font-medium">By {log.moderator} • {new Date(log.timestamp).toLocaleDateString()}</p>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <span className="text-[9px] font-mono text-slate-600 uppercase tracking-widest">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span className="text-xs font-mono text-muted-foreground">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <div className="py-8 text-center border-2 border-dashed border-slate-800 rounded-xl">
-                                    <p className="text-xs font-bold text-slate-600 uppercase tracking-widest italic">No prior history found.</p>
+                                <div className="py-8 text-center border-2 border-dashed border-border rounded-xl">
+                                    <p className="text-xs font-medium text-muted-foreground">No prior history found.</p>
                                 </div>
                             )}
-                        </div>
+                        </Card>
 
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8 backdrop-blur-md">
-                            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-3">
+                        <Card className="bg-card border border-border rounded-xl p-8">
+                            <h3 className="text-sm font-medium text-foreground mb-6 flex items-center gap-3">
                                 <div className="p-2 bg-yellow-600/10 rounded-lg text-yellow-500 border border-yellow-500/10">
                                     <InfoIcon />
                                 </div>
@@ -455,29 +459,29 @@ function PlayerLookupContent() {
                             {staffNotes.length > 0 ? (
                                 <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar mb-6">
                                     {staffNotes.map((note) => (
-                                        <div key={note.id} className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4">
+                                        <div key={note.id} className="bg-muted border border-border rounded-xl p-4">
                                             <div className="flex items-start justify-between gap-4">
-                                                <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap flex-1">{note.note}</p>
+                                                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap flex-1">{note.note}</p>
                                                 {note.can_delete ? (
-                                                    <Button variant="unstyled" size="unstyled"
+                                                    <Button variant="outline" size="default"
                                                         type="button"
                                                         onClick={() => handleDeleteNote(note.id)}
                                                         disabled={deletingNoteId === note.id}
-                                                        className="shrink-0 px-3 py-2 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] font-bold uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                                                        className="shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                                                     >
                                                         {deletingNoteId === note.id ? 'Deleting' : 'Delete'}
                                                     </Button>
                                                 ) : null}
                                             </div>
-                                            <p className="text-[11px] text-slate-500 mt-3 font-medium">
+                                            <p className="text-xs text-muted-foreground mt-3 font-medium">
                                                 By {note.created_by_tag || note.created_by_discord_id || 'Unknown Staff'} - {new Date(note.created_at).toLocaleString()}
                                             </p>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <div className="py-8 text-center border-2 border-dashed border-slate-800 rounded-xl mb-6">
-                                    <p className="text-xs font-bold text-slate-600 uppercase tracking-widest italic">No staff notes found.</p>
+                                <div className="py-8 text-center border-2 border-dashed border-border rounded-xl mb-6">
+                                    <p className="text-xs font-medium text-muted-foreground">No staff notes found.</p>
                                 </div>
                             )}
                             <form onSubmit={handleAddNote} className="space-y-3">
@@ -486,88 +490,88 @@ function PlayerLookupContent() {
                                     onChange={(event) => setNoteText(event.target.value)}
                                     rows={3}
                                     maxLength={1500}
-                                    className="w-full bg-black/40 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all resize-none"
+                                    className="w-full transition-all resize-none"
                                     placeholder="Add a staff-only note for this user..."
                                 />
-                                <Button variant="unstyled" size="unstyled"
+                                <Button variant="outline" size="default"
                                     type="submit"
                                     disabled={noteSaving || !noteText.trim()}
-                                    className="px-5 py-3 bg-yellow-600/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-yellow-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     {noteSaving ? "SAVING..." : "ADD NOTE"}
                                 </Button>
                             </form>
-                        </div>
+                        </Card>
 
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8 backdrop-blur-md">
-                            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-8 flex items-center gap-3">
-                                <div className="p-2 bg-red-600/10 rounded-lg text-red-500 border border-red-500/10">
+                        <Card className="bg-card border border-border rounded-xl p-8">
+                            <h3 className="text-sm font-medium text-foreground mb-8 flex items-center gap-3">
+                                <div className="p-2 bg-red-50 dark:bg-red-950/30 rounded-lg text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900">
                                     <ShieldIcon />
                                 </div>
                                 Quick Actions
                             </h3>
                             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_180px] gap-4 mb-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Reason</label>
+                                    <label className="text-xs font-medium text-muted-foreground block">Reason</label>
                                     <Textarea
                                         value={reasonText}
                                         onChange={(event) => setReasonText(event.target.value)}
                                         rows={3}
-                                        className="w-full bg-black/40 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all resize-none"
+                                        className="w-full transition-all resize-none"
                                         placeholder="Why are you taking this action?"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Soft Ban Minutes</label>
+                                    <label className="text-xs font-medium text-muted-foreground block">Soft Ban Minutes</label>
                                     <Input
                                         type="number"
                                         min="1"
                                         value={softBanDurationMinutes}
                                         onChange={(event) => setSoftBanDurationMinutes(event.target.value)}
-                                        className="w-full bg-black/40 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all"
+                                        className="w-full transition-all"
                                     />
-                                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                                    <p className="text-xs text-muted-foreground leading-relaxed">
                                         Used only for Soft Ban.
                                     </p>
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                                <Button variant="unstyled" size="unstyled"
+                                <Button variant="outline" size="default"
                                     onClick={() => handleAction('KICK')}
                                     disabled={actionLoading || !hasActionAccess('KICK') || !presence?.inGame}
-                                    className="px-6 py-4 bg-orange-600/10 border border-orange-500/20 hover:bg-orange-500/20 text-orange-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     KICK PLAYER
                                 </Button>
-                                <Button variant="unstyled" size="unstyled"
+                                <Button variant="outline" size="default"
                                     onClick={() => handleAction('BAN')}
                                     disabled={actionLoading || !hasActionAccess('BAN')}
-                                    className="px-6 py-4 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     BAN PLAYER
                                 </Button>
-                                <Button variant="unstyled" size="unstyled"
+                                <Button variant="outline" size="default"
                                     onClick={() => handleAction('SOFTBAN')}
                                     disabled={actionLoading || !hasActionAccess('SOFTBAN')}
-                                    className="px-6 py-4 bg-rose-600/10 border border-rose-500/20 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     SOFT BAN
                                 </Button>
-                                <Button variant="unstyled" size="unstyled"
+                                <Button variant="outline" size="default"
                                     onClick={() => handleAction('UNBAN')}
                                     disabled={actionLoading || !hasActionAccess('UNBAN')}
-                                    className="px-6 py-4 bg-emerald-600/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     UNBAN PLAYER
                                 </Button>
                             </div>
-                        </div>
+                        </Card>
 
-                        <div className="p-6 bg-sky-500/5 rounded-xl border border-sky-500/10 flex items-start gap-4">
-                            <div className="text-sky-500 mt-0.5">
+                        <div className="p-6 bg-accent rounded-xl border border-border flex items-start gap-4">
+                            <div className="text-foreground mt-0.5">
                                 <InfoIcon />
                             </div>
-                            <p className="text-[11px] font-medium text-slate-500 leading-relaxed">
+                            <p className="text-xs font-medium text-muted-foreground leading-relaxed">
                                 Join Server and Presence features require the latest Kernel Update (v1.2).
                                 If the player is currently in-game, you will see a &quot;LIVE&quot; badge above.
                             </p>
@@ -578,12 +582,12 @@ function PlayerLookupContent() {
 
             {!player && !loading && (
                 <div className="py-20 text-center space-y-4 max-w-md mx-auto">
-                    <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center text-slate-700 mx-auto border border-slate-800/50">
+                    <div className="w-16 h-16 bg-card rounded-xl flex items-center justify-center text-muted-foreground mx-auto border border-border">
                         <UserIcon />
                     </div>
                     <div>
-                        <h3 className="text-slate-300 font-bold uppercase text-[10px] tracking-[0.2em] mb-2">Search Required</h3>
-                        <p className="text-slate-600 text-[11px] font-medium leading-relaxed">
+                        <h3 className="text-foreground font-medium text-xs mb-2">Search Required</h3>
+                        <p className="text-muted-foreground text-xs font-medium leading-relaxed">
                             Enter a Roblox username above to view their profile, avatar, and execute administrative actions across all game servers.
                         </p>
                     </div>

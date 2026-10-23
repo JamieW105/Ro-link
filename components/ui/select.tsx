@@ -57,7 +57,7 @@ function Select({ options, value, onValueChange, disabled, className, id, name, 
         openOnFocus
         autoHighlight
       >
-        <ComboboxAnchor className={cn("h-auto min-h-10 bg-background px-3 py-2", className)}>
+        <ComboboxAnchor className={cn("h-auto min-h-9 bg-background px-3 py-2", className)}>
           <ComboboxInput id={id} aria-label={label} aria-labelledby={undefined} aria-describedby={describedBy} placeholder={selected?.label ?? "Select an option…"} className="h-auto min-w-0 text-inherit" />
           <ComboboxTrigger type="button" aria-label={`Show ${label.toLowerCase()} options`} />
         </ComboboxAnchor>

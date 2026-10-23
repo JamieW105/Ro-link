@@ -1,5 +1,7 @@
 'use client';
 
+import { Card } from '@/components/ui/card';
+
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -223,25 +225,25 @@ export default function ReportDetailsPage() {
     };
 
     if (loading) {
-        return <div className="p-12 text-center text-slate-500 animate-pulse uppercase tracking-widest font-bold text-xs">Loading Report Details...</div>;
+        return <div className="p-12 text-center text-muted-foreground animate-pulse font-medium text-xs">Loading Report Details...</div>;
     }
 
     return (
         <div className="space-y-6 md:space-y-8 max-w-5xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             {/* Header / Nav */}
             <div>
-                <Link href={`/dashboard/${id}/reports`} className="inline-flex items-center gap-2 text-slate-500 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest mb-4">
+                <Link href={`/dashboard/${id}/reports`} className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-xs font-medium mb-4">
                     <ChevronLeftIcon /> Back to Reports
                 </Link>
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-white tracking-tight">Report Review</h1>
-                        <p className="text-slate-500 text-sm font-medium">Reviewing Pending Report <span className="font-mono text-slate-600">#{report.id.slice(0, 8)}</span></p>
+                        <h1 className="text-2xl font-medium text-foreground tracking-tight">Report Review</h1>
+                        <p className="text-muted-foreground text-sm font-medium">Reviewing Pending Report <span className="font-mono text-muted-foreground">#{report.id.slice(0, 8)}</span></p>
                     </div>
                     <div className="flex gap-3">
-                        <Button variant="unstyled" size="unstyled"
+                        <Button variant="outline" size="default"
                             onClick={handleDismiss}
-                            className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors"
+                            className="transition-colors"
                         >
                             Dismiss
                         </Button>
@@ -253,9 +255,9 @@ export default function ReportDetailsPage() {
                 {/* Main Content: Info & Evidence */}
                 <div className="lg:col-span-2 space-y-6">
                     {/* Report Information */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 sm:p-6 md:p-8 backdrop-blur-md">
-                        <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-3">
-                            <div className="p-2 bg-red-600/10 rounded-lg text-red-500 border border-red-500/10">
+                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8">
+                        <h3 className="text-sm font-medium text-foreground mb-6 flex items-center gap-3">
+                            <div className="p-2 bg-red-50 dark:bg-red-950/30 rounded-lg text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900">
                                 <ShieldIcon />
                             </div>
                             Incident Details
@@ -263,12 +265,12 @@ export default function ReportDetailsPage() {
 
                         <div className="space-y-6">
                             <div>
-                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Reporter</label>
+                                <label className="text-xs font-medium text-muted-foreground block mb-2">Reporter</label>
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-700">?</div>
+                                    <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center text-muted-foreground font-medium border border-border">?</div>
                                     <div>
-                                        <p className="text-sm font-bold text-white">{report.reporter_roblox_username || "Unknown Roblox User"}</p>
-                                        <p className="text-xs font-mono text-slate-500">Discord ID: {report.reporter_discord_id}</p>
+                                        <p className="text-sm font-medium text-foreground">{report.reporter_roblox_username || "Unknown Roblox User"}</p>
+                                        <p className="text-xs font-mono text-muted-foreground">Discord ID: {report.reporter_discord_id}</p>
                                     </div>
                                 </div>
                             </div>
@@ -286,51 +288,51 @@ export default function ReportDetailsPage() {
                                         joinUrl: report.reported_join_url,
                                     },
                                 ].map((serverContext) => (
-                                    <div key={serverContext.label} className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-4">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{serverContext.label}</p>
+                                    <div key={serverContext.label} className="rounded-xl border border-border bg-muted p-4">
+                                        <p className="text-xs font-medium text-muted-foreground">{serverContext.label}</p>
                                         {serverContext.jobId ? (
                                             <>
-                                                <p className="mt-2 break-all font-mono text-xs text-slate-300">{serverContext.jobId}</p>
+                                                <p className="mt-2 break-all font-mono text-xs text-foreground">{serverContext.jobId}</p>
                                                 {serverContext.joinUrl && (
                                                     <a
                                                         href={serverContext.joinUrl}
                                                         target="_blank"
                                                         rel="noreferrer"
-                                                        className="mt-3 inline-flex text-xs font-bold text-sky-400 hover:text-sky-300"
+                                                        className="mt-3 inline-flex text-xs font-medium text-foreground hover:text-foreground"
                                                     >
                                                         Join server ↗
                                                     </a>
                                                 )}
                                             </>
                                         ) : (
-                                            <p className="mt-2 text-xs text-slate-500">Not found in a live server when reported.</p>
+                                            <p className="mt-2 text-xs text-muted-foreground">Not found in a live server when reported.</p>
                                         )}
                                     </div>
                                 ))}
                             </div>
 
-                            <div className="bg-slate-800/30 p-4 sm:p-6 rounded-xl border border-slate-700/50">
-                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Detailed Reason / Evidence</label>
-                                <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{report.reason}</p>
+                            <div className="bg-muted p-4 sm:p-6 rounded-xl border border-border">
+                                <label className="text-xs font-medium text-muted-foreground block mb-2">Detailed Reason / Evidence</label>
+                                <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">{report.reason}</p>
                             </div>
 
-                            <div className="flex gap-4 pt-4 border-t border-slate-800/50">
+                            <div className="flex gap-4 pt-4 border-t border-border">
                                 <div>
-                                    <label className="text-[10px] uppercase font-bold text-slate-600 tracking-widest block mb-1">Submitted</label>
-                                    <p className="text-xs font-mono text-slate-400">{new Date(report.created_at).toLocaleString()}</p>
+                                    <label className="text-xs font-medium text-muted-foreground block mb-1">Submitted</label>
+                                    <p className="text-xs font-mono text-muted-foreground">{new Date(report.created_at).toLocaleString()}</p>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] uppercase font-bold text-slate-600 tracking-widest block mb-1">Status</label>
-                                    <span className="px-2 py-0.5 bg-orange-500/10 text-orange-500 rounded border border-orange-500/20 text-[10px] font-bold uppercase tracking-wider">{report.status}</span>
+                                    <label className="text-xs font-medium text-muted-foreground block mb-1">Status</label>
+                                    <span className="px-2 py-0.5 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 rounded border border-orange-200 dark:border-orange-900 text-xs font-medium">{report.status}</span>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </Card>
 
                     {/* Global History */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 sm:p-6 md:p-8 backdrop-blur-md">
-                        <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-3">
-                            <div className="p-2 bg-amber-600/10 rounded-lg text-amber-500 border border-amber-500/10">
+                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8">
+                        <h3 className="text-sm font-medium text-foreground mb-6 flex items-center gap-3">
+                            <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
                                 <ShieldIcon />
                             </div>
                             Global Moderation History
@@ -339,38 +341,38 @@ export default function ReportDetailsPage() {
                         {logs.length > 0 ? (
                             <div className="space-y-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
                                 {logs.map((log) => (
-                                    <div key={log.id} className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4 flex items-center justify-between group hover:bg-slate-800/50 transition-all">
+                                    <div key={log.id} className="bg-muted border border-border rounded-xl p-4 flex items-center justify-between group hover:bg-muted transition-all">
                                         <div className="flex items-center gap-4">
                                             <div className={`w-2 h-2 rounded-full ${log.action === 'BAN' ? 'bg-red-500' : log.action === 'KICK' ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
                                             <div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">{log.action}</span>
-                                                    <span className="text-[9px] font-bold text-slate-500 px-1.5 py-px bg-slate-800 rounded border border-slate-700">
+                                                    <span className="text-xs font-medium text-foreground">{log.action}</span>
+                                                    <span className="text-xs font-medium text-muted-foreground px-1.5 py-px bg-muted rounded border border-border">
                                                         {guildNameMap[String(log.server_id)] || (log.server_id ? `Server ${String(log.server_id).slice(0, 8)}` : "Unknown Server")}
                                                     </span>
                                                 </div>
-                                                <p className="text-[11px] text-slate-500 mt-1 font-medium">By {log.moderator} • {new Date(log.timestamp).toLocaleDateString()}</p>
+                                                <p className="text-xs text-muted-foreground mt-1 font-medium">By {log.moderator} • {new Date(log.timestamp).toLocaleDateString()}</p>
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <span className="text-[9px] font-mono text-slate-600 uppercase tracking-widest">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            <span className="text-xs font-mono text-muted-foreground">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         ) : (
-                            <div className="py-8 text-center border-2 border-dashed border-slate-800 rounded-xl">
-                                <p className="text-xs font-bold text-slate-600 uppercase tracking-widest italic">No prior history found.</p>
+                            <div className="py-8 text-center border-2 border-dashed border-border rounded-xl">
+                                <p className="text-xs font-medium text-muted-foreground">No prior history found.</p>
                             </div>
                         )}
-                    </div>
+                    </Card>
                 </div>
 
                 {/* Sidebar: Profile & Actions */}
                 <div className="lg:col-span-1 space-y-6">
                     {/* User Profile Card */}
-                    <div className="bg-[#020617] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-                        <div className="h-20 bg-gradient-to-r from-red-900 to-slate-900"></div>
+                    <div className="bg-background border border-border rounded-xl overflow-hidden">
+                        <div className="h-20"></div>
                         <div className="px-4 sm:px-6 pb-4 sm:pb-6 -mt-10">
                             <div className="relative inline-block">
                                 <img
@@ -382,24 +384,24 @@ export default function ReportDetailsPage() {
                                                 ? `https://api.dicebear.com/7.x/identicon/svg?seed=${report.reported_roblox_username}`
                                                 : `https://www.roblox.com/headshot-thumbnail/image?userId=1&width=420&height=420&format=png`
                                     }
-                                    className="w-20 h-20 rounded-xl border-4 border-[#020617] bg-slate-800 object-cover shadow-lg"
+                                    className="w-20 h-20 rounded-xl border-4 border-border bg-muted object-cover"
                                     alt="Avatar"
                                 />
                                 {(profiles?.discord_id || /^\d+$/.test(report.reported_roblox_username)) && (
-                                    <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-[#5865F2] rounded-full border-2 border-[#020617] flex items-center justify-center text-white text-[10px]">D</div>
+                                    <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-background rounded-full border-2 border-border flex items-center justify-center text-foreground text-xs">D</div>
                                 )}
                             </div>
 
                             <div className="mt-4">
-                                <h2 className="text-lg font-bold text-white">
+                                <h2 className="text-lg font-medium text-foreground">
                                     {discordUser ? (discordUser.global_name || discordUser.username) : report.reported_roblox_username}
                                 </h2>
                                 {discordUser && discordUser.global_name && (
-                                    <p className="text-xs font-mono text-slate-500">@{discordUser.username}</p>
+                                    <p className="text-xs font-mono text-muted-foreground">@{discordUser.username}</p>
                                 )}
-                                {profiles?.roblox_id && <p className="text-xs font-mono text-slate-500 mt-1">Roblox ID: {profiles.roblox_id}</p>}
+                                {profiles?.roblox_id && <p className="text-xs font-mono text-muted-foreground mt-1">Roblox ID: {profiles.roblox_id}</p>}
                                 {/^\d+$/.test(report.reported_roblox_username) && !profiles?.roblox_id && !discordUser && (
-                                    <p className="text-xs font-mono text-slate-500 mt-1">Unlinked Discord User</p>
+                                    <p className="text-xs font-mono text-muted-foreground mt-1">Unlinked Discord User</p>
                                 )}
                             </div>
 
@@ -413,24 +415,24 @@ export default function ReportDetailsPage() {
                                     }
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="flex items-center justify-between p-3 bg-slate-900 rounded-xl border border-slate-800 hover:bg-slate-800 hover:border-slate-700 transition-all group"
+                                    className="flex items-center justify-between p-3 bg-card rounded-xl border border-border hover:bg-muted hover:border-border transition-all group"
                                 >
-                                    <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors">
+                                    <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
                                         {/^\d+$/.test(report.reported_roblox_username) && !profiles?.roblox_id ? "Discord Profile" : "Roblox Profile"}
                                     </span>
-                                    <LucideExternalLink width="14" height="14" strokeWidth="2" className="text-slate-600 group-hover:text-white" />
+                                    <LucideExternalLink width="14" height="14" strokeWidth="2" className="text-muted-foreground group-hover:text-foreground" />
                                 </a>
                                 {profiles?.discord_id ? (
-                                    <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                                    <div className="p-3 bg-card rounded-xl border border-border">
                                         <div className="flex justify-between items-center mb-1">
-                                            <span className="text-xs font-bold text-slate-400">Discord Account</span>
-                                            <span className="text-[10px] bg-[#5865F2]/20 text-[#5865F2] px-1.5 py-0.5 rounded border border-[#5865F2]/30 font-bold uppercase">Linked</span>
+                                            <span className="text-xs font-medium text-muted-foreground">Discord Account</span>
+                                            <span className="text-xs bg-background text-[#5865F2] px-1.5 py-0.5 rounded border border-border font-medium">Linked</span>
                                         </div>
-                                        <div className="text-xs font-mono text-slate-500 truncate">{profiles.discord_id}</div>
+                                        <div className="text-xs font-mono text-muted-foreground truncate">{profiles.discord_id}</div>
                                     </div>
                                 ) : (
-                                    <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 opacity-50">
-                                        <span className="text-xs font-bold text-slate-500">No Discord Linked</span>
+                                    <div className="p-3 bg-card rounded-xl border border-border opacity-50">
+                                        <span className="text-xs font-medium text-muted-foreground">No Discord Linked</span>
                                     </div>
                                 )}
                             </div>
@@ -438,48 +440,48 @@ export default function ReportDetailsPage() {
                     </div>
 
                     {/* Action Panel */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 sm:p-6 backdrop-blur-md">
-                        <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6">
+                        <h3 className="text-xs font-medium text-foreground mb-4 flex items-center gap-2">
                             <ShieldIcon /> Take Action
                         </h3>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Reason for Moderation</label>
+                                <label className="text-xs font-medium text-muted-foreground block mb-2">Reason for Moderation</label>
                                 <Textarea
                                     value={reason}
                                     onChange={(e) => setReason(e.target.value)}
-                                    className="w-full bg-black/40 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder:text-slate-700 focus:outline-none focus:border-red-500/50 min-h-[100px]"
+                                    className="w-full min-h-[100px]"
                                     placeholder="Enter the reason for this action (sent to user)..."
                                 />
                             </div>
 
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="outline" size="default"
                             onClick={() => handleAction('KICK', 'ROBLOX')}
                                 disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'KICK'))}
-                                className="w-full py-3 bg-orange-600/10 border border-orange-500/20 hover:bg-orange-500/20 text-orange-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Kick User
                             </Button>
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="outline" size="default"
                                 onClick={() => handleAction('SOFTBAN', 'ROBLOX')}
                                 disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'SOFTBAN'))}
-                                className="w-full py-3 bg-red-600/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Soft Ban (12h)
                             </Button>
-                            <Button variant="unstyled" size="unstyled"
+                            <Button variant="destructive" size="default"
                                 onClick={() => handleAction('BAN', 'ROBLOX')}
                                 disabled={actionLoading || !(perms.is_admin || hasAdminPanelCommandAccess(perms.allowed_misc_cmds, 'BAN'))}
-                                className="w-full py-3 bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/20 rounded-xl text-xs font-bold transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Permanent Ban
                             </Button>
                         </div>
-                        <p className="text-[10px] text-slate-600 mt-4 text-center leading-relaxed">
+                        <p className="text-xs text-muted-foreground mt-4 text-center leading-relaxed">
                             Actions will be logged globally. If the user has a linked Discord, they will receive a DM notification from the bot.
                         </p>
-                    </div>
+                    </Card>
                 </div>
             </div>
         </div>

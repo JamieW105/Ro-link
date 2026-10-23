@@ -4,6 +4,17 @@ const serverId = "123456789012345678";
 const guild = { id: serverId, name: "UI Test Server", icon: null, permissions: "8", owner: true, hasBot: true };
 const roles = [{ id: "role-1", name: "Verified Members", color: 0 }, { id: "role-2", name: "Moderators", color: 0 }];
 
+const sampleModule = {
+  id: 'module-welcome', slug: 'welcome-tools', name: 'Welcome tools',
+  description: 'Welcome new players and keep your community connected with configurable join messages.',
+  version: '1.0.0', category: 'Community', status: 'PUBLISHED', isOfficial: true,
+  creatorIsVerified: true, creatorApprovedModuleCount: 1, creatorMaxModuleInstallCount: 10,
+  sourceChecksum: 'fixture-checksum', configSchema: { message: { key: 'message', label: 'Welcome message', shortDescription: 'The message shown when players join.', type: 'string', options: [], defaultValue: 'Welcome!' } },
+  authorDiscordId: 'creator-user', submittedAt: null, reviewedAt: null, moderationNote: '',
+  publishedAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+};
+const sampleServer = { id: 'live-job-001', server_id: serverId, player_count: 2, players: [], updated_at: '2026-10-23T00:00:00Z' };
+
 async function mockDashboard(page: Page, themed = false) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -22,6 +33,9 @@ async function mockDashboard(page: Page, themed = false) {
     else if (pathname === "/api/settings/roles") body = [{ id: "configured-role", discord_role_id: "role-2", role_name: "Moderators", can_access_dashboard: true, can_kick: false, allowed_misc_cmds: [] }];
     else if (pathname === "/api/site-banners") body = { banners: [] };
     else if (pathname === "/api/ping") body = { ok: true };
+    else if (pathname === "/api/dashboard/marketplace") body = { modules: [sampleModule], installTargets: [{ ...guild, installedModuleCount: 0, moduleLimit: 5 }] };
+    else if (pathname === "/api/dashboard/live-panel") body = { server: { placeId: '1234' }, liveServers: [sampleServer], playerActivity: [], modulePanelCommands: [], logs: [], pendingReports: [] };
+    else if (pathname === "/api/dashboard/live-servers") body = [sampleServer];
     else if (pathname === "/api/dashboard/modules") body = { modules: [], installedCount: 0 };
     else if (pathname === "/api/dashboard/live-servers" || pathname === "/api/reports" || pathname === "/api/dashboard/logs") body = [];
     await route.fulfill({ json: body });
@@ -106,5 +120,84 @@ test("overview renders Dice metric components", async ({ page }) => {
   await page.goto(`/dashboard/${serverId}`);
   await expect(page.locator('[data-slot="stat"]').first()).toBeVisible();
   await expect(page.locator('[data-slot="stat-value"]').first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+
+test("the redesigned light theme carries across modules, marketplace and live panel", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  for (const path of [`/dashboard/${serverId}/modules`, '/dashboard/marketplace', `/dashboard/${serverId}/live-panel`]) {
+    await page.goto(path);
+    await expect(page.locator('h1').first()).toBeVisible();
+    await expect(page.locator('.dice-ui-dashboard').first()).toHaveCSS('color-scheme', 'light');
+  }
+  expect(errors).toEqual([]);
+});
+
+test("mobile navigation opens as a dialog and closes after choosing a page", async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'Mobile drawer interaction');
+  const errors = await mockDashboard(page);
+  await page.goto(`/dashboard/${serverId}`);
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Dashboard navigation', exact: true });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('link', { name: 'Roles', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/dashboard/${serverId}/settings/roles$`), { timeout: 20_000 });
+  await expect(dialog).toBeHidden({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Role Permissions', exact: true })).toBeVisible({ timeout: 20_000 });
+  expect(errors).toEqual([]);
+});
+
+
+test("theme choice persists across Servers, Live Panel, marketplace and product pages", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  await page.goto(`/dashboard/${serverId}/servers`);
+  await page.getByRole('button', { name: 'Switch to dark mode', exact: true }).click();
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  await page.reload();
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  await page.getByRole('button', { name: 'Server controls', exact: true }).click();
+  const controls = page.getByRole('dialog', { name: 'Server controls', exact: true });
+  await expect(controls).toHaveCSS('color-scheme', 'dark');
+  await page.keyboard.press('Escape');
+  await expect(controls).toBeHidden();
+  for (const path of [`/dashboard/${serverId}/servers`, `/dashboard/${serverId}/live-panel`, '/dashboard/marketplace', `/dashboard/marketplace/${sampleModule.slug}`]) {
+    await page.goto(path);
+    await expect(page.locator('h1').first()).toBeVisible();
+    await expect(page.locator('.dice-ui-dashboard').first()).toHaveCSS('color-scheme', 'dark');
+    await expect(page.getByRole('button', { name: 'Switch to light mode', exact: true })).toBeVisible();
+  }
+  await expect(page.getByRole('heading', { name: sampleModule.name, exact: true })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/dashboard/marketplace/${sampleModule.slug}$`));
+  await page.getByRole('button', { name: 'Switch to light mode', exact: true }).click();
+  await page.reload();
+  await expect(page.locator('html')).not.toHaveClass(/dark/);
+  await expect(page.locator('.dice-ui-dashboard').first()).toHaveCSS('color-scheme', 'light');
+  expect(errors).toEqual([]);
+});
+
+test("marketplace search opens a real product page and installs through the existing API", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  await page.goto('/dashboard/marketplace');
+  const search = page.getByRole('textbox', { name: 'Search modules', exact: true });
+  await search.fill('no results');
+  await expect(page.getByText('No modules found', { exact: true })).toBeVisible();
+  await search.fill('welcome');
+  await page.getByRole('link', { name: `View ${sampleModule.name}`, exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/dashboard/marketplace/${sampleModule.slug}$`), { timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: sampleModule.name, exact: true })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: 'Select Server To Install', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: sampleModule.name, exact: true });
+  await expect(dialog).toBeVisible();
+  const install = page.waitForRequest(request => request.url().includes('/api/dashboard/modules') && request.method() === 'POST');
+  await dialog.getByRole('button', { name: new RegExp(guild.name) }).click();
+  expect((await install).postDataJSON()).toMatchObject({ action: 'install', serverId, moduleId: sampleModule.id });
+  await expect(dialog.getByText('Installed to 1 server.', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await page.goto(`/dashboard/marketplace?module=${sampleModule.slug}`);
+  await expect(page.getByRole('heading', { name: sampleModule.name, exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back to marketplace', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Module marketplace', exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });

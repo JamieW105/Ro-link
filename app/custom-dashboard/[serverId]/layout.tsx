@@ -21,4 +21,4 @@ export async function generateMetadata({ params }: { params: Promise<{ serverId:
     });
 }
 
-export default function CustomDashboardLayout({ children }: { children: React.ReactNode }) { return children; }
+export default function CustomDashboardLayout({ children }: { children: React.ReactNode }) { return <div className="dice-ui-dashboard contents">{children}</div>; }
