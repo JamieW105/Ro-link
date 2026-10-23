@@ -941,7 +941,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     )}
 
                     {view === 'roles' && (
-                        <div className="space-y-6">
+                        <div className="space-y-4">
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2"><Shield className="size-4" aria-hidden="true" />Discord roles</CardTitle>
@@ -975,12 +975,12 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                                 return (
                                     <Card key={role.id}>
-                                        <CardHeader className="flex-row items-center justify-between gap-3">
+                                        <CardHeader className="flex-row items-center justify-between gap-3 px-4 py-3">
                                             <div className="flex min-w-0 items-center gap-3">
-                                                <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"><Hash className="size-4" aria-hidden="true" /></div>
-                                                <div className="min-w-0 space-y-2">
-                                                    <CardTitle className="break-words leading-snug">{role.role_name}</CardTitle>
-                                                    <Status variant="info"><StatusLabel>{permissionCount} permission{permissionCount === 1 ? '' : 's'}</StatusLabel></Status>
+                                                <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"><Hash className="size-4" aria-hidden="true" /></div>
+                                                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                                                    <CardTitle className="max-w-full break-words text-sm leading-snug">{role.role_name}</CardTitle>
+                                                    <Status variant="info" className="px-2 py-0.5"><StatusLabel>{permissionCount} permission{permissionCount === 1 ? '' : 's'}</StatusLabel></Status>
                                                 </div>
                                             </div>
                                             <div className="flex shrink-0 items-center gap-1">
