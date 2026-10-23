@@ -22,6 +22,7 @@ type DashboardChromeProps = {
   groups: NavigationGroup[];
   serverId: string;
   brand: string;
+  brandIconUrl?: string | null;
   userName: string;
   userAvatarUrl?: string | null;
   latency: string;
@@ -32,9 +33,10 @@ type DashboardChromeProps = {
   style?: CSSProperties;
 };
 
-export function DashboardChrome({ children, groups, serverId, brand, userName, userAvatarUrl, latency, online, homeHref, customHost, layout, style }: DashboardChromeProps) {
+export function DashboardChrome({ children, groups, serverId, brand, brandIconUrl, userName, userAvatarUrl, latency, online, homeHref, customHost, layout, style }: DashboardChromeProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [failedBrandIcon, setFailedBrandIcon] = useState<string | null>(null);
   const [failedAvatar, setFailedAvatar] = useState<string | null>(null);
   const [category, setCategory] = useState(groups.find(group => group.items.some(item => item.href === pathname))?.label || groups[0]?.label);
   const active = groups.flatMap(group => group.items).find(item => item.href === pathname);
@@ -59,7 +61,9 @@ export function DashboardChrome({ children, groups, serverId, brand, userName, u
   function brandHeader(mobile = false) {
     return <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
       <Link href={homeHref} aria-label={`${brand} workspace`} className="flex min-w-0 flex-1 items-center gap-2.5">
-        <span className="flex size-8 shrink-0 items-center justify-center"><Image src="/Media/Ro-LinkIcon.png" alt="" width={25} height={25} /></span>
+        {brandIconUrl && failedBrandIcon !== brandIconUrl
+          ? <Image src={brandIconUrl} alt={`${brand} server icon`} width={32} height={32} unoptimized className="size-8 shrink-0 rounded-lg object-cover" onError={() => setFailedBrandIcon(brandIconUrl)} />
+          : <span role="img" aria-label={`${brand} server icon unavailable`} className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-xs font-medium">{brand.slice(0, 2).toUpperCase()}</span>}
         {(!compact || mobile) && <div className="min-w-0"><div className="truncate text-sm font-semibold">{brand}</div><div className="text-xs text-muted-foreground">Workspace</div></div>}
       </Link>
       {(!compact || mobile) && <ChevronDown className="size-4 text-muted-foreground" />}

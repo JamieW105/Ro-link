@@ -654,3 +654,22 @@ test('custom modules open from the plus icon on a dedicated themed page', async 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test("workspace header displays the server name and icon with an initials fallback", async ({ page, isMobile }) => {
+  const errors = await mockDashboard(page);
+  await page.route(`**/api/custom-dashboard/${serverId}`, route => route.fulfill({json: {id: serverId, name: guild.name, icon: 'server-icon'}}));
+  await page.route('**/api/discord/media?*', route => route.fulfill({path: 'public/Media/Ro-LinkIcon.png'}));
+  await page.goto(`/dashboard/${serverId}/staff-shifts`);
+  if (isMobile) await page.getByRole('button', {name: 'Open navigation', exact: true}).click();
+  const header = page.getByRole('link', {name: `${guild.name} workspace`, exact: true}).filter({visible: true});
+  await expect(header).toBeVisible();
+  await expect(header).toContainText(guild.name);
+  const icon = header.getByRole('img', {name: `${guild.name} server icon`, exact: true});
+  await expect(icon).toBeVisible();
+  const iconSrc = new URL((await icon.getAttribute('src'))!, page.url());
+  expect(iconSrc.pathname).toBe('/api/discord/media');
+  expect(iconSrc.searchParams.get('url')).toContain(`/icons/${serverId}/server-icon.png`);
+  await icon.evaluate(node => node.dispatchEvent(new Event('error')));
+  await expect(header.getByRole('img', {name: `${guild.name} server icon unavailable`, exact: true})).toHaveText('UI');
+  expect(errors).toEqual([]);
+});

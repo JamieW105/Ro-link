@@ -1,6 +1,6 @@
 'use client';
 
-import { getDiscordMediaProxyUrl } from '@/lib/discordMedia';
+import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 import { DashboardChrome } from '@/components/dashboard/DashboardChrome';
 
 import { Button } from '@/components/ui/button';
@@ -219,11 +219,9 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
                 if (!infoResponse.ok || cancelled) return;
 
                 const info = await infoResponse.json() as CustomDashboardInfo;
+                setCustomDashboardInfo(info);
                 if (info.subdomain || info.hostname) {
-                    setCustomDashboardInfo(info);
                     setHasCustomDashboardSetup(true);
-                } else {
-                    setCustomDashboardInfo(null);
                 }
             } catch {
                 if (!cancelled) {
@@ -435,8 +433,10 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
         || customDashboardInfo?.layout
         || DEFAULT_CUSTOM_DASHBOARD_LAYOUT;
     const customDashboardBrand = isCustomDashboardStyled
-        ? customDashboardMetadata?.title || customDashboardInfo?.name || 'Ro-Link'
-        : 'Ro-Link';
+        ? customDashboardMetadata?.title || customDashboardInfo?.name || 'Server'
+        : customDashboardInfo?.name || 'Server';
+    const customDashboardLogo = (isCustomDashboardStyled && customDashboardMetadata?.logoUrl)
+        || (customDashboardInfo?.icon ? getDiscordGuildIconProxyUrl(String(id), customDashboardInfo.icon) : null);
     const customDashboardStyle: CSSProperties | undefined = isCustomDashboardStyled ? {
         '--dice-primary': customDashboardTheme.accent,
         '--dice-primary-foreground': '#171717',
@@ -508,6 +508,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             ]}
             serverId={String(id)}
             brand={customDashboardBrand}
+            brandIconUrl={customDashboardLogo}
             userName={session?.user?.name || 'Discord user'}
             userAvatarUrl={getDiscordMediaProxyUrl(session?.user?.image)}
             latency={apiLatencyLabel}
