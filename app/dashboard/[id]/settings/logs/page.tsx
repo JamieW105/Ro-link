@@ -97,9 +97,9 @@ export default function LogsPage() {
                         />
                     </div>
 
-                    <Button variant="outline" size="icon"
+                    <Button variant="outline"
                         onClick={() => setSortAsc(!sortAsc)}
-                        className="flex items-center transition-all"
+                        className="shrink-0 transition-all"
                     >
                         <SortIcon />
                         {sortAsc ? "Oldest First" : "Newest First"}
