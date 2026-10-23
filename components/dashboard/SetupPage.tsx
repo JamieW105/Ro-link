@@ -1,10 +1,9 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
-
+import { Status, StatusIndicator, StatusLabel } from '@/components/ui/status';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -158,7 +157,7 @@ export default function DashboardSetupPage() {
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className={`w-full transition-all duration-700 ${step === 1 ? "max-w-md mx-auto mt-20" : "max-w-7xl"}`}>
                 {step === 1 ? (
-                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10">
+                    <Card className="p-6">
                         <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center text-foreground mb-8 border border-border">
                             <SearchIcon />
                         </div>
@@ -168,22 +167,22 @@ export default function DashboardSetupPage() {
                         <form onSubmit={handleSetup} className="space-y-6">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className="text-xs font-medium text-muted-foreground pl-1 block">Place ID</label>
+                                    <label htmlFor="place-id" className="text-sm font-medium block">Place ID</label>
                                     <Input
                                         type="text"
                                         required
-                                        placeholder="Place ID"
+                                        id="place-id" placeholder="Place ID"
                                         className="w-full transition-all"
                                         value={placeId}
                                         onChange={(event) => setPlaceId(event.target.value)}
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-xs font-medium text-muted-foreground pl-1 block">Universe ID</label>
+                                    <label htmlFor="universe-id" className="text-sm font-medium block">Universe ID</label>
                                     <Input
                                         type="text"
                                         required
-                                        placeholder="Universe ID"
+                                        id="universe-id" placeholder="Universe ID"
                                         className="w-full transition-all"
                                         value={universeId}
                                         onChange={(event) => setUniverseId(event.target.value)}
@@ -192,11 +191,11 @@ export default function DashboardSetupPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-xs font-medium text-muted-foreground pl-1 block">Open Cloud API Key</label>
+                                <label htmlFor="open-cloud-key" className="text-sm font-medium block">Open Cloud API Key</label>
                                 <Input
                                     type="password"
                                     required
-                                    placeholder="Enter Roblox API Key"
+                                    id="open-cloud-key" placeholder="Enter Roblox API Key"
                                     className="w-full transition-all"
                                     value={openCloudKey}
                                     onChange={(event) => setOpenCloudKey(event.target.value)}
@@ -213,43 +212,43 @@ export default function DashboardSetupPage() {
                                 {loading ? (
                                     <div className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin"></div>
                                 ) : (
-                                    "REQUEST AUTH KEY"
+                                    "Request auth key"
                                 )}
                             </Button>
                         </form>
                     </Card>
                 ) : (
-                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 border-l-sky-600 border-l-4">
+                    <Card className="p-6">
                         <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-12">
-                            <div className="flex-1">
+                            <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-4 mb-10">
-                                    <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg flex items-center justify-center text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
+                                    <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center text-foreground border border-border">
                                         <CheckIcon />
                                     </div>
                                     <div>
                                         <h1 className="text-2xl font-medium tracking-tight">Setup Complete</h1>
-                                        <p className="text-muted-foreground text-xs font-medium">STATUS: ACTIVE</p>
+                                        <Status className="mt-2"><StatusIndicator /><StatusLabel>Active</StatusLabel></Status>
                                     </div>
                                 </div>
 
                                 <div className="space-y-8">
-                                    <div className="bg-muted p-5 rounded-xl border border-border">
-                                        <label className="text-xs text-muted-foreground font-medium flex items-center gap-2 mb-4">
+                                    <Card className="p-4">
+                                        <h2 className="text-sm text-foreground font-medium flex items-center gap-2 mb-4">
                                             <KeyIcon />
                                             Security Key
-                                        </label>
+                                        </h2>
                                         <div className="flex gap-3">
-                                            <code className="flex-1 bg-card px-4 py-3 rounded-lg font-mono text-xs text-foreground break-all border border-border">
+                                            <code className="min-w-0 flex-1 bg-card px-4 py-3 rounded-lg font-mono text-xs text-foreground break-all border border-border">
                                                 {apiKey}
                                             </code>
-                                            <Button variant="outline" size="icon"
+                                            <Button type="button" aria-label="Copy security key" variant="outline" size="icon"
                                                 onClick={() => navigator.clipboard.writeText(apiKey)}
                                                 className="transition-all"
                                             >
                                                 <CopyIcon />
                                             </Button>
                                         </div>
-                                    </div>
+                                    </Card>
 
                                     <div className="space-y-4">
                                         <h3 className="text-xs font-medium flex items-center gap-3 text-foreground">
@@ -258,7 +257,7 @@ export default function DashboardSetupPage() {
                                         </h3>
                                         <ol className="space-y-4">
                                             {setupSteps.map((text, index) => (
-                                                <li key={text} className="flex gap-4 text-xs font-semibold text-muted-foreground p-4 bg-muted rounded-xl border border-border">
+                                                <li key={text} className="flex gap-4 text-sm text-foreground p-3 rounded-md border border-border">
                                                     <span className="text-foreground">{`0${index + 1}`}</span>
                                                     {text}
                                                 </li>
@@ -268,53 +267,49 @@ export default function DashboardSetupPage() {
                                 </div>
                             </div>
 
-                            <div className="flex-1">
-                                <div className="bg-muted rounded-xl border border-border h-full flex flex-col overflow-hidden">
-                                    <div className="flex items-center justify-between px-6 py-4 bg-card border-b border-border gap-4">
+                            <div className="min-w-0 flex-1">
+                                <Card className="h-full overflow-hidden">
+                                    <div className="flex flex-wrap items-center justify-between px-6 py-4 bg-card border-b border-border gap-4">
                                         <div>
                                             <span className="text-xs font-medium text-muted-foreground">Installer plugin</span>
                                             <p className="text-sm font-semibold text-foreground mt-1">RoLink installer</p>
                                         </div>
-                                        <a
-                                            href={INSTALLER_PLUGIN_URL}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center gap-2 px-3 py-2 bg-primary hover:bg-primary text-foreground rounded text-xs font-medium tracking-tight transition-colors"
-                                        >
-                                            Open Plugin
-                                            <ExternalLinkIcon />
-                                        </a>
+                                        <Button asChild>
+                                            <a href={INSTALLER_PLUGIN_URL} target="_blank" rel="noreferrer">
+                                                Open Plugin <ExternalLinkIcon />
+                                            </a>
+                                        </Button>
                                     </div>
-                                    <div className="flex-1 overflow-auto p-6 bg-background custom-scrollbar">
+                                    <div className="p-6">
                                         <div className="space-y-5">
-                                            <div className="rounded-xl border border-border bg-accent p-5">
+                                            <Card className="bg-muted p-4">
                                                 <p className="text-xs font-medium text-foreground mb-2">No manual scripts required</p>
                                                 <p className="text-sm leading-6 text-foreground">
                                                     The installer plugin places and configures the Ro-Link bridge for you in Studio. Install it, paste your Security Key, and let it finish the setup.
                                                 </p>
-                                            </div>
-                                            <div className="grid gap-4 md:grid-cols-3">
+                                            </Card>
+                                            <div className="grid gap-4">
                                                 {installerHighlights.map((item) => (
-                                                    <Card key={item.title} className="rounded-xl border border-border bg-card p-4">
-                                                        <p className="text-xs font-medium text-muted-foreground mb-2">{item.title}</p>
-                                                        <p className="text-xs leading-6 text-muted-foreground">{item.body}</p>
+                                                    <Card key={item.title} className="p-4">
+                                                        <p className="text-sm font-medium text-foreground mb-2">{item.title}</p>
+                                                        <p className="text-sm leading-6 text-muted-foreground">{item.body}</p>
                                                     </Card>
                                                 ))}
                                             </div>
-                                            <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-5">
-                                                <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-2">Keep this key private</p>
-                                                <p className="text-xs leading-6 text-amber-100/80">
+                                            <Card className="bg-muted p-4">
+                                                <p className="text-xs font-medium text-foreground mb-2">Keep this key private</p>
+                                                <p className="text-xs leading-6 text-foreground">
                                                     Only paste the Security Key into the RoLink installer plugin or your secure backend tooling. Do not expose it in public repos, client scripts, or shared screenshots.
                                                 </p>
-                                            </div>
+                                            </Card>
                                         </div>
                                     </div>
-                                </div>
+                                </Card>
                             </div>
                         </div>
 
                         <div className="mt-10 pt-6 border-t border-border">
-                            <Button variant="ghost" size="default"
+                            <Button type="button" variant="outline" size="default"
                                 onClick={() => {
                                     setStep(1);
                                     setPlaceId("");
@@ -322,31 +317,12 @@ export default function DashboardSetupPage() {
                                 className="flex items-center transition-colors"
                             >
                                 <RefreshIcon />
-                                Reset Bridge Handshake
+                                Reset bridge handshake
                             </Button>
                         </div>
                     </Card>
                 )}
             </div>
-
-            <style jsx>{`
-                .custom-scrollbar::-webkit-scrollbar {
-                    width: 5px;
-                }
-
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: var(--dice-border);
-                    border-radius: 10px;
-                }
-
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: var(--dice-muted-foreground);
-                }
-            `}</style>
         </div>
     );
 }

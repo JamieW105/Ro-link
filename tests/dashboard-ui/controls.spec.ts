@@ -543,3 +543,37 @@ test("previous wave selects historical dates and quota and handles missing histo
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test("setup uses shared controls with readable actions in both themes", async ({ page }) => {
+  await mockDashboard(page);
+  await page.goto(`/dashboard/${serverId}/settings/setup`);
+  await expect(page.getByRole('heading', { name: 'Setup Complete' })).toBeVisible();
+  const plugin = page.getByRole('link', { name: 'Open Plugin' });
+  await expect(plugin).toHaveAttribute('data-slot', 'button');
+  await expect(page.getByRole('button', { name: 'Copy security key' })).toBeVisible();
+  for (const theme of ['light', 'dark']) {
+    const toggle = page.getByRole('button', { name: /Switch to .* mode/ }).first();
+    if (await toggle.getAttribute('aria-label') === `Switch to ${theme} mode`) await toggle.click();
+    await expect(page.locator('.dice-ui-dashboard').first()).toHaveCSS('color-scheme', theme);
+    await expect.poll(() => plugin.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const ctx = document.createElement('canvas').getContext('2d')!;
+      const luminance = (color: string) => {
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, 1, 1);
+        const rgb = Array.from(ctx.getImageData(0, 0, 1, 1).data).slice(0, 3).map(v => {
+          const c = v / 255;
+          return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        });
+        return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+      };
+      const fg = luminance(style.color), bg = luminance(style.backgroundColor);
+      return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+    })).toBeGreaterThanOrEqual(4.5);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await page.getByRole('button', { name: 'Reset bridge handshake' }).click();
+  await expect(page.getByLabel('Place ID', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Request auth key' })).toBeVisible();
+});
