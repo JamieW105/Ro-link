@@ -980,7 +980,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                 <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"><Hash className="size-4" aria-hidden="true" /></div>
                                                 <div className="min-w-0 space-y-2">
                                                     <CardTitle className="break-words leading-snug">{role.role_name}</CardTitle>
-                                                    <Status><StatusLabel>{permissionCount} permission{permissionCount === 1 ? '' : 's'}</StatusLabel></Status>
+                                                    <Status variant="info"><StatusLabel>{permissionCount} permission{permissionCount === 1 ? '' : 's'}</StatusLabel></Status>
                                                 </div>
                                             </div>
                                             <div className="flex shrink-0 items-center gap-1">
