@@ -615,3 +615,42 @@ test("server dashboard scrolls content and navigation without scrolling the docu
   expect(await page.evaluate(() => getComputedStyle(document.body).overflowY)).not.toBe('hidden');
   expect(errors).toEqual([]);
 });
+
+test('custom modules open from the plus icon on a dedicated themed page', async ({ page, isMobile }) => {
+  const errors = await mockDashboard(page);
+  await page.goto(`/dashboard/${serverId}/modules`);
+  await expect(page.getByPlaceholder('Module name')).toHaveCount(0);
+  const create = page.getByRole('link', { name: 'Create custom module', exact: true });
+  await expect(create).toBeVisible();
+  for (const theme of ['light', 'dark']) {
+    const toggle = page.getByRole('button', { name: `Switch to ${theme} mode` });
+    if (await toggle.count()) await toggle.click();
+    await create.focus();
+    await expect(page.getByRole('tooltip')).toHaveCSS('opacity', '1');
+    const colors = await page.getByRole('tooltip').evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { background: style.backgroundColor, color: style.color };
+    });
+    expect(colors.background).not.toBe('rgba(0, 0, 0, 0)');
+    expect(colors.background).not.toBe(colors.color);
+  }
+  if (!isMobile) {
+    await create.blur();
+    await create.hover();
+    await expect(page.getByRole('tooltip')).toHaveCSS('opacity', '1');
+  }
+  await create.click();
+  await expect(page).toHaveURL(`/dashboard/${serverId}/modules/new`);
+  await expect(page.getByRole('heading', { name: 'Create custom module' })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Module name', exact: true }).fill('Server tools');
+  await page.getByRole('textbox', { name: 'Luau module source' }).fill('return {}');
+  await page.route('**/api/dashboard/modules', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    expect(route.request().postDataJSON()).toMatchObject({ serverId, action: 'custom-create', name: 'Server tools', sourceCode: 'return {}' });
+    await route.fulfill({ json: { ok: true } });
+  });
+  await page.getByRole('button', { name: 'Upload Module', exact: true }).click();
+  await expect(page).toHaveURL(`/dashboard/${serverId}/modules`);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
+});

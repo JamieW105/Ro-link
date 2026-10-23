@@ -1,16 +1,14 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
@@ -76,6 +74,7 @@ function reviewLabel(status: string) {
 
 export default function DashboardModulesPage() {
     const { id } = useParams();
+    const router = useRouter();
     const serverId = Array.isArray(id) ? id[0] : String(id || '');
     const [modules, setModules] = useState<MarketplaceModule[]>([]);
     const [loading, setLoading] = useState(true);
@@ -86,12 +85,6 @@ export default function DashboardModulesPage() {
     const [customModuleLimit, setCustomModuleLimit] = useState(20);
     const [installedTotal, setInstalledTotal] = useState(0);
     const [customInstalledTotal, setCustomInstalledTotal] = useState(0);
-    const [customName, setCustomName] = useState('');
-    const [customDescription, setCustomDescription] = useState('');
-    const [customVersion, setCustomVersion] = useState('');
-    const [customSourceCode, setCustomSourceCode] = useState('');
-    const [customUploadTarget, setCustomUploadTarget] = useState<MarketplaceModule | null>(null);
-    const [uploadingCustom, setUploadingCustom] = useState(false);
 
     const enabledCount = useMemo(() => modules.filter((addon) => addon.installed && addon.enabled).length, [modules]);
     const selectedModule = useMemo(
@@ -162,55 +155,6 @@ export default function DashboardModulesPage() {
         }
     }
 
-    function startCustomUpload(target?: MarketplaceModule) {
-        setCustomUploadTarget(target || null);
-        setCustomName(target?.name || '');
-        setCustomDescription(target?.description || '');
-        setCustomVersion(target?.version || '');
-        setCustomSourceCode('');
-        setError(null);
-    }
-
-    async function submitCustomModule() {
-        setUploadingCustom(true);
-        setError(null);
-
-        try {
-            const response = await fetch('/api/dashboard/modules', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    serverId,
-                    moduleId: customUploadTarget?.id,
-                    action: customUploadTarget ? 'custom-reupload' : 'custom-create',
-                    name: customName,
-                    description: customDescription,
-                    version: customVersion,
-                    sourceCode: customSourceCode,
-                }),
-            });
-            const payload = await response.json().catch(() => ({}));
-
-            if (!response.ok) {
-                throw new Error(String(payload.error || 'Custom module upload failed.'));
-            }
-
-            if (payload.warning) {
-                setError(`Custom module saved but cannot run yet. ${payload.warning}`);
-            }
-
-            setCustomName('');
-            setCustomDescription('');
-            setCustomVersion('');
-            setCustomSourceCode('');
-            setCustomUploadTarget(null);
-            await loadModules();
-        } catch (uploadError) {
-            setError(uploadError instanceof Error ? uploadError.message : 'Custom module upload failed.');
-        } finally {
-            setUploadingCustom(false);
-        }
-    }
 
     if (loading) {
         return (
@@ -232,6 +176,16 @@ export default function DashboardModulesPage() {
                 </div>
 
                 <div className="flex shrink-0 flex-wrap gap-3 text-right">
+                    <div className="group/create relative self-center">
+                        <Button asChild variant="outline" size="icon">
+                            <Link href={`/dashboard/${serverId}/modules/new`} aria-label="Create custom module" aria-describedby="create-custom-module-hint">
+                                <Plus className="size-4" aria-hidden="true" />
+                            </Link>
+                        </Button>
+                        <span id="create-custom-module-hint" role="tooltip" className="pointer-events-none absolute left-0 top-full z-30 mt-2 w-max rounded-lg border border-border bg-popover px-3 py-2 text-xs font-medium text-popover-foreground shadow-md opacity-0 transition-opacity group-hover/create:opacity-100 group-focus-within/create:opacity-100">
+                            Create custom module
+                        </span>
+                    </div>
                     <div className="rounded-xl border border-border bg-card px-5 py-4">
                         <div className="text-2xl font-semibold text-foreground">{installedTotal}</div>
                         <div className="whitespace-nowrap text-xs font-medium text-muted-foreground">Marketplace / {moduleLimit}</div>
@@ -247,71 +201,6 @@ export default function DashboardModulesPage() {
                 </div>
             </header>
 
-            <section className="rounded-xl border border-border bg-card p-6">
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div>
-                        <h2 className="text-lg font-medium text-foreground">Server Custom Module</h2>
-                        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                            Upload Luau directly to this server without submitting it to the module marketplace.
-                        </p>
-                    </div>
-                    {customUploadTarget && (
-                        <Button variant="outline" size="default"
-                            type="button"
-                            onClick={() => startCustomUpload()}
-                            className="transition-colors"
-                        >
-                            New Upload
-                        </Button>
-                    )}
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
-                    <div className="space-y-3">
-                        <Input
-                            value={customName}
-                            onChange={(event) => setCustomName(event.target.value)}
-                            placeholder="Module name"
-                            className="w-full transition-colors"
-                        />
-                        <Input
-                            value={customVersion}
-                            onChange={(event) => setCustomVersion(event.target.value)}
-                            placeholder="Version"
-                            className="w-full transition-colors"
-                        />
-                        <Textarea
-                            value={customDescription}
-                            onChange={(event) => setCustomDescription(event.target.value)}
-                            placeholder="Description"
-                            rows={4}
-                            className="w-full resize-none transition-colors"
-                        />
-                    </div>
-                    <div className="space-y-3">
-                        {customUploadTarget && (
-                            <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-xs font-semibold text-amber-700 dark:text-amber-400">
-                                Re-uploading {customUploadTarget.name}. Paste the replacement source below.
-                            </div>
-                        )}
-                        <Textarea
-                            value={customSourceCode}
-                            onChange={(event) => setCustomSourceCode(event.target.value)}
-                            placeholder="Paste Luau module source"
-                            rows={10}
-                            className="custom-scrollbar w-full resize-y transition-colors"
-                        />
-                        <Button variant="default" size="default"
-                            type="button"
-                            onClick={submitCustomModule}
-                            disabled={uploadingCustom || !customName.trim() || !customSourceCode.trim()}
-                            className="transition-colors disabled:opacity-50"
-                        >
-                            {uploadingCustom ? 'Uploading' : customUploadTarget ? 'Re-upload Module' : 'Upload Module'}
-                        </Button>
-                    </div>
-                </div>
-            </section>
 
             {error && (
                 <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-5 py-4 text-sm font-medium text-red-700 dark:text-red-400">
@@ -402,7 +291,7 @@ export default function DashboardModulesPage() {
                                         <>
                                             {addon.isCustom && (
                                                 <Button variant="outline" size="default"
-                                                    onClick={() => startCustomUpload(addon)}
+                                                    onClick={() => router.push(`/dashboard/${serverId}/modules/${addon.id}/reupload`)}
                                                     disabled={busy}
                                                     className="transition-colors disabled:opacity-50"
                                                 >
@@ -583,7 +472,7 @@ export default function DashboardModulesPage() {
                                                     <Button variant="outline" size="default"
                                                         type="button"
                                                         onClick={() => {
-                                                            startCustomUpload(selectedModule);
+                                                            router.push(`/dashboard/${serverId}/modules/${selectedModule.id}/reupload`);
                                                             setSelectedModuleId(null);
                                                         }}
                                                         className="transition-colors"
