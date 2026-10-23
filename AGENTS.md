@@ -56,6 +56,11 @@ Reports, or Misc Actions to the sidebar. Standalone `servers`, `lookup`, `report
 (including report details), and `misc` pages have been retired; operational tools
 remain in Live Panel. Report configuration under `settings/reports` is separate.
 
+Staff Shifts and its dedicated settings page must retain permission-aware entry
+points and Dice light/dark styling. Keep shift-view and shift-management permissions
+separate; management alone must not expose staff history. Preserve the personal
+shift summary in Live Panel and the existing tracking and Discord command behavior.
+
 ## Validation
 
 Run `npm run typecheck`, `npm run lint`, and `npm run build` for UI migrations.

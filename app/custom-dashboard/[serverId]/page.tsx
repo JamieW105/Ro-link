@@ -29,6 +29,8 @@ interface DashboardInfo {
 
 interface DashboardPermissions {
     can_access_dashboard: boolean;
+    can_view_staff_shifts: boolean;
+    can_manage_staff_shifts: boolean;
     can_access_live_panel: boolean;
     is_admin: boolean;
 }
@@ -82,6 +84,10 @@ export default function CustomDashboardLandingPage() {
                     return;
                 }
 
+                if (permissions?.can_view_staff_shifts || permissions?.can_manage_staff_shifts) {
+                    router.replace(`/dashboard/${serverId}/staff-shifts`);
+                    return;
+                }
                 setAccessDenied(true);
             } catch {
                 setAccessError('unavailable');

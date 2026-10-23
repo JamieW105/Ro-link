@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits, ActivityType, REST, Routes, EmbedBuilder, Act
 const { createClient } = require('@supabase/supabase-js');
 const { setGlobalDispatcher, Agent } = require('undici');
 const discordCommands = require('../lib/discordCommands.json');
+const { SHIFT_COMMANDS, handleStaffShiftCommand } = require('../lib/discordStaffShifts');
 require('dotenv').config({ path: '.env.local', quiet: true });
 
 const hasSupabaseConfig = Boolean(
@@ -10,6 +11,10 @@ const hasSupabaseConfig = Boolean(
 );
 const supabase = hasSupabaseConfig
     ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    : null;
+
+const shiftAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
     : null;
 
 setGlobalDispatcher(new Agent({
@@ -1356,6 +1361,43 @@ client.on('interactionCreate', async interaction => {
         miscCommand = subcommand ? MISC_SUBCOMMAND_TO_COMMAND[subcommand] || null : null;
     }
 
+    if (SHIFT_COMMANDS.includes(commandName)) {
+        if (!guildId || !guild) return interaction.reply({ content: 'Use this command in a Discord server.', ephemeral: true });
+        await interaction.deferReply({ ephemeral: true });
+        try {
+            if (!shiftAdmin) return interaction.editReply('Staff shift commands are unavailable. Ask the server administrator to check the bot configuration.');
+            const blocked = await findBlockedServerForGuild(guildId);
+            const userBan = await findDgsuBanForUser(user.id);
+            const serverBan = await findDgsuBanForTargets([{ type: 'DISCORD_SERVER', targetId: guildId }]);
+            if (blocked || userBan || serverBan) return interaction.editReply(blocked ? getBlockedServerMessage(blocked) : 'You or this server cannot use Ro-Link.');
+            const guildMember = await guild.members.fetch(user.id);
+            const isAdmin = guild.ownerId === user.id || guildMember.permissions.has('Administrator') || guildMember.permissions.has('ManageGuild');
+            const { data: roles, error } = await shiftAdmin.from('dashboard_roles').select('*').eq('server_id', guildId)
+                .in('discord_role_id', [guildId, ...guildMember.roles.cache.keys()]);
+            if (error) throw error;
+            const permissions = { is_admin: isAdmin, allowed_misc_cmds: [] };
+            for (const role of roles || []) {
+                for (const [key, value] of Object.entries(role)) {
+                    if (key.startsWith('can_') && value === true) permissions[key] = true;
+                }
+                permissions.allowed_misc_cmds.push(...(role.allowed_misc_cmds || []));
+            }
+            const result = await handleStaffShiftCommand({
+                serverId: guildId, userId: user.id, command: commandName,
+                action: commandName === 'shift-manage' ? interaction.options.getSubcommand() : undefined,
+                period: commandName === 'shift-leaderboard' ? interaction.options.getString('period') || 'latest-wave' : 'latest-wave',
+                page: commandName === 'shift-leaderboard' ? interaction.options.getInteger('page') || 1 : 1,
+            }, { db: shiftAdmin, permissions, normalizePlayers: normalizeLivePlayerList });
+            const reply = { ...result };
+            delete reply.flags;
+            delete reply.allowed_mentions;
+            return interaction.editReply({ ...reply, allowedMentions: { parse: [] } });
+        } catch (error) {
+            console.error('[Staff Shifts] Discord command failed:', error);
+            return interaction.editReply('Could not process your shift command. Please try again.');
+        }
+    }
+
     // 1. Handle Setup separately (Owner Only)
     if (commandName === 'setup') {
         if (user.id !== guild?.ownerId) {
@@ -1458,6 +1500,9 @@ client.on('interactionCreate', async interaction => {
                 { name: '/ping', value: 'Check the bot response time and connection status.' },
                 { name: '/moderation', value: 'Open Ban, Kick, Unban, Softban, Update, and Shutdown actions.' },
                 { name: '/lookup', value: 'Lookup Discord info, linked Roblox info, server moderation history, and staff notes.' },
+                { name: '/shift-manage', value: 'Start, stop, or take a break from your shift. Use start to resume.' },
+                { name: '/shift', value: 'View your shift and quota progress.' },
+                { name: '/shift-leaderboard', value: 'View staff rankings (requires View Staff Shifts).' },
                 { name: '/staff-note', value: 'Add a staff-only note to a Discord or Roblox user.' },
                 { name: '/servers', value: 'View and manage live Roblox servers.' },
                 { name: '/update', value: 'Update your linked Roblox profile and roles.' },

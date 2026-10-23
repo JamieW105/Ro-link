@@ -11,7 +11,8 @@
     "start": "concurrently \"next start\" \"node scripts/bot.js\"",
     "lint": "eslint",
     "bot": "node scripts/bot.js",
-    "test:dashboard-ui": "playwright test"
+    "test:dashboard-ui": "playwright test",
+    "test:staff-shifts": "tsx --test scripts/staff-shifts.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -38,6 +39,7 @@
     "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/crypto-js": "^4.2.2",

@@ -90,3 +90,63 @@ npm run test:dashboard-ui
 To use an installed Chromium instead, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to its
 absolute path. Tests start a Next.js server on port 3100 and mock dashboard API
 responses; they do not write to Discord, Roblox, or the database.
+
+
+### Staff shifts
+
+Apply `supabase/migrations/20261016000137_staff_shifts.sql` to the target Supabase
+project before deploying this feature. It extends `dashboard_roles` and creates
+private shift settings, wave history, shift history, and service-role-only RPCs.
+The server must have `SUPABASE_SERVICE_ROLE_KEY`; browser credentials cannot access
+shift data. Existing root-level schema scripts remain the baseline for a new database.
+
+In **Settings → Roles**, grant **View Staff Shifts** and/or **Manage Staff Shift
+Settings** independently. Open **Staff Shifts** from the server picker or dashboard,
+and use its Shift settings button to enable shifts, choose automatic starts, and set the
+wave length (default seven days) and per-person quota (default five hours).
+Wave length and quota changes take effect in the next wave. Disabling shifts ends
+active shifts and preserves history. A zero-hour quota means no quota.
+
+A staff member must link their Roblox account and have a configured dashboard role
+permission (or Discord administrator/server-management access). The authenticated
+linked game's roster starts automatic shifts and confirms their time. Leaving the
+game ends the shift; a missing heartbeat expires after two minutes and caps time at
+the last confirmed heartbeat. Existing game polling is sufficient; no plugin update
+is required. If automatic start is off, staff can start/end their own shifts from
+the live panel while playing. Shift eligibility refreshes from Discord every minute.
+
+Reports cover a rolling day, week, 30 days, six calendar months, or the current
+wave. Overlapping game sessions count time only once; sessions crossing a reporting
+or wave boundary contribute only time within it. New waves start with zero hours
+without deleting historical shifts. The live panel shows the signed-in staff
+member's themed quota bar, lifetime confirmed hours, and total shift count.
+
+Run `npm run test:staff-shifts` for isolated PostgreSQL tests using PGlite. They
+exercise the actual migration, accounting, wave rollover, manual mode, pagination,
+server/self scoping, and database permissions without changing a remote database.
+
+
+### Discord shift commands
+
+Apply `supabase/migrations/20261016002647_staff_shift_commands.sql` after the staff
+shifts migration, and restart the standalone bot to register the updated slash
+command definitions. Both the bot and signed interaction endpoint use the same
+command handler. The standalone bot also needs `SUPABASE_SERVICE_ROLE_KEY` for the
+private shift records.
+
+- `/shift-manage start`: start a shift, or resume after a break, while in the linked
+  game. This works with automatic shifts enabled or disabled.
+- `/shift-manage break`: pause the current shift. Break time does not count toward
+  quota; resuming keeps the same shift count.
+- `/shift-manage stop`: end the current shift. Automatic heartbeats respect the
+  stopped state until the user starts again or leaves and rejoins.
+- `/shift`: privately view current shift time, status, wave quota progress, and
+  lifetime totals.
+- `/shift-leaderboard [period] [page]`: privately rank confirmed staff time for the
+  selected period (default latest wave), ten staff per page. Requires **View Staff
+  Shifts**; **Manage Staff Shift Settings** alone does not grant access.
+
+Shift commands require a staff role and work only in Discord servers. Starting or
+resuming also requires a linked Roblox account and a recent game roster. Replies
+are private and cannot ping users or roles. The dashboard marks staff on break
+without adding extra controls to its compact layout.

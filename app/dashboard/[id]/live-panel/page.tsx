@@ -1,4 +1,5 @@
 'use client';
+import StaffShiftProgress from '@/components/dashboard/StaffShiftProgress';
 
 import { Stat, StatLabel, StatValue } from '@/components/ui/stat';
 import { Status, StatusIndicator } from '@/components/ui/status';
@@ -2281,11 +2282,14 @@ export default function LivePanelPage() {
                     <div className="flex min-w-0 items-center gap-3"><Button asChild variant="ghost" size="icon" className="size-8"><Link href={`/dashboard/${guildId}`} aria-label="Back to dashboard"><PanelBackIcon className="size-4" /></Link></Button><div className="min-w-0"><h1 className="text-base font-semibold tracking-tight">Live panel</h1><p className="truncate text-xs text-muted-foreground">{serverName}</p></div><Status variant="success" className="hidden sm:inline-flex"><StatusIndicator />Live</Status></div>
                     <div className="flex items-center gap-2"><ThemeToggle /><Button asChild variant="outline" size="sm"><Link href="/dashboard">All servers</Link></Button></div>
                 </div>
-                <div className={`grid gap-3 border-t border-border bg-muted/20 p-4 md:px-6 ${canManageReports ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+                <div className="grid gap-4 border-t border-border bg-muted/20 p-4 md:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] md:px-6">
+                    <div className={`grid gap-3 content-start ${canManageReports ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
                     <Stat className="gap-y-1 p-3"><StatLabel>Servers</StatLabel><StatValue>{enrichedServers.length}</StatValue></Stat>
                     <Stat className="gap-y-1 p-3"><StatLabel>Players</StatLabel><StatValue>{totalPlayers}</StatValue></Stat>
                     <Stat className="gap-y-1 p-3"><StatLabel>Events</StatLabel><StatValue>{logs.length}</StatValue></Stat>
                     {canManageReports && <Stat className="gap-y-1 p-3"><StatLabel>Pending reports</StatLabel><StatValue>{pendingReports.length}</StatValue></Stat>}
+                    </div>
+                    <StaffShiftProgress serverId={guildId} />
                 </div>
             </header>
 

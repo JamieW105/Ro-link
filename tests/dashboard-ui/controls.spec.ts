@@ -15,7 +15,15 @@ const sampleModule = {
 };
 const sampleServer = { id: 'live-job-001', server_id: serverId, player_count: 2, players: [], updated_at: '2026-10-23T00:00:00Z' };
 
-async function mockDashboard(page: Page, themed = false) {
+const sampleShiftReport = {
+  settings: { enabled: true, automatic_start: false, wave_days: 7, quota_hours: 5 },
+  wave: { id: 'wave-1', starts_at: '2026-10-19T00:00:00Z', ends_at: '2026-10-26T00:00:00Z', quota_hours: 5 },
+  staff: [{ discord_id: 'test-user', roblox_user_id: '1234', username: 'UI Moderator', seconds: 7200, shift_count: 3, wave_seconds: 7200, total_seconds: 14400, total_shifts: 6, active: true, on_break: false }],
+  shifts: [{ id: 'shift-1', discord_id: 'test-user', username: 'UI Moderator', started_at: '2026-10-23T00:00:00Z', ended_at: null, last_seen_at: '2026-10-23T02:00:00Z', seconds: 7200, active: true }],
+  has_more: true, control: null, current_shift_seconds: 7200,
+};
+
+async function mockDashboard(page: Page, themed = false, permissions: Record<string, boolean> = {}) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.route("**/api/**", async (route) => {
@@ -23,7 +31,7 @@ async function mockDashboard(page: Page, themed = false) {
     let body: unknown = {};
     if (pathname === "/api/auth/session") body = { user: { id: "test-user", name: "UI Tester", image: null }, expires: "2099-01-01T00:00:00Z" };
     else if (pathname === "/api/guilds") body = [guild];
-    else if (pathname === "/api/user/permissions") body = { is_admin: true, can_access_dashboard: true, can_access_live_panel: true, allowed_misc_cmds: [] };
+    else if (pathname === "/api/user/permissions") body = { is_admin: true, can_access_dashboard: true, can_access_live_panel: true, allowed_misc_cmds: [], ...permissions };
     else if (pathname === `/api/guilds/${serverId}/roles` || pathname === "/api/discord/roles") body = roles;
     else if (pathname === "/api/discord/channels") body = [{ id: "channel-1", name: "audit-logs" }];
     else if (pathname === "/api/dashboard/server-config") body = { verification_enabled: true, verified_role: "role-1", on_join_role: "", block_unverified: false, api_key: "test-key", admin_cmds_enabled: true, misc_cmds_enabled: true };
@@ -34,6 +42,8 @@ async function mockDashboard(page: Page, themed = false) {
     else if (pathname === "/api/site-banners") body = { banners: [] };
     else if (pathname === "/api/ping") body = { ok: true };
     else if (pathname === "/api/dashboard/marketplace") body = { modules: [sampleModule], installTargets: [{ ...guild, installedModuleCount: 0, moduleLimit: 5 }] };
+    else if (pathname === "/api/dashboard/staff-shifts") body = sampleShiftReport;
+    else if (pathname === "/api/dashboard/staff-shifts/settings") body = { ok: true };
     else if (pathname === "/api/dashboard/live-panel") body = { server: { placeId: '1234' }, liveServers: [sampleServer], playerActivity: [], modulePanelCommands: [], logs: [], pendingReports: [] };
     else if (pathname === "/api/dashboard/live-servers") body = [sampleServer];
     else if (pathname === "/api/dashboard/modules") body = { modules: [], installedCount: 0 };
@@ -341,5 +351,75 @@ test("sidebar omits retired tools while Live Panel remains accessible and retire
     const response = await page.request.get(`/dashboard/${serverId}/${route}`);
     expect(response.status(), `Retired ${route} page`).toBe(404);
   }
+  expect(errors).toEqual([]);
+});
+
+
+test("staff shifts use Dice controls for reports, history, settings and both themes", async ({ page, isMobile }) => {
+  const errors = await mockDashboard(page);
+  await page.goto(`/dashboard/${serverId}`);
+  if (isMobile) await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page.getByRole('link', { name: 'Staff Shifts', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Staff shifts', exact: true })).toBeVisible({timeout:20000});
+  await expect(page.getByText('UI Moderator', { exact: true }).filter({visible:true}).first()).toBeVisible();
+  const period = page.getByRole('combobox', { name: 'Time period', exact: true });
+  await expect(period).toHaveValue('Latest wave');
+  await period.fill('Past week');
+  const changedPeriod = page.waitForRequest(request => request.url().includes('/api/dashboard/staff-shifts?') && new URL(request.url()).searchParams.get('period') === 'week');
+  await page.getByRole('option', { name: 'Past week', exact: true }).click();
+  await changedPeriod;
+  await page.getByText('Shift history', { exact: true }).click();
+  const nextPage = page.waitForRequest(request => request.url().includes('/api/dashboard/staff-shifts?') && new URL(request.url()).searchParams.get('offset') === '50');
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await nextPage;
+  await page.getByRole('button', { name: 'Switch to dark mode', exact: true }).click();
+  await expect(page.locator('.dice-shell')).toHaveCSS('color-scheme', 'dark');
+  await page.getByRole('link', { name: 'Shift settings', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Staff shift settings', exact: true })).toBeVisible({timeout:20000});
+  const automatic = page.getByRole('switch', { name: 'Automatically start shifts', exact: true });
+  await expect(automatic).not.toBeChecked();
+  await automatic.click();
+  await page.getByRole('spinbutton', { name: 'Shift wave length (days)', exact: true }).fill('14');
+  await page.getByRole('spinbutton', { name: 'Quota per wave (hours)', exact: true }).fill('8');
+  const saved = page.waitForRequest(request => request.url().includes('/api/dashboard/staff-shifts/settings') && request.method() === 'PATCH');
+  await page.getByRole('button', { name: 'Save shift settings', exact: true }).click();
+  expect((await saved).postDataJSON()).toMatchObject({serverId, enabled: true, automatic_start: true, wave_days: 14, quota_hours: 8});
+  await expect(page.getByRole('status')).toContainText('Shift settings saved.');
+  await expect(page.locator('.dice-shell')).toHaveCSS('color-scheme', 'dark');
+  await page.getByRole('button', { name: 'Switch to light mode', exact: true }).click();
+  await expect(page.locator('.dice-shell')).toHaveCSS('color-scheme', 'light');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("staff shift view and management permissions remain independent", async ({ page }) => {
+  const errors = await mockDashboard(page, false, {is_admin: false, can_access_dashboard: false, can_access_live_panel: false, can_view_staff_shifts: true, can_manage_staff_shifts: false});
+  await page.goto(`/dashboard/${serverId}/staff-shifts`);
+  await expect(page.getByRole('heading', {name:'Staff shifts',exact:true})).toBeVisible();
+  await expect(page.getByRole('link', {name:'Shift settings',exact:true})).toHaveCount(0);
+  await page.goto(`/dashboard/${serverId}/staff-shifts/settings`);
+  await expect(page.getByRole('heading', {name:'Sorry, you do not have access to this dashboard.',exact:true})).toBeVisible();
+  await page.route('**/api/user/permissions?*', route => route.fulfill({json:{is_admin:false, can_access_dashboard:false, can_access_live_panel:false, can_view_staff_shifts:false, can_manage_staff_shifts:true}}));
+  const settingsOnly = page.waitForRequest(request => request.url().includes('/api/dashboard/staff-shifts?') && new URL(request.url()).searchParams.get('settingsOnly') === 'true');
+  await page.goto(`/dashboard/${serverId}/staff-shifts`);
+  await settingsOnly;
+  await expect(page.getByText('Viewing staff time and history requires', {exact:false})).toBeVisible();
+  await expect(page.getByText('UI Moderator', {exact:true})).toHaveCount(0);
+  await page.getByRole('link', {name:'Shift settings',exact:true}).click();
+  await expect(page).toHaveURL(new RegExp(`/dashboard/${serverId}/staff-shifts/settings$`), {timeout:20000});
+  await expect(page.getByRole('button', {name:'Save shift settings',exact:true})).toBeVisible({timeout:20000});
+  expect(errors).toEqual([]);
+});
+
+test("Live Panel retains the personal shift summary and manual shift action", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  await page.goto(`/dashboard/${serverId}/live-panel`);
+  const personal = page.getByRole('region', {name:'Your staff shifts',exact:true});
+  await expect(personal).toBeVisible();
+  await expect(personal.getByRole('progressbar', {name:'Progress toward wave quota',exact:true})).toHaveAttribute('aria-valuenow', '40');
+  const stopped = page.waitForRequest(request => request.url().includes('/api/dashboard/staff-shifts') && request.method() === 'POST');
+  await personal.getByRole('button', {name:'End shift',exact:true}).click();
+  expect((await stopped).postDataJSON()).toEqual({serverId, action:'stop'});
+  await expect(personal.getByText('4.00 total hours · 6 shifts', {exact:true})).toBeVisible();
   expect(errors).toEqual([]);
 });

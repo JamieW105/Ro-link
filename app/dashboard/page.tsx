@@ -70,6 +70,8 @@ interface Guild {
 }
 
 interface GuildDashboardPermissions {
+    can_view_staff_shifts: boolean;
+    can_manage_staff_shifts: boolean;
     can_access_dashboard: boolean;
     can_access_live_panel: boolean;
     is_admin: boolean;
@@ -370,6 +372,7 @@ export default function Dashboard() {
                                                         <SettingsIcon />
                                                     </ServerIconLink>
                                                 )}
+                                                {(guildPermissions[guild.id]?.is_admin || guildPermissions[guild.id]?.can_view_staff_shifts || guildPermissions[guild.id]?.can_manage_staff_shifts) && <Button asChild variant="outline" size="sm"><Link href={`/dashboard/${guild.id}/staff-shifts`}>Staff shifts</Link></Button>}
                                                 {canOpenLivePanelFromServerList(guild, guildPermissions[guild.id]) && (
                                                     <ServerIconLink href={`/dashboard/${guild.id}/live-panel`} label="Live Panel" tone="live">
                                                         <LivePanelIcon />

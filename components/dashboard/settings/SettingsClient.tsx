@@ -69,6 +69,8 @@ interface DashboardRole {
     can_view_logs: boolean;
     can_view_runtime_logs: boolean;
     can_manage_staff_notes: boolean;
+    can_view_staff_shifts: boolean;
+    can_manage_staff_shifts: boolean;
     allowed_misc_cmds: string[];
 }
 
@@ -80,6 +82,8 @@ type DashboardRoleBooleanField =
     | 'can_view_logs'
     | 'can_view_runtime_logs'
     | 'can_manage_staff_notes'
+    | 'can_view_staff_shifts'
+    | 'can_manage_staff_shifts'
     | 'can_lookup'
     | 'can_kick'
     | 'can_ban'
@@ -94,6 +98,8 @@ const ROLE_PERMISSION_OPTIONS: Array<{ key: DashboardRoleBooleanField; label: st
     { key: 'can_view_logs', label: 'View /cmds Logs' },
     { key: 'can_view_runtime_logs', label: 'View In-Game Console Logs' },
     { key: 'can_manage_staff_notes', label: 'Manage Staff Notes' },
+    { key: 'can_view_staff_shifts', label: 'View Staff Shifts' },
+    { key: 'can_manage_staff_shifts', label: 'Manage Staff Shift Settings' },
     { key: 'can_lookup', label: 'Lookup Users' },
     { key: 'can_kick', label: 'Kick Users' },
     { key: 'can_ban', label: 'Ban Users' },
@@ -633,6 +639,8 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         view_logs: false,
                         view_runtime_logs: false,
                         manage_staff_notes: false,
+                        view_staff_shifts: false,
+                        manage_staff_shifts: false,
                     },
                     panelCmds: []
                 })
@@ -682,6 +690,8 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         view_logs: targetRole.can_view_logs,
                         view_runtime_logs: targetRole.can_view_runtime_logs,
                         manage_staff_notes: targetRole.can_manage_staff_notes,
+                        view_staff_shifts: targetRole.can_view_staff_shifts,
+                        manage_staff_shifts: targetRole.can_manage_staff_shifts,
                     },
                     panelCmds: normalizeAdminPanelCommandList(targetRole.allowed_misc_cmds)
                 })
