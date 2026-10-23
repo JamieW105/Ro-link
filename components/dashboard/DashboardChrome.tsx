@@ -44,7 +44,7 @@ export function DashboardChrome({ children, groups, serverId, brand, userName, u
   const visibleGroups = layout === "split_sidebar" ? groups.filter(group => group.label === category) : groups;
 
   function navigation(mobile = false) {
-    return <nav aria-label={mobile ? "Mobile dashboard" : "Dashboard"} className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
+    return <nav aria-label={mobile ? "Mobile dashboard" : "Dashboard"} className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-y-contain px-3 py-5">
       {(mobile ? groups : visibleGroups).filter(group => group.items.length).map(group => <div key={group.label}>
         {(!compact || mobile) && <p className="mb-2 px-3 text-xs font-medium text-muted-foreground">{group.label}</p>}
         <div className="space-y-1">{group.items.map(item => <Button key={item.href} asChild variant="ghost" size="sm" className={cn("h-9 w-full justify-start gap-3 px-3 font-normal", pathname === item.href && "bg-accent font-medium text-accent-foreground", compact && !mobile && "justify-center px-0")}>
@@ -79,14 +79,14 @@ export function DashboardChrome({ children, groups, serverId, brand, userName, u
     </div>;
   }
 
-  return <div className={cn(styles.theme, "dice-ui-dashboard custom-dashboard-shell dice-shell flex h-dvh min-w-0 bg-background text-foreground")} data-dashboard-layout={layout} style={style}>
+  return <div className={cn(styles.theme, styles.shell, "dice-ui-dashboard custom-dashboard-shell dice-shell flex min-w-0 bg-background text-foreground")} data-dashboard-layout={layout} style={style}>
     {layout === "split_sidebar" && <div className="hidden w-14 flex-col items-center gap-2 border-r border-border bg-muted/40 py-5 md:flex">{groups.filter(group => group.items.length).map(group => <Button key={group.label} variant={category === group.label ? "secondary" : "ghost"} size="icon" aria-label={group.label} onClick={() => setCategory(group.label)}>{group.items[0]?.icon}</Button>)}</div>}
-    {!horizontal && !drawer && <aside className={cn("hidden shrink-0 flex-col border-r border-border bg-muted/30 md:flex", compact ? "w-16" : "w-60")}>
+    {!horizontal && !drawer && <aside className={cn("hidden min-h-0 shrink-0 flex-col overflow-hidden border-r border-border bg-muted/30 md:flex", compact ? "w-16" : "w-60")}>
       {brandHeader()}
       {navigation()}
       {accountFooter()}
     </aside>}
-    <div className="flex min-w-0 flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <DashboardHeader>
         <div className="flex min-w-0 items-center gap-3">
           <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -101,8 +101,8 @@ export function DashboardChrome({ children, groups, serverId, brand, userName, u
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3"><ThemeToggle /><Status variant={online ? "success" : "warning"} className="hidden border-0 bg-transparent px-0 text-xs sm:inline-flex"><StatusIndicator />{online ? "Connected" : "Checking connection"}</Status><Separator orientation="vertical" className="hidden h-4 sm:block" /><span className="hidden text-xs tabular-nums text-muted-foreground lg:block">{latency}</span></div>
       </DashboardHeader>
-      {horizontal && <nav aria-label="Dashboard" className={cn("hidden items-center gap-1 overflow-x-auto border-b border-border bg-background px-6 py-2 md:flex", layout === "floating_dock" && "fixed bottom-4 left-1/2 z-40 max-w-[90vw] -translate-x-1/2 rounded-xl border p-2 shadow-md")}>{groups.flatMap(group => group.items).map(item => <Button key={item.href} asChild variant={pathname === item.href ? "secondary" : "ghost"} size="sm"><Link href={item.href}>{item.icon}{item.label}</Link></Button>)}</nav>}
-      <main className={cn("dashboard-content-frame min-h-0 min-w-0 flex-1 overflow-y-auto bg-background p-5 md:p-8", layout === "floating_dock" && "pb-24")}>
+      {horizontal && <nav aria-label="Dashboard" className={cn("hidden shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-background px-6 py-2 md:flex", layout === "floating_dock" && "fixed bottom-4 left-1/2 z-40 max-w-[90vw] -translate-x-1/2 rounded-xl border p-2 shadow-md")}>{groups.flatMap(group => group.items).map(item => <Button key={item.href} asChild variant={pathname === item.href ? "secondary" : "ghost"} size="sm"><Link href={item.href}>{item.icon}{item.label}</Link></Button>)}</nav>}
+      <main className={cn("dashboard-content-frame min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain bg-background p-5 md:p-8", layout === "floating_dock" && "pb-24")}>
         <div className="mx-auto w-full max-w-[1440px]">{children}</div>
       </main>
       <footer className="flex h-9 shrink-0 items-center justify-between border-t border-border px-5 text-[11px] text-muted-foreground md:px-8"><span>Ro-Link workspace</span><span className="truncate">Server {serverId}</span></footer>

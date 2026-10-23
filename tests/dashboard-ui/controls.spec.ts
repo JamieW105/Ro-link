@@ -577,3 +577,41 @@ test("setup uses shared controls with readable actions in both themes", async ({
   await expect(page.getByLabel('Place ID', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Request auth key' })).toBeVisible();
 });
+
+test("server dashboard scrolls content and navigation without scrolling the document", async ({ page, isMobile }) => {
+  const errors = await mockDashboard(page);
+  await page.setViewportSize({width:isMobile ? 412 : 1280,height:480});
+  let showNotice = false;
+  await page.route('**/api/site-banners', route => route.fulfill({json:showNotice ? [{id:'layout-notice',title:'Service notice',message:'Information about your community dashboard and the latest service updates.',tone:'INFO',placement:'ALL',linkLabel:null,linkUrl:null}] : []}));
+  await page.route('**/api/dashboard/staff-shifts?*', route => route.fulfill({json:{...sampleShiftReport,staff:Array.from({length:25},(_,i) => ({...sampleShiftReport.staff[0],discord_id:`staff-${i}`,username:`Moderator ${i+1}`}))}}));
+  for (const notice of [true,false]) {
+    showNotice = notice;
+    await page.goto(`/dashboard/${serverId}/staff-shifts`);
+    await expect(page.getByRole('heading',{name:'Staff shifts',exact:true})).toBeVisible({timeout:20000});
+    const notices = page.getByRole('region',{name:'Site notices',exact:true});
+    if (notice) await expect(notices).toBeVisible();
+    else await expect(notices).toBeHidden();
+    await expect.poll(() => page.evaluate(() => document.scrollingElement!.scrollHeight <= innerHeight && document.scrollingElement!.scrollWidth <= innerWidth)).toBe(true);
+    const header = page.locator('.dice-shell header');
+    const headerTop = (await header.boundingBox())!.y;
+    const main = page.locator('.dice-shell main');
+    await main.hover();
+    await page.mouse.wheel(0,1000);
+    await expect.poll(() => main.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
+    expect(await page.evaluate(() => scrollY)).toBe(0);
+    expect((await header.boundingBox())!.y).toBe(headerTop);
+    if (isMobile) await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+    const nav = page.getByRole('navigation',{name:isMobile ? 'Mobile dashboard' : 'Dashboard',exact:true});
+    await nav.evaluate(node => {node.scrollTop = node.scrollHeight;});
+    const account = page.locator('[data-slot="sidebar-account"]').filter({visible:true});
+    await expect(account.getByRole('link',{name:'Switch server',exact:true})).toBeVisible();
+    const box = (await account.boundingBox())!;
+    expect(box.y+box.height).toBeLessThanOrEqual(481);
+    expect(await page.evaluate(() => scrollY)).toBe(0);
+    if (isMobile) await page.keyboard.press('Escape');
+  }
+  await page.goto('/dashboard');
+  await expect(page.getByText(guild.name,{exact:true}).first()).toBeVisible();
+  expect(await page.evaluate(() => getComputedStyle(document.body).overflowY)).not.toBe('hidden');
+  expect(errors).toEqual([]);
+});

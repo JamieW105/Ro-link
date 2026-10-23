@@ -61,6 +61,11 @@ points and Dice light/dark styling. Keep shift-view and shift-management permiss
 separate; management alone must not expose staff history. Preserve the personal
 shift summary in Live Panel and the existing tracking and Discord command behavior.
 
+Server dashboards must stay within the viewport, including site notices. Scroll
+page content and sidebar navigation independently; keep the header, account footer,
+and dashboard footer visible. Do not add document scrolling or nested viewport
+heights. Check short desktop/mobile windows with and without notice banners.
+
 ## Validation
 
 Run `npm run typecheck`, `npm run lint`, and `npm run build` for UI migrations.

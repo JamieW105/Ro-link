@@ -55,7 +55,7 @@ export function SiteBannerGate() {
 
     return (
         <DashboardTheme>
-            <section className="relative z-35 bg-background text-foreground" aria-label="Site notices">
+            <section data-slot="site-notices" className="relative z-35 bg-background text-foreground" aria-label="Site notices">
                 {visibleBanners.map((banner) => {
                     const Icon = toneIcons[banner.tone];
                     const external = banner.linkUrl ? isExternalUrl(banner.linkUrl) : false;

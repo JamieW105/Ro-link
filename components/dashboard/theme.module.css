@@ -45,3 +45,27 @@
 .theme :global(.custom-scrollbar)::-webkit-scrollbar-thumb {
   background: var(--dice-border);
 }
+
+/* Only an active server dashboard owns the viewport. Display-contents route and
+   theme wrappers let notices and the shell share the body's flex layout. */
+:global(body):has(.shell) {
+  display: flex;
+  height: 100dvh;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.shell {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Several or long notices must not push the dashboard outside the viewport. */
+:global(body):has(.shell) [data-slot="site-notices"] {
+  max-height: 35dvh;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
