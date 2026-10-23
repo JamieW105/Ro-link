@@ -186,6 +186,47 @@ test("dashboard entry uses shared controls", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test("server invites keep readable text and icons in both themes", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  await page.route("**/api/guilds", (route) => route.fulfill({ json: [{ ...guild, hasBot: false }] }));
+  await page.goto("/dashboard");
+  const invite = page.getByRole('link', { name: 'Invite', exact: true });
+  await expect(invite).toBeVisible();
+  await expect(invite).toHaveAttribute('target', '_blank');
+  expect(new URL((await invite.getAttribute('href'))!).searchParams.get('guild_id')).toBe(serverId);
+  for (const theme of ['light', 'dark'] as const) {
+    await expect(page.locator('.dice-ui-dashboard').first()).toHaveCSS('color-scheme', theme);
+    for (const state of ['default', 'hover', 'focus']) {
+      if (state === 'hover') await invite.hover();
+      if (state === 'focus') {
+        await page.mouse.move(0, 0);
+        await invite.focus();
+      }
+      await expect.poll(() => invite.evaluate((node) => {
+        const style = getComputedStyle(node);
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const ctx = canvas.getContext('2d')!;
+        const luminance = (color: string) => {
+          ctx.fillStyle = color;
+          ctx.fillRect(0, 0, 1, 1);
+          const rgb = [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3).map((v) => {
+            const channel = v / 255;
+            return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+          });
+          return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+        };
+        const foreground = luminance(style.color);
+        const background = luminance(style.backgroundColor);
+        return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+      })).toBeGreaterThanOrEqual(4.5);
+      await expect(invite.locator('svg')).toHaveCSS('color', await invite.evaluate((node) => getComputedStyle(node).color));
+    }
+    await page.getByRole('button', { name: `Switch to ${theme === 'light' ? 'dark' : 'light'} mode`, exact: true }).click();
+  }
+  expect(errors).toEqual([]);
+});
+
 
 test("permission checkboxes save boolean permissions through keyboard interaction", async ({ page }) => {
   const errors = await mockDashboard(page);

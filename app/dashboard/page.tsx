@@ -383,15 +383,16 @@ export default function Dashboard() {
                                             </div>
                                         </div>
                                     ) : (
-                                        <a
-                                            href={getDiscordBotInviteUrl(guild.id)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="w-full py-2.5 bg-primary hover:bg-primary text-foreground rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2"
-                                        >
-                                            <PlusIcon />
-                                            Invite
-                                        </a>
+                                        <Button asChild className="w-full">
+                                            <a
+                                                href={getDiscordBotInviteUrl(guild.id)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                <PlusIcon />
+                                                Invite
+                                            </a>
+                                        </Button>
                                     )}
                                 </div>
                             </Card>
