@@ -85,7 +85,7 @@ export default function LogsPage() {
                 {/* Controls */}
                 <div className="px-6 py-5 border-b border-border flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="relative w-full sm:w-96 group">
-                        <div className="absolute inset-y-0 left-3 flex items-center text-muted-foreground group-focus-within:text-foreground transition-colors">
+                        <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted-foreground group-focus-within:text-foreground transition-colors">
                             <SearchIcon />
                         </div>
                         <Input
@@ -93,7 +93,7 @@ export default function LogsPage() {
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder="Search logs by user, action..."
-                            className="w-full transition-all tracking-wide"
+                            className="w-full pl-10 transition-all tracking-wide"
                         />
                     </div>
 
