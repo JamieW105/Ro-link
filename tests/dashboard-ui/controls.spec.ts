@@ -23,13 +23,13 @@ const sampleShiftReport = {
   has_more: true, control: null, current_shift_seconds: 7200,
 };
 
-async function mockDashboard(page: Page, themed = false, permissions: Record<string, boolean> = {}) {
+async function mockDashboard(page: Page, themed = false, permissions: Record<string, boolean> = {}, userId = "test-user") {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.route("**/api/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     let body: unknown = {};
-    if (pathname === "/api/auth/session") body = { user: { id: "test-user", name: "UI Tester", image: null }, expires: "2099-01-01T00:00:00Z" };
+    if (pathname === "/api/auth/session") body = { user: { id: userId, name: "UI Tester", image: null }, expires: "2099-01-01T00:00:00Z" };
     else if (pathname === "/api/guilds") body = [guild];
     else if (pathname === "/api/user/permissions") body = { is_admin: true, can_access_dashboard: true, can_access_live_panel: true, allowed_misc_cmds: [], ...permissions };
     else if (pathname === `/api/guilds/${serverId}/roles` || pathname === "/api/discord/roles") body = roles;
@@ -55,11 +55,15 @@ async function mockDashboard(page: Page, themed = false, permissions: Record<str
 
 test("dashboard headers stay slim and fixed across pages and themes", async ({ page }) => {
   test.setTimeout(120_000);
-  const errors = await mockDashboard(page);
+  const errors = await mockDashboard(page, false, {}, "953414442060746854");
   for (const path of ['/dashboard', '/dashboard/marketplace', `/dashboard/marketplace/${sampleModule.slug}`, '/dashboard/marketplace/create', '/dashboard/creator/modules', `/dashboard/${serverId}`, `/dashboard/${serverId}/settings/roles`, `/dashboard/${serverId}/staff-shifts`, `/dashboard/${serverId}/staff-shifts/settings`, `/dashboard/${serverId}/live-panel`]) {
     await page.goto(path);
     const header = page.locator('[data-dashboard-header]');
     await expect(header).toBeVisible();
+    if (path === "/dashboard" && test.info().project.name === "desktop") {
+      await expect(header.getByRole("link", { name: "Management" })).toBeVisible();
+      await expect(header.getByRole("button", { name: "Sign Out" })).toBeVisible();
+    }
     for (const theme of ['light', 'dark'] as const) {
       const toggle = header.getByRole('button', { name: /Switch to .* mode/ });
       await expect(toggle).toBeEnabled();
