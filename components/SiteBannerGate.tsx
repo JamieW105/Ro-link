@@ -63,7 +63,7 @@ export function SiteBannerGate() {
                     return (
                         <Card className="rounded-none border-x-0 border-t-0 shadow-none" data-tone={banner.tone.toLowerCase()} key={banner.id}>
                             <div className="mx-auto grid w-full max-w-[1440px] grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-5 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] md:px-8">
-                                <Icon aria-hidden="true" className={cn("size-4 self-start mt-0.5 text-muted-foreground", {
+                                <Icon aria-hidden="true" className={cn("size-4 shrink-0 text-muted-foreground", {
                                     'text-emerald-600 dark:text-emerald-400': banner.tone === 'SUCCESS',
                                     'text-amber-600 dark:text-amber-400': banner.tone === 'WARNING',
                                     'text-destructive': banner.tone === 'CRITICAL',
