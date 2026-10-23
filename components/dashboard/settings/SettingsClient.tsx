@@ -279,7 +279,6 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     const [channels, setChannels] = useState<DiscordChannel[]>([]);
     const [selectedRoleForAdd, setSelectedRoleForAdd] = useState("");
     const [addingRole, setAddingRole] = useState(false);
-    const [isRolesCollapsed, setIsRolesCollapsed] = useState(false);
     const [collapsedRoleIds, setCollapsedRoleIds] = useState<string[]>([]);
 
     const isLoggingChannelAccessible = !loggingChannelId || channels.some(channel => channel.id === loggingChannelId);
@@ -941,7 +940,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     {/* --- ROLE PERMISSIONS SECTION (NEW) --- */}
                     {view === 'roles' && (
                     <Card className="p-6">
-                        <div className="flex items-start justify-between mb-8 cursor-pointer" onClick={() => setIsRolesCollapsed(!isRolesCollapsed)}>
+                        <div className="flex items-start mb-8">
                             <div className="flex items-start gap-6">
                                 <div className="p-3 bg-accent rounded-xl text-foreground border border-border">
                                     <ShieldIcon />
@@ -953,193 +952,188 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     </p>
                                 </div>
                             </div>
-                            <Button variant="outline" size="icon" className={`     transition-all transform ${isRolesCollapsed ? 'rotate-180' : ''}`}>
-                                <LucideChevronDown width="20" height="20" strokeWidth="2" />
-                            </Button>
                         </div>
 
-                        {!isRolesCollapsed && (
-                            <div className="animate-in fade-in slide-in-from-top-4 duration-300">
-                                {/* Add Role Section */}
-                                <Card className="flex flex-col gap-3 mb-6 sm:flex-row">
-                                    <Select
-                                        value={selectedRoleForAdd}
-                                        onValueChange={(nextValue) => setSelectedRoleForAdd(nextValue)}
-                                        className="flex-1 transition-all"
-                                        aria-label="Discord role"
-                                        options={[{ value: '', label: 'Select a Discord Role...' }, ...discordRoles
-                                            .filter(dr => !dashboardRoles.some(dbr => dbr.discord_role_id === dr.id) && dr.name !== '@everyone')
-                                            .map(role => ({ value: role.id, label: role.name }))]}
-                                    />
-                                    <Button variant="default" size="default"
-                                        onClick={handleAddRole}
-                                        disabled={!selectedRoleForAdd || addingRole}
-                                        className="transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {addingRole ? "Adding..." : "Add Role"}
-                                    </Button>
-                                </Card>
+                        <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+                            {/* Add Role Section */}
+                            <Card className="flex flex-col gap-3 mb-6 sm:flex-row">
+                                <Select
+                                    value={selectedRoleForAdd}
+                                    onValueChange={(nextValue) => setSelectedRoleForAdd(nextValue)}
+                                    className="flex-1 transition-all"
+                                    aria-label="Discord role"
+                                    options={[{ value: '', label: 'Select a Discord Role...' }, ...discordRoles
+                                        .filter(dr => !dashboardRoles.some(dbr => dbr.discord_role_id === dr.id) && dr.name !== '@everyone')
+                                        .map(role => ({ value: role.id, label: role.name }))]}
+                                />
+                                <Button variant="default" size="default"
+                                    onClick={handleAddRole}
+                                    disabled={!selectedRoleForAdd || addingRole}
+                                    className="transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {addingRole ? "Adding..." : "Add Role"}
+                                </Button>
+                            </Card>
 
-                                {/* Roles List */}
-                                <div className="space-y-4">
-                                    {dashboardRoles.map((role) => {
-                                        const roleCommands = getRolePanelCommands(role);
-                                        const hasAllCommands = roleCommands.includes('*');
-                                        const permissionCount = getRolePermissionCount(role);
-                                        const roleCardCollapsed = collapsedRoleIds.includes(role.id);
+                            {/* Roles List */}
+                            <div className="space-y-4">
+                                {dashboardRoles.map((role) => {
+                                    const roleCommands = getRolePanelCommands(role);
+                                    const hasAllCommands = roleCommands.includes('*');
+                                    const permissionCount = getRolePermissionCount(role);
+                                    const roleCardCollapsed = collapsedRoleIds.includes(role.id);
 
-                                        return (
-                                        <Card key={role.id} className="bg-card border border-border rounded-xl p-6 transition-all hover:bg-card">
-                                            <div className={`flex items-center justify-between ${roleCardCollapsed ? '' : 'mb-6 border-b border-border pb-4'}`}>
-                                                <Button variant="ghost" size="default"
+                                    return (
+                                    <Card key={role.id} className="bg-card border border-border rounded-xl p-6 transition-all hover:bg-card">
+                                        <div className={`flex items-center justify-between ${roleCardCollapsed ? '' : 'mb-6 border-b border-border pb-4'}`}>
+                                            <Button variant="ghost" size="default"
+                                                type="button"
+                                                onClick={() => toggleRoleCollapsed(role.id)}
+                                                className="h-auto min-h-9 justify-start whitespace-normal py-3 flex min-w-0 flex-1 items-center text-left"
+                                            >
+                                                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground border border-border">
+                                                    <Hash className="size-4" aria-hidden="true" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-medium text-foreground tracking-wide">{role.role_name}</div>
+                                                    <div className="text-xs font-medium text-muted-foreground">
+                                                        {permissionCount} permission{permissionCount === 1 ? '' : 's'}
+                                                    </div>
+                                                </div>
+                                            </Button>
+                                            <div className="ml-4 flex items-center gap-2">
+                                                <Button variant="outline" size="icon"
                                                     type="button"
                                                     onClick={() => toggleRoleCollapsed(role.id)}
-                                                    className="h-auto min-h-9 justify-start whitespace-normal py-3 flex min-w-0 flex-1 items-center text-left"
+                                                    className={`     transition-all transform ${roleCardCollapsed ? 'rotate-180' : ''}`}
+                                                    title={roleCardCollapsed ? "Expand Role" : "Collapse Role"}
                                                 >
-                                                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground border border-border">
-                                                        <Hash className="size-4" aria-hidden="true" />
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <div className="text-sm font-medium text-foreground tracking-wide">{role.role_name}</div>
-                                                        <div className="text-xs font-medium text-muted-foreground">
-                                                            {permissionCount} permission{permissionCount === 1 ? '' : 's'}
-                                                        </div>
-                                                    </div>
+                                                    <LucideChevronDown width="16" height="16" strokeWidth="2" />
                                                 </Button>
-                                                <div className="ml-4 flex items-center gap-2">
-                                                    <Button variant="outline" size="icon"
-                                                        type="button"
-                                                        onClick={() => toggleRoleCollapsed(role.id)}
-                                                        className={`     transition-all transform ${roleCardCollapsed ? 'rotate-180' : ''}`}
-                                                        title={roleCardCollapsed ? "Expand Role" : "Collapse Role"}
-                                                    >
-                                                        <LucideChevronDown width="16" height="16" strokeWidth="2" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon"
-                                                        onClick={() => handleDeleteRole(role.id)}
-                                                        className="transition-colors"
-                                                        title="Remove Configuration"
-                                                    >
-                                                        <TrashIcon />
-                                                    </Button>
-                                                </div>
+                                                <Button variant="ghost" size="icon"
+                                                    onClick={() => handleDeleteRole(role.id)}
+                                                    className="transition-colors"
+                                                    title="Remove Configuration"
+                                                >
+                                                    <TrashIcon />
+                                                </Button>
                                             </div>
-
-                                            {!roleCardCollapsed && (
-                                                <>
-                                                    {/* Permissions Grid */}
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-3 xl:gap-4">
-                                                        {ROLE_PERMISSION_OPTIONS.map((perm) => (
-                                                            <label key={perm.key} className="flex items-center gap-3 cursor-pointer group select-none">
-                                                                <Checkbox
-                                                                    className="size-5"
-                                                                    checked={role[perm.key]}
-                                                                    onCheckedChange={(checked) => handleUpdateRole(role, perm.key, checked === true)}
-                                                                />
-                                                                <span className={`text-xs font-medium   transition-colors ${
-                                                                    role[perm.key] ? 'text-foreground' : 'text-muted-foreground group-hover:text-muted-foreground'
-                                                                    }`}>
-                                                                    {perm.label}
-                                                                </span>
-                                                            </label>
-                                                        ))}
-                                                    </div>
-
-                                                    <div className="mt-6 pt-6 border-t border-border space-y-5">
-                                                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                                                            <div>
-                                                                <label className="text-xs font-medium text-muted-foreground mb-2 block">
-                                                                    Roblox Admin Panel Commands
-                                                                </label>
-                                                                <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
-                                                                    Choose exactly which Ro-Link in-game panel commands this role can run. The dashboard and live Roblox panel both use this same command list.
-                                                                </p>
-                                                            </div>
-                                                            <Button variant="default" size="default"
-                                                                type="button"
-                                                                onClick={() => handleToggleRoleAllCommands(role)}
-                                                                className={`       transition-all  ${
-                                                                    hasAllCommands
-                                                                        ? '    '
-                                                                        : '    '
-                                                                }`}
-                                                            >
-                                                                {hasAllCommands ? 'All Commands Enabled' : 'Enable All Commands'}
-                                                            </Button>
-                                                        </div>
-
-                                                        <div className="space-y-4">
-                                                            {ADMIN_PANEL_COMMAND_GROUPS.map((group) => {
-                                                                const selectedCount = hasAllCommands
-                                                                    ? group.commands.length
-                                                                    : group.commands.filter((command) => hasAdminPanelCommandAccess(roleCommands, command.id)).length;
-
-                                                                return (
-                                                                    <Card key={group.category} className="rounded-xl border border-border bg-card p-4">
-                                                                        <div className="flex items-center justify-between mb-4">
-                                                                            <div>
-                                                                                <h4 className="text-xs font-medium text-foreground">{group.category}</h4>
-                                                                                <p className="text-xs text-muted-foreground mt-1">{selectedCount}/{group.commands.length} selected</p>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                                                                            {group.commands.map((command) => {
-                                                                                const enabled = hasAllCommands || hasAdminPanelCommandAccess(roleCommands, command.id);
-
-                                                                                return (
-                                                                                    <Button variant="outline" size="default"
-                                                                                        key={command.id}
-                                                                                        type="button"
-                                                                                        onClick={() => handleToggleRoleCommand(role, command.id)}
-                                                                                        aria-pressed={enabled}
-                                                                                        className={`h-auto min-h-9 justify-start whitespace-normal py-3 text-left     transition-all ${
-                                                                                            enabled
-                                                                                                ? '  '
-                                                                                                : '  '
-                                                                                        }`}
-                                                                                    >
-                                                                                        <div className="flex items-start gap-3">
-                                                                                            <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                                                                                                enabled
-                                                                                                    ? 'bg-primary border-primary text-primary-foreground'
-                                                                                                    : 'bg-card border-border text-muted-foreground'
-                                                                                            }`}>
-                                                                                                {enabled ? (
-                                                                                                    <LucideCheck width="12" height="12" strokeWidth="3" />
-                                                                                                ) : null}
-                                                                                            </div>
-                                                                                            <div className="min-w-0">
-                                                                                                <div className={`text-xs font-medium   ${enabled ? 'text-foreground' : 'text-foreground'}`}>
-                                                                                                    {command.label}
-                                                                                                </div>
-                                                                                                <p className={`mt-1 text-xs leading-relaxed ${enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                                                                                    {command.description}
-                                                                                                </p>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </Button>
-                                                                                );
-                                                                            })}
-                                                                        </div>
-                                                                    </Card>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-                                        </Card>
-                                    )})}
-
-                                    {dashboardRoles.length === 0 && (
-                                        <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
-                                            <p className="text-muted-foreground text-xs font-medium">No roles configured yet.</p>
                                         </div>
-                                    )}
-                                </div>
+
+                                        {!roleCardCollapsed && (
+                                            <>
+                                                {/* Permissions Grid */}
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-3 xl:gap-4">
+                                                    {ROLE_PERMISSION_OPTIONS.map((perm) => (
+                                                        <label key={perm.key} className="flex items-center gap-3 cursor-pointer group select-none">
+                                                            <Checkbox
+                                                                className="size-5"
+                                                                checked={role[perm.key]}
+                                                                onCheckedChange={(checked) => handleUpdateRole(role, perm.key, checked === true)}
+                                                            />
+                                                            <span className={`text-xs font-medium   transition-colors ${
+                                                                role[perm.key] ? 'text-foreground' : 'text-muted-foreground group-hover:text-muted-foreground'
+                                                                }`}>
+                                                                {perm.label}
+                                                            </span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+
+                                                <div className="mt-6 pt-6 border-t border-border space-y-5">
+                                                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                                        <div>
+                                                            <label className="text-xs font-medium text-muted-foreground mb-2 block">
+                                                                Roblox Admin Panel Commands
+                                                            </label>
+                                                            <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
+                                                                Choose exactly which Ro-Link in-game panel commands this role can run. The dashboard and live Roblox panel both use this same command list.
+                                                            </p>
+                                                        </div>
+                                                        <Button variant="default" size="default"
+                                                            type="button"
+                                                            onClick={() => handleToggleRoleAllCommands(role)}
+                                                            className={`       transition-all  ${
+                                                                hasAllCommands
+                                                                    ? '    '
+                                                                    : '    '
+                                                            }`}
+                                                        >
+                                                            {hasAllCommands ? 'All Commands Enabled' : 'Enable All Commands'}
+                                                        </Button>
+                                                    </div>
+
+                                                    <div className="space-y-4">
+                                                        {ADMIN_PANEL_COMMAND_GROUPS.map((group) => {
+                                                            const selectedCount = hasAllCommands
+                                                                ? group.commands.length
+                                                                : group.commands.filter((command) => hasAdminPanelCommandAccess(roleCommands, command.id)).length;
+
+                                                            return (
+                                                                <Card key={group.category} className="rounded-xl border border-border bg-card p-4">
+                                                                    <div className="flex items-center justify-between mb-4">
+                                                                        <div>
+                                                                            <h4 className="text-xs font-medium text-foreground">{group.category}</h4>
+                                                                            <p className="text-xs text-muted-foreground mt-1">{selectedCount}/{group.commands.length} selected</p>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                                                                        {group.commands.map((command) => {
+                                                                            const enabled = hasAllCommands || hasAdminPanelCommandAccess(roleCommands, command.id);
+
+                                                                            return (
+                                                                                <Button variant="outline" size="default"
+                                                                                    key={command.id}
+                                                                                    type="button"
+                                                                                    onClick={() => handleToggleRoleCommand(role, command.id)}
+                                                                                    aria-pressed={enabled}
+                                                                                    className={`h-auto min-h-9 justify-start whitespace-normal py-3 text-left     transition-all ${
+                                                                                        enabled
+                                                                                            ? '  '
+                                                                                            : '  '
+                                                                                    }`}
+                                                                                >
+                                                                                    <div className="flex items-start gap-3">
+                                                                                        <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                                                                                            enabled
+                                                                                                ? 'bg-primary border-primary text-primary-foreground'
+                                                                                                : 'bg-card border-border text-muted-foreground'
+                                                                                        }`}>
+                                                                                            {enabled ? (
+                                                                                                <LucideCheck width="12" height="12" strokeWidth="3" />
+                                                                                            ) : null}
+                                                                                        </div>
+                                                                                        <div className="min-w-0">
+                                                                                            <div className={`text-xs font-medium   ${enabled ? 'text-foreground' : 'text-foreground'}`}>
+                                                                                                {command.label}
+                                                                                            </div>
+                                                                                            <p className={`mt-1 text-xs leading-relaxed ${enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                                                                                {command.description}
+                                                                                            </p>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </Button>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </Card>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </Card>
+                                )})}
+
+                                {dashboardRoles.length === 0 && (
+                                    <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
+                                        <p className="text-muted-foreground text-xs font-medium">No roles configured yet.</p>
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        </div>
                     </Card>
                     )}
 
