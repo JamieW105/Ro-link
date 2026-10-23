@@ -1092,6 +1092,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                                                         key={command.id}
                                                                                         type="button"
                                                                                         onClick={() => handleToggleRoleCommand(role, command.id)}
+                                                                                        aria-pressed={enabled}
                                                                                         className={`h-auto min-h-9 justify-start whitespace-normal py-3 text-left     transition-all ${
                                                                                             enabled
                                                                                                 ? '  '
@@ -1101,7 +1102,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                                                         <div className="flex items-start gap-3">
                                                                                             <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
                                                                                                 enabled
-                                                                                                    ? 'bg-primary border-border text-foreground'
+                                                                                                    ? 'bg-primary border-primary text-primary-foreground'
                                                                                                     : 'bg-card border-border text-muted-foreground'
                                                                                             }`}>
                                                                                                 {enabled ? (

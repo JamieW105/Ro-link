@@ -673,3 +673,37 @@ test("workspace header displays the server name and icon with an initials fallba
   await expect(header.getByRole('img', {name: `${guild.name} server icon unavailable`, exact: true})).toHaveText('UI');
   expect(errors).toEqual([]);
 });
+
+test("role command ticks contrast in light and dark modes", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  await page.goto(`/dashboard/${serverId}/settings/roles`);
+  const command = page.getByRole('button', { name: 'Kick Remove a player from the live server.', exact: true });
+  await expect(command).toHaveAttribute('aria-pressed', 'false');
+  await command.focus();
+  await page.keyboard.press('Space');
+  await expect(command).toHaveAttribute('aria-pressed', 'true');
+  for (const theme of ['light', 'dark']) {
+    const toggle = page.getByRole('button', { name: `Switch to ${theme} mode`, exact: true });
+    if (await toggle.count()) await toggle.click();
+    await expect.poll(() => command.locator('svg').evaluate(icon => {
+      const ctx = document.createElement('canvas').getContext('2d')!;
+      const luminance = (color: string) => {
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, 1, 1);
+        const rgb = [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3).map(v => {
+          const c = v / 255;
+          return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        });
+        return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+      };
+      const tick = luminance(getComputedStyle(icon).color);
+      const box = luminance(getComputedStyle(icon.parentElement!).backgroundColor);
+      if (tick === box) throw new Error(JSON.stringify({tick:getComputedStyle(icon).color,box:getComputedStyle(icon.parentElement!).backgroundColor}));
+      return (Math.max(tick, box) + 0.05) / (Math.min(tick, box) + 0.05);
+    })).toBeGreaterThanOrEqual(3);
+  }
+  await command.click();
+  await expect(command).toHaveAttribute('aria-pressed', 'false');
+  await expect(command.locator('svg')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
