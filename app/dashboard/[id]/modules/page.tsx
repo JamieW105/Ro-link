@@ -231,14 +231,14 @@ export default function DashboardModulesPage() {
                     </p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 text-right">
+                <div className="flex shrink-0 flex-wrap gap-3 text-right">
                     <div className="rounded-xl border border-border bg-card px-5 py-4">
                         <div className="text-2xl font-semibold text-foreground">{installedTotal}</div>
-                        <div className="text-xs font-medium text-muted-foreground">Marketplace / {moduleLimit}</div>
+                        <div className="whitespace-nowrap text-xs font-medium text-muted-foreground">Marketplace / {moduleLimit}</div>
                     </div>
                     <div className="rounded-xl border border-border bg-card px-5 py-4">
                         <div className="text-2xl font-semibold text-foreground">{customInstalledTotal}</div>
-                        <div className="text-xs font-medium text-muted-foreground">Custom / {customModuleLimit}</div>
+                        <div className="whitespace-nowrap text-xs font-medium text-muted-foreground">Custom / {customModuleLimit}</div>
                     </div>
                     <div className="rounded-xl border border-border bg-card px-5 py-4">
                         <div className="text-2xl font-semibold text-emerald-700 dark:text-emerald-400">{enabledCount}</div>
