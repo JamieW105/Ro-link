@@ -292,20 +292,18 @@ export default function Dashboard() {
                         <h1 className="text-xl md:text-4xl font-semibold text-foreground tracking-tight mb-1">Select a Server</h1>
                         <p className="text-muted-foreground text-xs md:text-base font-medium">Choose a community to manage and monitor.</p>
                     </div>
-                    <Link
-                        href="/dashboard/marketplace"
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-accent px-5 py-3 text-xs font-medium text-foreground transition-colors hover:border-border hover:bg-accent"
-                    >
-                        <MarketplaceIcon />
-                        Open Marketplace
-                    </Link>
-                    <Link
-                        href="/dashboard/creator/modules"
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-5 py-3 text-xs font-medium text-emerald-700 dark:text-emerald-400 transition-colors hover:border-emerald-200 hover:bg-emerald-50"
-                    >
-                        <PlusIcon />
-                        Creator Dashboard
-                    </Link>
+                    <div className="ml-auto flex shrink-0 items-center gap-2">
+                        <Button asChild variant="secondary" size="icon">
+                            <Link href="/dashboard/marketplace" aria-label="Open Marketplace" title="Open Marketplace">
+                                <MarketplaceIcon />
+                            </Link>
+                        </Button>
+                        <Button asChild variant="outline" size="icon" className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-300">
+                            <Link href="/dashboard/creator/modules" aria-label="Creator Dashboard" title="Creator Dashboard">
+                                <PlusIcon />
+                            </Link>
+                        </Button>
+                    </div>
                 </header>
 
                 {loading ? (
