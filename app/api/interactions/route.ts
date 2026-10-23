@@ -1,3 +1,4 @@
+import { excludeManagementLogs } from '@/lib/serverLogs';
 import { SHIFT_COMMANDS, handleStaffShiftCommand } from '@/lib/discordStaffShifts';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
 import type { ShiftPeriod } from '@/lib/staffShifts';
@@ -644,27 +645,6 @@ async function blockServerFromStaffAction(input: {
 
     if (ownerId) {
         await dmBlockedServerOwner({ ownerId, guildName, guildId, actionId: moderationActionId, reason });
-    }
-
-    if (moderationActionId) {
-        try {
-            const { error: logError } = await client
-                .from('logs')
-                .insert([{
-                    server_id: guildId,
-                    action: 'RO_LINK_BLOCKED',
-                    target: guildId,
-                    moderator: input.blockedBy,
-                    timestamp: new Date().toISOString(),
-                    moderation_action_id: moderationActionId,
-                }]);
-
-            if (logError) {
-                console.error('[STAFF_ACTION] Failed to record staff block log:', logError);
-            }
-        } catch (error) {
-            console.error('[STAFF_ACTION] Failed to record staff block log:', error);
-        }
     }
 
     return { alreadyBlocked: false, guildName, ownerId, guildId: data.guild_id };
@@ -1431,9 +1411,9 @@ async function fetchRobloxLookup(username: string, serverId: string, openCloudKe
             .from('live_servers')
             .select('id, players')
             .eq('server_id', serverId),
-        supabase
+        excludeManagementLogs(supabase
             .from('logs')
-            .select('action, moderator, timestamp')
+            .select('action, moderator, timestamp'))
             .eq('server_id', serverId)
             .ilike('target', resolvedUsername)
             .order('timestamp', { ascending: false })
@@ -1549,9 +1529,9 @@ async function buildLookupInteractionResponse(input: {
 
     let combinedHistory: LookupHistoryEntry[] = [];
     if (showStaffControls) {
-        const { data: logsData } = await supabase
+        const { data: logsData } = await excludeManagementLogs(supabase
             .from('logs')
-            .select('id, action, moderator, timestamp, target')
+            .select('id, action, moderator, timestamp, target'))
             .eq('server_id', guildId)
             .order('timestamp', { ascending: false })
             .limit(100);

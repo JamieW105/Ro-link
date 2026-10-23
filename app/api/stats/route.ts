@@ -1,3 +1,4 @@
+import { excludeManagementLogs } from '@/lib/serverLogs';
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabaseAdmin';
 
@@ -27,9 +28,9 @@ async function getCommandCount(): Promise<number | null> {
     if (!isSupabaseConfigured()) return null;
 
     try {
-        const { count, error } = await getSupabaseAdmin()
+        const { count, error } = await excludeManagementLogs(getSupabaseAdmin()
             .from('logs')
-            .select('*', { count: 'exact', head: true })
+            .select('*', { count: 'exact', head: true }))
             .abortSignal(AbortSignal.timeout(5_000));
         if (error) {
             console.warn('[STATS] Command count unavailable. Check Supabase configuration and connectivity.');

@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "test:auth": "tsx --test scripts/auth-signin.test.ts scripts/discord-oauth.test.ts",
     "test:runtime-config": "tsx --test scripts/runtime-config.test.ts",
+    "test:server-logs": "tsx --test scripts/server-logs.test.ts",
     "start": "concurrently \"next start\" \"node scripts/bot.js\"",
     "lint": "eslint",
     "bot": "node scripts/bot.js",
