@@ -43,6 +43,44 @@ async function mockDashboard(page: Page, themed = false) {
   return errors;
 }
 
+test("create module header aligns with the form in both themes", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  await page.goto('/dashboard/marketplace/create');
+  const heading = page.getByRole('heading', { name: 'Create Module', exact: true });
+  await expect(heading).toBeVisible();
+  // Catch accidental form submissions from the theme toggle, even with invalid fields.
+  await page.locator('form').evaluate((form) => {
+    form.addEventListener('submit', (event) => { event.preventDefault(); form.dataset.submitted = 'true'; });
+    form.addEventListener('invalid', () => { form.dataset.invalid = 'true'; }, true);
+  });
+  for (const theme of ['light', 'dark'] as const) {
+    await expect(page.locator('.dice-ui-dashboard').first()).toHaveCSS('color-scheme', theme);
+    const navigation = await page.getByRole('navigation', { name: 'Module navigation' }).boundingBox();
+    const title = await heading.boundingBox();
+    const panel = await page.locator('form section').first().boundingBox();
+    const submit = await page.getByRole('button', { name: 'Submit for Moderation', exact: true }).boundingBox();
+    const toggle = page.getByRole('button', { name: /Switch to .* mode/ });
+    const toggleBox = await toggle.boundingBox();
+    expect(navigation && title && panel && submit && toggleBox).toBeTruthy();
+    expect(Math.abs(title!.x - panel!.x)).toBeLessThan(1);
+    expect(Math.abs(navigation!.x - title!.x)).toBeLessThan(1);
+    expect(toggleBox!.y + toggleBox!.height).toBeLessThanOrEqual(title!.y);
+    expect(submit!.y + submit!.height).toBeLessThan(panel!.y);
+    if (page.viewportSize()!.width >= 768) {
+      expect(submit!.x).toBeGreaterThan(title!.x + title!.width);
+      expect(Math.abs(submit!.x + submit!.width - panel!.x - (await page.locator('form header').boundingBox())!.width)).toBeLessThan(1);
+    } else {
+      expect(Math.abs(submit!.x - title!.x)).toBeLessThan(1);
+      expect(submit!.y).toBeGreaterThan(title!.y + title!.height);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    if (theme === 'light') await toggle.click();
+  }
+  await expect(page.locator('form')).not.toHaveAttribute('data-submitted', 'true');
+  await expect(page.locator('form')).not.toHaveAttribute('data-invalid', 'true');
+  expect(errors).toEqual([]);
+});
+
 
 // Check rendered colors, rather than a class/color-scheme that can change while
 // old global tokens still paint the page navy.

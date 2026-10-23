@@ -117,27 +117,33 @@ export default function CreateMarketplaceModulePage() {
     return (
         <main className="min-h-screen bg-background text-foreground">
             <form onSubmit={submitModule} className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-6 sm:px-8 md:py-10">
-                <header className="mb-8 flex flex-col gap-5 border-b border-border pb-6 md:flex-row md:items-end md:justify-between">
-                <ThemeToggle />
-                    <div>
-                        <Link href="/dashboard/marketplace" className="text-xs font-medium text-foreground hover:text-foreground">
-                            Back to Marketplace
-                        </Link>
-                        <Link href="/dashboard/creator/modules" className="ml-4 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-700">
-                            Creator Dashboard
-                        </Link>
-                        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground md:text-5xl">Create Module</h1>
-                        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                            Submit a Luau module for moderation. You can install and use your own module while it waits for review.
-                        </p>
+                <header className="mb-8 space-y-5 border-b border-border pb-6">
+                    <div className="flex items-start justify-between gap-4">
+                        <nav aria-label="Module navigation" className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                            <Link href="/dashboard/marketplace" className="text-xs font-medium text-foreground hover:text-foreground">
+                                Back to Marketplace
+                            </Link>
+                            <Link href="/dashboard/creator/modules" className="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-700">
+                                Creator Dashboard
+                            </Link>
+                        </nav>
+                        <ThemeToggle />
                     </div>
-                    <Button variant="default" size="default"
-                        type="submit"
-                        disabled={saving}
-                        className="transition-colors disabled:opacity-50"
-                    >
-                        {saving ? 'Submitting' : 'Submit for Moderation'}
-                    </Button>
+                    <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+                        <div className="min-w-0">
+                            <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-5xl">Create Module</h1>
+                            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                                Submit a Luau module for moderation. You can install and use your own module while it waits for review.
+                            </p>
+                        </div>
+                        <Button variant="default" size="default"
+                            type="submit"
+                            disabled={saving}
+                            className="shrink-0 self-start transition-colors disabled:opacity-50 md:self-auto"
+                        >
+                            {saving ? 'Submitting' : 'Submit for Moderation'}
+                        </Button>
+                    </div>
                 </header>
 
                 {error && (
