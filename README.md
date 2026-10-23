@@ -101,7 +101,7 @@ The server must have `SUPABASE_SERVICE_ROLE_KEY`; browser credentials cannot acc
 shift data. Existing root-level schema scripts remain the baseline for a new database.
 
 In **Settings → Roles**, grant **View Staff Shifts** and/or **Manage Staff Shift
-Settings** independently. Open **Staff Shifts** from the server picker or dashboard,
+Settings** independently. Open **Staff Shifts** from the dashboard sidebar,
 and use its Shift settings button to enable shifts, choose automatic starts, and set the
 wave length (default seven days) and per-person quota (default five hours).
 Wave length and quota changes take effect in the next wave. Disabling shifts ends
