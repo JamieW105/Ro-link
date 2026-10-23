@@ -43,6 +43,53 @@ async function mockDashboard(page: Page, themed = false) {
   return errors;
 }
 
+
+// Check rendered colors, rather than a class/color-scheme that can change while
+// old global tokens still paint the page navy.
+async function expectPalette(page: Page, theme: "light" | "dark") {
+  await expect(page.locator('[data-slot="stat"]').first()).toBeVisible();
+  await expect.poll(() => page.evaluate((dark) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext('2d')!;
+    const pixel = (value: string) => {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = value;
+      ctx.fillRect(0, 0, 1, 1);
+      return [...ctx.getImageData(0, 0, 1, 1).data].join(',');
+    };
+    const shell = getComputedStyle(document.querySelector('.dice-shell')!);
+    const card = getComputedStyle(document.querySelector('[data-slot="stat"]')!);
+    const primary = getComputedStyle(document.querySelector('a[href$="/live-panel"]:not([aria-label])')!);
+    const pairs = {
+      background: [shell.backgroundColor, dark ? 'oklch(0.145 0 0)' : 'oklch(1 0 0)'],
+      foreground: [shell.color, dark ? 'oklch(0.985 0 0)' : 'oklch(0.145 0 0)'],
+      card: [card.backgroundColor, dark ? 'oklch(0.205 0 0)' : 'oklch(1 0 0)'],
+      primary: [primary.backgroundColor, dark ? 'oklch(0.922 0 0)' : 'oklch(0.205 0 0)'],
+    };
+    return Object.fromEntries(Object.entries(pairs).filter(([, [actual, expected]]) => pixel(actual) !== pixel(expected)).map(([key, [actual, expected]]) => [key, {actual, expected}]));
+  }, theme === 'dark')).toEqual({});
+}
+
+test("overview colors follow the switch despite legacy root colors and survive reload", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  const legacyRoot = `:root { --background: #020617; --foreground: #f8fafc; --dice-card: #0f172a; --dice-foreground: #f8fafc; --dice-primary: #0284c7; --dice-muted: #1e293b; }`;
+  await page.goto(`/dashboard/${serverId}`);
+  await page.addStyleTag({ content: legacyRoot });
+  await expectPalette(page, 'light');
+  await page.getByRole('button', { name: 'Switch to dark mode', exact: true }).click();
+  await expectPalette(page, 'dark');
+  expect(await page.evaluate(() => localStorage.getItem('rolink-theme'))).toBe('dark');
+  await page.reload();
+  await page.addStyleTag({ content: legacyRoot });
+  await expectPalette(page, 'dark');
+  await page.getByRole('button', { name: 'Switch to light mode', exact: true }).click();
+  await expectPalette(page, 'light');
+  expect(await page.evaluate(() => localStorage.getItem('rolink-theme'))).toBe('light');
+  expect(errors).toEqual([]);
+});
+
 test("Dice selectors search, restore selection on Escape, clear and save domain values", async ({ page }) => {
   const errors = await mockDashboard(page);
   await page.goto(`/dashboard/${serverId}/verification`);

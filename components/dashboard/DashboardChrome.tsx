@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Status, StatusIndicator } from "@/components/ui/status";
+import styles from "./theme.module.css";
 import { cn } from "@/lib/utils";
 import type { CustomDashboardLayout } from "@/lib/customDashboardSettings";
 
@@ -61,7 +62,7 @@ export function DashboardChrome({ children, groups, serverId, brand, userName, l
     </div>;
   }
 
-  return <div className="custom-dashboard-shell dice-shell flex h-dvh min-w-0 bg-background text-foreground" data-dashboard-layout={layout} style={style}>
+  return <div className={cn(styles.theme, "dice-ui-dashboard custom-dashboard-shell dice-shell flex h-dvh min-w-0 bg-background text-foreground")} data-dashboard-layout={layout} style={style}>
     {layout === "split_sidebar" && <div className="hidden w-14 flex-col items-center gap-2 border-r border-border bg-muted/40 py-5 md:flex">{groups.filter(group => group.items.length).map(group => <Button key={group.label} variant={category === group.label ? "secondary" : "ghost"} size="icon" aria-label={group.label} onClick={() => setCategory(group.label)}>{group.items[0]?.icon}</Button>)}</div>}
     {!horizontal && !drawer && <aside className={cn("hidden shrink-0 flex-col border-r border-border bg-muted/30 md:flex", compact ? "w-16" : "w-60")}>
       {brandHeader()}
@@ -79,7 +80,7 @@ export function DashboardChrome({ children, groups, serverId, brand, userName, l
         <div className="flex min-w-0 items-center gap-3">
           <Dialog.Root open={open} onOpenChange={setOpen}>
             <Dialog.Trigger asChild><Button variant="ghost" size="icon" aria-label="Open navigation" className={cn("size-8", !drawer && "md:hidden")}><PanelLeft className="size-4" /></Button></Dialog.Trigger>
-            <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-[160] bg-black/30" /><Dialog.Content className="dice-ui-dashboard fixed inset-y-0 left-0 z-[170] flex w-72 flex-col border-r border-border bg-background text-foreground shadow-lg">
+            <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-[160] bg-black/30" /><Dialog.Content className={cn(styles.theme, "dice-ui-dashboard fixed inset-y-0 left-0 z-[170] flex w-72 flex-col border-r border-border bg-background text-foreground shadow-lg")}>
               <Dialog.Title className="sr-only">Dashboard navigation</Dialog.Title><Dialog.Description className="sr-only">Choose a dashboard page.</Dialog.Description>
               {brandHeader(true)}{navigation(true)}
               <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close navigation" className="absolute right-2 top-3"><X className="size-4" /></Button></Dialog.Close>

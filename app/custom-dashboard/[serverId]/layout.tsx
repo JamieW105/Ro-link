@@ -1,3 +1,4 @@
+import { DashboardTheme } from "@/components/dashboard/DashboardTheme";
 import { getDashboardServerName } from '@/lib/dashboardSeo';
 import { createSeoMetadata } from '@/lib/seo';
 import { supabase } from '@/lib/supabase';
@@ -21,4 +22,4 @@ export async function generateMetadata({ params }: { params: Promise<{ serverId:
     });
 }
 
-export default function CustomDashboardLayout({ children }: { children: React.ReactNode }) { return <div className="dice-ui-dashboard contents">{children}</div>; }
+export default function CustomDashboardLayout({ children }: { children: React.ReactNode }) { return <DashboardTheme>{children}</DashboardTheme>; }

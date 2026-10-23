@@ -36,7 +36,11 @@ and management screens. This requirement applies to future feature changes too. 
 - Use Lucide (`lucide-react`) for all interface icons. Import icons directly; do
   not add hand-drawn SVGs, emoji icons, or another icon pack. Keep `iconLibrary`
   set to `lucide` in `components.json`.
-- Keep semantic theme tokens in `app/globals.css` and preserve custom-dashboard
+- Keep semantic token mappings in `app/globals.css` and the complete light/dark
+  palette in `components/dashboard/theme.module.css`. Use DashboardTheme for route
+  boundaries and apply its theme class to standalone shells and portaled dialogs.
+  Do not inherit dashboard colors from `:root`. Verify actual computed background,
+  card, text, and button colors after toggling, not just the `dark` class. Preserve custom-dashboard
   branding and semantic accent tokens. Portal content must inherit the active dashboard theme. Preserve
   responsive layouts, permissions, loading/error states, and API behavior.
 - Label interactive controls, retain visible keyboard focus, use Checkbox/Switch

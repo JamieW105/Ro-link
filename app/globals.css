@@ -406,7 +406,7 @@ select option {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Dice UI uses the shadcn neutral palette and semantic tokens. */
+/* Fallback for shared controls on public pages. Dashboards own their palette. */
 :root {
   --dice-card: oklch(1 0 0);
   --dice-popover: oklch(1 0 0);
@@ -419,41 +419,4 @@ select option {
   --dice-accent: oklch(0.97 0 0);
   --dice-border: oklch(0.922 0 0);
   --dice-ring: oklch(0.708 0 0);
-}
-
-.dice-ui-dashboard {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  color-scheme: light;
-  color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.dice-ui-dashboard svg[stroke="currentColor"] {
-  stroke-width: 1.75;
-}
-
-.dice-ui-dashboard .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--dice-border);
-}
-
-/* Both modes use Dice UI's neutral palette; color accents remain semantic. */
-.dark .dice-ui-dashboard,
-.dice-ui-dashboard.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --dice-card: oklch(0.205 0 0);
-  --dice-popover: oklch(0.205 0 0);
-  --dice-foreground: oklch(0.985 0 0);
-  --dice-primary: oklch(0.922 0 0);
-  --dice-primary-foreground: oklch(0.205 0 0);
-  --dice-secondary: oklch(0.269 0 0);
-  --dice-muted: oklch(0.269 0 0);
-  --dice-muted-foreground: oklch(0.708 0 0);
-  --dice-accent: oklch(0.269 0 0);
-  --dice-border: oklch(1 0 0 / 0.1);
-  --dice-ring: oklch(0.556 0 0);
-  color-scheme: dark;
 }

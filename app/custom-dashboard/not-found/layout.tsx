@@ -1,3 +1,4 @@
+import { DashboardTheme } from "@/components/dashboard/DashboardTheme";
 import { createSeoMetadata } from '@/lib/seo';
 
 export const metadata = createSeoMetadata({
@@ -6,4 +7,4 @@ export const metadata = createSeoMetadata({
     index: false,
 });
 
-export default function CustomDashboardNotFoundLayout({ children }: { children: React.ReactNode }) { return <div className="dice-ui-dashboard contents">{children}</div>; }
+export default function CustomDashboardNotFoundLayout({ children }: { children: React.ReactNode }) { return <DashboardTheme>{children}</DashboardTheme>; }
