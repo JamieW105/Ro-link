@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, ArrowUpRight, ChevronDown, ChevronRight, LogOut, PanelLeft, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, LogOut, PanelLeft, X } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import { Button } from "@/components/ui/button";
@@ -99,7 +99,7 @@ export function DashboardChrome({ children, groups, serverId, brand, userName, u
           </Dialog.Root>
           <span className="hidden text-sm text-muted-foreground sm:inline">Workspace</span><ChevronRight className="hidden size-4 text-muted-foreground sm:block" /><span className="truncate text-sm font-medium">{active?.label === "Home" ? "Overview" : active?.label || "Dashboard"}</span>
         </div>
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3"><ThemeToggle /><Status variant={online ? "success" : "warning"} className="hidden border-0 bg-transparent px-0 text-xs sm:inline-flex"><StatusIndicator />{online ? "Connected" : "Checking connection"}</Status><Separator orientation="vertical" className="hidden h-4 sm:block" /><span className="hidden text-xs tabular-nums text-muted-foreground lg:block">{latency}</span><Button asChild variant="outline" size="sm"><Link href={homeHref}>{customHost ? "Dashboard home" : "All servers"}<ArrowUpRight className="size-3.5" /></Link></Button></div>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3"><ThemeToggle /><Status variant={online ? "success" : "warning"} className="hidden border-0 bg-transparent px-0 text-xs sm:inline-flex"><StatusIndicator />{online ? "Connected" : "Checking connection"}</Status><Separator orientation="vertical" className="hidden h-4 sm:block" /><span className="hidden text-xs tabular-nums text-muted-foreground lg:block">{latency}</span></div>
       </DashboardHeader>
       {horizontal && <nav aria-label="Dashboard" className={cn("hidden items-center gap-1 overflow-x-auto border-b border-border bg-background px-6 py-2 md:flex", layout === "floating_dock" && "fixed bottom-4 left-1/2 z-40 max-w-[90vw] -translate-x-1/2 rounded-xl border p-2 shadow-md")}>{groups.flatMap(group => group.items).map(item => <Button key={item.href} asChild variant={pathname === item.href ? "secondary" : "ghost"} size="sm"><Link href={item.href}>{item.icon}{item.label}</Link></Button>)}</nav>}
       <main className={cn("dashboard-content-frame min-h-0 min-w-0 flex-1 overflow-y-auto bg-background p-5 md:p-8", layout === "floating_dock" && "pb-24")}>
