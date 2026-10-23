@@ -423,3 +423,28 @@ test("Live Panel retains the personal shift summary and manual shift action", as
   await expect(personal.getByText('4.00 total hours · 6 shifts', {exact:true})).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("sidebar account shows the Discord avatar above a compact server switch and falls back on image errors", async ({ page, isMobile }) => {
+  const errors = await mockDashboard(page);
+  await page.route('**/api/auth/session', route => route.fulfill({json:{user:{id:'test-user',name:'UI Tester',image:'https://cdn.discordapp.com/avatars/test-user/avatar.png'},expires:'2099-01-01T00:00:00Z'}}));
+  await page.route('**/api/discord/media?*', route => route.fulfill({path:'public/Media/Ro-LinkIcon.png'}));
+  await page.goto(`/dashboard/${serverId}`);
+  if (isMobile) await page.getByRole('button', {name:'Open navigation',exact:true}).click();
+  const footer = page.locator('[data-slot="sidebar-account"]').filter({visible:true});
+  const avatar = footer.getByRole('img', {name:"UI Tester's Discord avatar",exact:true});
+  await expect(avatar).toBeVisible();
+  const avatarSrc = new URL((await avatar.getAttribute('src'))!, page.url());
+  expect(avatarSrc.pathname).toBe('/api/discord/media');
+  expect(avatarSrc.searchParams.get('url')).toBe('https://cdn.discordapp.com/avatars/test-user/avatar.png');
+  await expect.poll(() => avatar.evaluate(node => (node as HTMLImageElement).complete && (node as HTMLImageElement).naturalWidth > 0)).toBe(true);
+  const avatarBox = (await avatar.boundingBox())!;
+  const switchBox = (await footer.getByRole('link', {name:'Switch server',exact:true}).boundingBox())!;
+  expect(switchBox.y).toBeGreaterThanOrEqual(avatarBox.y + avatarBox.height);
+  expect((await footer.boundingBox())!.height).toBeLessThanOrEqual(90);
+  await expect(footer.getByRole('button', {name:'Sign out',exact:true})).toBeVisible();
+  await page.route('**/api/discord/media?*', route => route.fulfill({status:404}));
+  await page.reload();
+  if (isMobile) await page.getByRole('button', {name:'Open navigation',exact:true}).click();
+  await expect(footer.getByRole('img', {name:"UI Tester's avatar unavailable",exact:true})).toBeVisible();
+  expect(errors).toEqual([]);
+});

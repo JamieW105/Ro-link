@@ -22,6 +22,7 @@ type DashboardChromeProps = {
   serverId: string;
   brand: string;
   userName: string;
+  userAvatarUrl?: string | null;
   latency: string;
   online: boolean;
   homeHref: string;
@@ -30,9 +31,10 @@ type DashboardChromeProps = {
   style?: CSSProperties;
 };
 
-export function DashboardChrome({ children, groups, serverId, brand, userName, latency, online, homeHref, customHost, layout, style }: DashboardChromeProps) {
+export function DashboardChrome({ children, groups, serverId, brand, userName, userAvatarUrl, latency, online, homeHref, customHost, layout, style }: DashboardChromeProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [failedAvatar, setFailedAvatar] = useState<string | null>(null);
   const [category, setCategory] = useState(groups.find(group => group.items.some(item => item.href === pathname))?.label || groups[0]?.label);
   const active = groups.flatMap(group => group.items).find(item => item.href === pathname);
   const horizontal = layout === "spacious" || layout === "floating_dock";
@@ -63,18 +65,25 @@ export function DashboardChrome({ children, groups, serverId, brand, userName, l
     </div>;
   }
 
+  function accountFooter(mobile = false) {
+    const collapsed = compact && !mobile;
+    return <div data-slot="sidebar-account" className="shrink-0 border-t border-border p-2">
+      <div className={cn("flex items-center gap-2 rounded-md px-1 py-1", collapsed && "justify-center px-0")}>
+        {userAvatarUrl && failedAvatar !== userAvatarUrl
+          ? <Image src={userAvatarUrl} alt={`${userName}'s Discord avatar`} width={28} height={28} unoptimized className="size-7 shrink-0 rounded-full object-cover" onError={() => setFailedAvatar(userAvatarUrl)} />
+          : <span role="img" aria-label={`${userName}'s avatar unavailable`} className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-medium">{userName.slice(0, 2).toUpperCase()}</span>}
+        {!collapsed && <><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{userName}</p><p className="text-[10px] text-muted-foreground">Discord account</p></div><Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Sign out" onClick={() => void signOut({callbackUrl:"/auth/signin"})}><LogOut className="size-3.5" /></Button></>}
+      </div>
+      {!collapsed && !customHost && <Button variant="ghost" size="sm" asChild className="mt-1 h-7 w-full justify-start gap-2 px-1 text-xs text-muted-foreground"><Link href="/dashboard"><ArrowLeft className="size-3.5" />Switch server</Link></Button>}
+    </div>;
+  }
+
   return <div className={cn(styles.theme, "dice-ui-dashboard custom-dashboard-shell dice-shell flex h-dvh min-w-0 bg-background text-foreground")} data-dashboard-layout={layout} style={style}>
     {layout === "split_sidebar" && <div className="hidden w-14 flex-col items-center gap-2 border-r border-border bg-muted/40 py-5 md:flex">{groups.filter(group => group.items.length).map(group => <Button key={group.label} variant={category === group.label ? "secondary" : "ghost"} size="icon" aria-label={group.label} onClick={() => setCategory(group.label)}>{group.items[0]?.icon}</Button>)}</div>}
     {!horizontal && !drawer && <aside className={cn("hidden shrink-0 flex-col border-r border-border bg-muted/30 md:flex", compact ? "w-16" : "w-60")}>
       {brandHeader()}
       {navigation()}
-      <div className="border-t border-border p-3">
-        {!compact && !customHost && <Button variant="ghost" size="sm" asChild className="mb-4 w-full justify-start gap-3 text-muted-foreground"><Link href="/dashboard"><ArrowLeft className="size-4" />Switch server</Link></Button>}
-        <div className={cn("flex items-center gap-2.5 rounded-lg p-2", compact && "justify-center p-0")}>
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium">{userName.slice(0, 2).toUpperCase()}</span>
-          {!compact && <><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{userName}</p><p className="text-xs text-muted-foreground">Discord account</p></div><Button variant="ghost" size="icon" className="size-7" aria-label="Sign out" onClick={() => void signOut({callbackUrl:"/auth/signin"})}><LogOut className="size-3.5" /></Button></>}
-        </div>
-      </div>
+      {accountFooter()}
     </aside>}
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border px-4 md:px-8">
@@ -83,7 +92,7 @@ export function DashboardChrome({ children, groups, serverId, brand, userName, l
             <Dialog.Trigger asChild><Button variant="ghost" size="icon" aria-label="Open navigation" className={cn("size-8", !drawer && "md:hidden")}><PanelLeft className="size-4" /></Button></Dialog.Trigger>
             <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-[160] bg-black/30" /><Dialog.Content className={cn(styles.theme, "dice-ui-dashboard fixed inset-y-0 left-0 z-[170] flex w-72 flex-col border-r border-border bg-background text-foreground shadow-lg")}>
               <Dialog.Title className="sr-only">Dashboard navigation</Dialog.Title><Dialog.Description className="sr-only">Choose a dashboard page.</Dialog.Description>
-              {brandHeader(true)}{navigation(true)}
+              {brandHeader(true)}{navigation(true)}{accountFooter(true)}
               <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close navigation" className="absolute right-2 top-3"><X className="size-4" /></Button></Dialog.Close>
             </Dialog.Content></Dialog.Portal>
           </Dialog.Root>

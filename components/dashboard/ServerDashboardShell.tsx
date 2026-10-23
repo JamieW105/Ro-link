@@ -1,5 +1,6 @@
 'use client';
 
+import { getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 import { DashboardChrome } from '@/components/dashboard/DashboardChrome';
 
 import { Button } from '@/components/ui/button';
@@ -508,6 +509,7 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             serverId={String(id)}
             brand={customDashboardBrand}
             userName={session?.user?.name || 'Discord user'}
+            userAvatarUrl={getDiscordMediaProxyUrl(session?.user?.image)}
             latency={apiLatencyLabel}
             online={apiLatencyState === 'ready'}
             homeHref={dashboardHomeHref}
