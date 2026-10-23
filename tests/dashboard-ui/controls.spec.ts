@@ -513,3 +513,33 @@ test("staff shift switch thumbs contrast with their tracks in both states and th
   }
   expect(errors).toEqual([]);
 });
+
+test("previous wave selects historical dates and quota and handles missing history", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  const previous = {...sampleShiftReport, wave:{id:'previous-wave',starts_at:'2026-10-12T00:00:00Z',ends_at:'2026-10-19T00:00:00Z',quota_hours:3}, staff:[{...sampleShiftReport.staff[0],username:'Previous Moderator',seconds:3600,wave_seconds:3600,active:false}],shifts:[],has_more:false};
+  await page.route('**/api/dashboard/staff-shifts?*', route => new URL(route.request().url()).searchParams.get('period') === 'previous-wave' ? route.fulfill({json:previous}) : route.fallback());
+  await page.goto(`/dashboard/${serverId}/staff-shifts`);
+  const period = page.getByRole('combobox', {name:'Time period',exact:true});
+  await expect(period).toHaveValue('Latest wave');
+  await period.fill('Previous wave');
+  const historicalRequest = page.waitForRequest(request => request.url().includes('/api/dashboard/staff-shifts?') && new URL(request.url()).searchParams.get('period') === 'previous-wave');
+  await page.getByRole('option', {name:'Previous wave',exact:true}).click();
+  await historicalRequest;
+  await expect(period).toHaveValue('Previous wave');
+  await expect(page.getByText('Previous Moderator',{exact:true}).filter({visible:true}).first()).toBeVisible();
+  await expect(page.getByText(/Oct 12.*Oct 19.*3h quota/)).toBeVisible();
+  const quota = page.getByRole('progressbar',{name:'Previous Moderator wave quota',exact:true});
+  expect(Number(await quota.getAttribute('aria-valuenow'))).toBeCloseTo(100/3);
+  await expect(page.getByText('UI Moderator',{exact:true})).toHaveCount(0);
+  await period.fill('Latest wave');
+  await page.getByRole('option',{name:'Latest wave',exact:true}).click();
+  await expect(page.getByText('UI Moderator',{exact:true}).filter({visible:true}).first()).toBeVisible();
+  await page.route('**/api/dashboard/staff-shifts?*', route => new URL(route.request().url()).searchParams.get('period') === 'previous-wave' ? route.fulfill({json:{...sampleShiftReport,wave:null,staff:[],shifts:[],has_more:false}}) : route.fallback());
+  await page.getByRole('button',{name:'Switch to dark mode',exact:true}).click();
+  await period.fill('Previous wave');
+  await page.getByRole('option',{name:'Previous wave',exact:true}).click();
+  await expect(page.getByText('No previous wave available yet.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Staff activity',exact:true})).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
+});

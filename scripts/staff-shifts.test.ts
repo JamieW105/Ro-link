@@ -14,6 +14,7 @@ import {
     isShiftStaff,
     shiftPeriodStart,
     type ShiftReport,
+    type PreviousWaveReport,
 } from '../lib/staffShifts';
 
 const db = new PGlite();
@@ -88,6 +89,7 @@ before(async () => {
             'utf8',
         ),
     );
+    await db.exec(await readFile(new URL('../supabase/migrations/20261023073855_staff_shift_previous_wave.sql', import.meta.url), 'utf8'));
 });
 beforeEach(async () => {
     await db.exec(
@@ -590,4 +592,76 @@ test('break controls and action RPC remain restricted to service-role access', a
     } finally {
         await db.exec('RESET ROLE');
     }
+});
+
+
+async function previousReport(server = 'server-1', discord: string | null = null, offset = 0) {
+    const { rows } = await db.query<{result: PreviousWaveReport}>('SELECT public.staff_shift_previous_wave_report($1,$2,$3) result', [server,discord,offset]);
+    return rows[0].result;
+}
+async function preparePreviousWave() {
+    await configure();
+    await db.exec(`UPDATE public.staff_shift_waves SET starts_at = now()-interval '7 days', ends_at = now()+interval '1 day' WHERE server_id='server-1';
+        INSERT INTO public.staff_shift_waves(server_id,starts_at,ends_at,quota_hours) VALUES
+        ('server-1',now()-interval '21 days',now()-interval '14 days',1),
+        ('server-1',now()-interval '14 days',now()-interval '7 days',2);`);
+}
+
+test('previous wave is empty when no completed wave exists and never falls back to current shifts', async () => {
+    await configure();
+    await sync();
+    const result = await previousReport();
+    assert.equal(result.wave, null);
+    assert.deepEqual(result.staff, []);
+    assert.deepEqual(result.shifts, []);
+    assert.equal(result.has_more, false);
+});
+
+test('previous wave selects the latest completed snapshot and clips overlapping sessions at both boundaries', async () => {
+    await preparePreviousWave();
+    await db.exec(`INSERT INTO public.staff_shifts(server_id,job_id,discord_id,roblox_user_id,username,started_at,last_seen_at,ended_at) VALUES
+        ('server-1','crossing','discord-1','roblox-1','StaffOne',now()-interval '14 days 1 hour',now(),NULL),
+        ('server-1','overlap','discord-1','roblox-1','StaffOne',now()-interval '13 days',now()-interval '12 days',now()-interval '12 days'),
+        ('server-1','current-only','discord-2','roblox-2','CurrentOnly',now()-interval '7 days',now(),NULL),
+        ('server-2','other-server','discord-3','roblox-3','OtherServer',now()-interval '13 days',now()-interval '12 days',now()-interval '12 days');`);
+    const result = await previousReport();
+    assert.equal(result.wave?.quota_hours, 2);
+    assert.equal(result.settings.quota_hours, 5);
+    assert.equal(result.staff.length, 1);
+    assert.equal(result.staff[0].username, 'StaffOne');
+    assert.equal(result.staff[0].seconds, 7*86400);
+    assert.equal(result.staff[0].wave_seconds, 7*86400);
+    assert.equal(result.staff[0].shift_count, 2);
+    assert.equal(result.staff[0].active, false);
+    assert.equal(result.shifts.length, 2);
+    assert.ok(result.shifts.every(shift => !shift.active && Date.parse(shift.started_at) >= Date.parse(result.wave!.starts_at) && Date.parse(shift.ended_at!) <= Date.parse(result.wave!.ends_at)));
+    assert.equal((await report()).wave.quota_hours, 5);
+});
+
+test('previous wave history paginates only matching rows and personal reports remain scoped', async () => {
+    await preparePreviousWave();
+    await db.exec(`INSERT INTO public.staff_shifts(server_id,job_id,discord_id,roblox_user_id,username,started_at,last_seen_at,ended_at)
+        SELECT 'server-1','job-'||g,'discord-1','roblox-1','StaffOne',now()-interval '13 days'+g*interval '1 second',now()-interval '13 days'+(g+1)*interval '1 second',now()-interval '13 days'+(g+1)*interval '1 second' FROM generate_series(1,51) g;
+        INSERT INTO public.staff_shifts(server_id,job_id,discord_id,roblox_user_id,username,started_at,last_seen_at,ended_at) VALUES
+        ('server-1','other-staff','discord-2','roblox-2','OtherStaff',now()-interval '13 days',now()-interval '12 days',now()-interval '12 days');`);
+    const first = await previousReport('server-1','discord-1');
+    const next = await previousReport('server-1','discord-1',50);
+    assert.equal(first.shifts.length, 50);
+    assert.equal(first.has_more, true);
+    assert.equal(next.shifts.length, 1);
+    assert.equal(next.has_more, false);
+    assert.equal(first.staff.length, 1);
+    assert.equal(first.staff[0].seconds, 51);
+    assert.ok([...first.shifts,...next.shifts].every(shift => shift.discord_id === 'discord-1'));
+    assert.equal(new Set([...first.shifts,...next.shifts].map(shift => shift.id)).size, 51);
+});
+
+test('previous wave reports remain restricted to the service role', async () => {
+    for (const role of ['anon','authenticated']) {
+        await db.exec('SET ROLE '+role);
+        try { await assert.rejects(db.query("SELECT public.staff_shift_previous_wave_report('server-1')"), /permission denied/); }
+        finally { await db.exec('RESET ROLE'); }
+    }
+    const { rows } = await db.query<{allowed:boolean}>("SELECT has_function_privilege('service_role', 'public.staff_shift_previous_wave_report(text,text,integer)', 'execute') allowed");
+    assert.equal(rows[0].allowed,true);
 });

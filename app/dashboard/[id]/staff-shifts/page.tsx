@@ -32,18 +32,20 @@ import {
 import { usePermissions } from '@/context/PermissionsContext';
 import {
   shiftHours,
-  type ShiftPeriod,
+  type ShiftReportPeriod,
+  type PreviousWaveReport,
   type ShiftReport,
   type ShiftSettings,
   type ShiftWave,
 } from '@/lib/staffShifts';
 
-const periods: Array<{ value: ShiftPeriod; label: string }> = [
+const periods: Array<{ value: ShiftReportPeriod; label: string }> = [
   { value: 'day', label: 'Past day' },
   { value: 'week', label: 'Past week' },
   { value: '30-days', label: 'Past 30 days' },
   { value: '6-months', label: 'Past 6 months' },
   { value: 'latest-wave', label: 'Latest wave' },
+  { value: 'previous-wave', label: 'Previous wave' },
 ];
 export default function StaffShiftsPage() {
   const { id } = useParams();
@@ -51,12 +53,14 @@ export default function StaffShiftsPage() {
   const perms = usePermissions();
   const canView = perms.is_admin || perms.can_view_staff_shifts;
   const canManage = perms.is_admin || perms.can_manage_staff_shifts;
-  const [period, setPeriod] = useState<ShiftPeriod>('latest-wave');
+  const [period, setPeriod] = useState<ShiftReportPeriod>('latest-wave');
   const [offset, setOffset] = useState(0);
-  const [report, setReport] = useState<ShiftReport | null>(null);
+  const [report, setReport] = useState<ShiftReport | PreviousWaveReport | null>(
+    null,
+  );
   const [config, setConfig] = useState<{
     settings: ShiftSettings;
-    wave: ShiftWave;
+    wave: ShiftWave | null;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -149,7 +153,9 @@ export default function StaffShiftsPage() {
         {config && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Current wave</span>
+              <span className="text-sm font-medium">
+                {period === 'previous-wave' ? 'Previous wave' : 'Current wave'}
+              </span>
               <Status variant={config.settings.enabled ? 'success' : 'warning'}>
                 <StatusIndicator />
                 {config.settings.enabled
@@ -157,13 +163,19 @@ export default function StaffShiftsPage() {
                   : 'Shifts disabled'}
               </Status>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {shortDate(config.wave.starts_at)} –{' '}
-              {shortDate(config.wave.ends_at)} ·{' '}
-              {config.wave.quota_hours > 0
-                ? `${config.wave.quota_hours}h quota`
-                : 'No quota'}
-            </p>
+            {config.wave ? (
+              <p className="text-sm text-muted-foreground">
+                {shortDate(config.wave.starts_at)} –{' '}
+                {shortDate(config.wave.ends_at)} ·{' '}
+                {config.wave.quota_hours > 0
+                  ? `${config.wave.quota_hours}h quota`
+                  : 'No quota'}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No previous wave available yet.
+              </p>
+            )}
           </div>
         )}
         {canView && (
@@ -175,22 +187,32 @@ export default function StaffShiftsPage() {
               onValueChange={(value) => {
                 setLoading(true);
                 setReport(null);
-                setPeriod(value as ShiftPeriod);
+                setPeriod(value as ShiftReportPeriod);
                 setOffset(0);
               }}
             />
           </div>
         )}
       </Card>
-      {canView && report && (
+      {canView && report?.wave && (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
             <Stat className="p-5">
-              <StatLabel>Staff on shift</StatLabel>
+              <StatLabel>
+                {period === 'previous-wave'
+                  ? 'Staff recorded'
+                  : 'Staff on shift'}
+              </StatLabel>
               <StatValue>
-                {report.staff.filter((staff) => staff.active).length}
+                {period === 'previous-wave'
+                  ? report.staff.length
+                  : report.staff.filter((staff) => staff.active).length}
               </StatValue>
-              <StatDescription>Currently tracking time</StatDescription>
+              <StatDescription>
+                {period === 'previous-wave'
+                  ? 'With time in this wave'
+                  : 'Currently tracking time'}
+              </StatDescription>
             </Stat>
             <Stat className="p-5">
               <StatLabel>Hours recorded</StatLabel>
@@ -216,7 +238,7 @@ export default function StaffShiftsPage() {
             <CardHeader>
               <CardTitle>Staff activity</CardTitle>
               <CardDescription>
-                Recorded time and progress toward the current wave’s quota.
+                Recorded time and progress toward the selected wave’s quota.
               </CardDescription>
             </CardHeader>
             <div className="hidden md:block">
@@ -252,7 +274,7 @@ export default function StaffShiftsPage() {
                         <ShiftQuota
                           name={staff.username}
                           seconds={staff.wave_seconds}
-                          quota={report.wave.quota_hours}
+                          quota={report.wave?.quota_hours ?? 0}
                         />
                       </TableCell>
                     </TableRow>
@@ -278,7 +300,7 @@ export default function StaffShiftsPage() {
                   <ShiftQuota
                     name={staff.username}
                     seconds={staff.wave_seconds}
-                    quota={report.wave.quota_hours}
+                    quota={report.wave?.quota_hours ?? 0}
                   />
                 </article>
               ))}

@@ -7,6 +7,8 @@ export const SHIFT_PERIODS = [
     '6-months',
     'latest-wave',
 ] as const;
+export const SHIFT_REPORT_PERIODS = [...SHIFT_PERIODS, 'previous-wave'] as const;
+export type ShiftReportPeriod = (typeof SHIFT_REPORT_PERIODS)[number];
 export type ShiftPeriod = (typeof SHIFT_PERIODS)[number];
 export interface ShiftSettings {
     enabled: boolean;
@@ -51,6 +53,8 @@ export interface ShiftReport {
     shifts: StaffShift[];
     has_more: boolean;
 }
+export type PreviousWaveReport = Omit<ShiftReport, 'wave'> & { wave: ShiftWave | null };
+
 export function canViewStaffShifts(perms: DashboardPermissions) {
     return perms.is_admin || perms.can_view_staff_shifts;
 }

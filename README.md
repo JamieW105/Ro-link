@@ -115,8 +115,11 @@ the last confirmed heartbeat. Existing game polling is sufficient; no plugin upd
 is required. If automatic start is off, staff can start/end their own shifts from
 the live panel while playing. Shift eligibility refreshes from Discord every minute.
 
-Reports cover a rolling day, week, 30 days, six calendar months, or the current
-wave. Overlapping game sessions count time only once; sessions crossing a reporting
+Reports cover a rolling day, week, 30 days, six calendar months, the current
+wave, or the previous completed wave. Previous-wave reports use that wave’s saved
+dates and quota, excluding current-wave time. Apply
+`supabase/migrations/20261023073855_staff_shift_previous_wave.sql` to enable this
+report; no completed wave is shown as an empty state. Overlapping game sessions count time only once; sessions crossing a reporting
 or wave boundary contribute only time within it. New waves start with zero hours
 without deleting historical shifts. The live panel shows the signed-in staff
 member's themed quota bar, lifetime confirmed hours, and total shift count.

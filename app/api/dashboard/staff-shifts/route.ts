@@ -7,9 +7,9 @@ import {
     canViewStaffShifts,
     canManageStaffShifts,
     isShiftStaff,
-    SHIFT_PERIODS,
+    SHIFT_REPORT_PERIODS,
     shiftPeriodStart,
-    type ShiftPeriod,
+    type ShiftReportPeriod,
 } from '@/lib/staffShifts';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { normalizeLivePlayerList } from '@/lib/livePlayers';
@@ -20,11 +20,11 @@ export async function GET(req: Request) {
     const serverId = trimString(params.get('serverId'));
     const self = params.get('self') === 'true';
     const settingsOnly = params.get('settingsOnly') === 'true';
-    const period = (params.get('period') || 'latest-wave') as ShiftPeriod;
+    const period = (params.get('period') || 'latest-wave') as ShiftReportPeriod;
     const offset = Number(params.get('offset') || 0);
     if (
         !serverId ||
-        !SHIFT_PERIODS.includes(period) ||
+        !SHIFT_REPORT_PERIODS.includes(period) ||
         !Number.isSafeInteger(offset) ||
         offset < 0
     ) {
@@ -41,12 +41,19 @@ export async function GET(req: Request) {
               : canViewStaffShifts(perms),
     );
     if ('error' in access) return access.error;
-    const { data, error } = await getSupabaseAdmin().rpc('staff_shift_report', {
-        p_server: serverId,
-        p_discord: self || settingsOnly ? access.userId : null,
-        p_from: shiftPeriodStart(period, new Date()),
-        p_offset: offset,
-    });
+    const db = getSupabaseAdmin();
+    const { data, error } = period === 'previous-wave'
+        ? await db.rpc('staff_shift_previous_wave_report', {
+            p_server: serverId,
+            p_discord: self || settingsOnly ? access.userId : null,
+            p_offset: offset,
+        })
+        : await db.rpc('staff_shift_report', {
+            p_server: serverId,
+            p_discord: self || settingsOnly ? access.userId : null,
+            p_from: shiftPeriodStart(period, new Date()),
+            p_offset: offset,
+        });
     if (error) {
         console.error('[Staff Shifts] Report failed', error);
         return NextResponse.json(
