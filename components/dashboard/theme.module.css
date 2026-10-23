@@ -42,8 +42,24 @@
   stroke-width: 1.75;
 }
 
-.theme :global(.custom-scrollbar)::-webkit-scrollbar-thumb {
-  background: var(--dice-border);
+/* Hide dashboard scrollbar chrome without changing overflow or scroll input.
+   Include the document, notices, and portaled themed dialogs. */
+:global(html):has(.theme),
+:global(body):has(.theme),
+:global(body):has(.theme) [data-slot="site-notices"],
+.theme,
+.theme * {
+  scrollbar-width: none;
+}
+
+:global(html):has(.theme)::-webkit-scrollbar,
+:global(body):has(.theme)::-webkit-scrollbar,
+:global(body):has(.theme) [data-slot="site-notices"]::-webkit-scrollbar,
+.theme::-webkit-scrollbar,
+.theme *::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* Only an active server dashboard owns the viewport. Display-contents route and
