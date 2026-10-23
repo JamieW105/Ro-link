@@ -1,5 +1,6 @@
 'use client';
 
+import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
 
 import { Checkbox } from '@/components/ui/checkbox';
@@ -116,6 +117,10 @@ export default function CreateMarketplaceModulePage() {
 
     return (
         <main className="min-h-screen bg-background text-foreground">
+            <DashboardHeader contained>
+                <DashboardBrand label="Create module" />
+                <div className="flex shrink-0 items-center gap-2"><ThemeToggle /><Button asChild variant="outline" size="sm"><Link href="/dashboard">All servers</Link></Button></div>
+            </DashboardHeader>
             <form onSubmit={submitModule} className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-6 sm:px-8 md:py-10">
                 <header className="mb-8 space-y-5 border-b border-border pb-6">
                     <div className="flex items-start justify-between gap-4">
@@ -127,7 +132,6 @@ export default function CreateMarketplaceModulePage() {
                                 Creator Dashboard
                             </Link>
                         </nav>
-                        <ThemeToggle />
                     </div>
                     <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
                         <div className="min-w-0">

@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 import { useRouter } from 'next/navigation';
+import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -17,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { ShieldAlert as LucideShieldAlert } from 'lucide-react';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getDiscordGuildIconProxyUrl } from '@/lib/discordMedia';
@@ -269,12 +269,10 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <nav className="border-b border-border bg-background">
-                <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-5 md:px-8">
-                    <Link href="/dashboard" className="flex items-center gap-2.5 text-sm font-semibold"><span className="flex size-8 shrink-0 items-center justify-center"><Image src="/Media/Ro-LinkIcon.png" alt="" width={25} height={25} /></span>Ro-Link<span className="hidden text-muted-foreground sm:inline">/ Marketplace</span></Link>
-                    <div className="flex items-center gap-2"><ThemeToggle /><Button asChild variant="outline" size="sm"><Link href="/dashboard"><ArrowLeft className="size-3.5" />All servers</Link></Button></div>
-                </div>
-            </nav>
+            <DashboardHeader contained>
+                <DashboardBrand label="Marketplace" />
+                <div className="flex shrink-0 items-center gap-2"><ThemeToggle /><Button asChild variant="outline" size="sm"><Link href="/dashboard"><ArrowLeft className="size-3.5" />All servers</Link></Button></div>
+            </DashboardHeader>
 
             <main className="mx-auto max-w-7xl px-4 py-6 sm:px-8 md:py-12">
                 {!productView && <>

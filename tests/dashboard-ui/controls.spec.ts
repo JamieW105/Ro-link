@@ -53,6 +53,36 @@ async function mockDashboard(page: Page, themed = false, permissions: Record<str
   return errors;
 }
 
+test("dashboard headers stay slim and fixed across pages and themes", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await mockDashboard(page);
+  for (const path of ['/dashboard', '/dashboard/marketplace', `/dashboard/marketplace/${sampleModule.slug}`, '/dashboard/marketplace/create', '/dashboard/creator/modules', `/dashboard/${serverId}`, `/dashboard/${serverId}/settings/roles`, `/dashboard/${serverId}/staff-shifts`, `/dashboard/${serverId}/staff-shifts/settings`, `/dashboard/${serverId}/live-panel`]) {
+    await page.goto(path);
+    const header = page.locator('[data-dashboard-header]');
+    await expect(header).toBeVisible();
+    for (const theme of ['light', 'dark'] as const) {
+      const toggle = header.getByRole('button', { name: /Switch to .* mode/ });
+      await expect(toggle).toBeEnabled();
+      if (await toggle.getAttribute('aria-label') === `Switch to ${theme} mode`) await toggle.click();
+      await expect(page.locator('.dice-ui-dashboard').first()).toHaveCSS('color-scheme', theme);
+      await expect(header).toHaveCSS('height', '48px');
+      const box = (await header.boundingBox())!;
+      expect(box.y).toBe(0);
+      for (const control of await header.locator('a:visible, button:visible').all()) {
+        const bounds = (await control.boundingBox())!;
+        expect(bounds.y).toBeGreaterThanOrEqual(box.y);
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual(box.y + box.height);
+        expect(bounds.x + bounds.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      expect((await header.boundingBox())!.y).toBe(0);
+      await page.evaluate(() => window.scrollTo(0, 0));
+    }
+  }
+  expect(errors).toEqual([]);
+});
+
 test("create module header aligns with the form in both themes", async ({ page }) => {
   const errors = await mockDashboard(page);
   await page.goto('/dashboard/marketplace/create');

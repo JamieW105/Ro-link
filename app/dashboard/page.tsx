@@ -1,5 +1,6 @@
 'use client';
 
+import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
 
 import { Card } from '@/components/ui/card';
@@ -13,7 +14,7 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from 'next/link';
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
-import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from "@/lib/discordMedia";
+import { getDiscordGuildIconProxyUrl } from "@/lib/discordMedia";
 import { LayoutDashboard, LogOut, MonitorPlay, Plus, ShieldAlert, Store } from "lucide-react";
 
 const LogOutIcon = () => <LogOut size={14} aria-hidden="true" />;
@@ -247,46 +248,15 @@ export default function Dashboard() {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            {/* Sticky Professional Navbar */}
-            <nav className="sticky top-0 z-50 bg-background border-b border-border">
-                <div className="max-w-7xl mx-auto flex min-h-16 items-center justify-between gap-3 px-4 py-3 sm:px-8 md:h-20 md:py-0">
-                    <Link href="/" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
-                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 md:w-9 md:h-9 object-contain" />
-                        <span className="text-base md:text-xl font-medium tracking-tight text-foreground">Ro-Link</span>
-                    </Link>
-
-                    <div className="ml-auto flex items-center gap-2 border-l border-border pl-3 sm:gap-4 md:pl-4">
-                        <ThemeToggle />
-                        {(sessionUserId === '953414442060746854') && (
-                            <Link
-                                href="/management"
-                                className="hidden md:flex items-center gap-2 text-foreground px-4 py-2 rounded-lg text-xs font-medium transition-all"
-                            >
-                                <LucideBriefcaseBusiness width="14" height="14" strokeWidth="2.5" />
-                                Management
-                            </Link>
-                        )}
-                        <div className="text-right hidden sm:block">
-                            <p className="text-sm font-semibold text-foreground leading-none mb-1">{session?.user?.name}</p>
-                            <Button variant="ghost" size="default" type="button" onClick={handleSignOut} className="transition-colors flex items-center  justify-end">
-                                <LogOutIcon />
-                                Sign Out
-                            </Button>
-                        </div>
-                        <div className="relative group">
-                            <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-border transition-transform group-hover:scale-105" />
-                            <Button variant="outline" size="icon"
-                                type="button"
-                                onClick={handleSignOut}
-                                className="sm:hidden absolute -bottom-1 -right-1"
-                                title="Sign Out"
-                            >
-                                <LogOutIcon />
-                            </Button>
-                        </div>
-                    </div>
+            <DashboardHeader contained>
+                <DashboardBrand href="/" />
+                <div className="flex shrink-0 items-center gap-2">
+                    <ThemeToggle />
+                    {sessionUserId === '953414442060746854' && <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex"><Link href="/management"><LucideBriefcaseBusiness className="size-3.5" />Management</Link></Button>}
+                    <span className="hidden max-w-40 truncate text-xs text-muted-foreground sm:inline">{session?.user?.name}</span>
+                    <Button variant="outline" size="sm" type="button" onClick={handleSignOut}><LogOutIcon />Sign Out</Button>
                 </div>
-            </nav>
+            </DashboardHeader>
 
             <div className="motion-page max-w-7xl mx-auto px-4 sm:px-8 py-6 md:py-12">
                 <header className="mb-6 flex flex-col gap-4 md:mb-12 md:flex-row md:items-end md:justify-between">

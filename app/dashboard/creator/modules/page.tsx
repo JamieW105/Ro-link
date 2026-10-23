@@ -1,5 +1,6 @@
 'use client';
 
+import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
 
 import { Card } from '@/components/ui/card';
@@ -374,33 +375,17 @@ export default function CreatorModulesPage() {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <nav className="sticky top-0 z-50 border-b border-border bg-background">
-                <div className="mx-auto flex min-h-16 max-w-[1500px] items-center justify-between gap-3 px-4 py-3 sm:px-8 md:h-20 md:py-0">
-                    <Link href="/dashboard" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
-                        <Image src="/Media/Ro-LinkIcon.png" alt="Ro-Link" width={36} height={36} className="h-8 w-8 object-contain md:h-9 md:w-9" />
-                        <span className="text-base md:text-xl font-medium text-foreground">Ro-Link</span>
-                    </Link>
-                    <div className="flex items-center gap-2">
-                        <Link
-                            href="/dashboard/marketplace"
-                            className="rounded-lg border border-border px-4 py-3 text-xs font-medium text-foreground transition-colors hover:border-border hover:text-foreground"
-                        >
-                            Marketplace
-                        </Link>
-                        <Button variant="default" size="default"
-                            type="button"
-                            onClick={startNewModule}
-                            className="transition-colors"
-                        >
-                            New Module
-                        </Button>
-                    </div>
+            <DashboardHeader contained>
+                <DashboardBrand label="My modules" />
+                <div className="flex shrink-0 items-center gap-2">
+                    <ThemeToggle />
+                    <Button asChild variant="outline" size="sm"><Link href="/dashboard/marketplace">Marketplace</Link></Button>
+                    <Button size="sm" type="button" onClick={startNewModule}>New Module</Button>
                 </div>
-            </nav>
+            </DashboardHeader>
 
             <main className="mx-auto max-w-[1500px] px-4 py-6 sm:px-8 md:py-10">
                 <header className="mb-6 border-b border-border pb-6">
-                <ThemeToggle />
                     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                         <div className="min-w-0">
                             <Link href="/dashboard" className="text-xs font-medium text-foreground hover:text-foreground">
