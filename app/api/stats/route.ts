@@ -1,34 +1,50 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabaseAdmin';
+
+async function getGuildCount(): Promise<number | null> {
+    const token = process.env.DISCORD_TOKEN?.trim();
+    if (!token) return null;
+
+    try {
+        const response = await fetch('https://discord.com/api/v10/applications/@me', {
+            headers: { Authorization: `Bot ${token}` },
+            cache: 'no-store',
+            signal: AbortSignal.timeout(5_000),
+        });
+        if (!response.ok) {
+            console.warn(`[STATS] Discord guild count unavailable (HTTP ${response.status}). Check DISCORD_TOKEN.`);
+            return null;
+        }
+        const app = await response.json();
+        return typeof app.approximate_guild_count === 'number' ? app.approximate_guild_count : null;
+    } catch {
+        console.warn('[STATS] Discord guild count unavailable. Check Discord connectivity.');
+        return null;
+    }
+}
+
+async function getCommandCount(): Promise<number | null> {
+    if (!isSupabaseConfigured()) return null;
+
+    try {
+        const { count, error } = await getSupabaseAdmin()
+            .from('logs')
+            .select('*', { count: 'exact', head: true })
+            .abortSignal(AbortSignal.timeout(5_000));
+        if (error) {
+            console.warn('[STATS] Command count unavailable. Check Supabase configuration and connectivity.');
+            return null;
+        }
+        return count ?? null;
+    } catch {
+        console.warn('[STATS] Command count unavailable. Check Supabase configuration and connectivity.');
+        return null;
+    }
+}
 
 export async function GET() {
-    try {
-        const [discordResponse, commandCountResponse] = await Promise.all([
-            fetch('https://discord.com/api/v10/applications/@me', {
-                headers: {
-                    Authorization: `Bot ${process.env.DISCORD_TOKEN}`,
-                },
-                cache: 'no-store'
-            }),
-            getSupabaseAdmin().from('logs').select('*', { count: 'exact', head: true }),
-        ]);
-
-        if (!discordResponse.ok) {
-            throw new Error(`Discord API Error: ${discordResponse.status}`);
-        }
-
-        const app = await discordResponse.json();
-        const count = app.approximate_guild_count || 0;
-
-        // Note: Returns the 'Install Count' which matches the Developer Portal
-        // This includes cached/offline servers and may differ from active connections.
-
-        return NextResponse.json({
-            guild_count: count,
-            command_count: commandCountResponse.count || 0,
-        });
-    } catch (error) {
-        console.error('[STATS] Failed to fetch guild count:', error);
-        return NextResponse.json({ guild_count: 0, command_count: 0, error: 'Failed to fetch' }, { status: 500 });
-    }
+    const [guildCount, commandCount] = await Promise.all([getGuildCount(), getCommandCount()]);
+    return NextResponse.json({ guild_count: guildCount, command_count: commandCount }, {
+        headers: { 'Cache-Control': 'no-store' },
+    });
 }
