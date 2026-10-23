@@ -347,11 +347,6 @@ export default function Dashboard() {
                                                         <LivePanelIcon />
                                                     </ServerIconLink>
                                                 )}
-                                                {canOpenMarketplaceFromServerList(guild) && (
-                                                    <ServerIconLink href="/dashboard/marketplace" label="Open Marketplace" tone="market">
-                                                        <MarketplaceIcon />
-                                                    </ServerIconLink>
-                                                )}
                                             </div>
                                         </div>
                                     ) : (
