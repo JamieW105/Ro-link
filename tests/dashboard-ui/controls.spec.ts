@@ -285,6 +285,59 @@ test("permission checkboxes save boolean permissions through keyboard interactio
   expect(errors).toEqual([]);
 });
 
+test("role settings use Dice controls for commands and themed removal", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  await page.goto(`/dashboard/${serverId}/settings/roles`);
+  await expect(page.getByRole("heading", { name: "Discord roles", exact: true })).toBeVisible();
+  const kick = page.getByRole("checkbox", { name: "Kick", exact: true });
+  const all = page.getByRole("checkbox", { name: "All commands", exact: true });
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate(mode => { localStorage.setItem("rolink-theme", mode); }, theme);
+    await page.reload();
+    await expect(page.locator("html")).toHaveClass(new RegExp(theme));
+    await expect(kick).not.toBeChecked();
+    const saveOne = page.waitForRequest(request => request.url().includes("/api/settings/roles") && request.method() === "POST");
+    await kick.focus();
+    await page.keyboard.press("Space");
+    expect((await saveOne).postDataJSON().panelCmds).toEqual(["KICK"]);
+    await expect(kick).toBeChecked();
+    const saveAll = page.waitForRequest(request => request.url().includes("/api/settings/roles") && request.method() === "POST");
+    await all.click();
+    expect((await saveAll).postDataJSON().panelCmds).toEqual(["*"]);
+    await expect(kick).toBeChecked();
+    const saveExcept = page.waitForRequest(request => request.url().includes("/api/settings/roles") && request.method() === "POST");
+    await kick.click();
+    const commands = (await saveExcept).postDataJSON().panelCmds;
+    expect(commands.length).toBeGreaterThan(1);
+    expect(commands).not.toContain("KICK");
+    expect(commands).not.toContain("*");
+    await expect(all).not.toBeChecked();
+    await page.getByRole("button", { name: "Collapse Moderators" }).click();
+    await expect(kick).toBeHidden();
+    await page.getByRole("button", { name: "Expand Moderators" }).click();
+    await expect(kick).toBeVisible();
+    await page.getByRole("button", { name: "Remove Moderators" }).click();
+    const dialog = page.getByRole("dialog", { name: "Remove role configuration?" });
+    await expect(dialog).toBeVisible();
+    const colors = await dialog.evaluate(el => ({ background: getComputedStyle(el).backgroundColor, text: getComputedStyle(el).color }));
+    expect(colors.background).not.toEqual(colors.text);
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole("heading", { name: "Moderators", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.getByRole("main").evaluate(el => { el.scrollTop = 0; });
+    await page.screenshot({ path: `/workspace/artifacts/dice-${theme}-role-settings-${test.info().project.name}.png` });
+    await page.getByRole("heading", { name: "Roblox admin panel commands", exact: true }).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `/workspace/artifacts/dice-${theme}-role-commands-${test.info().project.name}.png` });
+  }
+  await page.getByRole("button", { name: "Remove Moderators" }).click();
+  const deleted = page.waitForRequest(request => request.url().includes("/api/settings/roles") && request.method() === "DELETE");
+  await page.getByRole("button", { name: "Remove configuration", exact: true }).click();
+  expect((await deleted).url()).toContain("id=configured-role");
+  await expect(page.getByRole("heading", { name: "No roles configured", exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("overview renders Dice metric components", async ({ page }) => {
   const errors = await mockDashboard(page);
   await page.goto(`/dashboard/${serverId}`);

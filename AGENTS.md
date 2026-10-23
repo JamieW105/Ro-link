@@ -45,6 +45,9 @@ and management screens. This requirement applies to future feature changes too. 
   responsive layouts, permissions, loading/error states, and API behavior.
 - Label interactive controls, retain visible keyboard focus, use Checkbox/Switch
   semantics, and verify keyboard selection, disabled states, and mobile layouts.
+  Role settings must use the shared Checkbox for individual permissions and commands,
+  Card sections, Dice Status counts, and a themed Dialog for removal. Do not use
+  custom checkmark boxes or browser confirmation popups for role management.
   Specialized native inputs (color, number, file, etc.) may use the shared Input;
   do not replace domain behavior merely to change presentation.
 

@@ -1,6 +1,9 @@
 'use client';
 
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Status, StatusLabel } from '@/components/ui/status';
+import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 
 import { Switch } from '@/components/ui/switch';
 
@@ -33,13 +36,12 @@ import {
     type CustomDashboardTheme,
 } from "@/lib/customDashboardSettings";
 import { useSession } from "next-auth/react";
-import { Command, Hash, Info, Save, Settings, Shield, Trash2 } from "lucide-react";
+import { Command, Hash, Info, Plus, Save, Settings, Shield, Trash2 } from "lucide-react";
 
 const SettingsIcon = () => <Settings size={24} aria-hidden="true" />;
 const SaveIcon = () => <Save size={18} aria-hidden="true" />;
 const CommandIcon = () => <Command size={18} aria-hidden="true" />;
 const InfoIcon = () => <Info size={18} aria-hidden="true" />;
-const ShieldIcon = () => <Shield size={18} aria-hidden="true" />;
 const TrashIcon = () => <Trash2 size={14} aria-hidden="true" />;
 
 interface DiscordRole {
@@ -279,6 +281,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     const [channels, setChannels] = useState<DiscordChannel[]>([]);
     const [selectedRoleForAdd, setSelectedRoleForAdd] = useState("");
     const [addingRole, setAddingRole] = useState(false);
+    const [roleToRemove, setRoleToRemove] = useState<DashboardRole | null>(null);
     const [collapsedRoleIds, setCollapsedRoleIds] = useState<string[]>([]);
 
     const isLoggingChannelAccessible = !loggingChannelId || channels.some(channel => channel.id === loggingChannelId);
@@ -702,7 +705,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     }
 
     async function handleDeleteRole(roleId: string) {
-        if (!confirm("Are you sure you want to remove this role configuration?")) return;
+        setRoleToRemove(null);
 
         // Optimistic Remove
         setDashboardRoles(dashboardRoles.filter(r => r.id !== roleId));
@@ -937,204 +940,137 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         </div>
                     )}
 
-                    {/* --- ROLE PERMISSIONS SECTION (NEW) --- */}
                     {view === 'roles' && (
-                    <Card className="p-6">
-                        <div className="flex items-start mb-8">
-                            <div className="flex items-start gap-6">
-                                <div className="p-3 bg-accent rounded-xl text-foreground border border-border">
-                                    <ShieldIcon />
-                                </div>
-                                <div>
-                                    <h3 className="text-base font-semibold mb-1">Discord roles</h3>
-                                    <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">
-                                        Assign specific dashboard and in-game capabilities to Discord roles.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="animate-in fade-in slide-in-from-top-4 duration-300">
-                            {/* Add Role Section */}
-                            <Card className="flex flex-col gap-3 mb-6 sm:flex-row">
-                                <Select
-                                    value={selectedRoleForAdd}
-                                    onValueChange={(nextValue) => setSelectedRoleForAdd(nextValue)}
-                                    className="flex-1 transition-all"
-                                    aria-label="Discord role"
-                                    options={[{ value: '', label: 'Select a Discord Role...' }, ...discordRoles
-                                        .filter(dr => !dashboardRoles.some(dbr => dbr.discord_role_id === dr.id) && dr.name !== '@everyone')
-                                        .map(role => ({ value: role.id, label: role.name }))]}
-                                />
-                                <Button variant="default" size="default"
-                                    onClick={handleAddRole}
-                                    disabled={!selectedRoleForAdd || addingRole}
-                                    className="transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {addingRole ? "Adding..." : "Add Role"}
-                                </Button>
+                        <div className="space-y-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2"><Shield className="size-4" aria-hidden="true" />Discord roles</CardTitle>
+                                    <CardDescription>Add a Discord role, then choose what its members can access. Changes save automatically.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                                    <div className="min-w-0 flex-1 space-y-2">
+                                        <label htmlFor="discord-role" className="text-sm font-medium">Discord role</label>
+                                        <Select
+                                            id="discord-role"
+                                            value={selectedRoleForAdd}
+                                            onValueChange={setSelectedRoleForAdd}
+                                            aria-label="Discord role"
+                                            options={[{ value: '', label: 'Select a Discord role…' }, ...discordRoles
+                                                .filter(dr => !dashboardRoles.some(dbr => dbr.discord_role_id === dr.id) && dr.name !== '@everyone')
+                                                .map(role => ({ value: role.id, label: role.name }))]}
+                                        />
+                                    </div>
+                                    <Button type="button" onClick={handleAddRole} disabled={!selectedRoleForAdd || addingRole}>
+                                        <Plus className="size-4" aria-hidden="true" />{addingRole ? 'Adding…' : 'Add Role'}
+                                    </Button>
+                                </CardContent>
                             </Card>
 
-                            {/* Roles List */}
-                            <div className="space-y-4">
-                                {dashboardRoles.map((role) => {
-                                    const roleCommands = getRolePanelCommands(role);
-                                    const hasAllCommands = roleCommands.includes('*');
-                                    const permissionCount = getRolePermissionCount(role);
-                                    const roleCardCollapsed = collapsedRoleIds.includes(role.id);
+                            {dashboardRoles.map((role) => {
+                                const roleCommands = getRolePanelCommands(role);
+                                const hasAllCommands = roleCommands.includes('*');
+                                const permissionCount = getRolePermissionCount(role);
+                                const collapsed = collapsedRoleIds.includes(role.id);
+                                const contentId = `role-permissions-${role.id}`;
 
-                                    return (
-                                    <Card key={role.id} className="bg-card border border-border rounded-xl p-6 transition-all hover:bg-card">
-                                        <div className={`flex items-center justify-between ${roleCardCollapsed ? '' : 'mb-6 border-b border-border pb-4'}`}>
-                                            <Button variant="ghost" size="default"
-                                                type="button"
-                                                onClick={() => toggleRoleCollapsed(role.id)}
-                                                className="h-auto min-h-9 justify-start whitespace-normal py-3 flex min-w-0 flex-1 items-center text-left"
-                                            >
-                                                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground border border-border">
-                                                    <Hash className="size-4" aria-hidden="true" />
+                                return (
+                                    <Card key={role.id}>
+                                        <CardHeader className="flex-row items-center justify-between gap-3">
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"><Hash className="size-4" aria-hidden="true" /></div>
+                                                <div className="min-w-0 space-y-2">
+                                                    <CardTitle className="break-words leading-snug">{role.role_name}</CardTitle>
+                                                    <Status><StatusLabel>{permissionCount} permission{permissionCount === 1 ? '' : 's'}</StatusLabel></Status>
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <div className="text-sm font-medium text-foreground tracking-wide">{role.role_name}</div>
-                                                    <div className="text-xs font-medium text-muted-foreground">
-                                                        {permissionCount} permission{permissionCount === 1 ? '' : 's'}
-                                                    </div>
-                                                </div>
-                                            </Button>
-                                            <div className="ml-4 flex items-center gap-2">
-                                                <Button variant="outline" size="icon"
-                                                    type="button"
-                                                    onClick={() => toggleRoleCollapsed(role.id)}
-                                                    className={`     transition-all transform ${roleCardCollapsed ? 'rotate-180' : ''}`}
-                                                    title={roleCardCollapsed ? "Expand Role" : "Collapse Role"}
-                                                >
-                                                    <LucideChevronDown width="16" height="16" strokeWidth="2" />
+                                            </div>
+                                            <div className="flex shrink-0 items-center gap-1">
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => toggleRoleCollapsed(role.id)} aria-expanded={!collapsed} aria-controls={contentId} aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${role.role_name}`}>
+                                                    <LucideChevronDown className={`size-4 transition-transform ${collapsed ? '' : 'rotate-180'}`} aria-hidden="true" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon"
-                                                    onClick={() => handleDeleteRole(role.id)}
-                                                    className="transition-colors"
-                                                    title="Remove Configuration"
-                                                >
-                                                    <TrashIcon />
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => setRoleToRemove(role)} aria-label={`Remove ${role.role_name}`} className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+                                                    <Trash2 className="size-4" aria-hidden="true" />
                                                 </Button>
                                             </div>
-                                        </div>
-
-                                        {!roleCardCollapsed && (
-                                            <>
-                                                {/* Permissions Grid */}
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-3 xl:gap-4">
+                                        </CardHeader>
+                                        <CardContent id={contentId} hidden={collapsed} className="space-y-6">
+                                            <Separator />
+                                            <section aria-labelledby={`dashboard-access-${role.id}`} className="space-y-4">
+                                                <div>
+                                                    <h3 id={`dashboard-access-${role.id}`} className="text-sm font-semibold">Dashboard permissions</h3>
+                                                    <p className="mt-1 text-sm text-muted-foreground">Control access to dashboard pages and moderation tools.</p>
+                                                </div>
+                                                <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
                                                     {ROLE_PERMISSION_OPTIONS.map((perm) => (
-                                                        <label key={perm.key} className="flex items-center gap-3 cursor-pointer group select-none">
-                                                            <Checkbox
-                                                                className="size-5"
-                                                                checked={role[perm.key]}
-                                                                onCheckedChange={(checked) => handleUpdateRole(role, perm.key, checked === true)}
-                                                            />
-                                                            <span className={`text-xs font-medium   transition-colors ${
-                                                                role[perm.key] ? 'text-foreground' : 'text-muted-foreground group-hover:text-muted-foreground'
-                                                                }`}>
-                                                                {perm.label}
-                                                            </span>
+                                                        <label key={perm.key} className="flex cursor-pointer items-start gap-3 text-sm leading-5">
+                                                            <Checkbox className="mt-0.5" checked={Boolean(role[perm.key])} onCheckedChange={(checked) => handleUpdateRole(role, perm.key, checked === true)} />
+                                                            {perm.label}
                                                         </label>
                                                     ))}
                                                 </div>
-
-                                                <div className="mt-6 pt-6 border-t border-border space-y-5">
-                                                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                                                        <div>
-                                                            <label className="text-xs font-medium text-muted-foreground mb-2 block">
-                                                                Roblox Admin Panel Commands
-                                                            </label>
-                                                            <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
-                                                                Choose exactly which Ro-Link in-game panel commands this role can run. The dashboard and live Roblox panel both use this same command list.
-                                                            </p>
-                                                        </div>
-                                                        <Button variant="default" size="default"
-                                                            type="button"
-                                                            onClick={() => handleToggleRoleAllCommands(role)}
-                                                            className={`       transition-all  ${
-                                                                hasAllCommands
-                                                                    ? '    '
-                                                                    : '    '
-                                                            }`}
-                                                        >
-                                                            {hasAllCommands ? 'All Commands Enabled' : 'Enable All Commands'}
-                                                        </Button>
+                                            </section>
+                                            <Separator />
+                                            <section aria-labelledby={`panel-commands-${role.id}`} className="space-y-5">
+                                                <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+                                                    <div>
+                                                        <h3 id={`panel-commands-${role.id}`} className="text-sm font-semibold">Roblox admin panel commands</h3>
+                                                        <p className="mt-1 max-w-xl text-sm text-muted-foreground">Choose the commands this role can run in the dashboard and live Roblox panel.</p>
                                                     </div>
-
-                                                    <div className="space-y-4">
-                                                        {ADMIN_PANEL_COMMAND_GROUPS.map((group) => {
-                                                            const selectedCount = hasAllCommands
-                                                                ? group.commands.length
-                                                                : group.commands.filter((command) => hasAdminPanelCommandAccess(roleCommands, command.id)).length;
-
-                                                            return (
-                                                                <Card key={group.category} className="rounded-xl border border-border bg-card p-4">
-                                                                    <div className="flex items-center justify-between mb-4">
-                                                                        <div>
-                                                                            <h4 className="text-xs font-medium text-foreground">{group.category}</h4>
-                                                                            <p className="text-xs text-muted-foreground mt-1">{selectedCount}/{group.commands.length} selected</p>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                                                                        {group.commands.map((command) => {
-                                                                            const enabled = hasAllCommands || hasAdminPanelCommandAccess(roleCommands, command.id);
-
-                                                                            return (
-                                                                                <Button variant="outline" size="default"
-                                                                                    key={command.id}
-                                                                                    type="button"
-                                                                                    onClick={() => handleToggleRoleCommand(role, command.id)}
-                                                                                    aria-pressed={enabled}
-                                                                                    className={`h-auto min-h-9 justify-start whitespace-normal py-3 text-left     transition-all ${
-                                                                                        enabled
-                                                                                            ? '  '
-                                                                                            : '  '
-                                                                                    }`}
-                                                                                >
-                                                                                    <div className="flex items-start gap-3">
-                                                                                        <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                                                                                            enabled
-                                                                                                ? 'bg-primary border-primary text-primary-foreground'
-                                                                                                : 'bg-card border-border text-muted-foreground'
-                                                                                        }`}>
-                                                                                            {enabled ? (
-                                                                                                <LucideCheck width="12" height="12" strokeWidth="3" />
-                                                                                            ) : null}
-                                                                                        </div>
-                                                                                        <div className="min-w-0">
-                                                                                            <div className={`text-xs font-medium   ${enabled ? 'text-foreground' : 'text-foreground'}`}>
-                                                                                                {command.label}
-                                                                                            </div>
-                                                                                            <p className={`mt-1 text-xs leading-relaxed ${enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                                                                                {command.description}
-                                                                                            </p>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </Button>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                </Card>
-                                                            );
-                                                        })}
-                                                    </div>
+                                                    <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm font-medium">
+                                                        <Checkbox checked={hasAllCommands} onCheckedChange={() => handleToggleRoleAllCommands(role)} />
+                                                        All commands
+                                                    </label>
                                                 </div>
-                                            </>
-                                        )}
+                                                <div className="space-y-6">
+                                                    {ADMIN_PANEL_COMMAND_GROUPS.map((group) => {
+                                                        const selectedCount = hasAllCommands ? group.commands.length : group.commands.filter(command => hasAdminPanelCommandAccess(roleCommands, command.id)).length;
+                                                        return (
+                                                            <fieldset key={group.category} className="min-w-0 space-y-3">
+                                                                <legend className="mb-3 flex w-full items-center justify-between gap-3 text-sm font-medium">
+                                                                    {group.category}<Status><StatusLabel>{selectedCount}/{group.commands.length} selected</StatusLabel></Status>
+                                                                </legend>
+                                                                <div className="grid gap-3 lg:grid-cols-2">
+                                                                    {group.commands.map(command => {
+                                                                        const enabled = hasAllCommands || hasAdminPanelCommandAccess(roleCommands, command.id);
+                                                                        return (
+                                                                            <label key={command.id} className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-4 transition-colors hover:bg-accent has-[[data-state=checked]]:border-primary/40 has-[[data-state=checked]]:bg-accent/50">
+                                                                                <Checkbox className="mt-0.5" checked={enabled} aria-label={command.label} onCheckedChange={() => handleToggleRoleCommand(role, command.id)} aria-describedby={`${role.id}-${command.id}-description`} />
+                                                                                <span className="min-w-0 space-y-1">
+                                                                                    <span className="block text-sm font-medium">{command.label}</span>
+                                                                                    <span id={`${role.id}-${command.id}-description`} className="block text-sm leading-relaxed text-muted-foreground">{command.description}</span>
+                                                                                </span>
+                                                                            </label>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </fieldset>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </section>
+                                        </CardContent>
                                     </Card>
-                                )})}
-
-                                {dashboardRoles.length === 0 && (
-                                    <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
-                                        <p className="text-muted-foreground text-xs font-medium">No roles configured yet.</p>
+                                );
+                            })}
+                            {dashboardRoles.length === 0 && (
+                                <Card>
+                                    <CardContent className="flex flex-col items-center gap-2 pt-6 text-center">
+                                        <Shield className="mb-2 size-6 text-muted-foreground" aria-hidden="true" />
+                                        <h2 className="text-sm font-semibold">No roles configured</h2>
+                                        <p className="text-sm text-muted-foreground">Add a Discord role above to start assigning permissions.</p>
+                                    </CardContent>
+                                </Card>
+                            )}
+                            <Dialog open={Boolean(roleToRemove)} onOpenChange={(open) => { if (!open) setRoleToRemove(null); }}>
+                                <DialogContent>
+                                    <DialogTitle>Remove role configuration?</DialogTitle>
+                                    <DialogDescription className="mt-2">Remove the permissions configured for {roleToRemove?.role_name}? The Discord role itself will remain.</DialogDescription>
+                                    <div className="mt-6 flex justify-end gap-2">
+                                        <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+                                        <Button type="button" variant="destructive" onClick={() => { if (roleToRemove) handleDeleteRole(roleToRemove.id); }}>Remove configuration</Button>
                                     </div>
-                                )}
-                            </div>
+                                </DialogContent>
+                            </Dialog>
                         </div>
-                    </Card>
                     )}
 
 
