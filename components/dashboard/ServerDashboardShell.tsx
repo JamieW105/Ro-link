@@ -443,8 +443,8 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
     } as CSSProperties : undefined;
 
     const utilityItems = [
-        { label: "Staff Shifts", icon: <RolesIcon />, href: `/dashboard/${id}/staff-shifts`, hide: !(userPermissions.is_admin || userPermissions.can_view_staff_shifts || userPermissions.can_manage_staff_shifts) },
         { label: "Home", icon: <HomeIcon />, href: `/dashboard/${id}`, hide: !canUseStandardDashboard },
+        { label: "Staff Shifts", icon: <RolesIcon />, href: `/dashboard/${id}/staff-shifts`, hide: !(userPermissions.is_admin || userPermissions.can_view_staff_shifts || userPermissions.can_manage_staff_shifts) },
         {
             label: "Verification",
             icon: <VerificationIcon />,
