@@ -251,7 +251,7 @@ export default function Dashboard() {
             <nav className="sticky top-0 z-50 bg-background border-b border-border">
                 <div className="max-w-7xl mx-auto flex min-h-16 items-center justify-between gap-3 px-4 py-3 sm:px-8 md:h-20 md:py-0">
                     <Link href="/" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
-                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 md:w-9 md:h-9 rounded-lg object-contain border border-border" />
+                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 md:w-9 md:h-9 object-contain" />
                         <span className="text-base md:text-xl font-medium tracking-tight text-foreground">Ro-Link</span>
                     </Link>
 

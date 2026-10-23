@@ -58,7 +58,7 @@ export function DashboardChrome({ children, groups, serverId, brand, userName, u
   function brandHeader(mobile = false) {
     return <div className="flex h-16 items-center gap-2 border-b border-border px-4">
       <Link href={homeHref} aria-label={`${brand} workspace`} className="flex min-w-0 flex-1 items-center gap-2.5">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-sky-500/20 bg-sky-500/5"><Image src="/Media/Ro-LinkIcon.png" alt="" width={25} height={25} /></span>
+        <span className="flex size-8 shrink-0 items-center justify-center"><Image src="/Media/Ro-LinkIcon.png" alt="" width={25} height={25} /></span>
         {(!compact || mobile) && <div className="min-w-0"><div className="truncate text-sm font-semibold">{brand}</div><div className="text-xs text-muted-foreground">Workspace</div></div>}
       </Link>
       {(!compact || mobile) && <ChevronDown className="size-4 text-muted-foreground" />}

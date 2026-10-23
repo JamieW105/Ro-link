@@ -358,7 +358,7 @@ export default function CreatorModulesPage() {
         return (
             <div className="flex min-h-screen items-center justify-center bg-background p-6 text-center text-foreground">
                 <Card className="w-full max-w-md rounded-xl border border-border bg-card p-8">
-                    <Image src="/Media/Ro-LinkIcon.png" alt="" width={48} height={48} className="mx-auto mb-5 h-12 w-12 rounded-xl border border-border object-contain" />
+                    <Image src="/Media/Ro-LinkIcon.png" alt="" width={48} height={48} className="mx-auto mb-5 h-12 w-12 object-contain" />
                     <h1 className="text-2xl font-medium">Sign in required</h1>
                     <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Authenticate with Discord before managing creator modules and marketplace submissions.</p>
                 <Button variant="default" size="default"
@@ -377,7 +377,7 @@ export default function CreatorModulesPage() {
             <nav className="sticky top-0 z-50 border-b border-border bg-background">
                 <div className="mx-auto flex min-h-16 max-w-[1500px] items-center justify-between gap-3 px-4 py-3 sm:px-8 md:h-20 md:py-0">
                     <Link href="/dashboard" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
-                        <Image src="/Media/Ro-LinkIcon.png" alt="Ro-Link" width={36} height={36} className="h-8 w-8 rounded-lg border border-border object-contain md:h-9 md:w-9" />
+                        <Image src="/Media/Ro-LinkIcon.png" alt="Ro-Link" width={36} height={36} className="h-8 w-8 object-contain md:h-9 md:w-9" />
                         <span className="text-base md:text-xl font-medium text-foreground">Ro-Link</span>
                     </Link>
                     <div className="flex items-center gap-2">
