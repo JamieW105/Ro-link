@@ -2,10 +2,11 @@
 
 import { useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, ArrowUpRight, ChevronDown, ChevronRight, Layers, LogOut, PanelLeft, X } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, ChevronDown, ChevronRight, LogOut, PanelLeft, X } from "lucide-react";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -55,7 +56,7 @@ export function DashboardChrome({ children, groups, serverId, brand, userName, l
   function brandHeader(mobile = false) {
     return <div className="flex h-16 items-center gap-2 border-b border-border px-4">
       <Link href={homeHref} aria-label={`${brand} workspace`} className="flex min-w-0 flex-1 items-center gap-2.5">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><Layers className="size-4" /></span>
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-sky-500/20 bg-sky-500/5"><Image src="/Media/Ro-LinkIcon.png" alt="" width={25} height={25} /></span>
         {(!compact || mobile) && <div className="min-w-0"><div className="truncate text-sm font-semibold">{brand}</div><div className="text-xs text-muted-foreground">Workspace</div></div>}
       </Link>
       {(!compact || mobile) && <ChevronDown className="size-4 text-muted-foreground" />}
