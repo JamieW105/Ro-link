@@ -15,11 +15,11 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from 'next/link';
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
 import { getDiscordGuildIconProxyUrl } from "@/lib/discordMedia";
-import { LayoutDashboard, LogOut, MonitorPlay, Plus, ShieldAlert, Store } from "lucide-react";
+import { Gauge, LogOut, MonitorPlay, Plus, ShieldAlert, Store } from "lucide-react";
 
 const LogOutIcon = () => <LogOut size={14} aria-hidden="true" />;
 const PlusIcon = () => <Plus size={14} strokeWidth={2.5} aria-hidden="true" />;
-const SettingsIcon = () => <LayoutDashboard size={15} aria-hidden="true" />;
+const DashboardIcon = () => <Gauge size={15} aria-hidden="true" />;
 const MarketplaceIcon = () => <Store size={15} aria-hidden="true" />;
 const LivePanelIcon = () => <MonitorPlay size={15} aria-hidden="true" />;
 
@@ -338,8 +338,8 @@ export default function Dashboard() {
                                         <div className="flex flex-col gap-2">
                                             <div className="flex items-center gap-2">
                                                 {canOpenDashboardFromServerList(guild, guildPermissions[guild.id]) && (
-                                                    <ServerIconLink href={`/dashboard/${guild.id}`} label="Open Console">
-                                                        <SettingsIcon />
+                                                    <ServerIconLink href={`/dashboard/${guild.id}`} label="Dashboard">
+                                                        <DashboardIcon />
                                                     </ServerIconLink>
                                                 )}
                                                 {canOpenLivePanelFromServerList(guild, guildPermissions[guild.id]) && (
