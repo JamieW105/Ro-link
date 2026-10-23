@@ -478,3 +478,34 @@ test("sidebar account shows the Discord avatar above a compact server switch and
   await expect(footer.getByRole('img', {name:"UI Tester's avatar unavailable",exact:true})).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("staff shift switch thumbs contrast with their tracks in both states and themes", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  await page.goto(`/dashboard/${serverId}/staff-shifts/settings`);
+  const switches = [page.getByRole('switch', {name:'Staff shifts enabled',exact:true}), page.getByRole('switch', {name:'Automatically start shifts',exact:true})];
+  await expect(switches[0]).toBeChecked();
+  await expect(switches[1]).not.toBeChecked();
+  for (const theme of ['light','dark']) {
+    const toggle = page.getByRole('button', {name:`Switch to ${theme} mode`,exact:true});
+    if (await toggle.count()) await toggle.click();
+    for (const control of switches) {
+      await expect.poll(() => control.evaluate(node => {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const ctx = canvas.getContext('2d')!;
+        ctx.fillStyle = getComputedStyle(node.closest('[data-slot="card"]')!).backgroundColor;
+        ctx.fillRect(0,0,1,1);
+        ctx.fillStyle = getComputedStyle(node).backgroundColor;
+        ctx.fillRect(0,0,1,1);
+        const luminance = (rgb: Uint8ClampedArray) => [...rgb].slice(0,3).map(v => v/255).map(v => v <= 0.04045 ? v/12.92 : ((v+0.055)/1.055)**2.4).reduce((sum,v,i) => sum + v*[0.2126,0.7152,0.0722][i],0);
+        const track = luminance(ctx.getImageData(0,0,1,1).data);
+        ctx.fillStyle = getComputedStyle(node.querySelector('[data-slot="switch-thumb"]')!).backgroundColor;
+        ctx.fillRect(0,0,1,1);
+        const thumb = luminance(ctx.getImageData(0,0,1,1).data);
+        return (Math.max(track,thumb)+0.05)/(Math.min(track,thumb)+0.05);
+      })).toBeGreaterThanOrEqual(3);
+    }
+    for (const control of switches) await control.click();
+  }
+  expect(errors).toEqual([]);
+});
