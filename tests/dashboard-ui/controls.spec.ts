@@ -196,19 +196,14 @@ test("mobile navigation opens as a dialog and closes after choosing a page", asy
 });
 
 
-test("theme choice persists across Servers, Live Panel, marketplace and product pages", async ({ page }) => {
+test("theme choice persists across dashboard, Live Panel, marketplace and product pages", async ({ page }) => {
   const errors = await mockDashboard(page);
-  await page.goto(`/dashboard/${serverId}/servers`);
+  await page.goto(`/dashboard/${serverId}`);
   await page.getByRole('button', { name: 'Switch to dark mode', exact: true }).click();
   await expect(page.locator('html')).toHaveClass(/dark/);
   await page.reload();
   await expect(page.locator('html')).toHaveClass(/dark/);
-  await page.getByRole('button', { name: 'Server controls', exact: true }).click();
-  const controls = page.getByRole('dialog', { name: 'Server controls', exact: true });
-  await expect(controls).toHaveCSS('color-scheme', 'dark');
-  await page.keyboard.press('Escape');
-  await expect(controls).toBeHidden();
-  for (const path of [`/dashboard/${serverId}/servers`, `/dashboard/${serverId}/live-panel`, '/dashboard/marketplace', `/dashboard/marketplace/${sampleModule.slug}`]) {
+  for (const path of [`/dashboard/${serverId}`, `/dashboard/${serverId}/live-panel`, '/dashboard/marketplace', `/dashboard/marketplace/${sampleModule.slug}`]) {
     await page.goto(path);
     await expect(page.locator('h1').first()).toBeVisible();
     await expect(page.locator('.dice-ui-dashboard').first()).toHaveCSS('color-scheme', 'dark');
@@ -246,5 +241,26 @@ test("marketplace search opens a real product page and installs through the exis
   await expect(page.getByRole('heading', { name: sampleModule.name, exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to marketplace', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Module marketplace', exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+
+test("sidebar omits retired tools while Live Panel remains accessible and retired pages return 404", async ({ page, isMobile }) => {
+  const errors = await mockDashboard(page);
+  await page.goto(`/dashboard/${serverId}`);
+  if (isMobile) await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  const nav = page.getByRole('navigation', { name: isMobile ? 'Mobile dashboard' : 'Dashboard', exact: true });
+  await expect(nav).toBeVisible();
+  for (const route of ['servers', 'live-panel', 'lookup', 'reports', 'misc']) {
+    await expect(nav.locator(`a[href="/dashboard/${serverId}/${route}"]`)).toHaveCount(0);
+  }
+  await expect(nav.getByRole('link', { name: 'Reports', exact: true })).toHaveAttribute('href', `/dashboard/${serverId}/settings/reports`);
+  if (isMobile) await page.keyboard.press('Escape');
+  await page.getByRole('link', { name: 'Open live panel', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Live panel', exact: true })).toBeVisible();
+  for (const route of ['servers', 'lookup', 'reports', 'reports/report-1', 'misc']) {
+    const response = await page.request.get(`/dashboard/${serverId}/${route}`);
+    expect(response.status(), `Retired ${route} page`).toBe(404);
+  }
   expect(errors).toEqual([]);
 });

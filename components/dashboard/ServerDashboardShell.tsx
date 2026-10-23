@@ -5,11 +5,10 @@ import { DashboardChrome } from '@/components/dashboard/DashboardChrome';
 import { Button } from '@/components/ui/button';
 
 
-import { FileText as LucideFileText, Home as LucideHome, LayoutDashboard as LucideLayoutDashboard, MonitorPlay as LucideMonitorPlay, Package as LucidePackage, Rss as LucideRss, Search as LucideSearch, Server as LucideServer, Settings as LucideSettings, ShieldCheck as LucideShieldCheck, TriangleAlert as LucideTriangleAlert, UserCheck as LucideUserCheck, WandSparkles as LucideWandSparkles } from 'lucide-react';
+import { FileText as LucideFileText, Home as LucideHome, LayoutDashboard as LucideLayoutDashboard, Package as LucidePackage, Rss as LucideRss, Settings as LucideSettings, ShieldCheck as LucideShieldCheck, TriangleAlert as LucideTriangleAlert, UserCheck as LucideUserCheck } from 'lucide-react';
 
 import { useParams, usePathname } from "next/navigation";
 import { useState, useEffect, type CSSProperties } from "react";
-import { hasAnyAdminPanelCommand, MISC_ACTION_COMMAND_IDS } from "@/lib/adminPanelCommands";
 import {
     DEFAULT_CUSTOM_DASHBOARD_LAYOUT,
     DEFAULT_CUSTOM_DASHBOARD_THEME,
@@ -81,26 +80,10 @@ type CustomDashboardPreview = {
     metadata?: CustomDashboardMetadata;
 };
 
-// --- PREMIUM SVG ICONS ---
+// Dashboard navigation icons.
 
 const HomeIcon = () => (
     <LucideHome width="18" height="18" />
-);
-
-const ServersIcon = () => (
-    <LucideServer width="18" height="18" />
-);
-
-const LivePanelIcon = () => (
-    <LucideMonitorPlay width="18" height="18" />
-);
-
-const MagicIcon = () => (
-    <LucideWandSparkles width="18" height="18" />
-);
-
-const LookupIcon = () => (
-    <LucideSearch width="18" height="18" />
 );
 
 const VerificationIcon = () => (
@@ -109,10 +92,6 @@ const VerificationIcon = () => (
 
 const ModulesIcon = () => (
     <LucidePackage width="18" height="18" />
-);
-
-const ReportsIcon = () => (
-    <LucideTriangleAlert width="18" height="18" />
 );
 
 const ScrollIcon = () => (
@@ -438,7 +417,6 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             : '...';
     const canManageDashboardSettings = userPermissions.is_admin || userPermissions.can_manage_settings;
     const canUseStandardDashboard = userPermissions.is_admin || userPermissions.can_access_dashboard;
-    const canUseLivePanel = userPermissions.is_admin || userPermissions.can_access_live_panel;
     const dashboardHomeHref = isCustomDashboardHost ? `/custom-dashboard/${id}` : '/dashboard';
     const hasConfiguredCustomDashboard = Boolean(customDashboardInfo?.subdomain || customDashboardInfo?.hostname);
     const isCustomDashboardStyled = Boolean(customDashboardPreview || hasConfiguredCustomDashboard || isCustomDashboardHost);
@@ -462,8 +440,6 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
     const utilityItems = [
         { label: "Home", icon: <HomeIcon />, href: `/dashboard/${id}`, hide: !canUseStandardDashboard },
-        { label: "Live Servers", icon: <ServersIcon />, href: `/dashboard/${id}/servers`, hide: !canUseStandardDashboard },
-        { label: "Live Panel", icon: <LivePanelIcon />, href: `/dashboard/${id}/live-panel`, hide: !canUseLivePanel },
         {
             label: "Verification",
             icon: <VerificationIcon />,
@@ -477,27 +453,6 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             hide: !canManageDashboardSettings
         },
     ].filter(item => !item.hide);
-
-    const moderationItems = [
-        {
-            label: "Player Lookup",
-            icon: <LookupIcon />,
-            href: `/dashboard/${id}/lookup`,
-            hide: !userPermissions.can_lookup
-        },
-        {
-            label: "Reports",
-            icon: <ReportsIcon />,
-            href: `/dashboard/${id}/reports`,
-            hide: !userPermissions.can_manage_reports
-        },
-        {
-            label: "Misc Actions",
-            icon: <MagicIcon />,
-            href: `/dashboard/${id}/misc`,
-            hide: !userPermissions.is_admin && !hasAnyAdminPanelCommand(userPermissions.allowed_misc_cmds, MISC_ACTION_COMMAND_IDS)
-        },
-    ].filter(i => !i.hide);
 
     const settingItems = [
         {
@@ -543,7 +498,6 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
             key={pathname}
             groups={[
                 { label: 'Workspace', items: utilityItems },
-                { label: 'Moderation', items: moderationItems },
                 { label: 'Settings', items: settingItems },
             ]}
             serverId={String(id)}

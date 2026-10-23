@@ -26,7 +26,7 @@ and management screens. This requirement applies to future feature changes too. 
   Both modes are required for all new and changed UI. Reuse ThemeToggle and the
   next-themes provider; persist the choice with `rolink-theme`. Never hard-code a
   light-only or dark-only page. Check surfaces, text, borders, popups and status
-  colors in both modes, including Servers, Live Panel and marketplace products.
+  colors in both modes, including Live Panel and marketplace products.
   Use Card for page panels, Dice Stat for metrics, and Dice Status for state labels.
   Use Button variants (`default`, `outline`, `secondary`, `ghost`, `destructive`)
   and the shared controls' standard sizing. Never restore legacy unstyled wrappers,
@@ -47,6 +47,14 @@ and management screens. This requirement applies to future feature changes too. 
   semantics, and verify keyboard selection, disabled states, and mobile layouts.
   Specialized native inputs (color, number, file, etc.) may use the shared Input;
   do not replace domain behavior merely to change presentation.
+
+## Dashboard navigation
+
+Keep the Live Panel page at `/dashboard/[id]/live-panel` and its permission-aware
+entry from the overview. Do not add Live Servers, Live Panel, Player Lookup,
+Reports, or Misc Actions to the sidebar. Standalone `servers`, `lookup`, `reports`
+(including report details), and `misc` pages have been retired; operational tools
+remain in Live Panel. Report configuration under `settings/reports` is separate.
 
 ## Validation
 

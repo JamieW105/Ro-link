@@ -417,7 +417,7 @@ export default function ServerDashboard() {
                                 <div className="mb-4 flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground"><ActivityIcon /></div>
                                 <h3 className="text-sm font-medium">You’re all caught up</h3>
                                 <p className="mt-2 max-w-xs text-sm text-muted-foreground">New moderation actions and server events will appear here as they happen.</p>
-                                <Button asChild variant="outline" size="sm" className="mt-5"><Link href={`/dashboard/${serverId}/servers`}>View servers<ArrowIcon /></Link></Button>
+                                {canAccessLivePanel && <Button asChild variant="outline" size="sm" className="mt-5"><Link href={`/dashboard/${serverId}/live-panel`}>View live activity<ArrowIcon /></Link></Button>}
                             </div>
                         ) : (
                             <div className="divide-y divide-border">{logs.slice(0, 8).map(log => <div key={log.id} className="flex items-start justify-between gap-4 py-4">
