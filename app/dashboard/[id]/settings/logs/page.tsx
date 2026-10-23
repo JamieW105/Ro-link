@@ -1,19 +1,16 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 
 
-import { ArrowDownUp as LucideArrowDownUp, NotebookText as LucideNotebookText, Search as LucideSearch } from 'lucide-react';
+import { ArrowDownUp as LucideArrowDownUp, Search as LucideSearch } from 'lucide-react';
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { normalizeDashboardLogs, type NormalizedDashboardLog } from "@/lib/logRecords";
-
-const ScrollIcon = () => (
-    <LucideNotebookText width="24" height="24" strokeWidth="2" />
-);
 
 const SearchIcon = () => (
     <LucideSearch width="16" height="16" strokeWidth="2" />
@@ -71,9 +68,7 @@ export default function LogsPage() {
             {/* Page Header */}
             <div className="mb-10 pb-8 border-b border-border">
                 <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 bg-accent rounded-xl flex items-center justify-center text-foreground border border-border">
-                        <ScrollIcon />
-                    </div>
+                    <PageIcon name="logs" />
                     <div>
                         <h1 className="text-3xl font-semibold tracking-tight text-foreground">Activity Logs</h1>
                         <p className="text-muted-foreground text-sm font-medium mt-1">Real-time audit trail of all server actions.</p>

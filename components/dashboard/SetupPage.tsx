@@ -1,4 +1,5 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Card } from '@/components/ui/card';
 import { Status, StatusIndicator, StatusLabel } from '@/components/ui/status';
@@ -8,12 +9,10 @@ import { Button } from '@/components/ui/button';
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Check, Copy, ExternalLink, KeyRound, RefreshCw, Search, ShieldAlert } from "lucide-react";
+import { Copy, ExternalLink, KeyRound, RefreshCw, ShieldAlert } from "lucide-react";
 
 const INSTALLER_PLUGIN_URL = "https://create.roblox.com/store/asset/87859041511603/RoLink-installer";
 
-const SearchIcon = () => <Search size={20} aria-hidden="true" />;
-const CheckIcon = () => <Check size={20} strokeWidth={3} aria-hidden="true" />;
 const KeyIcon = () => <KeyRound size={16} aria-hidden="true" />;
 const CopyIcon = () => <Copy size={14} aria-hidden="true" />;
 const ExternalLinkIcon = () => <ExternalLink size={14} aria-hidden="true" />;
@@ -158,9 +157,7 @@ export default function DashboardSetupPage() {
             <div className={`w-full transition-all duration-700 ${step === 1 ? "max-w-md mx-auto mt-20" : "max-w-7xl"}`}>
                 {step === 1 ? (
                     <Card className="p-6">
-                        <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center text-foreground mb-8 border border-border">
-                            <SearchIcon />
-                        </div>
+                        <PageIcon name="setup" />
                         <h1 className="text-2xl font-medium mb-2 tracking-tight">Setup</h1>
                         <p className="text-muted-foreground text-sm font-medium mb-8">Connect your Roblox game to Discord.</p>
 
@@ -222,9 +219,7 @@ export default function DashboardSetupPage() {
                         <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-12">
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-4 mb-10">
-                                    <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center text-foreground border border-border">
-                                        <CheckIcon />
-                                    </div>
+                                    <PageIcon name="verification" />
                                     <div>
                                         <h1 className="text-2xl font-medium tracking-tight">Setup Complete</h1>
                                         <Status className="mt-2"><StatusIndicator /><StatusLabel>Active</StatusLabel></Status>

@@ -1,4 +1,5 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Status, StatusLabel } from '@/components/ui/status';
@@ -893,7 +894,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     return (
         <div className={`animate-in fade-in slide-in-from-bottom-4 duration-700 w-full ${showsSaveButton ? 'pb-32' : 'pb-20'}`}>
             <div className="mb-7">
-                <h1 className="text-2xl font-semibold tracking-tight">{pageCopy.title}</h1>
+                <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight"><PageIcon name={view === "overview" ? "settings" : view} />{pageCopy.title}</h1>
                 <p className="mt-1 text-sm text-muted-foreground">{pageCopy.description}</p>
             </div>
 

@@ -1,4 +1,5 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
@@ -135,7 +136,7 @@ export default function CreateMarketplaceModulePage() {
                     </div>
                     <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
                         <div className="min-w-0">
-                            <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-5xl">Create Module</h1>
+                            <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-5xl flex items-center gap-3"><PageIcon name="creator" />Create Module</h1>
                             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
                                 Submit a Luau module for moderation. You can install and use your own module while it waits for review.
                             </p>

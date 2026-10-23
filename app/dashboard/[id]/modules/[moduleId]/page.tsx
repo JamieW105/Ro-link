@@ -1,4 +1,5 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Card } from '@/components/ui/card';
 
@@ -687,7 +688,7 @@ export default function DashboardModuleConfigPage() {
                     <Link href={`/dashboard/${serverId}/modules`} className="text-xs font-medium text-foreground hover:text-foreground">
                         Back to modules
                     </Link>
-                    <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground">{module.name}</h1>
+                    <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground flex items-center gap-3"><PageIcon name="modules" />{module.name}</h1>
                     <div className="mt-3 flex flex-wrap gap-2">
                         {module.isOfficial && (
                             <div className="inline-flex rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-foreground">

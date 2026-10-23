@@ -1,4 +1,5 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
@@ -261,7 +262,7 @@ export default function Dashboard() {
             <div className="motion-page max-w-7xl mx-auto px-4 sm:px-8 py-6 md:py-12">
                 <header className="mb-6 flex flex-col gap-4 md:mb-12 md:flex-row md:items-end md:justify-between">
                     <div>
-                        <h1 className="text-xl md:text-4xl font-semibold text-foreground tracking-tight mb-1">Select a Server</h1>
+                        <h1 className="text-xl md:text-4xl font-semibold text-foreground tracking-tight mb-1 flex items-center gap-3"><PageIcon name="overview" />Select a Server</h1>
                         <p className="text-muted-foreground text-xs md:text-base font-medium">Choose a community to manage and monitor.</p>
                     </div>
                     <div className="ml-auto flex shrink-0 items-center gap-2">

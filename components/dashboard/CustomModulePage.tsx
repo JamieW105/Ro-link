@@ -1,4 +1,5 @@
 "use client";
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -98,7 +99,7 @@ export default function CustomModulePage() {
             <Card className="p-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
-                        <h1 className="text-xl font-semibold text-foreground">{customUploadTarget ? "Re-upload custom module" : "Create custom module"}</h1>
+                        <h1 className="text-xl font-semibold text-foreground flex items-center gap-3"><PageIcon name="creator" />{customUploadTarget ? "Re-upload custom module" : "Create custom module"}</h1>
                         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
                             Upload Luau directly to this server without submitting it to the module marketplace.
                         </p>

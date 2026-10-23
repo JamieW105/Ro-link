@@ -1,4 +1,5 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Card } from '@/components/ui/card';
 
@@ -300,7 +301,7 @@ export default function DashboardPlayerPage() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div className="space-y-2">
                     <p className="text-xs font-medium text-muted-foreground">Roblox Player</p>
-                    <h1 className="text-3xl font-medium tracking-tight text-foreground">{player.displayName}</h1>
+                    <h1 className="text-3xl font-medium tracking-tight text-foreground flex items-center gap-3"><PageIcon name="player" />{player.displayName}</h1>
                     <p className="text-sm font-medium text-muted-foreground">@{player.username}</p>
                 </div>
 

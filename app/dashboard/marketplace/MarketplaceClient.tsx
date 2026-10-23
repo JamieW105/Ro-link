@@ -1,4 +1,5 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
@@ -277,7 +278,7 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
             <main className="mx-auto max-w-7xl px-4 py-6 sm:px-8 md:py-12">
                 {!productView && <>
                 <header className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-start">
-                    <div><h1 className="text-2xl font-semibold tracking-tight">Module marketplace</h1><p className="mt-2 text-sm text-muted-foreground">Extend your workspace with tools built for your community.</p></div>
+                    <div><h1 className="text-2xl font-semibold tracking-tight flex items-center gap-3"><PageIcon name="marketplace" />Module marketplace</h1><p className="mt-2 text-sm text-muted-foreground">Extend your workspace with tools built for your community.</p></div>
                     <div className="flex flex-wrap gap-2"><Button asChild variant="outline"><Link href="/dashboard/creator/modules">My modules</Link></Button><Button asChild><Link href="/dashboard/marketplace/create"><Plus className="size-4" />Create module</Link></Button></div>
                 </header>
                 <div className="mb-6 flex flex-col gap-3 sm:flex-row">
@@ -335,7 +336,7 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
                                             </span>
                                         )}
                                     </div>
-                                    <h1 className="mt-4 text-3xl font-semibold tracking-tight">{selectedModule.name}</h1>
+                                    <h1 className="mt-4 flex items-center gap-3 text-3xl font-semibold tracking-tight"><PageIcon name="modules" />{selectedModule.name}</h1>
                                     <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
                                         {selectedModule.description || 'No description provided.'}
                                     </p>

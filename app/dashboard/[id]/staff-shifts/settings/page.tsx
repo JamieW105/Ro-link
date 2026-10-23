@@ -1,4 +1,5 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
@@ -96,7 +97,7 @@ export default function StaffShiftSettingsPage() {
         </Link>
       </Button>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-3"><PageIcon name="shiftSettings" />
           Staff shift settings
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">

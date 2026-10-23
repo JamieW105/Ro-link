@@ -1,4 +1,5 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 import StaffShiftProgress from '@/components/dashboard/StaffShiftProgress';
 
 import { Stat, StatLabel, StatValue } from '@/components/ui/stat';
@@ -2280,7 +2281,7 @@ export default function LivePanelPage() {
         <div className="live-panel fixed inset-0 flex flex-col overflow-hidden bg-background text-foreground">
             <div className="shrink-0 border-b border-border bg-background">
                 <DashboardHeader>
-                    <div className="flex min-w-0 items-center gap-3"><Button asChild variant="ghost" size="icon" className="size-8"><Link href={`/dashboard/${guildId}`} aria-label="Back to dashboard"><PanelBackIcon className="size-4" /></Link></Button><div className="min-w-0"><h1 className="text-sm font-semibold tracking-tight">Live panel</h1><p className="truncate text-xs text-muted-foreground">{serverName}</p></div><Status variant="success" className="hidden sm:inline-flex"><StatusIndicator />Live</Status></div>
+                    <div className="flex min-w-0 items-center gap-3"><Button asChild variant="ghost" size="icon" className="size-8"><Link href={`/dashboard/${guildId}`} aria-label="Back to dashboard"><PanelBackIcon className="size-4" /></Link></Button><div className="min-w-0"><h1 className="text-sm font-semibold tracking-tight flex items-center gap-3"><PageIcon name="live" compact />Live panel</h1><p className="truncate text-xs text-muted-foreground">{serverName}</p></div><Status variant="success" className="hidden sm:inline-flex"><StatusIndicator />Live</Status></div>
                     <div className="flex shrink-0 items-center gap-2"><ThemeToggle /><Button asChild variant="outline" size="sm"><Link href="/dashboard">All servers</Link></Button></div>
                 </DashboardHeader>
                 <div className="grid gap-4 border-t border-border bg-muted/20 p-4 md:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] md:px-6">

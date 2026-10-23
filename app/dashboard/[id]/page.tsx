@@ -1,4 +1,5 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Status, StatusIndicator } from '@/components/ui/status';
@@ -389,7 +390,7 @@ export default function ServerDashboard() {
         <div className="space-y-7">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
-                    <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-3"><PageIcon name="overview" />Overview</h1>
                     <p className="mt-1 text-sm text-muted-foreground">Your community at a glance. Manage {serverName} from one place.</p>
                 </div>
                 <div className="flex items-center gap-2">

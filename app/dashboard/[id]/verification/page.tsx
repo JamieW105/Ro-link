@@ -1,4 +1,5 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Card } from '@/components/ui/card';
 
@@ -129,9 +130,7 @@ export default function VerificationPage() {
             <div className="mb-10 pb-8 border-b border-border">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-5">
-                        <div className="w-14 h-14 bg-accent rounded-xl flex items-center justify-center text-foreground border border-border">
-                            <ShieldIcon />
-                        </div>
+                        <PageIcon name="verification" />
                         <div>
                             <h1 className="text-3xl font-semibold tracking-tight text-foreground">Verification</h1>
                             <div className="flex items-center gap-2 mt-1">

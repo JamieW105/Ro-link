@@ -1,4 +1,5 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
@@ -391,7 +392,7 @@ export default function CreatorModulesPage() {
                             <Link href="/dashboard" className="text-xs font-medium text-foreground hover:text-foreground">
                                 Back to Dashboard
                             </Link>
-                            <h1 className="mt-4 text-3xl font-semibold text-foreground md:text-5xl">Creator Dashboard</h1>
+                            <h1 className="mt-4 text-3xl font-semibold text-foreground md:text-5xl flex items-center gap-3"><PageIcon name="creator" />Creator Dashboard</h1>
                             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
                                 Build modules, track review progress, and manage published work from one focused workspace.
                             </p>

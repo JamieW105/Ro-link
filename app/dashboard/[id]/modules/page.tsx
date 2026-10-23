@@ -1,4 +1,5 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Plus, X } from 'lucide-react';
 
@@ -169,7 +170,7 @@ export default function DashboardModulesPage() {
             <header className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
                 <div>
                     <p className="text-xs font-medium text-foreground">Add-ons Marketplace</p>
-                    <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Modules</h1>
+                    <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground flex items-center gap-3"><PageIcon name="modules" />Modules</h1>
                     <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
                         Manage server add-ons that the Roblox runtime loads from Ro-Link when the game bridge starts.
                     </p>
