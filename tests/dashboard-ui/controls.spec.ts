@@ -1053,3 +1053,55 @@ test("Live Panel reports use themed confirmation and respect limited-role action
   await expect(page.getByRole('button',{name:/^Server actions |^Restart server |^Shut down server /})).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+
+test("Live Panel searches Roblox as users type and limits both lists to five matches", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  await page.route('**/api/dashboard/live-panel?**', route => route.fulfill({ json: {
+    server: { placeId: '1234' }, liveServers: [sampleServer], playerActivity: [], modulePanelCommands: [], pendingReports: [],
+    logs: [
+      { id: 'recent', action: 'STAFF_NOTE', target: 'cher1234', moderator: 'Staff', timestamp: new Date(Date.now() - 30 * 60_000).toISOString() },
+      { id: 'old', action: 'STAFF_NOTE', target: 'cher', moderator: 'Staff', timestamp: new Date(Date.now() - 61 * 60_000).toISOString() },
+    ],
+  } }));
+  const queries: string[] = [];
+  await page.route('**/api/dashboard/modules/input-options?**', async route => {
+    const query = new URL(route.request().url()).searchParams.get('query')!;
+    queries.push(query);
+    const names = [query + 'LongName', query + '12', query + '1', query, query + '123', query + '1234'];
+    await route.fulfill({ json: { options: names.map((username, index) => ({
+      data: { username, displayName: username, userId: String(7000 + index) },
+    })) } });
+  });
+  await page.goto(`/dashboard/${serverId}/live-panel`);
+  const profile = page.getByRole('textbox', { name: 'Search player profiles' });
+  await profile.fill('cher');
+  const list = profile.locator('..').locator('> div');
+  await expect(list.getByRole('button')).toHaveCount(5);
+  await expect(list.getByRole('button').first().getByText('@cher1234', { exact: true })).toBeVisible();
+  await expect(list.getByRole('button').nth(1).getByText('@cher', { exact: true })).toBeVisible();
+  await expect(list).toHaveCSS('overflow-y', 'auto');
+  await profile.fill('jamie');
+  await expect(list.getByRole('button')).toHaveCount(5);
+  await expect(list.getByRole('button').first()).toContainText('@jamie');
+  await expect(list).not.toContainText('@cher');
+  await profile.fill('');
+  await page.getByRole('button', { name: 'Run Command', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  const command = dialog.getByRole('textbox', { name: 'Live command' });
+  await command.fill('Soft Ban cher');
+  const matches = dialog.getByRole('button').filter({ hasText: /@(?:cher|jamie)/ });
+  await expect(matches).toHaveCount(5);
+  await expect(matches.first()).toContainText('@cher1234');
+  await command.fill('Soft Ban jamie');
+  await expect(matches).toHaveCount(5);
+  await expect(matches.first()).toContainText('@jamie');
+  await expect(dialog).not.toContainText('@cher');
+  await matches.first().focus();
+  await page.keyboard.press('Enter');
+  await expect(command).toHaveValue('Soft Ban jamie');
+  expect(queries).toContain('cher');
+  expect(queries).toContain('jamie');
+  expect(queries).not.toContain('soft');
+  expect(errors).toEqual([]);
+});

@@ -391,19 +391,14 @@ function targetMatchScore(user: LivePanelUser, rawQuery: string) {
         return 0;
     }
 
-    const candidates = [user.username, user.displayName, user.userId]
-        .map(normalizeIdentity)
-        .filter(Boolean);
-
-    if (candidates.some((candidate) => candidate === query)) {
-        return 0;
-    }
-    if (candidates.some((candidate) => candidate.startsWith(query))) {
-        return 1;
-    }
-    if (candidates.some((candidate) => candidate.includes(query))) {
-        return 2;
-    }
+    const username = normalizeIdentity(user.username);
+    if (username === query) return 0;
+    if (username.startsWith(query)) return 1;
+    if (username.includes(query)) return 2;
+    if (normalizeIdentity(user.userId) === query) return 3;
+    if (normalizeIdentity(user.displayName).includes(query)) return 4;
+    // Roblox can return close matches that do not contain the literal query.
+    if (user.presence === 'searched') return 5;
 
     return null;
 }
@@ -418,6 +413,20 @@ function getTargetActivityTimestamp(user: LivePanelUser) {
     return 0;
 }
 
+function usernameDistance(username: string, query: string) {
+    const candidate = normalizeIdentity(username);
+    const search = normalizeIdentity(query);
+    let row = Array.from({ length: search.length + 1 }, (_, index) => index);
+    for (let i = 0; i < candidate.length; i++) {
+        const next = [i + 1];
+        for (let j = 0; j < search.length; j++) {
+            next.push(Math.min(next[j] + 1, row[j + 1] + 1, row[j] + (candidate[i] === search[j] ? 0 : 1)));
+        }
+        row = next;
+    }
+    return row[search.length];
+}
+
 function rankTargetUsers(users: LivePanelUser[], query: string) {
     return users
         .map((user) => ({ user, score: targetMatchScore(user, query) }))
@@ -425,6 +434,11 @@ function rankTargetUsers(users: LivePanelUser[], query: string) {
         .sort((left, right) => {
             const matchDifference = left.score - right.score;
             if (matchDifference !== 0) return matchDifference;
+
+            const distanceDifference = query.trim()
+                ? usernameDistance(left.user.username, query) - usernameDistance(right.user.username, query)
+                : 0;
+            if (distanceDifference !== 0) return distanceDifference;
 
             const activityDifference = getTargetActivityTimestamp(right.user) - getTargetActivityTimestamp(left.user);
             if (activityDifference !== 0) return activityDifference;
@@ -434,6 +448,70 @@ function rankTargetUsers(users: LivePanelUser[], query: string) {
             return presenceDifference || left.user.username.localeCompare(right.user.username, undefined, { sensitivity: 'base' });
         })
         .map(({ user }) => user);
+}
+
+function useRobloxUserSuggestions(serverId: string, rawQuery: string, knownUsers: LivePanelUser[], logs: NormalizedDashboardLog[]) {
+    const query = rawQuery.trim().toLowerCase().replace(/^@/, '').split(/\s+/)[0] || '';
+    const [result, setResult] = useState<{ key: string; users: LivePanelUser[] }>({ key: '', users: [] });
+    const key = `${serverId}:${query}`;
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        const timer = setInterval(() => setNow(Date.now()), 10_000);
+        return () => clearInterval(timer);
+    }, []);
+
+    useEffect(() => {
+        if (!serverId || query.length < 2) return;
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            try {
+                const params = new URLSearchParams({ serverId, type: 'player', source: 'roblox-users', query });
+                const response = await fetch(`/api/dashboard/modules/input-options?${params}`, { signal: controller.signal });
+                if (!response.ok) return;
+                const payload = await response.json();
+                const users: LivePanelUser[] = (Array.isArray(payload.options) ? payload.options : [])
+                    .flatMap((option: { data?: { username?: string; displayName?: string; userId?: string; avatarUrl?: string } }) => {
+                        const data = option.data;
+                        if (!data?.username || !data.userId) return [];
+                        return [{
+                            username: data.username,
+                            displayName: data.displayName || data.username,
+                            userId: data.userId,
+                            avatarUrl: data.avatarUrl || null,
+                            presence: 'searched' as const,
+                            serverId: null,
+                            sourceReason: 'Roblox user',
+                        }];
+                    });
+                if (!controller.signal.aborted) setResult({ key, users });
+            } catch {
+                // Keep local matches available when Roblox is unavailable.
+            }
+        }, 250);
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [serverId, query, key]);
+
+    return useMemo(() => {
+        const users = [...knownUsers];
+        if (result.key === key) {
+            for (const user of result.users) {
+                if (!users.some((known) => known.userId === user.userId
+                    || known.username.toLowerCase() === user.username.toLowerCase())) users.push(user);
+            }
+        }
+        const recentLogs = logs.filter((log) => {
+            const timestamp = new Date(log.timestamp).getTime();
+            return timestamp <= now && timestamp >= now - 60 * 60 * 1000;
+        });
+        return rankTargetUsers(users, query)
+            .map((user) => ({ user, recent: recentLogs.some((log) => logIdentifiesUser(log, user)) }))
+            .sort((left, right) => Number(right.recent) - Number(left.recent))
+            .slice(0, 5)
+            .map(({ user }) => user);
+    }, [knownUsers, query, key, result, logs, now]);
 }
 
 function placeholderUser(identity: string, reason: string): LivePanelUser {
@@ -447,6 +525,15 @@ function placeholderUser(identity: string, reason: string): LivePanelUser {
         serverId: null,
         sourceReason: reason,
     };
+}
+
+function logIdentifiesUser(log: NormalizedDashboardLog, user: LivePanelUser) {
+    const identities = [user.username, user.userId].map(normalizeIdentity).filter(Boolean);
+    return [log.target, log.moderator, ...log.targetIdentities, ...log.moderatorIdentities]
+        .some((value) => {
+            const tokens: string[] = value.toLowerCase().match(/[a-z0-9_]+/g) || [];
+            return identities.some((identity) => tokens.includes(identity));
+        });
 }
 
 function logMentionsUser(log: NormalizedDashboardLog, user: LivePanelUser) {
@@ -1255,11 +1342,21 @@ export default function LivePanelPage() {
         return [...builtInCommands, ...visibleModuleCommands];
     }, [modulePanelCommands, perms]);
 
+    const commandBarParsed = useMemo(() => (
+        parseCommandBarInput(commandBarValue, availableCommands)
+    ), [availableCommands, commandBarValue]);
+    const profileUserMatches = useRobloxUserSuggestions(guildId, profileSearch, allKnownUsers, logs);
+    const commandUserQuery = commandBarParsed.command
+        ? (commandBarParsed.command.requiresTarget || commandBarParsed.command.id === 'VIEW'
+            ? commandBarParsed.remainder : '')
+        : commandBarValue;
+    const commandUserMatches = useRobloxUserSuggestions(guildId, commandUserQuery, allKnownUsers, logs);
+
     const suggestions = useMemo(() => {
         const query = profileSearch.trim().toLowerCase();
         if (!query) return [];
 
-        const ranked = rankTargetUsers(allKnownUsers, query)
+        const ranked = profileUserMatches
             .map((user) => {
                 const recentLog = logs.find((log) => logMentionsUser(log, user));
                 const reason = user.presence === 'live'
@@ -1272,21 +1369,12 @@ export default function LivePanelPage() {
                 return { user, reason };
             });
 
-        return ranked.slice(0, 6);
-    }, [allKnownUsers, logs, profileSearch]);
-
-    const commandBarParsed = useMemo(() => (
-        parseCommandBarInput(commandBarValue, availableCommands)
-    ), [availableCommands, commandBarValue]);
+        return ranked.slice(0, 5);
+    }, [profileUserMatches, logs, profileSearch]);
 
     const commandBarSuggestions = useMemo<CommandBarSuggestion[]>(() => {
         const query = commandBarValue.trim().toLowerCase().replace(/^@/, '');
         const items: CommandBarSuggestion[] = [];
-        const userMatches = (rawSearch: string) => {
-            const search = rawSearch.trim().toLowerCase().replace(/^@/, '');
-            return rankTargetUsers(allKnownUsers, search)
-                .slice(0, 6);
-        };
         const userReason = (user: LivePanelUser) => {
             const recentLog = logs.find((log) => logMentionsUser(log, user));
             if (user.presence === 'live') return user.joinedAt
@@ -1319,10 +1407,10 @@ export default function LivePanelPage() {
             const defaultTargetCommand = availableCommands.find((command) => command.id === 'REFRESH')
                 || availableCommands.find((command) => command.requiresTarget);
             if (query.length >= 2 && defaultTargetCommand) {
-                userMatches(query).slice(0, 3).forEach((user) => {
+                commandUserMatches.forEach((user) => {
                     items.push({
                         kind: 'user',
-                        title: user.displayName || user.username,
+                        title: user.username,
                         detail: `${userReason(user)}. Run ${defaultTargetCommand.label}.`,
                         meta: `@${user.username}`,
                         value: `${defaultTargetCommand.label} ${user.username}`,
@@ -1335,20 +1423,20 @@ export default function LivePanelPage() {
 
         const command = commandBarParsed.command;
         if (command.requiresTarget) {
-            userMatches(commandBarParsed.remainder).forEach((user) => {
+            commandUserMatches.forEach((user) => {
                 items.push({
                     kind: 'user',
-                    title: user.displayName || user.username,
+                    title: user.username,
                     detail: userReason(user),
                     meta: `@${user.username}`,
                     value: `${command.label} ${user.username}${VALUE_COMMAND_SET.has(command.id) || TARGET_VALUE_COMMANDS.has(command.id) ? ' ' : ''}`,
                 });
             });
         } else if (command.id === 'VIEW') {
-            userMatches(commandBarParsed.remainder).forEach((user) => {
+            commandUserMatches.forEach((user) => {
                 items.push({
                     kind: 'user',
-                    title: user.displayName || user.username,
+                    title: user.username,
                     detail: `${userReason(user)}. Leave blank to reset your own camera.`,
                     meta: `@${user.username}`,
                     value: `${command.label} ${user.username}`,
@@ -1377,7 +1465,7 @@ export default function LivePanelPage() {
         }
 
         return items.slice(0, 8);
-    }, [allKnownUsers, availableCommands, commandBarParsed, commandBarValue, logs]);
+    }, [commandUserMatches, availableCommands, commandBarParsed, commandBarValue, logs]);
 
     const totalPlayers = enrichedServers.reduce((sum, server) => sum + server.visiblePlayerCount, 0);
     const panelUser = selectedProfileUser;
@@ -3019,7 +3107,7 @@ export default function LivePanelPage() {
                                 className="w-full transition-all"
                             />
                             {profileSearch.trim() && suggestions.length > 0 && !selectedProfileUser && (
-                                <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-border bg-card">
+                                <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-72 overflow-y-auto overscroll-contain rounded-xl border border-border bg-card">
                                     {suggestions.map(({ user, reason }) => (
                                         <Button variant="outline" size="default"
                                             type="button"
