@@ -56,6 +56,8 @@ and management screens. This requirement applies to future feature changes too. 
   Role settings must use the shared Checkbox for individual permissions and commands,
   Card sections, Dice Status counts, and a themed Dialog for removal. Do not use
   custom checkmark boxes or browser confirmation popups for role management.
+  In Live Panel, use the shared Dialog for commands, announcements, and confirmations,
+  DropdownMenu for server/player actions, and Table for moderation activity.
   Specialized native inputs (color, number, file, etc.) may use the shared Input;
   do not replace domain behavior merely to change presentation.
 

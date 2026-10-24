@@ -938,3 +938,118 @@ test("live command suggestions have room for descriptions without CMD badges", a
   }
   expect(errors).toEqual([]);
 });
+
+
+test("Live Panel Dice dialogs, menus, and controls preserve command flows", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await mockDashboard(page);
+  const liveServer = { ...sampleServer, players: [{ username: 'DicePlayer', displayName: 'Dice Player', userId: '42', avatarUrl: null }] };
+  await page.route('**/api/dashboard/live-panel?*', route => route.fulfill({json: { server: { placeId: '1234' }, liveServers: [liveServer], playerActivity: [], modulePanelCommands: [], pendingReports: [], logs: [{id:'log-dice',action:'KICK',moderator:'Moderator',target:'DicePlayer',timestamp:'2026-10-24T00:00:00Z'}] }}));
+  await page.route('**/api/dashboard/live-servers?*', route => route.fulfill({json: [liveServer]}));
+  await page.route('**/api/dashboard/runtime-logs?*', route => route.fulfill({json: {logs:[{id:'runtime-dice',created_at:'2026-10-24T00:00:00Z',level:'info',message:'Runtime fixture line'}]}}));
+  for (const theme of ['light', 'dark']) {
+    await page.addInitScript(value => localStorage.setItem('rolink-theme', value), theme);
+    await page.goto(`/dashboard/${serverId}/live-panel`);
+    await expect(page.getByRole('region', {name:'Live operations',exact:true})).toBeVisible();
+    await expect(page.getByRole('table', {name:'Live moderation activity'})).toBeVisible();
+    await expect(page.getByLabel('Search live servers')).toHaveAttribute('data-slot','input');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight)).toBe(true);
+    await page.screenshot({path:`/workspace/artifacts/dice-${theme}-live-panel-${test.info().project.name}.png`});
+
+    await page.getByRole('button', {name:'Run Command',exact:true}).click();
+    const commandDialog = page.getByRole('dialog', {name:'Run Live Command',exact:true});
+    await expect(commandDialog).toHaveAttribute('data-slot','dialog-content');
+    await expect(commandDialog).toHaveCSS('color-scheme',theme);
+    await commandDialog.getByLabel('Live command').fill('refresh DicePlayer');
+    await page.screenshot({path:`/workspace/artifacts/dice-${theme}-live-command-${test.info().project.name}.png`});
+    let sent = page.waitForRequest(r => r.url().includes('/api/dashboard/command') && r.method()==='POST');
+    await commandDialog.getByRole('button', {name:'Run Command',exact:true}).click();
+    expect((await sent).postDataJSON()).toMatchObject({serverId,command:'REFRESH',args:{username:'DicePlayer'}});
+    await expect(commandDialog).toBeHidden();
+
+    await page.getByRole('button', {name:'Announce',exact:true}).click();
+    const announce = page.getByRole('dialog', {name:'Announce to Live Servers',exact:true});
+    const target = announce.getByRole('combobox', {name:'Announcement target',exact:true});
+    await target.fill('All live');
+    await page.getByRole('option', {name:'All live servers',exact:true}).click();
+    await announce.getByLabel('Announcement message').fill('Dice UI fixture announcement');
+    sent = page.waitForRequest(r => r.url().includes('/api/dashboard/command') && r.method()==='POST');
+    await announce.getByRole('button', {name:'Send Announcement',exact:true}).click();
+    expect((await sent).postDataJSON()).toMatchObject({command:'BROADCAST',args:{message:'Dice UI fixture announcement',target_scope:'GLOBAL'}});
+    await expect(announce).toBeHidden();
+
+    await page.getByRole('button', {name:/^Restart server /}).click();
+    const confirmation = page.getByRole('dialog', {name:'Restart server',exact:true});
+    await expect(confirmation).toBeVisible();
+    await confirmation.getByRole('button', {name:'Cancel',exact:true}).click();
+    await expect(confirmation).toBeHidden();
+    await page.getByRole('button', {name:/^Restart server /}).click();
+    sent = page.waitForRequest(r => r.url().includes('/api/dashboard/command') && r.method()==='POST');
+    await confirmation.getByRole('button', {name:'Confirm',exact:true}).click();
+    expect((await sent).postDataJSON()).toMatchObject({command:'UPDATE',args:{job_id:liveServer.id,target_scope:'SERVER'}});
+
+    await page.getByRole('button', {name:/^Server actions /}).click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    await expect(page.getByRole('menu')).toHaveCSS('color-scheme',theme);
+    await page.getByRole('menuitem', {name:'View server logs',exact:true}).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByText(/Runtime fixture line/)).toBeVisible();
+    await page.getByRole('button', {name:'Return to live commands',exact:true}).click();
+
+    await page.getByRole('button', {name:'Open profile for DicePlayer',exact:true}).click();
+    await expect(page.getByRole('heading', {name:'Live Panel Profile',exact:true})).toBeVisible();
+    await page.getByRole('button', {name:'Kick',exact:true}).click();
+    const kick = page.getByRole('dialog', {name:'Kick DicePlayer',exact:true});
+    await expect(kick).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(kick).toBeHidden();
+    await page.getByLabel('Staff note', {exact:true}).fill('Dice UI fixture note');
+    const note = page.waitForRequest(r => r.url().includes('/api/dashboard/staff-notes') && r.method()==='POST');
+    await page.getByRole('button', {name:'Save Note',exact:true}).click();
+    expect((await note).postDataJSON()).toMatchObject({robloxUsername:'DicePlayer',note:'Dice UI fixture note'});
+    await page.getByRole('button', {name:'Close player profile',exact:true}).click();
+  }
+  expect(errors).toEqual([]);
+});
+
+test("Live Panel reports use themed confirmation and respect limited-role actions", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  let report = { id:'report-dice', server_id:serverId, reported_roblox_username:'DicePlayer', reporter_roblox_username:'Reporter', reason:'Fixture report evidence', status:'PENDING', created_at:'2026-10-24T00:00:00Z', moderator_note:'' };
+  await page.route('**/api/dashboard/live-panel?*', route => route.fulfill({json:{server:{placeId:'1234'},liveServers:[sampleServer],logs:[],pendingReports:[report]}}));
+  await page.route('**/api/reports**', async route => {
+    if (route.request().method() === 'PATCH') {
+      report = {...report,...route.request().postDataJSON()};
+      await route.fulfill({json:report});
+    } else if (new URL(route.request().url()).pathname.endsWith('/context')) {
+      await route.fulfill({json:{report,profile:{roblox_username:'DicePlayer'},logs:[]}});
+    } else await route.fulfill({json:[report]});
+  });
+  for (const theme of ['light','dark']) {
+    report = {...report,status:'PENDING'};
+    await page.addInitScript(value => localStorage.setItem('rolink-theme',value),theme);
+    await page.goto(`/dashboard/${serverId}/live-panel`);
+    await page.getByRole('button',{name:'Unmoderated reports: 1',exact:true}).click();
+    await expect(page.getByRole('heading',{name:'Report Evidence',exact:true})).toBeVisible();
+    await page.getByLabel('Moderator note',{exact:true}).fill('Reviewed with Dice UI');
+    await page.getByRole('button',{name:'Resolve',exact:true}).click();
+    const confirm = page.getByRole('dialog',{name:/Resolve report/});
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole('button',{name:'Cancel',exact:true}).click();
+    await expect(confirm).toBeHidden();
+    await expect(page.getByLabel('Moderator note',{exact:true})).toHaveValue('Reviewed with Dice UI');
+    await page.getByRole('button',{name:'Resolve',exact:true}).click();
+    const update = page.waitForRequest(r => r.url().includes('/api/reports/report-dice?') && r.method()==='PATCH');
+    await confirm.getByRole('button',{name:'Confirm',exact:true}).click();
+    expect((await update).postDataJSON()).toEqual({status:'RESOLVED',moderatorNote:'Reviewed with Dice UI'});
+    await expect(confirm).toBeHidden();
+    await page.screenshot({path:`/workspace/artifacts/dice-${theme}-live-reports-${test.info().project.name}.png`});
+  }
+  await page.route('**/api/user/permissions?*',route=>route.fulfill({json:{is_admin:false,can_access_dashboard:true,can_access_live_panel:true,can_manage_reports:false,can_view_runtime_logs:false,allowed_misc_cmds:[]}}));
+  await page.goto(`/dashboard/${serverId}/live-panel`);
+  await expect(page.getByRole('heading',{name:'Quick actions',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Run Command',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Announce',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:/Unmoderated reports/})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:/^Server actions |^Restart server |^Shut down server /})).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

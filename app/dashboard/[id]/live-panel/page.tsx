@@ -4,17 +4,20 @@ import { PageIcon } from "@/components/dashboard/PageIcon";
 import StaffShiftProgress from '@/components/dashboard/StaffShiftProgress';
 
 import { Stat, StatLabel, StatValue } from '@/components/ui/stat';
-import { Status, StatusIndicator } from '@/components/ui/status';
-import { ArrowLeft as PanelBackIcon } from 'lucide-react';
+import { Status, StatusIndicator, StatusLabel } from '@/components/ui/status';
+import { ArrowLeft as PanelBackIcon, MoreHorizontal, Loader2 } from 'lucide-react';
 
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
 
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 
 
 import { Select } from '@/components/ui/select';
@@ -23,7 +26,7 @@ import { Ban as LucideBan, Clock3 as LucideClock3, FileText as LucideFileText, L
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { usePermissions } from '@/context/PermissionsContext';
@@ -37,7 +40,6 @@ import {
 } from '@/lib/adminPanelCommands';
 import { normalizeDashboardLogs, type NormalizedDashboardLog } from '@/lib/logRecords';
 import { normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
-import { getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 import type { PlayerPresenceActivity } from '@/lib/playerPresence';
 import { buildRobloxAvatarUrl } from '@/lib/robloxAvatars';
 
@@ -195,10 +197,9 @@ type EnrichedLiveServer = LiveServerRecord & {
 };
 
 type ConfirmAction = {
-    command: string;
-    user: LivePanelUser;
     title: string;
     body: string;
+    onConfirm: () => void | Promise<void>;
 } | null;
 
 type PanelModal = 'announce' | 'command' | null;
@@ -542,18 +543,6 @@ function getReportStatus(report: Pick<LiveReport, 'status'> | null | undefined):
     return 'PENDING';
 }
 
-function reportStatusClass(status: string | null | undefined) {
-    const normalized = trimString(status).toUpperCase();
-    if (normalized === 'RESOLVED') {
-        return 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400';
-    }
-    if (normalized === 'DISMISSED') {
-        return 'border-border bg-muted text-muted-foreground';
-    }
-
-    return 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400';
-}
-
 function getReportReporterLabel(report: LiveReport) {
     return report.reporter_roblox_username || report.reporter_discord_id || 'Unknown reporter';
 }
@@ -710,12 +699,11 @@ function getMissingRequiredModuleFields(command: AdminPanelCommandDefinition, ar
         .map((field) => field.label || field.id);
 }
 
-function ActionTooltip({ label }: { label: string }) {
-    return (
-        <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
-            {label}
-        </span>
-    );
+function PlayerAvatarImage({ src, name, size = 40 }: { src: string | null; name: string; size?: number }) {
+    const [failed, setFailed] = useState(false);
+    return src && !failed
+        ? <Image unoptimized width={size} height={size} src={src} alt="" onError={() => setFailed(true)} className="h-full w-full object-cover" />
+        : <span className="flex h-full w-full items-center justify-center bg-muted text-xs font-medium text-muted-foreground">{name.slice(0, 1).toUpperCase()}</span>;
 }
 
 function UserAvatarButton({ user, onClick, onContextMenu, compact = false }: { user: LivePanelUser; onClick: () => void; onContextMenu?: (event: React.MouseEvent<HTMLButtonElement>) => void; compact?: boolean }) {
@@ -726,11 +714,13 @@ function UserAvatarButton({ user, onClick, onContextMenu, compact = false }: { u
             type="button"
             onClick={onClick}
             onContextMenu={onContextMenu}
-            className={`group relative ${sizeClass} shrink-0     transition-all   `}
+            aria-label={`Open profile for ${user.username}`}
+            title={`${user.displayName || user.username} (@${user.username})`}
+            className={`relative ${sizeClass} shrink-0 p-0`}
         >
             <span className="block h-full w-full overflow-hidden rounded-xl">
                 {user.avatarUrl ? (
-                    <img src={user.avatarUrl} alt={user.username} className="h-full w-full object-cover" />
+                    <PlayerAvatarImage key={user.avatarUrl} src={user.avatarUrl} name={user.username} />
                 ) : (
                     <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
                         {user.username.slice(0, 1)}
@@ -738,14 +728,7 @@ function UserAvatarButton({ user, onClick, onContextMenu, compact = false }: { u
                 )}
             </span>
             <span className={`absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full border border-border ${user.presence === 'live' ? 'bg-emerald-400' : user.presence === 'recently-left' ? 'bg-amber-400' : 'bg-muted'}`} />
-            <span className="pointer-events-none absolute left-1/2 top-full z-40 mt-2 min-w-36 -translate-x-1/2 -translate-y-1 rounded-lg border border-border bg-card px-3 py-2 text-left opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
-                <span className="block truncate text-xs font-semibold text-foreground">
-                    {user.displayName || user.username}
-                </span>
-                <span className="mt-0.5 block truncate font-mono text-xs font-medium text-foreground">
-                    @{user.username}
-                </span>
-            </span>
+
         </Button>
     );
 }
@@ -756,7 +739,7 @@ function UserAvatar({ user, compact = false }: { user: LivePanelUser; compact?: 
     return (
         <span className={`relative ${sizeClass} shrink-0 overflow-hidden rounded-xl border border-border bg-card`}>
             {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user.username} className="h-full w-full object-cover" />
+                <PlayerAvatarImage key={user.avatarUrl} src={user.avatarUrl} name={user.username} />
             ) : (
                 <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
                     {user.username.slice(0, 1)}
@@ -776,7 +759,7 @@ function ClickableUserText({ value, onOpen }: { value: string; onOpen: () => voi
         <Button variant="ghost" size="default"
             type="button"
             onClick={onOpen}
-            className="underline decoration-sky-500/30 underline-offset-4 transition-colors"
+            className="inline h-auto max-w-full whitespace-normal break-words rounded-sm p-0 text-left align-baseline font-medium underline decoration-muted-foreground/50 underline-offset-4"
         >
             {value}
         </Button>
@@ -785,7 +768,6 @@ function ClickableUserText({ value, onOpen }: { value: string; onOpen: () => voi
 
 export default function LivePanelPage() {
     const params = useParams();
-    const { data: session } = useSession();
     const perms = usePermissions();
     const guildId = String(params.id ?? '');
 
@@ -854,20 +836,6 @@ export default function LivePanelPage() {
         setProfileCommand('');
         setProfileCommandValue('');
     }, []);
-
-    useEffect(() => {
-        if (!contextMenu) return undefined;
-        const close = () => setContextMenu(null);
-        const closeOnEscape = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') close();
-        };
-        window.addEventListener('pointerdown', close);
-        window.addEventListener('keydown', closeOnEscape);
-        return () => {
-            window.removeEventListener('pointerdown', close);
-            window.removeEventListener('keydown', closeOnEscape);
-        };
-    }, [contextMenu]);
 
     const loadPanel = useCallback(async (showLoader = false) => {
         if (!guildId) return;
@@ -1059,14 +1027,14 @@ export default function LivePanelPage() {
         if (!selectedProfileUser) return;
 
         function handleKeyDown(event: KeyboardEvent) {
-            if (event.key !== 'Escape' || panelModal || confirmAction) return;
+            if (event.defaultPrevented || event.key !== 'Escape' || panelModal || confirmAction || contextMenu) return;
             event.preventDefault();
             clearSelectedProfile();
         }
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [clearSelectedProfile, confirmAction, panelModal, selectedProfileUser]);
+    }, [clearSelectedProfile, confirmAction, contextMenu, panelModal, selectedProfileUser]);
 
     useEffect(() => {
         if (!guildId) return;
@@ -1709,7 +1677,7 @@ export default function LivePanelPage() {
         setPanelModal('announce');
     }
 
-    async function sendServerLifecycleCommand(serverId: string, command: 'UPDATE' | 'SHUTDOWN') {
+    async function sendServerLifecycleCommand(serverId: string, command: 'UPDATE' | 'SHUTDOWN', confirmed = false) {
         if (!canUseDashboardCommand(perms, command)) {
             setNotice({ type: 'error', text: 'You do not have permission to use that server action.' });
             return;
@@ -1720,7 +1688,8 @@ export default function LivePanelPage() {
             ? `Restart server ${formatServerId(serverId)}? Players will be moved through a reserved server and then back into public servers.`
             : `Shut down server ${formatServerId(serverId)}? Players in this live server will be disconnected.`;
 
-        if (!confirm(confirmation)) {
+        if (!confirmed) {
+            setConfirmAction({ title: `${label} server`, body: confirmation, onConfirm: () => sendServerLifecycleCommand(serverId, command, true) });
             return;
         }
 
@@ -1762,8 +1731,7 @@ export default function LivePanelPage() {
         const label = getAdminPanelCommandDefinition(command)?.label || command;
         if (command === 'KICK' || command === 'BAN' || command === 'SOFTBAN') {
             setConfirmAction({
-                command,
-                user,
+                onConfirm: () => sendPlayerCommand(command, user),
                 title: `${label} ${user.username}`,
                 body: `Queue ${label.toLowerCase()} for ${user.displayName || user.username} in ${formatServerId(user.serverId || '')}?`,
             });
@@ -1777,7 +1745,7 @@ export default function LivePanelPage() {
         if (!confirmAction) return;
         const action = confirmAction;
         setConfirmAction(null);
-        await sendPlayerCommand(action.command, action.user);
+        await action.onConfirm();
     }
 
     async function submitAnnouncement() {
@@ -2142,11 +2110,13 @@ export default function LivePanelPage() {
         return payload;
     }
 
-    async function updateSelectedReportStatus(status: ReportStatus) {
+    async function updateSelectedReportStatus(status: ReportStatus, confirmed = false) {
         if (!selectedReport) return;
 
         const isClosing = status === 'RESOLVED' || status === 'DISMISSED';
-        if (isClosing && !window.confirm(`${status === 'RESOLVED' ? 'Resolve' : 'Dismiss'} report #${shortReportId(selectedReport.id)}?`)) {
+        if (isClosing && !confirmed) {
+            const title = `${status === 'RESOLVED' ? 'Resolve' : 'Dismiss'} report #${shortReportId(selectedReport.id)}`;
+            setConfirmAction({ title, body: 'Update this report and save the moderator note?', onConfirm: () => updateSelectedReportStatus(status, true) });
             return;
         }
 
@@ -2179,7 +2149,7 @@ export default function LivePanelPage() {
         }
     }
 
-    async function runReportModerationAction(command: 'KICK' | 'BAN' | 'SOFTBAN') {
+    async function runReportModerationAction(command: 'KICK' | 'BAN' | 'SOFTBAN', confirmed = false) {
         if (!selectedReport) return;
 
         if (!canUseDashboardCommand(perms, command)) {
@@ -2200,7 +2170,8 @@ export default function LivePanelPage() {
             return;
         }
 
-        if (!window.confirm(`${command} ${targetUsername} and resolve report #${shortReportId(selectedReport.id)}?`)) {
+        if (!confirmed) {
+            setConfirmAction({ title: `${command} ${targetUsername}`, body: `Run this moderation action and resolve report #${shortReportId(selectedReport.id)}?`, onConfirm: () => runReportModerationAction(command, true) });
             return;
         }
 
@@ -2255,11 +2226,11 @@ export default function LivePanelPage() {
     }
 
     const quickActions = [
-        { command: 'REFRESH', label: 'Refresh', icon: <RefreshIcon />, tone: 'text-foreground hover:border-border hover:bg-accent' },
-        { command: 'RESET', label: 'Reset', icon: <ResetIcon />, tone: 'text-foreground hover:border-border hover:bg-accent' },
-        { command: 'KICK', label: 'Kick', icon: <KickIcon />, tone: 'text-amber-700 dark:text-amber-400 hover:border-amber-200 hover:bg-amber-50' },
-        { command: 'BAN', label: 'Ban', icon: <BanIcon />, tone: 'text-red-700 dark:text-red-400 hover:border-red-200 hover:bg-red-50' },
-        { command: 'SOFTBAN', label: 'Temp Ban', icon: <TempBanIcon />, tone: 'text-rose-700 dark:text-rose-400 hover:border-rose-200 hover:bg-rose-50' },
+        { command: 'REFRESH', label: 'Refresh', icon: <RefreshIcon /> },
+        { command: 'RESET', label: 'Reset', icon: <ResetIcon /> },
+        { command: 'KICK', label: 'Kick', icon: <KickIcon /> },
+        { command: 'BAN', label: 'Ban', icon: <BanIcon /> },
+        { command: 'SOFTBAN', label: 'Temp Ban', icon: <TempBanIcon /> },
     ].filter((action) => canUseDashboardCommand(perms, action.command));
     const selectedReportStatus = getReportStatus(selectedReport);
     const selectedReportTargetUsername = trimString(selectedReportProfile?.roblox_username) || trimString(selectedReport?.reported_roblox_username);
@@ -2272,8 +2243,8 @@ export default function LivePanelPage() {
 
     if (loading) {
         return (
-            <div className="flex h-screen items-center justify-center bg-background">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-transparent" />
+            <div role="status" className="flex min-h-dvh items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />Loading Live Panel…
             </div>
         );
     }
@@ -2311,28 +2282,19 @@ export default function LivePanelPage() {
                 <StaffShiftProgress serverId={guildId} />
             </div>
 
-            {notice && (
-                <div className={`shrink-0 border-b px-4 py-3 text-sm font-semibold ${notice.type === 'success'
-                    ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'
-                    : 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400'
-                    }`}>
-                    {notice.text}
-                </div>
-            )}
+            {notice && <Status role={notice.type === 'error' ? 'alert' : 'status'} variant={notice.type === 'success' ? 'success' : 'error'} className="w-full shrink-0 rounded-none border-x-0 border-t-0 px-4 py-2 text-sm"><StatusLabel className="whitespace-normal leading-relaxed">{notice.text}</StatusLabel></Status>}
 
-            <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(300px,0.92fr)_minmax(380px,1.08fr)]">
-                <section className="flex min-h-0 flex-col overflow-hidden border-b border-border bg-card md:border-b-0 md:border-r">
-                    <div className="shrink-0 border-b border-border bg-card p-5">
+            <main className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 md:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] md:overflow-hidden">
+                <Card aria-label="Live operations" className="flex min-h-[420px] min-w-0 flex-col overflow-hidden md:min-h-0">
+                    <CardHeader className="shrink-0 gap-3 border-b border-border p-4">
                         <div className="flex items-center justify-between gap-3">
                             <div>
-                                <h2 className="text-sm font-semibold text-foreground">Quick Actions</h2>
-                                <p className="mt-1 text-xs font-medium text-muted-foreground">Run global tools or target a user from the lists below.</p>
+                                <CardTitle>Quick actions</CardTitle>
+                                <CardDescription className="mt-1">Run global tools or target a player below.</CardDescription>
                             </div>
-                            <span className="rounded-full border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                                Live
-                            </span>
+                            <Status variant="success"><StatusLabel>Live</StatusLabel></Status>
                         </div>
-                        <div className={`mt-4 grid gap-3 ${canRunCommands && canAnnounce ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                        <div className={`grid gap-2 ${canRunCommands && canAnnounce ? 'grid-cols-2' : 'grid-cols-1'}`}>
                             {canRunCommands && (
                                 <Button variant="outline" size="default"
                                     type="button"
@@ -2363,21 +2325,22 @@ export default function LivePanelPage() {
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </CardHeader>
 
                     <div className="flex min-h-0 flex-1 flex-col">
-                        <div className="shrink-0 border-b border-border p-5">
-                            <div className="mb-3 flex items-center justify-between">
-                                <h2 className="text-sm font-semibold text-foreground">Live Servers</h2>
+                        <CardHeader className="shrink-0 gap-3 border-b border-border p-4">
+                            <div className="flex items-center justify-between">
+                                <CardTitle>Live servers</CardTitle>
                                 <span className="text-xs font-medium text-muted-foreground">Update: 7s</span>
                             </div>
                             <Input
+                                aria-label="Search live servers"
                                 value={serverSearch}
                                 onChange={(event) => setServerSearch(event.target.value)}
                                 placeholder="Search servers, users, user IDs"
                                 className="w-full transition-all"
                             />
-                        </div>
+                        </CardHeader>
 
                         <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
                             {filteredServers.length === 0 ? (
@@ -2389,83 +2352,72 @@ export default function LivePanelPage() {
                                     {filteredServers.map((server) => {
                                         const joinUrl = buildJoinUrl(placeId, server.id);
                                         return (
-                                            <Card key={server.id} onContextMenu={(event) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, jobId: server.id, user: null }); }} className="m-3 rounded-xl border border-border bg-card p-4 transition-all hover:border-border hover:bg-accent">
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div className="min-w-0">
-                                                        <Button variant="ghost" size="default"
-                                                            type="button"
-                                                            onClick={() => setServerSearch(server.id)}
-                                                            className="block max-w-full truncate text-left"
-                                                        >
-                                                            {formatServerId(server.id)}
-                                                        </Button>
-                                                        <p className="mt-1 text-xs font-medium text-muted-foreground">
-                                                            {server.visiblePlayerCount} player{server.visiblePlayerCount === 1 ? '' : 's'} active, last pulse {formatTime(server.updated_at)}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex shrink-0 items-center gap-2">
-                                                        {joinUrl ? (
-                                                            <a
-                                                                href={joinUrl}
-                                                                className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 transition-all hover:border-emerald-300 hover:bg-emerald-50"
-                                                            >
-                                                                <PlayIcon />
-                                                                <ActionTooltip label="Join Server" />
-                                                            </a>
-                                                        ) : (
-                                                            <Button variant="outline" size="default"
+                                            <Card key={server.id} onContextMenu={(event) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, jobId: server.id, user: null }); }} className="m-3">
+                                                <CardHeader className="p-4 pb-3">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <Button variant="ghost" size="default"
                                                                 type="button"
-                                                                disabled
-                                                                className="group relative flex shrink-0 cursor-not-allowed items-center justify-center"
+                                                                onClick={() => setServerSearch(server.id)}
+                                                                className="h-auto max-w-full truncate p-0 text-left font-medium"
                                                             >
-                                                                <PlayIcon />
-                                                                <ActionTooltip label="Set Place ID to Join" />
+                                                                {formatServerId(server.id)}
                                                             </Button>
-                                                        )}
-                                                        {canRestartServers && (
-                                                            <Button variant="outline" size="default"
-                                                                type="button"
-                                                                aria-label={`Restart server ${formatServerId(server.id)}`}
-                                                                onClick={() => sendServerLifecycleCommand(server.id, 'UPDATE')}
-                                                                disabled={actionLoading === 'UPDATE'}
-                                                                className="group relative flex shrink-0 items-center justify-center transition-all disabled:cursor-not-allowed"
-                                                            >
-                                                                <ServerRestartIcon />
-                                                                <ActionTooltip label="Restart Server" />
+                                                            <p className="mt-1 text-xs font-medium text-muted-foreground">
+                                                                {server.visiblePlayerCount} player{server.visiblePlayerCount === 1 ? '' : 's'} active, last pulse {formatTime(server.updated_at)}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex shrink-0 items-center gap-2">
+                                                            <Button asChild={Boolean(joinUrl)} variant="outline" size="icon" type={joinUrl ? undefined : 'button'} disabled={!joinUrl} aria-label={joinUrl ? 'Join server' : 'Set Place ID to join'} title={joinUrl ? 'Join server' : 'Set Place ID to join'} className="size-8">
+                                                                {joinUrl ? <a href={joinUrl}><PlayIcon /></a> : <PlayIcon />}
                                                             </Button>
-                                                        )}
-                                                        {canShutdownServers && (
-                                                            <Button variant="outline" size="default"
-                                                                type="button"
-                                                                aria-label={`Shut down server ${formatServerId(server.id)}`}
-                                                                onClick={() => sendServerLifecycleCommand(server.id, 'SHUTDOWN')}
-                                                                disabled={actionLoading === 'SHUTDOWN'}
-                                                                className="group relative flex shrink-0 items-center justify-center transition-all disabled:cursor-not-allowed"
-                                                            >
-                                                                <ServerShutdownIcon />
-                                                                <ActionTooltip label="Shut Down Server" />
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                            {canViewRuntimeLogs && <Button variant="ghost" size="icon" type="button" className="size-8" aria-label={`Server actions ${formatServerId(server.id)}`} onClick={(event) => setContextMenu({x:event.clientX, y:event.clientY, jobId:server.id, user:null})}><MoreHorizontal className="size-4" aria-hidden="true" /></Button>}
+                                                            {canRestartServers && (
+                                                                <Button variant="outline" size="default"
+                                                                    type="button"
+                                                                    aria-label={`Restart server ${formatServerId(server.id)}`}
+                                                                    onClick={() => sendServerLifecycleCommand(server.id, 'UPDATE')}
+                                                                    disabled={actionLoading === 'UPDATE'}
+                                                                    className="size-8 p-0"
+                                                                >
+                                                                    <ServerRestartIcon />
 
-                                                <div className="mt-4 flex flex-wrap gap-2">
-                                                    {server.players.length > 0 ? (
-                                                        server.players.map((player) => (
-                                                            <UserAvatarButton
-                                                                key={`${server.id}-${getUserKey(player)}`}
-                                                                user={player}
-                                                                compact
-                                                                onClick={() => selectProfileUser(player)}
-                                                                onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ x: event.clientX, y: event.clientY, jobId: server.id, user: player }); }}
-                                                            />
-                                                        ))
-                                                    ) : (
-                                                        <span className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
-                                                            Legacy bridge payload has no user profiles.
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                                </Button>
+                                                            )}
+                                                            {canShutdownServers && (
+                                                                <Button variant="outline" size="default"
+                                                                    type="button"
+                                                                    aria-label={`Shut down server ${formatServerId(server.id)}`}
+                                                                    onClick={() => sendServerLifecycleCommand(server.id, 'SHUTDOWN')}
+                                                                    disabled={actionLoading === 'SHUTDOWN'}
+                                                                    className="size-8 p-0"
+                                                                >
+                                                                    <ServerShutdownIcon />
+
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="px-4 pb-4">
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {server.players.length > 0 ? (
+                                                            server.players.map((player) => (
+                                                                <UserAvatarButton
+                                                                    key={`${server.id}-${getUserKey(player)}`}
+                                                                    user={player}
+                                                                    compact
+                                                                    onClick={() => selectProfileUser(player)}
+                                                                    onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ x: event.clientX, y: event.clientY, jobId: server.id, user: player }); }}
+                                                                />
+                                                            ))
+                                                        ) : (
+                                                            <span className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
+                                                                Legacy bridge payload has no user profiles.
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </CardContent>
                                             </Card>
                                         );
                                     })}
@@ -2473,236 +2425,261 @@ export default function LivePanelPage() {
                             )}
                         </div>
                     </div>
-                </section>
+                </Card>
 
-                <section className="flex min-h-0 flex-col overflow-hidden bg-card">
+                <Card aria-label="Player activity" className="flex min-h-[480px] min-w-0 flex-col overflow-hidden md:min-h-0">
                     {panelUser ? (
-                        <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-5">
-                            <div className="mb-4 flex items-center justify-between gap-3">
+                        <CardContent className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4">
+                            <CardHeader className="flex-row items-center justify-between gap-3 p-0 pb-4">
                                 <div>
                                     <p className="text-xs font-medium text-foreground">User Profile</p>
-                                    <h2 className="mt-1 text-xl font-semibold text-foreground">Live Panel Profile</h2>
+                                    <CardTitle className="mt-1 leading-snug">Live Panel Profile</CardTitle>
                                 </div>
                                 <Button variant="outline" size="icon"
                                     type="button"
+                                    aria-label="Close player profile"
                                     onClick={clearSelectedProfile}
                                     className="transition-colors"
                                 >
                                     <CloseIcon />
                                 </Button>
-                            </div>
+                            </CardHeader>
 
                             <div className="space-y-4">
-                                <Card className="rounded-xl border border-border bg-card p-5">
-                                    <div className="flex items-center gap-4">
-                                        <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border bg-accent">
-                                            {panelProfileDetails?.discordUser?.avatarUrl ? (
-                                                <img src={panelProfileDetails.discordUser.avatarUrl} alt="" className="h-full w-full object-cover" />
-                                            ) : (
-                                                <span className="flex h-full w-full items-center justify-center text-xl font-semibold text-foreground">
-                                                    {(panelProfileDetails?.discordUser?.globalName || panelProfileDetails?.discordUser?.username || panelUser.username).slice(0, 1).toUpperCase()}
-                                                </span>
-                                            )}
-                                        </span>
-                                        <div className="min-w-0">
-                                            <h3 className="truncate text-lg font-semibold text-foreground">
-                                                {panelProfileDetails?.discordMember?.nick || panelProfileDetails?.discordUser?.globalName || panelProfileDetails?.discordUser?.username || 'Discord user not linked'}
-                                            </h3>
-                                            <p className="truncate text-sm font-semibold text-muted-foreground">
-                                                {panelProfileDetails?.discordUser?.username ? `@${panelProfileDetails.discordUser.username}` : 'Using Roblox identity only'}
-                                            </p>
-                                            <p className="mt-1 truncate font-mono text-xs font-medium text-muted-foreground">
-                                                {panelProfileDetails?.discordUser?.id || (profileDetailsLoadingKey === getUserKey(panelUser) ? 'Loading Discord info' : 'No Discord ID')}
-                                            </p>
+                                <Card className="overflow-hidden">
+                                    <CardHeader className="p-4 pb-3">
+                                        <div className="flex items-center gap-4">
+                                            <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border bg-accent">
+                                                {panelProfileDetails?.discordUser?.avatarUrl ? (
+                                                    <PlayerAvatarImage key={panelProfileDetails.discordUser.avatarUrl} src={panelProfileDetails.discordUser.avatarUrl} name={panelUser.username} size={64} />
+                                                ) : (
+                                                    <span className="flex h-full w-full items-center justify-center text-base font-semibold text-foreground">
+                                                        {(panelProfileDetails?.discordUser?.globalName || panelProfileDetails?.discordUser?.username || panelUser.username).slice(0, 1).toUpperCase()}
+                                                    </span>
+                                                )}
+                                            </span>
+                                            <div className="min-w-0">
+                                                <CardTitle className="truncate text-sm font-semibold text-foreground">
+                                                    {panelProfileDetails?.discordMember?.nick || panelProfileDetails?.discordUser?.globalName || panelProfileDetails?.discordUser?.username || 'Discord user not linked'}
+                                                </CardTitle>
+                                                <p className="truncate text-sm font-semibold text-muted-foreground">
+                                                    {panelProfileDetails?.discordUser?.username ? `@${panelProfileDetails.discordUser.username}` : 'Using Roblox identity only'}
+                                                </p>
+                                                <p className="mt-1 truncate font-mono text-xs font-medium text-muted-foreground">
+                                                    {panelProfileDetails?.discordUser?.id || (profileDetailsLoadingKey === getUserKey(panelUser) ? 'Loading Discord info' : 'No Discord ID')}
+                                                </p>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="mt-4 grid grid-cols-2 gap-3">
-                                        <div className="rounded-xl border border-border bg-muted p-3">
-                                            <p className="text-xs font-medium text-muted-foreground">Linked</p>
-                                            <p className={`mt-1 text-sm font-semibold ${panelProfileDetails?.linked ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-                                                {panelProfileDetails?.linked ? 'Verified' : 'Roblox only'}
-                                            </p>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-4">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="rounded-xl border border-border bg-muted p-3">
+                                                <p className="text-xs font-medium text-muted-foreground">Linked</p>
+                                                <p className={`mt-1 text-sm font-semibold ${panelProfileDetails?.linked ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                                                    {panelProfileDetails?.linked ? 'Verified' : 'Roblox only'}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-border bg-muted p-3">
+                                                <p className="text-xs font-medium text-muted-foreground">Top Role</p>
+                                                <p className="mt-1 truncate text-sm font-semibold text-foreground" style={{ color: panelProfileDetails?.discordMember?.highestRole?.color || undefined }}>
+                                                    {panelProfileDetails?.discordMember?.highestRole?.name || 'None'}
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div className="rounded-xl border border-border bg-muted p-3">
-                                            <p className="text-xs font-medium text-muted-foreground">Top Role</p>
-                                            <p className="mt-1 truncate text-sm font-semibold text-foreground" style={{ color: panelProfileDetails?.discordMember?.highestRole?.color || undefined }}>
-                                                {panelProfileDetails?.discordMember?.highestRole?.name || 'None'}
-                                            </p>
-                                        </div>
-                                    </div>
+                                    </CardContent>
                                 </Card>
 
-                                <Card className="rounded-xl border border-border bg-card p-4">
-                                    <div className="flex items-center gap-3">
-                                        <UserAvatar user={panelUser} />
-                                        <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-semibold text-foreground">{panelProfileDetails?.robloxUser?.displayName || panelProfile?.displayName || panelUser.displayName}</p>
-                                            <p className="truncate text-xs font-semibold text-muted-foreground">@{panelProfileDetails?.robloxUser?.username || panelProfile?.username || panelUser.username}</p>
+                                <Card className="overflow-hidden">
+                                    <CardHeader className="p-4 pb-3">
+                                        <div className="flex items-center gap-3">
+                                            <UserAvatar user={panelUser} />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-semibold text-foreground">{panelProfileDetails?.robloxUser?.displayName || panelProfile?.displayName || panelUser.displayName}</p>
+                                                <p className="truncate text-xs font-semibold text-muted-foreground">@{panelProfileDetails?.robloxUser?.username || panelProfile?.username || panelUser.username}</p>
+                                            </div>
+                                            <Status variant={panelUser.presence === 'live' ? 'success' : 'default'}><StatusLabel>{presenceLabel(panelUser)}</StatusLabel></Status>
                                         </div>
-                                        <span className={`shrink-0 rounded-lg border px-2.5 py-1 text-xs font-semibold   ${panelUser.presence === 'live' ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400' : 'border-border bg-muted text-muted-foreground'}`}>
-                                            {presenceLabel(panelUser)}
-                                        </span>
-                                    </div>
-                                    <div className="mt-3 grid grid-cols-2 gap-3">
-                                        <div className="rounded-xl border border-border bg-muted p-3">
-                                            <p className="text-xs font-medium text-muted-foreground">Roblox ID</p>
-                                            <p className="mt-1 truncate font-mono text-xs font-medium text-foreground">{panelProfileDetails?.robloxUser?.id || panelProfile?.id || panelUser.userId || 'Unknown'}</p>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-4">
+                                        <div className="mt-3 grid grid-cols-2 gap-3">
+                                            <div className="rounded-xl border border-border bg-muted p-3">
+                                                <p className="text-xs font-medium text-muted-foreground">Roblox ID</p>
+                                                <p className="mt-1 truncate font-mono text-xs font-medium text-foreground">{panelProfileDetails?.robloxUser?.id || panelProfile?.id || panelUser.userId || 'Unknown'}</p>
+                                            </div>
+                                            <div className="rounded-xl border border-border bg-muted p-3">
+                                                <p className="text-xs font-medium text-muted-foreground">Server</p>
+                                                <p className="mt-1 truncate font-mono text-xs font-medium text-foreground">{panelUser.serverId ? formatServerId(panelUser.serverId) : 'Not live'}</p>
+                                            </div>
                                         </div>
-                                        <div className="rounded-xl border border-border bg-muted p-3">
-                                            <p className="text-xs font-medium text-muted-foreground">Server</p>
-                                            <p className="mt-1 truncate font-mono text-xs font-medium text-foreground">{panelUser.serverId ? formatServerId(panelUser.serverId) : 'Not live'}</p>
-                                        </div>
-                                    </div>
+                                    </CardContent>
                                 </Card>
 
                                 {quickActions.length > 0 && (
-                                    <Card className="rounded-xl border border-border bg-card p-4">
-                                        <p className="mb-3 text-xs font-medium text-muted-foreground">Moderation Actions</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {quickActions.map((action) => {
-                                                const disabled = (action.command === 'KICK' || action.command === 'REFRESH' || action.command === 'RESET') && panelUser.presence !== 'live';
-                                                return (
-                                                    <Button variant="outline" size="default"
-                                                        key={action.command}
-                                                        type="button"
-                                                        disabled={disabled || actionLoading === action.command}
-                                                        onClick={() => requestPlayerCommand(action.command, panelUser)}
-                                                        className={`group relative flex   items-center justify-center     transition-all disabled:cursor-not-allowed disabled:opacity-35 ${action.tone}`}
-                                                    >
-                                                        {action.icon}
-                                                        <ActionTooltip label={action.label} />
-                                                    </Button>
-                                                );
-                                            })}
-                                        </div>
+                                    <Card className="overflow-hidden">
+                                        <CardHeader className="p-4 pb-3">
+                                            <CardTitle className="mb-3 text-xs font-medium text-muted-foreground">Moderation Actions</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="px-4 pb-4">
+                                            <div className="flex flex-wrap gap-2">
+                                                {quickActions.map((action) => {
+                                                    const disabled = (action.command === 'KICK' || action.command === 'REFRESH' || action.command === 'RESET') && panelUser.presence !== 'live';
+                                                    return (
+                                                        <Button variant={action.command === 'BAN' || action.command === 'SOFTBAN' ? 'destructive' : 'outline'} size="sm"
+                                                            key={action.command}
+                                                            type="button"
+                                                            disabled={disabled || actionLoading === action.command}
+                                                            onClick={() => requestPlayerCommand(action.command, panelUser)}
+                                                            aria-label={action.label}
+                                                        >
+                                                            {action.icon}
+                                                            {action.label}
+                                                        </Button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </CardContent>
                                     </Card>
                                 )}
 
-                                <Card className="rounded-xl border border-border bg-card p-4">
-                                    <p className="mb-3 text-xs font-medium text-muted-foreground">Misc / Module Command</p>
-                                    <div className="space-y-3">
-                                        <Select
-                                            value={profileCommand}
-                                            onValueChange={(nextValue) => {
-                                                setProfileCommand(nextValue);
-                                                setProfileCommandValue('');
-                                            }}
-                                            className="w-full"
-                                            aria-label="Profile command"
-                                            options={[{ value: '', label: 'Choose a command' }, ...profileCommandOptions.map(command => ({ value: command.id, label: command.label, group: 'Misc commands' })), ...moduleLiveActions.map(action => ({ value: action.id, label: `${action.moduleName} - ${action.label}`, group: 'Module commands' }))]}
-                                        />
-                                        {profileCommandNeedsValue && (
-                                            <Input
-                                                value={profileCommandValue}
-                                                onChange={(event) => setProfileCommandValue(event.target.value)}
-                                                placeholder={profileCommandDefinition?.id === 'SET_CHAR'
-                                                    ? 'Character username'
-                                                    : profileCommandDefinition?.id === 'TEAM'
-                                                        ? 'Roblox team name'
-                                                        : profileCommandDefinition?.id === 'BROADCAST'
-                                                            ? 'Message'
-                                                            : 'Value or note'}
+                                <Card className="overflow-hidden">
+                                    <CardHeader className="p-4 pb-3">
+                                        <CardTitle className="mb-3 text-xs font-medium text-muted-foreground">Misc / Module Command</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-4">
+                                        <div className="space-y-3">
+                                            <Select
+                                                value={profileCommand}
+                                                onValueChange={(nextValue) => {
+                                                    setProfileCommand(nextValue);
+                                                    setProfileCommandValue('');
+                                                }}
                                                 className="w-full"
+                                                aria-label="Profile command"
+                                                options={[{ value: '', label: 'Choose a command' }, ...profileCommandOptions.map(command => ({ value: command.id, label: command.label, group: 'Misc commands' })), ...moduleLiveActions.map(action => ({ value: action.id, label: `${action.moduleName} - ${action.label}`, group: 'Module commands' }))]}
                                             />
-                                        )}
-                                        <Button variant="outline" size="default"
-                                            type="button"
-                                            disabled={!profileCommand || actionLoading === profileCommand}
-                                            onClick={submitProfileCommand}
-                                            className="w-full transition-all disabled:opacity-50"
-                                        >
-                                            {profileCommand && actionLoading === profileCommand ? 'Running...' : 'Run On User'}
-                                        </Button>
-                                    </div>
+                                            {profileCommandNeedsValue && (
+                                                <Input
+                                                    aria-label="Command value"
+                                                    value={profileCommandValue}
+                                                    onChange={(event) => setProfileCommandValue(event.target.value)}
+                                                    placeholder={profileCommandDefinition?.id === 'SET_CHAR'
+                                                        ? 'Character username'
+                                                        : profileCommandDefinition?.id === 'TEAM'
+                                                            ? 'Roblox team name'
+                                                            : profileCommandDefinition?.id === 'BROADCAST'
+                                                                ? 'Message'
+                                                                : 'Value or note'}
+                                                    className="w-full"
+                                                />
+                                            )}
+                                            <Button variant="outline" size="default"
+                                                type="button"
+                                                disabled={!profileCommand || actionLoading === profileCommand}
+                                                onClick={submitProfileCommand}
+                                                className="w-full transition-all disabled:opacity-50"
+                                            >
+                                                {profileCommand && actionLoading === profileCommand ? 'Running...' : 'Run On User'}
+                                            </Button>
+                                        </div>
+                                    </CardContent>
                                 </Card>
 
-                                <Card className="rounded-xl border border-border bg-card p-4">
-                                    <h3 className="text-sm font-semibold text-foreground">Staff Note</h3>
-                                    <Textarea
-                                        value={noteText}
-                                        onChange={(event) => setNoteText(event.target.value)}
-                                        rows={3}
-                                        placeholder={`Write a private staff note for ${panelUser.username}`}
-                                        className="mt-3 w-full resize-none"
-                                    />
-                                    <div className="mt-3 flex justify-end">
-                                        <Button variant="outline" size="default"
-                                            type="button"
-                                            disabled={actionLoading === 'note'}
-                                            onClick={() => saveUserNote('note')}
-                                            className="transition-all disabled:opacity-50"
-                                        >
-                                            {actionLoading === 'note' ? 'Saving...' : 'Save Note'}
-                                        </Button>
-                                    </div>
-                                    <div className="mt-4 space-y-2">
-                                        {staffNotesLoading ? (
-                                            <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs font-semibold text-muted-foreground">Loading notes...</div>
-                                        ) : staffNotes.length > 0 ? staffNotes.map((note) => (
-                                            <div key={note.id} className="rounded-xl border border-border bg-muted p-3">
-                                                <p className="whitespace-pre-wrap text-xs leading-5 text-foreground">{note.note}</p>
-                                                <p className="mt-2 text-xs font-semibold text-muted-foreground">
-                                                    By {note.created_by_tag || note.created_by_discord_id || 'Unknown'} on {new Date(note.created_at).toLocaleDateString()}
-                                                </p>
-                                            </div>
-                                        )) : (
-                                            <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs font-semibold text-muted-foreground">No staff notes for this user.</div>
-                                        )}
-                                    </div>
+                                <Card className="overflow-hidden">
+                                    <CardHeader className="p-4 pb-3">
+                                        <CardTitle className="text-sm font-semibold text-foreground">Staff Note</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-4">
+                                        <Textarea
+                                            aria-label="Staff note"
+                                                    value={noteText}
+                                            onChange={(event) => setNoteText(event.target.value)}
+                                            rows={3}
+                                            placeholder={`Write a private staff note for ${panelUser.username}`}
+                                            className="mt-3 w-full resize-none"
+                                        />
+                                        <div className="mt-3 flex justify-end">
+                                            <Button variant="outline" size="default"
+                                                type="button"
+                                                disabled={actionLoading === 'note'}
+                                                onClick={() => saveUserNote('note')}
+                                                className="transition-all disabled:opacity-50"
+                                            >
+                                                {actionLoading === 'note' ? 'Saving...' : 'Save Note'}
+                                            </Button>
+                                        </div>
+                                        <div className="mt-4 space-y-2">
+                                            {staffNotesLoading ? (
+                                                <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs font-semibold text-muted-foreground">Loading notes...</div>
+                                            ) : staffNotes.length > 0 ? staffNotes.map((note) => (
+                                                <div key={note.id} className="rounded-xl border border-border bg-muted p-3">
+                                                    <p className="whitespace-pre-wrap text-xs leading-5 text-foreground">{note.note}</p>
+                                                    <p className="mt-2 text-xs font-semibold text-muted-foreground">
+                                                        By {note.created_by_tag || note.created_by_discord_id || 'Unknown'} on {new Date(note.created_at).toLocaleDateString()}
+                                                    </p>
+                                                </div>
+                                            )) : (
+                                                <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs font-semibold text-muted-foreground">No staff notes for this user.</div>
+                                            )}
+                                        </div>
+                                    </CardContent>
                                 </Card>
 
-                                <Card className="rounded-xl border border-border bg-card p-4">
-                                    <div className="mb-3 flex items-center justify-between gap-3">
-                                        <h3 className="text-sm font-semibold text-foreground">User Logs</h3>
-                                        <span className="text-xs font-medium text-muted-foreground">
-                                            {profileLogsLoading ? 'Loading' : `${profileLogEntries.length} shown`}
-                                        </span>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {panelUser.presence === 'live' && (
-                                            <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-3">
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Joined</span>
-                                                    <span className="font-mono text-xs font-medium text-emerald-700 dark:text-emerald-400">{panelUser.joinedAt ? formatTime(new Date(panelUser.joinedAt).toISOString()) : panelUser.serverId ? formatServerId(panelUser.serverId) : 'Live'}</span>
+                                <Card className="overflow-hidden">
+                                    <CardHeader className="p-4 pb-3">
+                                        <div className="mb-3 flex items-center justify-between gap-3">
+                                            <CardTitle className="text-sm font-semibold text-foreground">User Logs</CardTitle>
+                                            <span className="text-xs font-medium text-muted-foreground">
+                                                {profileLogsLoading ? 'Loading' : `${profileLogEntries.length} shown`}
+                                            </span>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-4">
+                                        <div className="space-y-2">
+                                            {panelUser.presence === 'live' && (
+                                                <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-3">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Joined</span>
+                                                        <span className="font-mono text-xs font-medium text-emerald-700 dark:text-emerald-400">{panelUser.joinedAt ? formatTime(new Date(panelUser.joinedAt).toISOString()) : panelUser.serverId ? formatServerId(panelUser.serverId) : 'Live'}</span>
+                                                    </div>
+                                                    <p className="mt-1 text-xs font-medium text-muted-foreground">{panelUser.joinedAt ? 'Current join time from the tracked live roster.' : 'Currently connected to a tracked live server.'}</p>
                                                 </div>
-                                                <p className="mt-1 text-xs font-medium text-emerald-100/70">{panelUser.joinedAt ? 'Current join time from the tracked live roster.' : 'Currently connected to a tracked live server.'}</p>
-                                            </div>
-                                        )}
-                                        {panelUser.presence === 'recently-left' && (
-                                            <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3">
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Left</span>
-                                                    <span className="font-mono text-xs font-medium text-amber-700 dark:text-amber-400">{panelUser.leftAt ? formatTime(new Date(panelUser.leftAt).toISOString()) : 'Recent'}</span>
+                                            )}
+                                            {panelUser.presence === 'recently-left' && (
+                                                <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Left</span>
+                                                        <span className="font-mono text-xs font-medium text-amber-700 dark:text-amber-400">{panelUser.leftAt ? formatTime(new Date(panelUser.leftAt).toISOString()) : 'Recent'}</span>
+                                                    </div>
+                                                    <p className="mt-1 text-xs font-medium text-muted-foreground">Recently disappeared from the live server roster.</p>
                                                 </div>
-                                                <p className="mt-1 text-xs font-medium text-amber-100/70">Recently disappeared from the live server roster.</p>
-                                            </div>
-                                        )}
-                                        {profileLogEntries.map((log) => (
-                                            <div key={log.id} className="rounded-xl border border-border bg-muted p-3">
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-xs font-semibold text-foreground">{log.action}</span>
-                                                    <span className="font-mono text-xs font-medium text-muted-foreground">{formatTime(log.timestamp)}</span>
+                                            )}
+                                            {profileLogEntries.map((log) => (
+                                                <div key={log.id} className="rounded-xl border border-border bg-muted p-3">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <span className="text-xs font-semibold text-foreground">{log.action}</span>
+                                                        <span className="font-mono text-xs font-medium text-muted-foreground">{formatTime(log.timestamp)}</span>
+                                                    </div>
+                                                    <p className="mt-1 text-xs font-medium text-muted-foreground">
+                                                        Target <ClickableUserText value={log.target} onOpen={() => selectProfileUser(resolveUserFromText(log.target))} /> by <ClickableUserText value={log.moderator} onOpen={() => selectProfileUser(resolveUserFromText(log.moderator))} />
+                                                    </p>
                                                 </div>
-                                                <p className="mt-1 text-xs font-medium text-muted-foreground">
-                                                    Target <ClickableUserText value={log.target} onOpen={() => selectProfileUser(resolveUserFromText(log.target))} /> by <ClickableUserText value={log.moderator} onOpen={() => selectProfileUser(resolveUserFromText(log.moderator))} />
-                                                </p>
-                                            </div>
-                                        ))}
-                                        {profileLogEntries.length === 0 && (
-                                            <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs font-semibold text-muted-foreground">
-                                                No logs targeting this user were found.
-                                            </div>
-                                        )}
-                                    </div>
+                                            ))}
+                                            {profileLogEntries.length === 0 && (
+                                                <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs font-semibold text-muted-foreground">
+                                                    No logs targeting this user were found.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </CardContent>
                                 </Card>
                             </div>
-                        </div>
+                        </CardContent>
                     ) : rightPaneMode === 'runtime-logs' && runtimeLogTarget ? (
                         <div className="flex min-h-0 flex-1 flex-col bg-background">
-                            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border bg-card p-5">
+                            <CardHeader className="shrink-0 flex-row items-start justify-between gap-4 border-b border-border p-4">
                                 <div className="min-w-0">
                                     <p className="text-xs font-medium text-foreground">Live raw console</p>
-                                    <h2 className="mt-1 truncate text-xl font-semibold text-foreground">{runtimeLogTarget.user ? `${runtimeLogTarget.user.username}'s client logs` : `Server ${formatServerId(runtimeLogTarget.jobId)} logs`}</h2>
+                                    <CardTitle className="mt-1 break-words leading-snug">{runtimeLogTarget.user ? `${runtimeLogTarget.user.username}'s client logs` : `Server ${formatServerId(runtimeLogTarget.jobId)} logs`}</CardTitle>
                                     <p className="mt-1 text-xs font-medium text-muted-foreground">Refreshing every 7 seconds. Press Esc to return to live commands.</p>
                                 </div>
                                 <Button variant="outline" size="icon"
@@ -2713,7 +2690,7 @@ export default function LivePanelPage() {
                                 >
                                     <CloseIcon />
                                 </Button>
-                            </div>
+                            </CardHeader>
                             <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto bg-muted p-4 font-mono text-xs leading-6">
                                 {runtimeLogsLoading && runtimeLogs.length === 0 ? (
                                     <div className="p-8 text-center font-sans text-xs font-medium text-muted-foreground">Loading live console...</div>
@@ -2728,11 +2705,11 @@ export default function LivePanelPage() {
                         </div>
                     ) : rightPaneMode === 'reports' && canManageReports ? (
                         <div className="flex min-h-0 flex-1 flex-col">
-                            <div className="shrink-0 border-b border-border bg-card p-5">
+                            <CardHeader className="shrink-0 gap-3 border-b border-border p-4">
                                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                                     <div>
                                         <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Reports Manager</p>
-                                        <h2 className="mt-1 text-xl font-semibold text-foreground">Live Reports</h2>
+                                        <CardTitle className="mt-1">Live Reports</CardTitle>
                                         <p className="mt-1 text-xs font-medium text-muted-foreground">Review player reports without leaving live operations.</p>
                                     </div>
                                     <Button variant="outline" size="default"
@@ -2746,22 +2723,17 @@ export default function LivePanelPage() {
 
                                 <div className="mt-4">
                                     <Input
-                                        value={reportSearch}
+                                        aria-label="Search reports"
+                                                value={reportSearch}
                                         onChange={(event) => setReportSearch(event.target.value)}
                                         placeholder="Search reports"
                                         className="w-full transition-all"
                                     />
                                 </div>
 
-                                {reportsNotice && (
-                                    <div className={`mt-4 rounded-xl border px-4 py-3 text-xs font-semibold ${reportsNotice.type === 'success'
-                                        ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'
-                                        : 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400'
-                                        }`}>
-                                        {reportsNotice.text}
-                                    </div>
-                                )}
-                            </div>
+                                {reportsNotice && <Status role={reportsNotice.type === 'error' ? 'alert' : 'status'} variant={reportsNotice.type === 'success' ? 'success' : 'error'} className="w-full rounded-md"><StatusLabel className="whitespace-normal leading-relaxed">{reportsNotice.text}</StatusLabel></Status>}
+
+                            </CardHeader>
 
                             <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(240px,0.8fr)_minmax(340px,1.2fr)]">
                                 <div className="custom-scrollbar min-h-0 overflow-y-auto border-b border-border xl:border-b-0 xl:border-r">
@@ -2779,16 +2751,15 @@ export default function LivePanelPage() {
                                                         key={report.id}
                                                         type="button"
                                                         onClick={() => setSelectedReportId(report.id)}
-                                                        className={`h-auto min-h-9 justify-start whitespace-normal py-3 block w-full   text-left transition-colors ${selected ? '' : ''}`}
+                                                        aria-pressed={selected}
+                                                        className={`block h-auto min-h-9 w-full justify-start whitespace-normal rounded-none py-3 text-left ${selected ? 'bg-accent' : ''}`}
                                                     >
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div className="min-w-0">
                                                                 <p className="truncate text-sm font-semibold text-foreground">{report.reported_roblox_username}</p>
                                                                 <p className="mt-1 truncate font-mono text-xs font-medium text-muted-foreground">#{shortReportId(report.id)}</p>
                                                             </div>
-                                                            <span className={`shrink-0 rounded-lg border px-2 py-0.5 text-xs font-semibold   ${reportStatusClass(status)}`}>
-                                                                {status.toLowerCase()}
-                                                            </span>
+                                                            <Status render={<span />} variant={status === 'PENDING' ? 'warning' : status === 'RESOLVED' ? 'success' : 'default'}>{status.toLowerCase()}</Status>
                                                         </div>
                                                         <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{report.reason}</p>
                                                         <div className="mt-3 flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
@@ -2807,51 +2778,56 @@ export default function LivePanelPage() {
                                         <div className="flex min-h-72 items-center justify-center text-xs font-medium text-muted-foreground">Loading report details...</div>
                                     ) : selectedReport ? (
                                         <div className="space-y-4">
-                                            <Card className="rounded-xl border border-border bg-card p-5">
-                                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                                    <div className="min-w-0">
-                                                        <p className="font-mono text-xs font-medium text-muted-foreground">Report #{shortReportId(selectedReport.id)}</p>
-                                                        <h3 className="mt-1 truncate text-xl font-semibold text-foreground">{selectedReportTargetUsername || 'Unknown target'}</h3>
-                                                        <p className="mt-1 text-xs font-semibold text-muted-foreground">Submitted {formatDateTime(selectedReport.created_at)}</p>
+                                            <Card className="overflow-hidden">
+                                                <CardHeader className="p-4 pb-3">
+                                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                                        <div className="min-w-0">
+                                                            <p className="font-mono text-xs font-medium text-muted-foreground">Report #{shortReportId(selectedReport.id)}</p>
+                                                            <CardTitle className="mt-1 truncate text-base font-semibold text-foreground">{selectedReportTargetUsername || 'Unknown target'}</CardTitle>
+                                                            <p className="mt-1 text-xs font-semibold text-muted-foreground">Submitted {formatDateTime(selectedReport.created_at)}</p>
+                                                        </div>
+                                                        <Status variant={selectedReportStatus === 'PENDING' ? 'warning' : selectedReportStatus === 'RESOLVED' ? 'success' : 'default'}><StatusLabel>{selectedReportStatus.toLowerCase()}</StatusLabel></Status>
                                                     </div>
-                                                    <span className={`w-fit rounded-lg border px-3 py-1 text-xs font-semibold   ${reportStatusClass(selectedReportStatus)}`}>
-                                                        {selectedReportStatus.toLowerCase()}
-                                                    </span>
-                                                </div>
-
-                                                <div className="mt-4 grid grid-cols-2 gap-3">
-                                                    <div className="rounded-xl border border-border bg-muted p-3">
-                                                        <p className="text-xs font-medium text-muted-foreground">Reporter</p>
-                                                        <p className="mt-1 truncate text-sm font-semibold text-foreground">{getReportReporterLabel(selectedReport)}</p>
+                                                </CardHeader>
+                                                <CardContent className="px-4 pb-4">
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div className="rounded-xl border border-border bg-muted p-3">
+                                                            <p className="text-xs font-medium text-muted-foreground">Reporter</p>
+                                                            <p className="mt-1 truncate text-sm font-semibold text-foreground">{getReportReporterLabel(selectedReport)}</p>
+                                                        </div>
+                                                        <div className="rounded-xl border border-border bg-muted p-3">
+                                                            <p className="text-xs font-medium text-muted-foreground">Roblox ID</p>
+                                                            <p className="mt-1 truncate font-mono text-xs font-medium text-foreground">{selectedReportTargetId || 'Unknown'}</p>
+                                                        </div>
+                                                        <div className="rounded-xl border border-border bg-muted p-3">
+                                                            <p className="text-xs font-medium text-muted-foreground">Discord</p>
+                                                            <p className="mt-1 truncate font-mono text-xs font-medium text-foreground">{selectedReportDiscordId || selectedReport.reported_roblox_username || 'Unknown'}</p>
+                                                        </div>
+                                                        <div className="rounded-xl border border-border bg-muted p-3">
+                                                            <p className="text-xs font-medium text-muted-foreground">Closed</p>
+                                                            <p className="mt-1 truncate text-xs font-medium text-foreground">{selectedReport.resolved_at ? formatDateTime(selectedReport.resolved_at) : 'Open'}</p>
+                                                        </div>
                                                     </div>
-                                                    <div className="rounded-xl border border-border bg-muted p-3">
-                                                        <p className="text-xs font-medium text-muted-foreground">Roblox ID</p>
-                                                        <p className="mt-1 truncate font-mono text-xs font-medium text-foreground">{selectedReportTargetId || 'Unknown'}</p>
-                                                    </div>
-                                                    <div className="rounded-xl border border-border bg-muted p-3">
-                                                        <p className="text-xs font-medium text-muted-foreground">Discord</p>
-                                                        <p className="mt-1 truncate font-mono text-xs font-medium text-foreground">{selectedReportDiscordId || selectedReport.reported_roblox_username || 'Unknown'}</p>
-                                                    </div>
-                                                    <div className="rounded-xl border border-border bg-muted p-3">
-                                                        <p className="text-xs font-medium text-muted-foreground">Closed</p>
-                                                        <p className="mt-1 truncate text-xs font-medium text-foreground">{selectedReport.resolved_at ? formatDateTime(selectedReport.resolved_at) : 'Open'}</p>
-                                                    </div>
-                                                </div>
+                                                </CardContent>
                                             </Card>
 
-                                            <Card className="rounded-xl border border-border bg-card p-4">
-                                                <div className="mb-3 flex items-center justify-between gap-3">
-                                                    <h3 className="text-sm font-semibold text-foreground">Report Evidence</h3>
-                                                    <Button variant="outline" size="default"
-                                                        type="button"
-                                                        onClick={openReportTargetProfile}
-                                                        disabled={!selectedReportTargetUsername}
-                                                        className="transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                                                    >
-                                                        Target Profile
-                                                    </Button>
-                                                </div>
-                                                <p className="whitespace-pre-wrap rounded-xl border border-border bg-muted p-4 text-sm leading-6 text-foreground">{selectedReport.reason || 'No reason provided.'}</p>
+                                            <Card className="overflow-hidden">
+                                                <CardHeader className="p-4 pb-3">
+                                                    <div className="mb-3 flex items-center justify-between gap-3">
+                                                        <CardTitle className="text-sm font-semibold text-foreground">Report Evidence</CardTitle>
+                                                        <Button variant="outline" size="default"
+                                                            type="button"
+                                                            onClick={openReportTargetProfile}
+                                                            disabled={!selectedReportTargetUsername}
+                                                            className="transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                                                        >
+                                                            Target Profile
+                                                        </Button>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="px-4 pb-4">
+                                                    <p className="whitespace-pre-wrap rounded-xl border border-border bg-muted p-4 text-sm leading-6 text-foreground">{selectedReport.reason || 'No reason provided.'}</p>
+                                                </CardContent>
                                             </Card>
 
                                             <div className="grid gap-3 md:grid-cols-2">
@@ -2867,119 +2843,127 @@ export default function LivePanelPage() {
                                                         joinUrl: selectedReport.reported_join_url,
                                                     },
                                                 ].map((serverContext) => (
-                                                    <Card key={serverContext.label} className="rounded-xl border border-border bg-card p-4">
-                                                        <p className="text-xs font-medium text-muted-foreground">{serverContext.label}</p>
-                                                        {serverContext.jobId ? (
-                                                            <>
-                                                                <p className="mt-2 break-all font-mono text-xs text-foreground">{serverContext.jobId}</p>
-                                                                {serverContext.joinUrl && (
-                                                                    <a
-                                                                        href={serverContext.joinUrl}
-                                                                        className="mt-3 inline-flex rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 transition-colors hover:bg-emerald-50"
-                                                                    >
-                                                                        Join server
-                                                                    </a>
-                                                                )}
-                                                            </>
-                                                        ) : (
-                                                            <p className="mt-2 text-xs font-medium text-muted-foreground">No live server snapshot was captured.</p>
-                                                        )}
+                                                    <Card key={serverContext.label} className="overflow-hidden">
+                                                        <CardHeader className="p-4 pb-3">
+                                                            <CardTitle className="text-xs font-medium text-muted-foreground">{serverContext.label}</CardTitle>
+                                                        </CardHeader>
+                                                        <CardContent className="px-4 pb-4">
+                                                            {serverContext.jobId ? (
+                                                                <>
+                                                                    <p className="mt-2 break-all font-mono text-xs text-foreground">{serverContext.jobId}</p>
+                                                                    {serverContext.joinUrl && (
+                                                                        <Button asChild variant="outline" size="sm" className="mt-3"><a href={serverContext.joinUrl}>Join server</a></Button>
+                                                                    )}
+                                                                </>
+                                                            ) : (
+                                                                <p className="mt-2 text-xs font-medium text-muted-foreground">No live server snapshot was captured.</p>
+                                                            )}
+                                                        </CardContent>
                                                     </Card>
                                                 ))}
                                             </div>
 
-                                            <Card className="rounded-xl border border-border bg-card p-4">
-                                                <h3 className="text-sm font-semibold text-foreground">Moderator Note</h3>
-                                                <Textarea
+                                            <Card className="overflow-hidden">
+                                                <CardHeader className="p-4 pb-3">
+                                                    <CardTitle className="text-sm font-semibold text-foreground">Moderator Note</CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="px-4 pb-4">
+                                                    <Textarea
+                                                        aria-label="Moderator note"
                                                     value={reportModeratorNote}
-                                                    onChange={(event) => setReportModeratorNote(event.target.value)}
-                                                    rows={3}
-                                                    placeholder="Add an internal note before resolving or dismissing"
-                                                    className="mt-3 w-full resize-none"
-                                                />
-                                                <div className="mt-3 flex flex-wrap gap-2">
-                                                    {(['KICK', 'SOFTBAN', 'BAN'] as const)
-                                                        .filter((command) => canUseDashboardCommand(perms, command))
-                                                        .map((command) => (
+                                                        onChange={(event) => setReportModeratorNote(event.target.value)}
+                                                        rows={3}
+                                                        placeholder="Add an internal note before resolving or dismissing"
+                                                        className="mt-3 w-full resize-none"
+                                                    />
+                                                    <div className="mt-3 flex flex-wrap gap-2">
+                                                        {(['KICK', 'SOFTBAN', 'BAN'] as const)
+                                                            .filter((command) => canUseDashboardCommand(perms, command))
+                                                            .map((command) => (
+                                                                <Button variant="outline" size="default"
+                                                                    key={command}
+                                                                    type="button"
+                                                                    disabled={reportActionLoading !== null}
+                                                                    onClick={() => runReportModerationAction(command)}
+                                                                    className={`        transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${command === 'BAN'
+                                                                        ? '   '
+                                                                        : command === 'SOFTBAN'
+                                                                            ? '   '
+                                                                            : '   '
+                                                                        }`}
+                                                                >
+                                                                    {reportActionLoading === command
+                                                                        ? 'Running...'
+                                                                        : `${command === 'SOFTBAN' ? 'Temp Ban' : command.charAt(0) + command.slice(1).toLowerCase()} & Resolve`}
+                                                                </Button>
+                                                            ))}
+                                                        {selectedReportStatus !== 'RESOLVED' && (
                                                             <Button variant="outline" size="default"
-                                                                key={command}
                                                                 type="button"
                                                                 disabled={reportActionLoading !== null}
-                                                                onClick={() => runReportModerationAction(command)}
-                                                                className={`        transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${command === 'BAN'
-                                                                    ? '   '
-                                                                    : command === 'SOFTBAN'
-                                                                        ? '   '
-                                                                        : '   '
-                                                                    }`}
+                                                                onClick={() => updateSelectedReportStatus('RESOLVED')}
+                                                                className="transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                                                             >
-                                                                {reportActionLoading === command
-                                                                    ? 'Running...'
-                                                                    : `${command === 'SOFTBAN' ? 'Temp Ban' : command.charAt(0) + command.slice(1).toLowerCase()} & Resolve`}
+                                                                {reportActionLoading === 'RESOLVED' ? 'Saving...' : 'Resolve'}
                                                             </Button>
-                                                        ))}
-                                                    {selectedReportStatus !== 'RESOLVED' && (
-                                                        <Button variant="outline" size="default"
-                                                            type="button"
-                                                            disabled={reportActionLoading !== null}
-                                                            onClick={() => updateSelectedReportStatus('RESOLVED')}
-                                                            className="transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                                                        >
-                                                            {reportActionLoading === 'RESOLVED' ? 'Saving...' : 'Resolve'}
-                                                        </Button>
-                                                    )}
-                                                    {selectedReportStatus !== 'DISMISSED' && (
-                                                        <Button variant="outline" size="default"
-                                                            type="button"
-                                                            disabled={reportActionLoading !== null}
-                                                            onClick={() => updateSelectedReportStatus('DISMISSED')}
-                                                            className="transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                                                        >
-                                                            {reportActionLoading === 'DISMISSED' ? 'Saving...' : 'Dismiss'}
-                                                        </Button>
-                                                    )}
-                                                    {selectedReportStatus !== 'PENDING' && (
-                                                        <Button variant="outline" size="default"
-                                                            type="button"
-                                                            disabled={reportActionLoading !== null}
-                                                            onClick={() => updateSelectedReportStatus('PENDING')}
-                                                            className="transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                                                        >
-                                                            {reportActionLoading === 'PENDING' ? 'Saving...' : 'Reopen'}
-                                                        </Button>
-                                                    )}
-                                                </div>
+                                                        )}
+                                                        {selectedReportStatus !== 'DISMISSED' && (
+                                                            <Button variant="outline" size="default"
+                                                                type="button"
+                                                                disabled={reportActionLoading !== null}
+                                                                onClick={() => updateSelectedReportStatus('DISMISSED')}
+                                                                className="transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                                            >
+                                                                {reportActionLoading === 'DISMISSED' ? 'Saving...' : 'Dismiss'}
+                                                            </Button>
+                                                        )}
+                                                        {selectedReportStatus !== 'PENDING' && (
+                                                            <Button variant="outline" size="default"
+                                                                type="button"
+                                                                disabled={reportActionLoading !== null}
+                                                                onClick={() => updateSelectedReportStatus('PENDING')}
+                                                                className="transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                                            >
+                                                                {reportActionLoading === 'PENDING' ? 'Saving...' : 'Reopen'}
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </CardContent>
                                             </Card>
 
-                                            <Card className="rounded-xl border border-border bg-card p-4">
-                                                <div className="mb-3 flex items-center justify-between gap-3">
-                                                    <h3 className="text-sm font-semibold text-foreground">Target History</h3>
-                                                    <span className="text-xs font-medium text-muted-foreground">{selectedReportLogs.length} shown</span>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    {selectedReportLogs.slice(0, 12).map((log) => (
-                                                        <div key={log.id} className="rounded-xl border border-border bg-muted p-3">
-                                                            <div className="flex items-center justify-between gap-3">
-                                                                <span className="text-xs font-semibold text-foreground">{log.action}</span>
-                                                                <span className="font-mono text-xs font-medium text-muted-foreground">{formatTime(log.timestamp)}</span>
+                                            <Card className="overflow-hidden">
+                                                <CardHeader className="p-4 pb-3">
+                                                    <div className="mb-3 flex items-center justify-between gap-3">
+                                                        <CardTitle className="text-sm font-semibold text-foreground">Target History</CardTitle>
+                                                        <span className="text-xs font-medium text-muted-foreground">{selectedReportLogs.length} shown</span>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="px-4 pb-4">
+                                                    <div className="space-y-2">
+                                                        {selectedReportLogs.slice(0, 12).map((log) => (
+                                                            <div key={log.id} className="rounded-xl border border-border bg-muted p-3">
+                                                                <div className="flex items-center justify-between gap-3">
+                                                                    <span className="text-xs font-semibold text-foreground">{log.action}</span>
+                                                                    <span className="font-mono text-xs font-medium text-muted-foreground">{formatTime(log.timestamp)}</span>
+                                                                </div>
+                                                                <p className="mt-1 text-xs font-medium text-muted-foreground">
+                                                                    Target <ClickableUserText value={log.target} onOpen={() => {
+                                                                        setRightPaneMode('lookup');
+                                                                        selectProfileUser(resolveUserFromText(log.target));
+                                                                    }} /> by <ClickableUserText value={log.moderator} onOpen={() => {
+                                                                        setRightPaneMode('lookup');
+                                                                        selectProfileUser(resolveUserFromText(log.moderator));
+                                                                    }} />
+                                                                </p>
                                                             </div>
-                                                            <p className="mt-1 text-xs font-medium text-muted-foreground">
-                                                                Target <ClickableUserText value={log.target} onOpen={() => {
-                                                                    setRightPaneMode('lookup');
-                                                                    selectProfileUser(resolveUserFromText(log.target));
-                                                                }} /> by <ClickableUserText value={log.moderator} onOpen={() => {
-                                                                    setRightPaneMode('lookup');
-                                                                    selectProfileUser(resolveUserFromText(log.moderator));
-                                                                }} />
-                                                            </p>
-                                                        </div>
-                                                    ))}
-                                                    {selectedReportLogs.length === 0 && (
-                                                        <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs font-semibold text-muted-foreground">
-                                                            No moderation history found for this target.
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                        ))}
+                                                        {selectedReportLogs.length === 0 && (
+                                                            <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs font-semibold text-muted-foreground">
+                                                                No moderation history found for this target.
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </CardContent>
                                             </Card>
                                         </div>
                                     ) : (
@@ -2992,11 +2976,9 @@ export default function LivePanelPage() {
                         </div>
                     ) : (
                         <>
-                    <div className="shrink-0 border-b border-border bg-card p-5">
+                    <CardHeader className="shrink-0 gap-3 border-b border-border p-4">
                         <div className="mb-2 flex items-center justify-between gap-3">
-                            <h2 className="text-xs font-semibold text-foreground">
-                                Profile / Create Log
-                            </h2>
+                            <CardTitle>Profile / Create Log</CardTitle>
                             {canManageReports && (
                                 <Button
                                     variant="outline"
@@ -3024,7 +3006,8 @@ export default function LivePanelPage() {
                         </div>
                         <div className="relative">
                             <Input
-                                value={profileSearch}
+                                aria-label="Search player profiles"
+                                                value={profileSearch}
                                 onChange={(event) => setProfileSearch(event.target.value)}
                                 onKeyDown={(event) => {
                                     if (event.key === 'Enter') {
@@ -3042,7 +3025,7 @@ export default function LivePanelPage() {
                                             type="button"
                                             key={getUserKey(user)}
                                             onClick={() => selectProfileUser(user)}
-                                            className="flex w-full items-center text-left transition-colors last:"
+                                            className="h-auto min-h-14 w-full justify-start whitespace-normal py-3 text-left"
                                         >
                                             <UserAvatar user={user} compact />
                                             <span className="min-w-0 flex-1">
@@ -3058,16 +3041,15 @@ export default function LivePanelPage() {
                             )}
                         </div>
 
-                        <h2 className="mb-2 mt-4 text-xs font-semibold text-foreground">
-                            Live Logs
-                        </h2>
+                        <label htmlFor="live-log-search" className="mt-2 text-sm font-medium">Live logs</label>
                         <Input
-                            value={logSearch}
+                            id="live-log-search" aria-label="Search live logs"
+                                                value={logSearch}
                             onChange={(event) => setLogSearch(event.target.value)}
                             placeholder="Search logs by server, user, action, or moderator"
                             className="w-full transition-all"
                         />
-                    </div>
+                    </CardHeader>
 
                     <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
                         {filteredLogs.length === 0 ? (
@@ -3075,129 +3057,83 @@ export default function LivePanelPage() {
                                 No logs matched.
                             </div>
                         ) : (
-                            <div className="divide-y divide-border">
-                                {filteredLogs.map((log) => (
-                                    <div key={log.id} className="grid gap-3 px-5 py-3 transition-colors hover:bg-accent md:grid-cols-[minmax(0,180px)_minmax(0,1fr)_120px] md:items-center">
-                                        <div className="min-w-0">
-                                            <span className={`inline-flex max-w-full truncate rounded-lg border px-2.5 py-1 text-xs font-semibold   ${log.action.includes('BAN')
-                                                ? 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400'
-                                                : log.action === 'KICK'
-                                                    ? 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400'
-                                                    : 'border-border bg-accent text-foreground'
-                                                }`}>
-                                                {log.action}
-                                            </span>
-                                        </div>
-                                        <p className="min-w-0 text-sm font-medium text-foreground">
-                                            <ClickableUserText value={log.moderator} onOpen={() => selectProfileUser(resolveUserFromText(log.moderator))} /> used <span className="font-medium text-foreground">{log.action}</span> on <ClickableUserText value={log.target} onOpen={() => selectProfileUser(resolveUserFromText(log.target))} />
-                                        </p>
-                                        <p className="font-mono text-xs font-medium text-muted-foreground md:text-right">
-                                            {formatTime(log.timestamp)}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
+                            <Table className="table-fixed">
+                                <caption className="sr-only">Live moderation activity</caption>
+                                <TableHeader><TableRow>
+                                    <TableHead className="w-24 pl-4">Action</TableHead>
+                                    <TableHead>Activity</TableHead>
+                                    <TableHead className="hidden w-24 md:table-cell">Time</TableHead>
+                                </TableRow></TableHeader>
+                                <TableBody>
+                                    {filteredLogs.map(log => <TableRow key={log.id}>
+                                        <TableCell className="py-3 pl-4"><Status variant={log.action.includes('BAN') ? 'error' : log.action === 'KICK' ? 'warning' : 'default'} className="max-w-full"><StatusLabel className="truncate">{log.action}</StatusLabel></Status></TableCell>
+                                        <TableCell className="break-words py-3 text-sm">
+                                            <ClickableUserText value={log.moderator} onOpen={() => selectProfileUser(resolveUserFromText(log.moderator))} /> used {log.action} on <ClickableUserText value={log.target} onOpen={() => selectProfileUser(resolveUserFromText(log.target))} />
+                                            <span className="mt-1 block text-xs text-muted-foreground md:hidden">{formatTime(log.timestamp)}</span>
+                                        </TableCell>
+                                        <TableCell className="hidden py-3 text-xs text-muted-foreground md:table-cell">{formatTime(log.timestamp)}</TableCell>
+                                    </TableRow>)}
+                                </TableBody>
+                            </Table>
                         )}
                     </div>
                         </>
                     )}
-                </section>
-            </div>
+                </Card>
+            </main>
 
-            {confirmAction && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4">
-                    <div className="w-full max-w-md rounded-xl border border-border bg-background p-6">
-                        <h3 className="text-xl font-semibold text-foreground">{confirmAction.title}</h3>
-                        <p className="mt-3 text-sm leading-6 text-muted-foreground">{confirmAction.body}</p>
-                        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                            <Button variant="outline" size="default"
-                                type="button"
-                                onClick={() => setConfirmAction(null)}
-                                className="transition-colors"
-                            >
-                                Cancel
-                            </Button>
-                            <Button variant="destructive" size="default"
-                                type="button"
-                                onClick={submitConfirmAction}
-                                className="transition-colors"
-                            >
-                                Confirm
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <Dialog open={Boolean(confirmAction)} onOpenChange={(open) => { if (!open) setConfirmAction(null); }}>
+                {confirmAction && <DialogContent onEscapeKeyDown={(event) => event.stopPropagation()} className="max-w-md">
+                    <DialogHeader><DialogTitle>{confirmAction.title}</DialogTitle><DialogDescription>{confirmAction.body}</DialogDescription></DialogHeader>
+                    <DialogFooter className="mt-6">
+                        <Button type="button" variant="outline" onClick={() => setConfirmAction(null)}>Cancel</Button>
+                        <Button type="button" variant="destructive" onClick={submitConfirmAction}>Confirm</Button>
+                    </DialogFooter>
+                </DialogContent>}
+            </Dialog>
 
-            {contextMenu && (
-                <div
-                    role="menu"
-                    onPointerDown={(event) => event.stopPropagation()}
-                    style={{ left: Math.min(contextMenu.x, window.innerWidth - 224), top: Math.min(contextMenu.y, window.innerHeight - 220) }}
-                    className="fixed z-[120] w-52 overflow-hidden rounded-xl border border-border bg-card p-1"
-                >
-                    {contextMenu.user ? (
-                        <>
-                            <p className="truncate px-3 py-2 text-xs font-semibold text-muted-foreground">@{contextMenu.user.username}</p>
-                            {canViewRuntimeLogs && <Button variant="ghost" size="default" type="button" onClick={() => openRuntimeLogs(contextMenu.jobId, contextMenu.user)} className="w-full text-left">View user&apos;s client logs</Button>}
-                            <Button variant="outline" size="default" type="button" onClick={() => openPlayerMessage(contextMenu.user!)} className="w-full text-left">Message</Button>
-                            {canUseDashboardCommand(perms, 'KICK') && <Button variant="ghost" size="default" type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('KICK', contextMenu.user!); }} className="w-full text-left">Kick</Button>}
-                            {canUseDashboardCommand(perms, 'BAN') && <Button variant="ghost" size="default" type="button" onClick={() => { setContextMenu(null); requestPlayerCommand('BAN', contextMenu.user!); }} className="w-full text-left">Ban</Button>}
-                        </>
-                    ) : (
-                        canViewRuntimeLogs
-                            ? <Button variant="ghost" size="default" type="button" onClick={() => openRuntimeLogs(contextMenu.jobId)} className="w-full text-left">View server logs</Button>
-                            : <p className="px-3 py-2.5 text-xs font-semibold text-muted-foreground">No console log access</p>
-                    )}
-                </div>
-            )}
+            <DropdownMenu open={Boolean(contextMenu)} onOpenChange={(open) => { if (!open) setContextMenu(null); }}>
+                {contextMenu && <DropdownMenuContent anchor={{getBoundingClientRect: () => new DOMRect(contextMenu.x, contextMenu.y, 0, 0)}}>
+                    <DropdownMenuGroup>
+                        <DropdownMenuLabel>{contextMenu.user ? `@${contextMenu.user.username}` : 'Server actions'}</DropdownMenuLabel>
+                        {contextMenu.user ? <>
+                            {canViewRuntimeLogs && <DropdownMenuItem onClick={() => openRuntimeLogs(contextMenu.jobId, contextMenu.user)}>View client logs</DropdownMenuItem>}
+                            <DropdownMenuItem onClick={() => openPlayerMessage(contextMenu.user!)}>Message</DropdownMenuItem>
+                            {canUseDashboardCommand(perms, 'KICK') && <DropdownMenuItem onClick={() => { setContextMenu(null); requestPlayerCommand('KICK', contextMenu.user!); }}>Kick</DropdownMenuItem>}
+                            {canUseDashboardCommand(perms, 'BAN') && <DropdownMenuItem onClick={() => { setContextMenu(null); requestPlayerCommand('BAN', contextMenu.user!); }}>Ban</DropdownMenuItem>}
+                        </> : canViewRuntimeLogs ? <DropdownMenuItem onClick={() => openRuntimeLogs(contextMenu.jobId)}>View server logs</DropdownMenuItem> : <DropdownMenuItem disabled>No console log access</DropdownMenuItem>}
+                    </DropdownMenuGroup>
+                </DropdownMenuContent>}
+            </DropdownMenu>
 
-            {panelModal && (
-                <div className="fixed inset-0 z-[105] flex items-center justify-center bg-black/40 p-4">
-                    <div className="w-full max-w-2xl overflow-hidden rounded-xl border border-border bg-background">
-                        <div className="flex items-start justify-between gap-4 border-b border-border bg-card px-6 py-5">
+            <Dialog open={Boolean(panelModal)} onOpenChange={(open) => { if (!open) setPanelModal(null); }}>
+                <DialogContent onEscapeKeyDown={(event) => event.stopPropagation()} className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto p-0">
+                        <DialogHeader className="flex-row items-start justify-between gap-4 border-b border-border px-6 py-5">
                             <div>
-                                <p className="text-xs font-medium text-foreground">{panelModal === 'announce' ? 'Announcement' : 'Command Runner'}</p>
-                                <h3 className="mt-1 text-xl font-semibold text-foreground">{panelModal === 'announce' ? 'Announce to Live Servers' : 'Run Live Command'}</h3>
+                                <DialogTitle>{panelModal === 'announce' ? 'Announce to Live Servers' : 'Run Live Command'}</DialogTitle>
+                                <DialogDescription className="mt-1">{panelModal === 'announce' ? 'Send a message to all live servers or one player.' : 'Choose a command, then enter its target and any required values.'}</DialogDescription>
                             </div>
                             <Button variant="outline" size="icon"
                                 type="button"
                                 onClick={() => setPanelModal(null)}
+                                aria-label="Close dialog"
                                 className="transition-colors"
                             >
                                 <CloseIcon />
                             </Button>
-                        </div>
+                        </DialogHeader>
                         <div className="space-y-4 px-6 py-6">
+                            {notice?.type === 'error' && <Status role="alert" variant="error" className="w-full rounded-md"><StatusLabel className="whitespace-normal leading-relaxed">{notice.text}</StatusLabel></Status>}
                             {panelModal === 'announce' ? (
                                 <>
                                     <div className="space-y-3">
-                                        <p className="text-xs font-medium text-muted-foreground">Target</p>
-                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            <Button variant="outline" size="default"
-                                                type="button"
-                                                onClick={() => {
-                                                    setAnnouncementTargetType('global');
-                                                    setAnnouncementUser('');
-                                                }}
-                                                className={`    text-left transition-all ${announcementTargetType === 'global' ? '  ' : '   '}`}
-                                            >
-                                                <span className="block text-sm font-semibold">Global</span>
-                                                <span className="mt-1 block text-xs font-medium text-muted-foreground">Everybody playing the game, every server.</span>
-                                            </Button>
-                                            <Button variant="outline" size="default"
-                                                type="button"
-                                                onClick={() => setAnnouncementTargetType('user')}
-                                                className={`    text-left transition-all ${announcementTargetType === 'user' ? '  ' : '   '}`}
-                                            >
-                                                <span className="block text-sm font-semibold">User</span>
-                                                <span className="mt-1 block text-xs font-medium text-muted-foreground">One live Roblox player.</span>
-                                            </Button>
-                                        </div>
+                                        <label className="text-sm font-medium" htmlFor="announcement-target">Target</label>
+                                        <Select id="announcement-target" aria-label="Announcement target" value={announcementTargetType} onValueChange={value => { setAnnouncementTargetType(value as '' | 'global' | 'user'); setAnnouncementUser(''); }} options={[{value:'',label:'Choose a target'},{value:'global',label:'All live servers'},{value:'user',label:'One live player'}]} />
                                     </div>
                                     {announcementTargetType === 'user' && (
                                         <div className="space-y-3">
                                             <Input
+                                                aria-label="Announcement recipient"
                                                 value={announcementUser}
                                                 onChange={(event) => setAnnouncementUser(event.target.value)}
                                                 placeholder="Search or type a live Roblox username"
@@ -3210,7 +3146,7 @@ export default function LivePanelPage() {
                                                             key={getUserKey(user)}
                                                             type="button"
                                                             onClick={() => setAnnouncementUser(user.username)}
-                                                            className="flex w-full items-center justify-between text-left transition-colors"
+                                                            className="h-auto min-h-14 w-full justify-between gap-3 whitespace-normal py-3 text-left"
                                                         >
                                                             <span className="min-w-0">
                                                                 <span className="block truncate text-sm font-semibold text-foreground">{user.displayName || user.username}</span>
@@ -3224,7 +3160,8 @@ export default function LivePanelPage() {
                                         </div>
                                     )}
                                     <Textarea
-                                        value={announcement}
+                                        aria-label="Announcement message"
+                                                value={announcement}
                                         onChange={(event) => setAnnouncement(event.target.value)}
                                         rows={5}
                                         placeholder="Message to send"
@@ -3241,13 +3178,12 @@ export default function LivePanelPage() {
                                 </>
                             ) : (
                                 <>
-                                    <div className="rounded-xl border border-border bg-card px-4 py-3 focus-within:border-border">
+                                    <div className="space-y-2">
                                         <div className="flex items-center gap-3">
-                                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground">
-                                                <CommandIcon />
-                                            </span>
+
                                             <Input
                                                 autoFocus
+                                                aria-label="Live command"
                                                 value={commandBarValue}
                                                 onChange={(event) => setCommandBarValue(event.target.value)}
                                                 onKeyDown={(event) => {
@@ -3260,9 +3196,7 @@ export default function LivePanelPage() {
                                                 className="min-w-0 flex-1"
                                             />
                                             {commandBarParsed.command && (
-                                                <span className="hidden rounded-lg border border-border bg-accent px-2.5 py-1 text-xs font-semibold text-foreground sm:inline-flex">
-                                                    {commandBarParsed.command.id}
-                                                </span>
+                                                <Status render={<span />} className="hidden sm:inline-flex">{commandBarParsed.command.id}</Status>
                                             )}
                                         </div>
                                     </div>
@@ -3302,9 +3236,8 @@ export default function LivePanelPage() {
                                 </>
                             )}
                         </div>
-                    </div>
-                </div>
-            )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
