@@ -2282,7 +2282,17 @@ export default function LivePanelPage() {
         <div className="live-panel fixed inset-0 flex flex-col overflow-hidden bg-background text-foreground">
             <div className="shrink-0 border-b border-border bg-background">
                 <DashboardHeader>
-                    <div className="flex min-w-0 items-center gap-3"><Button asChild variant="ghost" size="icon" className="size-8"><Link href={`/dashboard/${guildId}`} aria-label="Back to dashboard"><PanelBackIcon className="size-4" /></Link></Button><div className="min-w-0"><h1 className="text-sm font-semibold tracking-tight flex items-center gap-3"><PageIcon name="live" compact />Live panel</h1><p className="truncate text-xs text-muted-foreground">{serverName}</p></div><Status variant="success" className="hidden sm:inline-flex"><StatusIndicator />Live</Status></div>
+                    <div className="flex min-w-0 items-center gap-3">
+                        <Button asChild variant="ghost" size="icon" className="size-8"><Link href={`/dashboard/${guildId}`} aria-label="Back to dashboard"><PanelBackIcon className="size-4" /></Link></Button>
+                        <div className="flex min-w-0 items-center gap-2">
+                            <PageIcon name="live" compact />
+                            <div className="min-w-0 space-y-0.5">
+                                <h1 className="whitespace-nowrap text-sm font-semibold leading-4 tracking-tight">Live panel</h1>
+                                <p className="truncate text-xs leading-4 text-muted-foreground" title={serverName}>{serverName}</p>
+                            </div>
+                        </div>
+                        <Status variant="success" className="hidden sm:inline-flex"><StatusIndicator />Live</Status>
+                    </div>
                     <div className="flex min-w-0 flex-1 items-center gap-4 overflow-x-auto text-xs" aria-label="Live panel counts">
                         {[
                             { label: 'Servers', value: enrichedServers.length },
