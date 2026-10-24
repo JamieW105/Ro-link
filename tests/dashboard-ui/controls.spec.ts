@@ -222,11 +222,49 @@ test("logging selection uses Dice and retains the None value", async ({ page }) 
   expect(errors).toEqual([]);
 });
 
-test("dashboard entry uses shared controls", async ({ page }) => {
+test("dashboard entry uses compact Dice cards and permission-aware actions", async ({ page }) => {
+  const errors = await mockDashboard(page, false, { is_admin: false, can_access_dashboard: false, can_access_live_panel: true });
+  const inviteGuild = { ...guild, id: 'invite-server', name: 'Invite community', hasBot: false };
+  const restrictedGuild = { ...guild, id: 'role-server', name: 'Live panel staff', owner: false, permissions: '0', isRoleAccess: true };
+  await page.route('**/api/guilds', route => route.fulfill({ json: [inviteGuild, restrictedGuild, guild] }));
+  for (const theme of ['light', 'dark']) {
+    await page.addInitScript(mode => localStorage.setItem('rolink-theme', mode), theme);
+    await page.goto('/dashboard');
+    const cards = page.getByRole('main').locator('[data-slot="card"]');
+    await expect(cards).toHaveCount(3);
+    await expect(cards.first()).toHaveAttribute('aria-label', restrictedGuild.name);
+    const restricted = page.getByRole('region', { name: restrictedGuild.name, exact: true });
+    await expect(restricted.getByRole('link', { name: 'Live Panel', exact: true })).toHaveAttribute('data-slot', 'button');
+    await expect(restricted.getByRole('link', { name: 'Dashboard', exact: true })).toHaveCount(0);
+    const owner = page.getByRole('region', { name: guild.name, exact: true });
+    await expect(owner.getByRole('link', { name: 'Dashboard', exact: true })).toHaveAttribute('href', `/dashboard/${serverId}`);
+    await expect(owner.getByText('Installed', { exact: true })).toHaveAttribute('data-slot', 'status-label');
+    await expect(owner.locator('[data-slot="card-header"]')).toBeVisible();
+    await expect(owner.locator('[data-slot="card-footer"]')).toBeVisible();
+    await expect(owner.getByRole('link', { name: /marketplace|staff shifts/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /sign out/i })).toHaveAttribute('data-slot', 'button');
+    await expect(page.getByRole('link', { name: 'Open Marketplace' })).toHaveAttribute('data-slot', 'button');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(page.locator('.dice-ui-dashboard').first()).toHaveCSS('color-scheme', theme);
+    await page.screenshot({ path: `/workspace/artifacts/dice-${theme}-server-list-${test.info().project.name}.png` });
+  }
+  expect(errors).toEqual([]);
+});
+
+test("dashboard entry keeps themed empty, error, and expired-session states", async ({ page }) => {
   const errors = await mockDashboard(page);
-  await page.goto("/dashboard");
-  await expect(page.getByText(guild.name, { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: /sign out/i })).toHaveAttribute("data-slot", "button");
+  for (const theme of ['light', 'dark']) {
+    await page.addInitScript(mode => localStorage.setItem('rolink-theme', mode), theme);
+    for (const state of ['empty', 'error', 'expired']) {
+      await page.route('**/api/guilds', route => route.fulfill({ status: state === 'empty' ? 200 : state === 'expired' ? 401 : 500, json: state === 'empty' ? [] : { error: 'Unable to fetch Discord servers.' } }));
+      await page.goto('/dashboard');
+      await expect(page.getByRole('heading', { name: state === 'empty' ? 'No servers available' : state === 'expired' ? 'Discord session expired' : 'Could not load servers', exact: true })).toBeVisible();
+      if (state !== 'empty') await expect(page.getByRole('button', { name: state === 'expired' ? 'Sign in again' : 'Retry', exact: true })).toHaveAttribute('data-slot', 'button');
+      const description = page.getByRole('main').locator('[data-slot="card-description"]');
+      const colors = await description.evaluate(el => ({ text: getComputedStyle(el).color, background: getComputedStyle(el.closest('[data-slot="card"]')!).backgroundColor }));
+      expect(colors.text).not.toEqual(colors.background);
+    }
+  }
   expect(errors).toEqual([]);
 });
 

@@ -4,62 +4,16 @@ import { PageIcon } from "@/components/dashboard/PageIcon";
 import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
 
-import { Card } from '@/components/ui/card';
-
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-
-
-import { BriefcaseBusiness as LucideBriefcaseBusiness } from 'lucide-react';
-
+import { Status, StatusLabel } from '@/components/ui/status';
 import { useSession, signIn, signOut } from "next-auth/react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Image from 'next/image';
 import Link from 'next/link';
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
 import { getDiscordGuildIconProxyUrl } from "@/lib/discordMedia";
-import { Gauge, LogOut, MonitorPlay, Plus, ShieldAlert, Store } from "lucide-react";
-
-const LogOutIcon = () => <LogOut size={14} aria-hidden="true" />;
-const PlusIcon = () => <Plus size={14} strokeWidth={2.5} aria-hidden="true" />;
-const DashboardIcon = () => <Gauge size={15} aria-hidden="true" />;
-const MarketplaceIcon = () => <Store size={15} aria-hidden="true" />;
-const LivePanelIcon = () => <MonitorPlay size={15} aria-hidden="true" />;
-
-function ActionTooltip({ label }: { label: string }) {
-    return (
-        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground opacity-0 transition-all group-hover/server-action:translate-y-0 group-hover/server-action:opacity-100">
-            {label}
-        </span>
-    );
-}
-
-function ServerIconLink({
-    href,
-    label,
-    children,
-    tone = 'default',
-}: {
-    href: string;
-    label: string;
-    children: ReactNode;
-    tone?: 'default' | 'live' | 'market';
-}) {
-    const toneClass = tone === 'live'
-        ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 hover:border-emerald-200 hover:bg-emerald-50'
-        : tone === 'market'
-            ? 'border-border bg-accent text-foreground hover:border-border hover:bg-accent'
-            : 'border-border bg-muted text-foreground hover:border-border hover:bg-accent hover:text-foreground';
-
-    return (
-        <Link
-            href={href}
-            aria-label={label}
-            className={`group/server-action relative flex h-10 w-10 items-center justify-center rounded-lg border transition-all ${toneClass}`}
-        >
-            {children}
-            <ActionTooltip label={label} />
-        </Link>
-    );
-}
+import { BriefcaseBusiness, Gauge, Loader2, LogOut, MonitorPlay, Plus, ShieldAlert, Store } from "lucide-react";
 
 interface Guild {
     id: string;
@@ -223,151 +177,102 @@ export default function Dashboard() {
 
     if (status === "loading") {
         return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-border border-t-transparent rounded-full animate-spin"></div>
+            <div role="status" className="flex min-h-dvh items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />Loading dashboard…
             </div>
         );
     }
 
     if (status === "unauthenticated") {
         return (
-            <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6 text-center">
-                <div className="w-16 h-16 bg-muted rounded-xl flex items-center justify-center mb-6 text-muted-foreground border border-border">
-                    <ShieldAlert size={32} aria-hidden="true" />
-                </div>
-                <h1 className="text-2xl font-medium mb-2 tracking-tight">Access Denied</h1>
-                <p className="text-muted-foreground mb-8 max-w-sm text-sm">Please authenticate with Discord to manage your community servers.</p>
-                <Button variant="default" size="default"
-                    onClick={() => signIn('discord')}
-                    className="transition-all"
-                >
-                    Sign In with Discord
-                </Button>
-            </div>
+            <main className="flex min-h-dvh items-center justify-center bg-background p-4 text-foreground">
+                <Card className="w-full max-w-md">
+                    <CardHeader>
+                        <ShieldAlert className="mb-2 size-5 text-muted-foreground" aria-hidden="true" />
+                        <CardTitle>Sign in to your dashboard</CardTitle>
+                        <CardDescription>Authenticate with Discord to manage your community servers.</CardDescription>
+                    </CardHeader>
+                    <CardFooter><Button type="button" onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}>Sign In with Discord</Button></CardFooter>
+                </Card>
+            </main>
         );
     }
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="min-h-dvh bg-background text-foreground">
             <DashboardHeader contained>
                 <DashboardBrand href="/" />
                 <div className="flex shrink-0 items-center gap-2">
                     <ThemeToggle />
-                    {sessionUserId === '953414442060746854' && <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex"><Link href="/management"><LucideBriefcaseBusiness className="size-3.5" />Management</Link></Button>}
+                    {sessionUserId === '953414442060746854' && <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex"><Link href="/management"><BriefcaseBusiness className="size-3.5" aria-hidden="true" />Management</Link></Button>}
                     <span className="hidden max-w-40 truncate text-xs text-muted-foreground sm:inline">{session?.user?.name}</span>
-                    <Button variant="outline" size="sm" type="button" onClick={handleSignOut}><LogOutIcon />Sign Out</Button>
+                    <Button variant="outline" size="sm" type="button" onClick={handleSignOut}><LogOut className="size-3.5" aria-hidden="true" />Sign Out</Button>
                 </div>
             </DashboardHeader>
 
-            <div className="motion-page max-w-7xl mx-auto px-4 sm:px-8 py-6 md:py-12">
-                <header className="mb-6 flex flex-col gap-4 md:mb-12 md:flex-row md:items-end md:justify-between">
+            <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8">
+                <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                        <h1 className="text-xl md:text-4xl font-semibold text-foreground tracking-tight mb-1 flex items-center gap-3"><PageIcon name="overview" />Select a Server</h1>
-                        <p className="text-muted-foreground text-xs md:text-base font-medium">Choose a community to manage and monitor.</p>
+                        <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight"><PageIcon name="overview" />Select a Server</h1>
+                        <p className="mt-1 text-sm text-muted-foreground">Choose a community to manage and monitor.</p>
                     </div>
-                    <div className="ml-auto flex shrink-0 items-center gap-2">
-                        <Button asChild variant="secondary" size="icon">
-                            <Link href="/dashboard/marketplace" aria-label="Open Marketplace" title="Open Marketplace">
-                                <MarketplaceIcon />
-                            </Link>
-                        </Button>
-                        <Button asChild variant="outline" size="icon" className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-300">
-                            <Link href="/dashboard/creator/modules" aria-label="Creator Dashboard" title="Creator Dashboard">
-                                <PlusIcon />
-                            </Link>
-                        </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button asChild variant="outline" size="sm"><Link href="/dashboard/marketplace" aria-label="Open Marketplace"><Store className="size-4" aria-hidden="true" />Marketplace</Link></Button>
+                        <Button asChild variant="outline" size="sm"><Link href="/dashboard/creator/modules" aria-label="Creator Dashboard"><Plus className="size-4" aria-hidden="true" />Creator Dashboard</Link></Button>
                     </div>
                 </header>
 
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center py-32">
-                        <div className="w-10 h-10 border-2 border-border border-t-transparent rounded-full animate-spin mb-6"></div>
-                        <p className="text-muted-foreground text-sm font-medium animate-pulse">Loading servers...</p>
-                    </div>
+                    <Card><CardContent role="status" className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" aria-hidden="true" />Loading servers…</CardContent></Card>
                 ) : guildsError ? (
-                    <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-8 text-center">
-                        <h2 className="text-lg font-medium text-foreground">
-                            {needsReauthentication ? 'Discord session expired' : 'Could not load servers'}
-                        </h2>
-                        <p className="mt-2 text-sm font-medium text-red-100/80">
-                            {needsReauthentication ? 'Sign in with Discord again to refresh your server access.' : guildsError}
-                        </p>
-                        <Button variant="destructive" size="default"
-                            onClick={() => needsReauthentication
-                                ? signIn('discord', { callbackUrl: '/dashboard' })
-                                : window.location.reload()}
-                            className="mt-6 transition-colors"
-                        >
-                            {needsReauthentication ? 'Sign in again' : 'Retry'}
-                        </Button>
-                    </div>
-                ) : sortedGuilds.length === 0 ? (
-                    <Card className="rounded-xl border border-border bg-card p-8 text-center">
-                        <h2 className="text-lg font-medium text-foreground">No servers available</h2>
-                        <p className="mt-2 text-sm font-medium text-muted-foreground">Ro-Link could not find any Discord servers you can manage.</p>
+                    <Card role="alert">
+                        <CardHeader>
+                            <CardTitle>{needsReauthentication ? 'Discord session expired' : 'Could not load servers'}</CardTitle>
+                            <CardDescription>{needsReauthentication ? 'Sign in with Discord again to refresh your server access.' : guildsError}</CardDescription>
+                        </CardHeader>
+                        <CardFooter><Button type="button" variant="outline" onClick={() => needsReauthentication ? signIn('discord', { callbackUrl: '/dashboard' }) : window.location.reload()}>{needsReauthentication ? 'Sign in again' : 'Retry'}</Button></CardFooter>
                     </Card>
+                ) : sortedGuilds.length === 0 ? (
+                    <Card><CardHeader>
+                        <CardTitle>No servers available</CardTitle>
+                        <CardDescription>Ro-Link could not find any Discord servers you can manage.</CardDescription>
+                    </CardHeader></Card>
                 ) : (
-                    <div className="motion-list grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
-                        {sortedGuilds.map(guild => (
-                            <Card key={guild.id} className="interactive-lift subtle-glow group relative flex flex-col overflow-hidden rounded-xl border border-border bg-card p-5 transition-all hover:border-border sm:p-6">
-                                <div className="mb-5 flex flex-col items-start gap-4 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
-                                    <div className="relative">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {sortedGuilds.map(guild => {
+                            const dashboardAccess = canOpenDashboardFromServerList(guild, guildPermissions[guild.id]);
+                            const livePanelAccess = canOpenLivePanelFromServerList(guild, guildPermissions[guild.id]);
+                            return (
+                                <Card key={guild.id} aria-label={guild.name} className="flex min-w-0 flex-col">
+                                    <CardHeader className="flex-row items-center gap-3 p-4">
                                         {guild.icon ? (
-                                            <img
-                                                src={getDiscordGuildIconProxyUrl(guild.id, guild.icon)}
-                                                alt={guild.name}
-                                                className="w-16 h-16 rounded-xl relative z-10 border border-border"
-                                            />
+                                            <Image unoptimized src={getDiscordGuildIconProxyUrl(guild.id, guild.icon)} alt="" width={40} height={40} className="size-10 shrink-0 rounded-md" />
                                         ) : (
-                                            <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center text-xl font-medium text-foreground relative z-10 border border-border">
-                                                {guild.name.substring(0, 1)}
-                                            </div>
+                                            <div aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-medium text-muted-foreground">{guild.name.substring(0, 1)}</div>
                                         )}
-                                        {guild.hasBot && (
-                                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-border z-20"></div>
-                                        )}
-                                    </div>
-                                    <div className="break-all rounded-md border border-border bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
-                                        ID: {guild.id.substring(0, 8)}
-                                    </div>
-                                </div>
-
-                                <h3 className="mb-6 w-full break-words text-lg font-medium tracking-tight text-foreground sm:mb-8">{guild.name}</h3>
-
-                                <div className="mt-auto">
-                                    {guild.hasBot ? (
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex items-center gap-2">
-                                                {canOpenDashboardFromServerList(guild, guildPermissions[guild.id]) && (
-                                                    <ServerIconLink href={`/dashboard/${guild.id}`} label="Dashboard">
-                                                        <DashboardIcon />
-                                                    </ServerIconLink>
-                                                )}
-                                                {canOpenLivePanelFromServerList(guild, guildPermissions[guild.id]) && (
-                                                    <ServerIconLink href={`/dashboard/${guild.id}/live-panel`} label="Live Panel" tone="live">
-                                                        <LivePanelIcon />
-                                                    </ServerIconLink>
-                                                )}
-                                            </div>
+                                        <div className="min-w-0 space-y-1.5">
+                                            <CardTitle className="break-words text-sm leading-snug">{guild.name}</CardTitle>
+                                            <Status variant={guild.hasBot ? 'success' : 'default'} className="px-2 py-0.5"><StatusLabel>{guild.hasBot ? 'Installed' : 'Not installed'}</StatusLabel></Status>
                                         </div>
-                                    ) : (
-                                        <Button asChild className="w-full">
-                                            <a
-                                                href={getDiscordBotInviteUrl(guild.id)}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                            >
-                                                <PlusIcon />
-                                                Invite
-                                            </a>
-                                        </Button>
-                                    )}
-                                </div>
-                            </Card>
-                        ))}
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-4"><p className="break-all text-xs text-muted-foreground">Server ID: {guild.id}</p></CardContent>
+                                    <CardFooter className="mt-auto flex-wrap border-t border-border p-4">
+                                        {guild.hasBot ? (
+                                            <>
+                                                {dashboardAccess && <Button asChild size="sm"><Link href={`/dashboard/${guild.id}`}><Gauge className="size-4" aria-hidden="true" />Dashboard</Link></Button>}
+                                                {livePanelAccess && <Button asChild variant="outline" size="sm"><Link href={`/dashboard/${guild.id}/live-panel`}><MonitorPlay className="size-4" aria-hidden="true" />Live Panel</Link></Button>}
+                                                {!dashboardAccess && !livePanelAccess && <p className="text-xs text-muted-foreground">Ask a server administrator for dashboard access.</p>}
+                                            </>
+                                        ) : (
+                                            <Button asChild size="sm"><a href={getDiscordBotInviteUrl(guild.id)} target="_blank" rel="noopener noreferrer"><Plus className="size-4" aria-hidden="true" />Invite</a></Button>
+                                        )}
+                                    </CardFooter>
+                                </Card>
+                            );
+                        })}
                     </div>
                 )}
-            </div>
+            </main>
         </div>
     );
 }
