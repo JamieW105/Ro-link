@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { searchRobloxUsers } from '@/lib/robloxUserSearch';
 import { normalizeLivePlayerList } from '@/lib/livePlayers';
 import { requireDashboardAccess, trimString } from '@/lib/serverDashboardAccess';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
@@ -57,20 +58,10 @@ async function fetchLiveServers(serverId: string) {
     return (data || []) as LiveServerRow[];
 }
 
-async function fetchRobloxUsers(query: string): Promise<OptionItem[]> {
-    if (query.length < 2) return [];
-
-    const searchResponse = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(query)}&limit=10`, {
-        headers: { Accept: 'application/json' },
-        cache: 'no-store',
-    });
-
-    if (!searchResponse.ok) {
-        throw new Error(`Roblox user search failed (${searchResponse.status}).`);
-    }
-
-    const searchPayload = await searchResponse.json().catch(() => ({}));
-    const users = (Array.isArray(searchPayload.data) ? searchPayload.data : []) as RobloxSearchUser[];
+async function fetchRobloxUsers(query: string): Promise<{ options: OptionItem[]; searchUnavailable: boolean }> {
+    const result = await searchRobloxUsers(query);
+    if (result.unavailable) return { options: [], searchUnavailable: true };
+    const users = result.users as RobloxSearchUser[];
     const userIds = users
         .map((user) => trimString(user?.id))
         .filter(Boolean);
@@ -79,7 +70,7 @@ async function fetchRobloxUsers(query: string): Promise<OptionItem[]> {
     if (userIds.length > 0) {
         const thumbnailResponse = await fetch(
             `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userIds.map((userId) => encodeURIComponent(userId)).join(',')}&size=150x150&format=Png&isCircular=false`,
-            { headers: { Accept: 'application/json' }, cache: 'no-store' },
+            { headers: { Accept: 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(3000) },
         ).catch(() => null);
 
         if (thumbnailResponse?.ok) {
@@ -91,7 +82,7 @@ async function fetchRobloxUsers(query: string): Promise<OptionItem[]> {
         }
     }
 
-    return users
+    const options = users
         .map((user): OptionItem | null => {
             const userId = trimString(user?.id);
             const username = trimString(user?.name);
@@ -121,6 +112,7 @@ async function fetchRobloxUsers(query: string): Promise<OptionItem[]> {
             };
         })
         .filter((item): item is OptionItem => Boolean(item));
+    return { options, searchUnavailable: false };
 }
 
 function buildServerOptions(liveServers: LiveServerRow[], query: string): OptionItem[] {
@@ -213,7 +205,7 @@ export async function GET(req: NextRequest) {
 
     try {
         if (type === 'player' && source === 'roblox-users') {
-            return NextResponse.json({ options: await fetchRobloxUsers(query) });
+            return NextResponse.json(await fetchRobloxUsers(query));
         }
 
         const liveServers = await fetchLiveServers(serverId);
