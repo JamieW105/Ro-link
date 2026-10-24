@@ -2308,9 +2308,7 @@ export default function LivePanelPage() {
                     </div>
                     <div className="flex shrink-0 items-center gap-2"><ThemeToggle /><Button asChild variant="outline" size="sm"><Link href="/dashboard">All servers</Link></Button></div>
                 </DashboardHeader>
-                <div className="border-t border-border bg-muted/20 px-4 py-2 sm:px-8">
-                    <StaffShiftProgress serverId={guildId} />
-                </div>
+                <StaffShiftProgress serverId={guildId} />
             </div>
 
             {notice && (

@@ -563,7 +563,7 @@ for (const scenario of [
   { name: 'staff shifts are disabled', enabled: false, quota: 5 },
   { name: 'the wave has no quota', enabled: true, quota: 0 },
 ]) {
-  test(`Live Panel hides quota progress when ${scenario.name}`, async ({ page }) => {
+  test(`Live Panel hides disabled shift UI when ${scenario.name}`, async ({ page }) => {
     const errors = await mockDashboard(page);
     await page.route('**/api/dashboard/staff-shifts?*', route => route.fulfill({json: {
       ...sampleShiftReport,
@@ -572,14 +572,15 @@ for (const scenario of [
     }}));
     await page.goto(`/dashboard/${serverId}/live-panel`);
     const personal = page.getByRole('region', {name:'Your staff shifts',exact:true});
-    await expect(personal.getByText('4.00 total hours · 6 shifts', {exact:true})).toBeVisible();
-    await expect(personal.getByText('Wave quota', {exact:true})).toHaveCount(0);
-    await expect(personal.getByRole('progressbar')).toHaveCount(0);
     if (scenario.enabled) {
+      await expect(personal.getByText('4.00 total hours · 6 shifts', {exact:true})).toBeVisible();
+      await expect(personal.getByText('Wave quota', {exact:true})).toHaveCount(0);
+      await expect(personal.getByRole('progressbar')).toHaveCount(0);
       await expect(personal.getByRole('button', {name:'End shift',exact:true})).toBeVisible();
     } else {
-      await expect(personal.getByText('Staff shifts are disabled.', {exact:true})).toBeVisible();
-      await expect(personal.getByRole('button')).toHaveCount(0);
+      await expect(page.getByLabel('Live panel counts')).toBeVisible();
+      await expect(personal).toHaveCount(0);
+      await expect(page.locator('[data-slot="staff-shift-summary"]')).toHaveCount(0);
     }
     expect(errors).toEqual([]);
   });
