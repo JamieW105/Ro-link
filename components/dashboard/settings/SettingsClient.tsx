@@ -37,7 +37,7 @@ import {
     type CustomDashboardTheme,
 } from "@/lib/customDashboardSettings";
 import { useSession } from "next-auth/react";
-import { Hash, Plus, Save, Shield, Trash2 } from "lucide-react";
+import { Command, FileText, Hash, KeyRound, LayoutTemplate, Plus, Save, ScrollText, Shield, Trash2, TriangleAlert, Users } from "lucide-react";
 
 const SaveIcon = () => <Save size={18} aria-hidden="true" />;
 const TrashIcon = () => <Trash2 size={14} aria-hidden="true" />;
@@ -805,36 +805,43 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     const settingsTiles = [
         {
             title: 'Game Connection',
+            icon: KeyRound,
             description: 'Configure Roblox place IDs, API keys, and install the game script.',
             href: `/dashboard/${id}/settings/setup`,
         },
         {
             title: 'Role Permissions',
+            icon: Users,
             description: 'Assign dashboard permissions and Roblox admin panel commands to Discord roles.',
             href: `/dashboard/${id}/settings/roles`,
         },
         {
             title: 'Command Modules',
+            icon: Command,
             description: 'Enable or disable admin and misc command groups server-wide.',
             href: `/dashboard/${id}/settings/commands`,
         },
         {
             title: 'Audit Logging',
+            icon: ScrollText,
             description: 'Select the Discord channel for moderation and administrative action logs.',
             href: `/dashboard/${id}/settings/logging`,
         },
         {
             title: 'Report System',
+            icon: TriangleAlert,
             description: 'Turn reports on or off and pick the Discord channel for report notifications.',
             href: `/dashboard/${id}/settings/reports`,
         },
         ...(hasCustomDashboardSetup ? [{
             title: 'Custom Dashboard',
+            icon: LayoutTemplate,
             description: 'Edit the custom URL, sign-in metadata, layout, and color scheme.',
             href: `/dashboard/${id}/settings/dashboard`,
         }] : []),
         {
             title: 'Activity Logs',
+            icon: FileText,
             description: 'Review recent dashboard and moderation activity for this server.',
             href: `/dashboard/${id}/settings/logs`,
         },
@@ -896,7 +903,10 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                             {settingsTiles.map((tile) => (
                                 <Card key={tile.href} className="flex flex-col">
                                     <CardHeader>
-                                        <CardTitle>{tile.title}</CardTitle>
+                                        <CardTitle className="flex items-center gap-3">
+                                            <tile.icon className="size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                            {tile.title}
+                                        </CardTitle>
                                         <CardDescription>{tile.description}</CardDescription>
                                     </CardHeader>
                                     <CardContent className="mt-auto">
