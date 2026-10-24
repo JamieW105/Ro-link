@@ -760,3 +760,49 @@ test("role command ticks contrast in light and dark modes", async ({ page }) => 
   await expect(command.locator('svg')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test("dashboard panels use Dice headers without repeating page icons", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await mockDashboard(page);
+  for (const [route, title] of [
+    ['settings/commands', 'Global Command Modules'],
+    ['settings/logging', 'Audit Logging'],
+    ['settings/reports', 'Report System'],
+    ['settings/dashboard', 'Custom Dashboard'],
+    ['verification', 'Toggle Verification'],
+  ]) {
+    await page.goto(`/dashboard/${serverId}/${route}`);
+    await expect(page.locator('[data-slot="page-icon"]')).toHaveCount(1);
+    const titleElement = page.getByRole('heading', { name: title, level: 2, exact: true });
+    await expect(titleElement).toHaveAttribute('data-slot', 'card-title');
+    const header = page.locator('[data-slot="card-header"]').filter({ has: titleElement });
+    await expect(header).toHaveAttribute('data-slot', 'card-header');
+    await expect(header.locator('svg')).toHaveCount(0);
+    for (const theme of ['light', 'dark']) {
+      const toggle = page.getByRole('button', { name: `Switch to ${theme} mode`, exact: true });
+      if (await toggle.count()) await toggle.click();
+      await expect(page.locator('.dice-ui-dashboard').first()).toHaveCSS('color-scheme', theme);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await page.screenshot({ path: `/workspace/artifacts/panels-${route.replaceAll('/', '-')}-${theme}-${test.info().project.name}.png` });
+    }
+  }
+  await page.goto(`/dashboard/${serverId}/settings/commands`);
+  const admin = page.getByRole('switch', { name: 'Admin commands', exact: true });
+  const before = await admin.isChecked();
+  await admin.focus();
+  await page.keyboard.press('Space');
+  const save = page.waitForRequest(request => request.url().includes('/api/dashboard/server-config') && request.method() === 'PATCH');
+  await page.getByRole('button', { name: 'Save Settings', exact: true }).click();
+  expect((await save).postDataJSON().updates).toMatchObject({ admin_cmds_enabled: !before });
+  await page.goto(`/dashboard/${serverId}/settings`);
+  await page.getByRole('button', { name: 'Remove Ro-Link', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Remove Ro-Link', exact: true });
+  await expect(dialog).toBeVisible();
+  const deleteData = dialog.getByRole('checkbox', { name: /Delete Ro-Link Data/ });
+  await deleteData.focus();
+  await page.keyboard.press('Space');
+  await expect(deleteData).toBeChecked();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  expect(errors).toEqual([]);
+});

@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 
 import { Select } from '@/components/ui/select';
 
-import { ArrowRight as LucideArrowRight, Check as LucideCheck, ChevronDown as LucideChevronDown, FileText as LucideFileText, TriangleAlert as LucideTriangleAlert, X as LucideX } from 'lucide-react';
+import { ArrowRight as LucideArrowRight, ChevronDown as LucideChevronDown, X as LucideX } from 'lucide-react';
 
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
@@ -37,12 +37,9 @@ import {
     type CustomDashboardTheme,
 } from "@/lib/customDashboardSettings";
 import { useSession } from "next-auth/react";
-import { Command, Hash, Info, Plus, Save, Settings, Shield, Trash2 } from "lucide-react";
+import { Hash, Plus, Save, Shield, Trash2 } from "lucide-react";
 
-const SettingsIcon = () => <Settings size={24} aria-hidden="true" />;
 const SaveIcon = () => <Save size={18} aria-hidden="true" />;
-const CommandIcon = () => <Command size={18} aria-hidden="true" />;
-const InfoIcon = () => <Info size={18} aria-hidden="true" />;
 const TrashIcon = () => <Trash2 size={14} aria-hidden="true" />;
 
 interface DiscordRole {
@@ -810,43 +807,36 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
             title: 'Game Connection',
             description: 'Configure Roblox place IDs, API keys, and install the game script.',
             href: `/dashboard/${id}/settings/setup`,
-            tone: 'emerald',
         },
         {
             title: 'Role Permissions',
             description: 'Assign dashboard permissions and Roblox admin panel commands to Discord roles.',
             href: `/dashboard/${id}/settings/roles`,
-            tone: 'purple',
         },
         {
             title: 'Command Modules',
             description: 'Enable or disable admin and misc command groups server-wide.',
             href: `/dashboard/${id}/settings/commands`,
-            tone: 'sky',
         },
         {
             title: 'Audit Logging',
             description: 'Select the Discord channel for moderation and administrative action logs.',
             href: `/dashboard/${id}/settings/logging`,
-            tone: 'indigo',
         },
         {
             title: 'Report System',
             description: 'Turn reports on or off and pick the Discord channel for report notifications.',
             href: `/dashboard/${id}/settings/reports`,
-            tone: 'red',
         },
         ...(hasCustomDashboardSetup ? [{
             title: 'Custom Dashboard',
             description: 'Edit the custom URL, sign-in metadata, layout, and color scheme.',
             href: `/dashboard/${id}/settings/dashboard`,
-            tone: 'amber',
         }] : []),
         {
             title: 'Activity Logs',
             description: 'Review recent dashboard and moderation activity for this server.',
             href: `/dashboard/${id}/settings/logs`,
-            tone: 'slate',
         },
     ];
     const infoItems = view === 'roles'
@@ -903,41 +893,19 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {view === 'overview' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            {settingsTiles.map((tile) => {
-                                const toneClass = tile.tone === 'emerald'
-                                    ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900 group-hover:border-emerald-200'
-                                    : tile.tone === 'purple'
-                                        ? 'bg-accent text-foreground border-border group-hover:border-border'
-                                        : tile.tone === 'indigo'
-                                            ? 'bg-accent text-foreground border-border group-hover:border-border'
-                                            : tile.tone === 'red'
-                                                ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900 group-hover:border-red-200'
-                                                : tile.tone === 'amber'
-                                                    ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900 group-hover:border-amber-200'
-                                                : tile.tone === 'sky'
-                                                    ? 'bg-accent text-foreground border-border group-hover:border-border'
-                                                    : 'bg-muted text-muted-foreground border-border group-hover:border-border';
-
-                                return (
-                                    <Button variant="outline" size="default"
-                                        key={tile.href}
-                                        type="button"
-                                        onClick={() => router.push(tile.href)}
-                                        className="h-auto min-h-9 justify-start whitespace-normal py-3 group min-h-44 text-left transition-all"
-                                    >
-                                        <div className={`mb-6 inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-colors ${toneClass}`}>
-                                            <SettingsIcon />
-                                        </div>
-                                        <div className="flex items-start justify-between gap-4">
-                                            <div>
-                                                <h3 className="text-sm font-semibold text-foreground">{tile.title}</h3>
-                                                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{tile.description}</p>
-                                            </div>
-                                            <LucideArrowRight className="mt-0.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" width="18" height="18" strokeWidth="2.5" />
-                                        </div>
-                                    </Button>
-                                );
-                            })}
+                            {settingsTiles.map((tile) => (
+                                <Card key={tile.href} className="flex flex-col">
+                                    <CardHeader>
+                                        <CardTitle>{tile.title}</CardTitle>
+                                        <CardDescription>{tile.description}</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="mt-auto">
+                                        <Button type="button" variant="outline" onClick={() => router.push(tile.href)}>
+                                            Open {tile.title}<LucideArrowRight className="size-4" aria-hidden="true" />
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            ))}
                         </div>
                     )}
 
@@ -945,7 +913,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         <div className="space-y-4">
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2"><Shield className="size-4" aria-hidden="true" />Discord roles</CardTitle>
+                                    <CardTitle>Discord roles</CardTitle>
                                     <CardDescription>Add a Discord role, then choose what its members can access. Changes save automatically.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -1078,19 +1046,15 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     {/* Custom Dashboard Config Section */}
                     {view === 'dashboard' && (
                     <div className="space-y-6">
-                        <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
-                            <div className="flex items-start gap-6 mb-8">
-                                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
-                                    <SettingsIcon />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-medium text-foreground mb-2">Custom Dashboard</h3>
-                                    <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">Set the custom dashboard address and control how the branded sign-in and dashboard shell appear.</p>
-                                </div>
-                            </div>
+                        <Card>
+                            <CardHeader>
+                            <CardTitle>Custom Dashboard</CardTitle>
+                            <CardDescription>Set the custom dashboard address and control how the branded sign-in and dashboard shell appear.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
 
                             <div className="grid grid-cols-1 gap-6">
-                                <Card className="bg-card p-6 rounded-xl border border-border">
+                                <Card className="p-6">
                                     <label className="text-xs font-medium text-muted-foreground block mb-2">Dashboard Subdomain</label>
                                     <div className="flex rounded-xl border border-border bg-muted focus-within:border-amber-500">
                                         <Input
@@ -1117,7 +1081,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                                 <div className="space-y-6">
                                     <div className="space-y-6">
-                                        <Card className="bg-card p-6 rounded-xl border border-border">
+                                        <Card className="p-6">
                                             <label className="text-xs font-medium text-muted-foreground block mb-2">Dashboard Title</label>
                                             <Input
                                                 value={customDashboardMetadata.title}
@@ -1128,7 +1092,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                             />
                                         </Card>
 
-                                        <Card className="bg-card p-6 rounded-xl border border-border">
+                                        <Card className="p-6">
                                             <label className="text-xs font-medium text-muted-foreground block mb-2">Description</label>
                                             <Textarea
                                                 value={customDashboardMetadata.description}
@@ -1140,7 +1104,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                         </Card>
 
                                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                                            <Card className="bg-card p-6 rounded-xl border border-border">
+                                            <Card className="p-6">
                                                 <label className="text-xs font-medium text-muted-foreground block mb-2">Logo URL</label>
                                                 <Input
                                                     value={customDashboardMetadata.logoUrl}
@@ -1150,7 +1114,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                 />
                                             </Card>
 
-                                            <Card className="bg-card p-6 rounded-xl border border-border">
+                                            <Card className="p-6">
                                                 <label className="text-xs font-medium text-muted-foreground block mb-2">Support URL</label>
                                                 <Input
                                                     value={customDashboardMetadata.supportUrl}
@@ -1163,13 +1127,12 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     </div>
                                 </div>
                             </div>
-                        </Card>
+                        </CardContent>
+                    </Card>
 
-                        <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10">
-                            <div className="mb-6">
-                                <h3 className="text-lg font-medium text-foreground mb-2">Layout</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed">Choose how dense the custom-host dashboard shell should feel.</p>
-                            </div>
+                        <Card>
+                            <CardHeader><CardTitle>Layout</CardTitle><CardDescription>Choose how dense the custom-host dashboard shell should feel.</CardDescription></CardHeader>
+                            <CardContent>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                 {CUSTOM_DASHBOARD_LAYOUTS.map((layout) => (
                                     <Button variant="outline" size="default"
@@ -1190,13 +1153,12 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     </Button>
                                 ))}
                             </div>
+                        </CardContent>
                         </Card>
 
-                        <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10">
-                            <div className="mb-6">
-                                <h3 className="text-lg font-medium text-foreground mb-2">Theme</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed">Choose one of seven color schemes for custom dashboard branding.</p>
-                            </div>
+                        <Card>
+                            <CardHeader><CardTitle>Theme</CardTitle><CardDescription>Choose one of seven color schemes for custom dashboard branding.</CardDescription></CardHeader>
+                            <CardContent>
                             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                                 {CUSTOM_DASHBOARD_THEMES.map((theme) => (
                                     <Button variant="outline" size="default"
@@ -1221,6 +1183,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     </Button>
                                 ))}
                             </div>
+                        </CardContent>
                         </Card>
                     </div>
                     )}
@@ -1228,20 +1191,16 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* Command Config Section */}
                     {view === 'commands' && (
-                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
-                        <div className="flex items-start gap-6 mb-8">
-                            <div className="p-3 bg-accent rounded-xl text-foreground border border-border">
-                                <CommandIcon />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-medium text-foreground mb-2">Global Command Modules</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">Enable or disable specific command categories server-wide. Disabled commands will not function in-game regardless of role.</p>
-                            </div>
-                        </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Global Command Modules</CardTitle>
+                            <CardDescription>Enable or disable specific command categories server-wide. Disabled commands will not function in-game regardless of role.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
 
                         <div className="grid grid-cols-1 gap-6">
                             {/* Admin Commands Toggle */}
-                            <Card className="flex items-center justify-between p-6 bg-card border border-border rounded-xl">
+                            <Card className="flex items-center justify-between gap-4 p-6">
                                 <div>
                                     <h4 className="text-sm font-medium text-foreground tracking-tight">Admin Commands</h4>
                                     <p className="text-xs text-muted-foreground font-medium mt-1">Kick, Ban, Unban, Shutdown, Update</p>
@@ -1250,7 +1209,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                             </Card>
 
                             {/* Misc Commands Toggle */}
-                            <Card className="flex items-center justify-between p-6 bg-card border border-border rounded-xl">
+                            <Card className="flex items-center justify-between gap-4 p-6">
                                 <div>
                                     <h4 className="text-sm font-medium text-foreground tracking-tight">Misc Commands</h4>
                                     <p className="text-xs text-muted-foreground font-medium mt-1">Fly, Noclip, Heal, Teleport, etc.</p>
@@ -1258,23 +1217,20 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                 <Switch checked={miscCmds} onCheckedChange={setMiscCmds} aria-label="Miscellaneous commands" />
                             </Card>
                         </div>
+                    </CardContent>
                     </Card>
                     )}
 
                     {/* Logging Config Section */}
                     {view === 'logging' && (
-                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
-                        <div className="flex items-start gap-6 mb-8">
-                            <div className="p-3 bg-accent rounded-xl text-foreground border border-border">
-                                <LucideFileText width="18" height="18" strokeWidth="2" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-medium text-foreground mb-2">Audit Logging</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">Select a Discord channel where administrative actions (kick, ban, etc) will be logged.</p>
-                            </div>
-                        </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Audit Logging</CardTitle>
+                            <CardDescription>Select a Discord channel where administrative actions (kick, ban, etc) will be logged.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
 
-                        <Card className="bg-card p-6 rounded-xl border border-border">
+                        <Card className="p-6">
                             <label className="text-xs font-medium text-muted-foreground block mb-2">Logging Channel</label>
                             <Select
                                 value={loggingChannelId}
@@ -1289,34 +1245,29 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                 </p>
                             )}
                         </Card>
+                    </CardContent>
                     </Card>
                     )}
 
                     {/* Report System Config */}
                     {view === 'reports' && (
-                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
-                        <div className="flex items-start gap-6 mb-8">
-                            <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-xl text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900">
-                                <LucideTriangleAlert width="18" height="18" strokeWidth="2" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-medium text-foreground mb-2">Report System</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">Enable player reports via Discord and configure where they are forwarded.</p>
-                            </div>
-                        </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Report System</CardTitle>
+                            <CardDescription>Enable player reports via Discord and configure where they are forwarded.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Card className="bg-card p-6 rounded-xl border border-border flex items-center justify-between">
+                            <Card className="p-6 flex items-center justify-between">
                                 <div>
                                     <label className="text-xs font-medium text-muted-foreground block mb-1">Status</label>
-                                    <span className={`text-sm font-medium ${reportsEnabled ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground'}`}>
-                                        {reportsEnabled ? 'ENABLED' : 'DISABLED'}
-                                    </span>
+                                    <Status variant={reportsEnabled ? "success" : "default"}><StatusLabel>{reportsEnabled ? 'Enabled' : 'Disabled'}</StatusLabel></Status>
                                 </div>
                                 <Switch checked={reportsEnabled} onCheckedChange={setReportsEnabled} aria-label="Player reports" />
                             </Card>
 
-                            <Card className="bg-card p-6 rounded-xl border border-border">
+                            <Card className="p-6">
                                 <label className="text-xs font-medium text-muted-foreground block mb-1">Reports Channel</label>
                                 <Select
                                     value={reportsChannelId}
@@ -1332,26 +1283,22 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                 )}
                             </Card>
                         </div>
+                    </CardContent>
                     </Card>
                     )}
 
                     {/* Status Box */}
                     {showsSaveButton && (
-                        <Card className="p-5 sm:p-6 md:p-8 bg-card border border-border rounded-xl flex items-center justify-between">
+                        <Card className="flex flex-wrap items-center justify-between gap-4 p-6">
                             <div className="flex items-center gap-5">
-                                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
-                                    <InfoIcon />
-                                </div>
+
                                 <div>
                                     <h4 className="text-xs font-medium text-foreground tracking-tight">System Status</h4>
                                     <p className="text-xs text-muted-foreground font-medium tracking-tight mt-0.5">Settings changes propagate to game servers within ~30 seconds.</p>
                                 </div>
                             </div>
                             {success && (
-                                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 animate-in fade-in slide-in-from-right-2 duration-300">
-                                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                                    <span className="text-xs font-medium">Changes Saved</span>
-                                </div>
+                                <Status variant="success" role="status"><StatusLabel>Changes saved</StatusLabel></Status>
                             )}
                             {error && <span className="text-red-700 dark:text-red-400 text-xs font-medium">{error}</span>}
                         </Card>
@@ -1359,12 +1306,10 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* Remove Ro-Link */}
                     {view === 'overview' && (
-                    <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl p-5 sm:p-6 md:p-8 xl:p-10">
+                    <Card className="p-6">
                         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                             <div className="flex items-start gap-5">
-                                <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-xl text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900">
-                                    <TrashIcon />
-                                </div>
+
                                 <div>
                                     <h3 className="text-lg font-medium text-foreground mb-2">Remove Ro-Link</h3>
                                     <p className="text-sm text-muted-foreground leading-relaxed max-w-xl">
@@ -1386,7 +1331,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                 Remove Ro-Link
                             </Button>
                         </div>
-                    </div>
+                    </Card>
                     )}
                 </div>
 
@@ -1401,9 +1346,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                 <div className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 pointer-events-none">
                     <Card className="pointer-events-auto flex w-full max-w-3xl flex-col gap-4 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-accent text-foreground">
-                                <SaveIcon />
-                            </div>
+
                             <div>
                                 <p className="text-sm font-medium text-foreground">Save your settings</p>
                                 <p className="mt-0.5 text-xs font-medium text-muted-foreground">You have unsaved changes on this page.</p>
@@ -1429,18 +1372,17 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
             )}
 
             {view === 'overview' && isRemoveModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-                    <div className="w-full max-w-2xl rounded-xl border border-red-200 dark:border-red-900 bg-background overflow-hidden">
+                <Dialog open={isRemoveModalOpen} onOpenChange={(open) => { if (!open) closeRemoveModal(); }}>
+                    <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto p-0" onEscapeKeyDown={(event) => { if (removingRoLink) event.preventDefault(); }} onPointerDownOutside={(event) => { if (removingRoLink) event.preventDefault(); }}>
                         <div className="flex items-start justify-between gap-4 border-b border-border px-8 py-6">
                             <div>
                                 <p className="text-xs font-medium text-red-700 dark:text-red-400">Danger Zone</p>
-                                <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">Remove Ro-Link</h3>
-                                <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-                                    Choose what should happen for this server. You can remove the bot, wipe the saved Ro-Link data, or perform both actions together.
-                                </p>
+                                <DialogTitle className="mt-2">Remove Ro-Link</DialogTitle>
+                                <DialogDescription className="mt-2">Choose what should happen for this server. You can remove the bot, wipe the saved Ro-Link data, or perform both actions together.</DialogDescription>
                             </div>
                             <Button variant="outline" size="icon"
                                 type="button"
+                                aria-label="Close removal dialog"
                                 onClick={closeRemoveModal}
                                 disabled={removingRoLink}
                                 className="transition-colors disabled:opacity-50"
@@ -1450,41 +1392,23 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         </div>
 
                         <div className="space-y-5 px-8 py-8">
-                            <Button variant="outline" size="default"
-                                type="button"
-                                onClick={() => setRemoveBotOption((current) => !current)}
-                                className={`h-auto min-h-9 justify-start whitespace-normal py-3 w-full    text-left transition-all ${removeBotOption ? ' ' : '  '}`}
-                            >
-                                <div className="flex items-start gap-4">
-                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${removeBotOption ? 'border-red-500 bg-red-500 text-foreground' : 'border-border bg-card text-transparent'}`}>
-                                        <LucideCheck width="12" height="12" strokeWidth="3" />
-                                    </div>
+                            <label className="flex cursor-pointer items-start gap-4 rounded-lg border border-border p-4"><Checkbox className="mt-0.5" checked={removeBotOption} onCheckedChange={(checked) => setRemoveBotOption(checked === true)} disabled={removingRoLink} />
                                     <div>
                                         <div className="text-sm font-medium text-foreground">Remove Bot from Server</div>
                                         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                                             Makes Ro-Link leave this Discord server. Existing database data stays unless you also enable the delete option below.
                                         </p>
                                     </div>
-                                </div>
-                            </Button>
+                                </label>
 
-                            <Button variant="outline" size="default"
-                                type="button"
-                                onClick={() => setDeleteDataOption((current) => !current)}
-                                className={`h-auto min-h-9 justify-start whitespace-normal py-3 w-full    text-left transition-all ${deleteDataOption ? ' ' : '  '}`}
-                            >
-                                <div className="flex items-start gap-4">
-                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${deleteDataOption ? 'border-red-500 bg-red-500 text-foreground' : 'border-border bg-card text-transparent'}`}>
-                                        <LucideCheck width="12" height="12" strokeWidth="3" />
-                                    </div>
+                            <label className="flex cursor-pointer items-start gap-4 rounded-lg border border-border p-4"><Checkbox className="mt-0.5" checked={deleteDataOption} onCheckedChange={(checked) => setDeleteDataOption(checked === true)} disabled={removingRoLink} />
                                     <div>
                                         <div className="text-sm font-medium text-foreground">Delete Ro-Link Data</div>
                                         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                                             Deletes this server’s stored Ro-Link setup, logs, live server cache, command queue, reports, and dashboard role configuration from the database.
                                         </p>
                                     </div>
-                                </div>
-                            </Button>
+                                </label>
 
                             <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-5 py-4 text-sm text-amber-700 dark:text-amber-400">
                                 Deleting data is permanent. If you want a full disconnect, enable both options before confirming.
@@ -1520,8 +1444,8 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                 Confirm Removal
                             </Button>
                         </div>
-                    </div>
-                </div>
+                    </DialogContent>
+                </Dialog>
             )}
         </div>
     );

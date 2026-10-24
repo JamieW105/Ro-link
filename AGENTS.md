@@ -33,6 +33,10 @@ and management screens. This requirement applies to future feature changes too. 
   navy/sky gradients, neon glows, oversized controls, all-caps headings, or global
   CSS that overrides component styling. Feature UI must visibly follow Dice's theme.
   Use `type="submit"` for submissions and `type="button"` for other form actions.
+- Keep the colored main icon in the page heading. Do not repeat the page icon in
+  panel headers or add decorative icon badges/watermarks inside those panels.
+  Use CardHeader, CardTitle, CardDescription, and CardContent for panel structure;
+  retain icons that communicate actions, metrics, identity, or meaningful states.
 - Use Lucide (`lucide-react`) for all interface icons. Import icons directly; do
   not add hand-drawn SVGs, emoji icons, or another icon pack. Keep `iconLibrary`
   set to `lucide` in `components.json`.

@@ -1,7 +1,9 @@
 'use client';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+
+import { Status, StatusIndicator, StatusLabel } from '@/components/ui/status';
 
 import { Switch } from '@/components/ui/switch';
 
@@ -9,19 +11,17 @@ import { Button } from '@/components/ui/button';
 
 
 import { Select } from '@/components/ui/select';
-import { Info, Save, Shield, UserRoundCheck } from "lucide-react";
+import { Save, UserRoundCheck } from "lucide-react";
 
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 
-const ShieldIcon = () => <Shield size={24} aria-hidden="true" />;
 
 const SaveIcon = () => <Save size={18} aria-hidden="true" />;
 
 const RoleIcon = () => <UserRoundCheck size={18} aria-hidden="true" />;
 
-const InfoIcon = () => <Info size={18} aria-hidden="true" />;
 
 interface VerificationConfig {
     verification_enabled?: boolean | null;
@@ -134,10 +134,7 @@ export default function VerificationPage() {
                         <div>
                             <h1 className="text-3xl font-semibold tracking-tight text-foreground">Verification</h1>
                             <div className="flex items-center gap-2 mt-1">
-                                <span className={`w-2 h-2 rounded-full ${enabled ? 'bg-emerald-500 animate-pulse' : 'bg-muted'}`}></span>
-                                <p className="text-muted-foreground text-xs font-medium">
-                                    {enabled ? 'System Operational' : 'System Disabled'}
-                                </p>
+                                <Status variant={enabled ? "success" : "default"}><StatusIndicator /><StatusLabel>{enabled ? 'System Operational' : 'System Disabled'}</StatusLabel></Status>
                             </div>
                         </div>
                     </div>
@@ -163,20 +160,19 @@ export default function VerificationPage() {
                 {/* Main Settings Column */}
                 <div className="col-span-12 lg:col-span-8 space-y-8">
                     {/* Primary Config Section */}
-                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
-                        <div aria-hidden="true" className="pointer-events-none absolute top-0 right-0 p-8 opacity-[0.02] text-foreground">
-                            <ShieldIcon />
-                        </div>
+                    <Card>
 
-                        <div className="flex items-center justify-between mb-12">
+
+                        <CardHeader className="flex-row items-start justify-between gap-4">
                             <div>
-                                <h3 className="text-lg font-medium text-foreground mb-2">Toggle Verification</h3>
-                                <p className="text-sm text-muted-foreground">Enable or disable the Roblox-to-Discord linking flow for this server.</p>
+                                <CardTitle>Toggle Verification</CardTitle>
+                                <CardDescription className="mt-2">Enable or disable the Roblox-to-Discord linking flow for this server.</CardDescription>
                             </div>
                             <Switch checked={enabled} onCheckedChange={setEnabled} aria-label="Roblox verification" />
-                        </div>
+                        </CardHeader>
+                        <CardContent>
 
-                        <div className={`grid grid-cols-1 md:grid-cols-2 gap-10 transition-all duration-700 ${!enabled ? 'opacity-30 pointer-events-none' : ''}`}>
+                        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 transition-all duration-700 ${!enabled ? 'opacity-30 pointer-events-none' : ''}`}>
                             <div className="space-y-4">
                                 <label className="text-xs font-medium text-muted-foreground pl-1 flex items-center gap-2">
                                     <RoleIcon />
@@ -215,12 +211,10 @@ export default function VerificationPage() {
                         </div>
 
                         {/* Extra Safety Setting */}
-                        <div className={`mt-12 pt-10 border-t border-border transition-all duration-700 ${!enabled ? 'opacity-30 pointer-events-none' : ''}`}>
-                            <div className="flex items-center justify-between p-6 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl">
+                        <div className={`mt-6 pt-6 border-t border-border transition-all duration-700 ${!enabled ? 'opacity-30 pointer-events-none' : ''}`}>
+                            <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
                                 <div className="flex items-center gap-5">
-                                    <div className="w-10 h-10 bg-red-50 dark:bg-red-950/30 rounded-xl flex items-center justify-center text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900">
-                                        <ShieldIcon />
-                                    </div>
+
                                     <div>
                                         <h4 className="text-sm font-medium text-foreground tracking-tight">Block Unverified Joins</h4>
                                         <p className="text-xs text-muted-foreground font-medium mt-1">Automatically kick players from the Roblox game if they haven&apos;t linked their Discord account.</p>
@@ -236,27 +230,23 @@ export default function VerificationPage() {
                                 disabled={saving}
                                 className="w-full transition-all disabled:opacity-50 flex items-center justify-center active:scale-95"
                             >
-                                {saving ? <div className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin"></div> : "SAVE SETTINGS"}
+                                {saving ? <div className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin"></div> : "Save settings"}
                             </Button>
                         </div>
+                        </CardContent>
                     </Card>
 
                     {/* Status Box */}
-                    <Card className="p-5 sm:p-6 md:p-8 bg-card border border-border rounded-xl flex items-center justify-between">
+                    <Card className="flex flex-wrap items-center justify-between gap-4 p-6">
                         <div className="flex items-center gap-5">
-                            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
-                                <InfoIcon />
-                            </div>
+
                             <div>
                                 <h4 className="text-xs font-medium text-foreground tracking-tight">System Status</h4>
                                 <p className="text-xs text-muted-foreground font-medium tracking-tight mt-0.5">Ro-Link authentication servers are currently synced and stable.</p>
                             </div>
                         </div>
                         {success && (
-                            <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 animate-in fade-in slide-in-from-right-2 duration-300">
-                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                                <span className="text-xs font-medium">Changes Saved</span>
-                            </div>
+                            <Status variant="success" role="status"><StatusLabel>Changes saved</StatusLabel></Status>
                         )}
                         {error && <span className="text-red-700 dark:text-red-400 text-xs font-medium">{error}</span>}
                     </Card>
@@ -287,10 +277,8 @@ export default function VerificationPage() {
                         </div>
                     </Card>
 
-                    <div className="bg-accent border border-border rounded-xl p-5 sm:p-6 md:p-8 relative overflow-hidden group hover:border-border transition-all">
-                        <div className="absolute -bottom-6 -right-6 opacity-[0.03] text-foreground group-hover:rotate-12 transition-transform duration-700">
-                            <ShieldIcon />
-                        </div>
+                    <Card className="p-6">
+
                         <h4 className="text-sm font-medium text-foreground mb-2">Bot Context</h4>
                         <p className="text-xs text-muted-foreground leading-relaxed mb-6">Ro-Link requires its role to be above any roles it attempts to assign.</p>
                         <Card className="p-5 bg-card rounded-xl border border-border text-xs font-mono text-foreground leading-loose">
@@ -311,7 +299,7 @@ export default function VerificationPage() {
                                 On Join Role
                             </div>
                         </Card>
-                    </div>
+                    </Card>
                 </div>
             </div>
         </div>
