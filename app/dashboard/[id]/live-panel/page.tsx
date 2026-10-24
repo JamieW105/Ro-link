@@ -2365,68 +2365,6 @@ export default function LivePanelPage() {
                         </div>
                     </div>
 
-                    {canManageReports && (
-                        <div className="shrink-0 border-b border-border bg-amber-500/[0.03] p-5">
-                            <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                                    <ReportIcon />
-                                    <h2 className="text-sm font-semibold">Unmoderated Reports</h2>
-                                    <span className="rounded-full border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">{pendingReports.length}</span>
-                                </div>
-                                <Button variant="outline" size="default"
-                                    type="button"
-                                    onClick={() => {
-                                        clearSelectedProfile();
-                                        setRightPaneMode('reports');
-                                    }}
-                                    className="transition-colors"
-                                >
-                                    Manage
-                                </Button>
-                            </div>
-
-                            {pendingReports.length === 0 ? (
-                                <p className="mt-3 text-xs font-medium text-muted-foreground">No reports are awaiting moderation.</p>
-                            ) : (
-                                <div className="mt-3 space-y-2">
-                                    {pendingReports.slice(0, 3).map((report) => (
-                                        <Button variant="outline" size="default"
-                                            key={report.id}
-                                            type="button"
-                                            onClick={() => {
-                                                clearSelectedProfile();
-                                                setRightPaneMode('reports');
-                                                setReportStatusFilter('PENDING');
-                                                setSelectedReportId(report.id);
-                                            }}
-                                            className="h-auto min-h-9 justify-start whitespace-normal py-3 block w-full text-left transition-colors"
-                                        >
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="min-w-0 truncate text-xs font-semibold text-foreground">{report.reported_roblox_username}</span>
-                                                <span className="shrink-0 font-mono text-xs font-medium text-muted-foreground">{formatTime(report.created_at)}</span>
-                                            </div>
-                                            <p className="mt-1 truncate text-xs font-medium text-muted-foreground">{report.reason}</p>
-                                            <p className="mt-1 truncate text-xs font-medium text-muted-foreground">By {report.reporter_roblox_username || report.reporter_discord_id || 'Unknown'}</p>
-                                        </Button>
-                                    ))}
-                                    {pendingReports.length > 3 && (
-                                        <Button variant="ghost" size="default"
-                                            type="button"
-                                            onClick={() => {
-                                                clearSelectedProfile();
-                                                setRightPaneMode('reports');
-                                                setReportStatusFilter('PENDING');
-                                            }}
-                                            className="block w-full text-right transition-colors"
-                                        >
-                                            View all {pendingReports.length} reports
-                                        </Button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
                     <div className="flex min-h-0 flex-1 flex-col">
                         <div className="shrink-0 border-b border-border p-5">
                             <div className="mb-3 flex items-center justify-between">
@@ -3059,6 +2997,30 @@ export default function LivePanelPage() {
                             <h2 className="text-xs font-semibold text-foreground">
                                 Profile / Create Log
                             </h2>
+                            {canManageReports && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    type="button"
+                                    aria-label={`Unmoderated reports: ${pendingReports.length}`}
+                                    title="Manage unmoderated reports"
+                                    onClick={() => {
+                                        clearSelectedProfile();
+                                        setReportStatusFilter('PENDING');
+                                        setRightPaneMode('reports');
+                                    }}
+                                    className="shrink-0 text-amber-700 dark:text-amber-400"
+                                >
+                                    <ReportIcon />
+                                    Reports
+                                    <span
+                                        aria-hidden="true"
+                                        className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                    >
+                                        {pendingReports.length}
+                                    </span>
+                                </Button>
+                            )}
                         </div>
                         <div className="relative">
                             <Input
