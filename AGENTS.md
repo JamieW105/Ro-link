@@ -33,6 +33,10 @@ and management screens. This requirement applies to future feature changes too. 
   navy/sky gradients, neon glows, oversized controls, all-caps headings, or global
   CSS that overrides component styling. Feature UI must visibly follow Dice's theme.
   Use `type="submit"` for submissions and `type="button"` for other form actions.
+- Multiline Live Panel command suggestions must use content-sized rows with clear
+  vertical padding and spacing; do not constrain titles and descriptions to the
+  standard single-line Button height. Omit redundant CMD/Cmds badges and use the
+  shared Dice Status for category and user labels in both themes.
 - Keep the colored main icon in the page heading. Do not repeat the page icon in
   panel headers or add decorative icon badges/watermarks inside those panels.
   Use CardHeader, CardTitle, CardDescription, and CardContent for panel structure;

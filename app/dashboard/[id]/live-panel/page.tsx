@@ -3308,24 +3308,24 @@ export default function LivePanelPage() {
                                     </div>
                                     {commandBarSuggestions.length > 0 && (
                                         <div className="max-h-72 overflow-hidden rounded-xl border border-border bg-card">
-                                            <div className="custom-scrollbar max-h-72 overflow-y-auto p-2">
+                                            <div className="custom-scrollbar max-h-72 space-y-1 overflow-y-auto p-2">
                                                 {commandBarSuggestions.map((suggestion, index) => (
                                                     <Button variant="ghost" size="default"
                                                         key={`${suggestion.kind}-${suggestion.value}-${index}`}
                                                         type="button"
                                                         onClick={() => setCommandBarValue(suggestion.value)}
-                                                        className="flex w-full items-center text-left transition-colors"
+                                                        className="flex h-auto min-h-14 w-full items-center gap-3 whitespace-normal px-3 py-3 text-left transition-colors"
                                                     >
-                                                        <span className={`flex h-8 w-10 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold   ${suggestion.kind === 'command' ? 'border-border bg-accent text-foreground' : 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'}`}>
-                                                            {suggestion.kind === 'command' ? 'CMD' : 'USER'}
-                                                        </span>
+                                                        {suggestion.kind === 'user' && (
+                                                            <Status render={<span />} variant="info">User</Status>
+                                                        )}
                                                         <span className="min-w-0 flex-1">
                                                             <span className="block truncate text-sm font-semibold text-foreground">{suggestion.title}</span>
-                                                            <span className="mt-0.5 block truncate text-xs font-medium text-muted-foreground">{suggestion.detail}</span>
+                                                            <span className="mt-1 block text-xs font-medium leading-relaxed text-muted-foreground">{suggestion.detail}</span>
                                                         </span>
-                                                        <span className="hidden shrink-0 rounded-lg border border-border bg-muted px-2.5 py-1 font-mono text-xs font-medium text-muted-foreground sm:inline-flex">
+                                                        <Status render={<span />} className="hidden sm:inline-flex">
                                                             {suggestion.meta}
-                                                        </span>
+                                                        </Status>
                                                     </Button>
                                                 ))}
                                             </div>

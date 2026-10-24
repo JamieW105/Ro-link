@@ -906,3 +906,34 @@ test('save confirmations expire after three seconds and errors remain visible', 
   await page.clock.runFor(5000);
   await expect(page.getByText('Could not save shift settings.', { exact: true })).toBeVisible();
 });
+
+test("live command suggestions have room for descriptions without CMD badges", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  await page.goto(`/dashboard/${serverId}/live-panel`);
+  await page.getByRole('button', { name: 'Run Command', exact: true }).click();
+  const input = page.getByPlaceholder('refresh username');
+  const suggestion = page.getByRole('button', { name: /^Kick Remove a player/ });
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(value => {
+      localStorage.setItem('rolink-theme', value);
+      document.documentElement.classList.toggle('dark', value === 'dark');
+    }, theme);
+    await expect(suggestion).toBeVisible();
+    await expect(page.getByText('CMD', { exact: true })).toHaveCount(0);
+    const spacing = await suggestion.evaluate(row => {
+      const style = getComputedStyle(row);
+      const description = row.querySelector('span.min-w-0 > span:last-child')!;
+      const rowBox = row.getBoundingClientRect();
+      const textBox = description.getBoundingClientRect();
+      return { top: parseFloat(style.paddingTop), bottom: rowBox.bottom - textBox.bottom, height: rowBox.height };
+    });
+    expect(spacing.top).toBeGreaterThanOrEqual(12);
+    expect(spacing.bottom).toBeGreaterThanOrEqual(12);
+    expect(spacing.height).toBeGreaterThanOrEqual(56);
+    await suggestion.focus();
+    await page.keyboard.press('Enter');
+    await expect(input).toHaveValue(/kick/i);
+    await input.fill('');
+  }
+  expect(errors).toEqual([]);
+});
