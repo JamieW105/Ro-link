@@ -1,5 +1,4 @@
 'use client';
-import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
@@ -13,7 +12,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
 import { getDiscordGuildIconProxyUrl } from "@/lib/discordMedia";
-import { BriefcaseBusiness, Gauge, Loader2, LogOut, MonitorPlay, Plus, ShieldAlert, Store } from "lucide-react";
+import { BriefcaseBusiness, Gauge, LayoutDashboard, Loader2, LogOut, MonitorPlay, Plus, ShieldAlert, Store } from "lucide-react";
 
 interface Guild {
     id: string;
@@ -213,7 +212,7 @@ export default function Dashboard() {
             <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8">
                 <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                        <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight"><PageIcon name="overview" />Select a Server</h1>
+                        <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight"><span aria-hidden="true" data-slot="page-icon" className="inline-flex size-14 shrink-0 items-center justify-center text-foreground"><LayoutDashboard className="size-6" /></span>Select a Server</h1>
                         <p className="mt-1 text-sm text-muted-foreground">Choose a community to manage and monitor.</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
