@@ -1,10 +1,10 @@
 'use client';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Status, StatusLabel } from '@/components/ui/status';
 import { Separator } from '@/components/ui/separator';
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 import { Switch } from '@/components/ui/switch';
 
@@ -18,6 +18,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 
 import { ArrowRight as LucideArrowRight, ChevronDown as LucideChevronDown, X as LucideX } from 'lucide-react';
+
+import Link from "next/link";
 
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
@@ -909,11 +911,11 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                         </CardTitle>
                                         <CardDescription>{tile.description}</CardDescription>
                                     </CardHeader>
-                                    <CardContent className="mt-auto">
-                                        <Button type="button" variant="outline" onClick={() => router.push(tile.href)}>
-                                            Open {tile.title}<LucideArrowRight className="size-4" aria-hidden="true" />
+                                    <CardFooter className="mt-auto">
+                                        <Button variant="outline" asChild>
+                                            <Link href={tile.href}>Open {tile.title}<LucideArrowRight className="size-4" aria-hidden="true" /></Link>
                                         </Button>
-                                    </CardContent>
+                                    </CardFooter>
                                 </Card>
                             ))}
                         </div>
@@ -1316,17 +1318,14 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
                     {/* Remove Ro-Link */}
                     {view === 'overview' && (
-                    <Card className="p-6">
-                        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                            <div className="flex items-start gap-5">
-
-                                <div>
-                                    <h3 className="text-lg font-medium text-foreground mb-2">Remove Ro-Link</h3>
-                                    <p className="text-sm text-muted-foreground leading-relaxed max-w-xl">
-                                        Open a removal panel for this server. You can remove the bot from the Discord server, delete the stored Ro-Link database data, or do both together.
-                                    </p>
-                                </div>
-                            </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Remove Ro-Link</CardTitle>
+                            <CardDescription className="max-w-xl">
+                                Open a removal panel for this server. You can remove the bot from the Discord server, delete the stored Ro-Link database data, or do both together.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardFooter>
                             <Button variant="destructive" size="default"
                                 type="button"
                                 onClick={() => {
@@ -1340,7 +1339,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                 <TrashIcon />
                                 Remove Ro-Link
                             </Button>
-                        </div>
+                        </CardFooter>
                     </Card>
                     )}
                 </div>
@@ -1384,7 +1383,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
             {view === 'overview' && isRemoveModalOpen && (
                 <Dialog open={isRemoveModalOpen} onOpenChange={(open) => { if (!open) closeRemoveModal(); }}>
                     <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto p-0" onEscapeKeyDown={(event) => { if (removingRoLink) event.preventDefault(); }} onPointerDownOutside={(event) => { if (removingRoLink) event.preventDefault(); }}>
-                        <div className="flex items-start justify-between gap-4 border-b border-border px-8 py-6">
+                        <DialogHeader className="flex-row items-start justify-between gap-4 border-b border-border px-6 py-6">
                             <div>
                                 <p className="text-xs font-medium text-red-700 dark:text-red-400">Danger Zone</p>
                                 <DialogTitle className="mt-2">Remove Ro-Link</DialogTitle>
@@ -1399,9 +1398,9 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                             >
                                 <LucideX width="18" height="18" strokeWidth="2.5" />
                             </Button>
-                        </div>
+                        </DialogHeader>
 
-                        <div className="space-y-5 px-8 py-8">
+                        <div className="space-y-5 px-6 py-6">
                             <label className="flex cursor-pointer items-start gap-4 rounded-lg border border-border p-4"><Checkbox className="mt-0.5" checked={removeBotOption} onCheckedChange={(checked) => setRemoveBotOption(checked === true)} disabled={removingRoLink} />
                                     <div>
                                         <div className="text-sm font-medium text-foreground">Remove Bot from Server</div>
@@ -1431,7 +1430,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                             )}
                         </div>
 
-                        <div className="flex flex-col-reverse gap-3 border-t border-border px-8 py-6 sm:flex-row sm:items-center sm:justify-end">
+                        <DialogFooter className="border-t border-border px-6 py-6 sm:items-center">
                             <Button variant="ghost" size="default"
                                 type="button"
                                 onClick={closeRemoveModal}
@@ -1453,7 +1452,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                 )}
                                 Confirm Removal
                             </Button>
-                        </div>
+                        </DialogFooter>
                     </DialogContent>
                 </Dialog>
             )}
