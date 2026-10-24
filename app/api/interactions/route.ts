@@ -1,3 +1,7 @@
+import { excludeManagementLogs } from '@/lib/serverLogs';
+import { SHIFT_COMMANDS, handleStaffShiftCommand } from '@/lib/discordStaffShifts';
+import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
+import type { ShiftPeriod } from '@/lib/staffShifts';
 import { after, NextResponse } from 'next/server';
 import nacl from 'tweetnacl';
 import { supabase } from '@/lib/supabase';
@@ -641,27 +645,6 @@ async function blockServerFromStaffAction(input: {
 
     if (ownerId) {
         await dmBlockedServerOwner({ ownerId, guildName, guildId, actionId: moderationActionId, reason });
-    }
-
-    if (moderationActionId) {
-        try {
-            const { error: logError } = await client
-                .from('logs')
-                .insert([{
-                    server_id: guildId,
-                    action: 'RO_LINK_BLOCKED',
-                    target: guildId,
-                    moderator: input.blockedBy,
-                    timestamp: new Date().toISOString(),
-                    moderation_action_id: moderationActionId,
-                }]);
-
-            if (logError) {
-                console.error('[STAFF_ACTION] Failed to record staff block log:', logError);
-            }
-        } catch (error) {
-            console.error('[STAFF_ACTION] Failed to record staff block log:', error);
-        }
     }
 
     return { alreadyBlocked: false, guildName, ownerId, guildId: data.guild_id };
@@ -1428,9 +1411,9 @@ async function fetchRobloxLookup(username: string, serverId: string, openCloudKe
             .from('live_servers')
             .select('id, players')
             .eq('server_id', serverId),
-        supabase
+        excludeManagementLogs(supabase
             .from('logs')
-            .select('action, moderator, timestamp')
+            .select('action, moderator, timestamp'))
             .eq('server_id', serverId)
             .ilike('target', resolvedUsername)
             .order('timestamp', { ascending: false })
@@ -1546,9 +1529,9 @@ async function buildLookupInteractionResponse(input: {
 
     let combinedHistory: LookupHistoryEntry[] = [];
     if (showStaffControls) {
-        const { data: logsData } = await supabase
+        const { data: logsData } = await excludeManagementLogs(supabase
             .from('logs')
-            .select('id, action, moderator, timestamp, target')
+            .select('id, action, moderator, timestamp, target'))
             .eq('server_id', guildId)
             .order('timestamp', { ascending: false })
             .limit(100);
@@ -2136,6 +2119,43 @@ export async function POST(req: Request) {
                 options = subcommand?.options;
             }
 
+            if (SHIFT_COMMANDS.includes(name || '')) {
+                if (!guild_id || !userId) {
+                    return NextResponse.json({ type: 4, data: { content: 'Use this command in a Discord server.', flags: 64 } });
+                }
+                const applicationId = String(interaction.application_id ?? '');
+                const interactionToken = String(interaction.token ?? '');
+                if (!applicationId || !interactionToken) {
+                    return NextResponse.json({ type: 4, data: { content: 'Could not respond to this interaction. Please try again.', flags: 64 } });
+                }
+                after(async () => {
+                    try {
+                        const db = getSupabaseAdmin();
+                        const blocked = await findBlockedServer(db, guild_id);
+                        const ban = await findDgsuBanForTargets(db, [{ type: 'DISCORD_SERVER', targetId: guild_id }]);
+                        if (blocked || ban) {
+                            await editOriginalInteractionResponse(applicationId, interactionToken, {
+                                content: blocked ? getBlockedServerMessage(blocked) : DGSU_BAN_ERROR_MESSAGE,
+                                flags: 64,
+                            });
+                            return;
+                        }
+                        const permissions = await resolveDashboardUserPermissions(guild_id, userId);
+                        const result = await handleStaffShiftCommand({
+                            serverId: guild_id, userId, command: name!,
+                            action: getSubcommandOption(options)?.name,
+                            period: (getCommandOptionValue(options, 'period') || 'latest-wave') as ShiftPeriod,
+                            page: Number(getCommandOptionValue(options, 'page') || 1),
+                        }, { db, permissions, normalizePlayers: normalizeLivePlayerList });
+                        await editOriginalInteractionResponse(applicationId, interactionToken, result);
+                    } catch (error) {
+                        console.error('[Staff Shifts] Discord command failed', error);
+                        await editOriginalInteractionResponse(applicationId, interactionToken, { content: 'Could not process your shift command. Please try again.', flags: 64 });
+                    }
+                });
+                return NextResponse.json({ type: 5, data: { flags: 64 } });
+            }
+
             // Handle Setup (Owner Only)
             if (name === 'setup') {
                 if (!guild_id) {
@@ -2280,7 +2300,7 @@ export async function POST(req: Request) {
                                     },
                                     {
                                         name: '**Utility Commands**',
-                                        value: buildCommandSummary(['lookup', 'verify', 'ping', 'servers']),
+                                        value: buildCommandSummary(['lookup', 'verify', 'ping', 'servers', 'shift-manage', 'shift', 'shift-leaderboard']),
                                         inline: false
                                     },
                                     {

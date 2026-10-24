@@ -1,10 +1,11 @@
 import NextAuth from "next-auth"
 import type { AuthOptions, Session } from "next-auth"
 import DiscordProvider from "next-auth/providers/discord"
+import { NextRequest, NextResponse } from "next/server"
 import { getSharedDashboardCookieDomain, isAllowedDashboardUrl } from "@/lib/customDashboardDomains"
 import { DGSU_BAN_AUTH_ERROR } from "@/lib/dgsuBanConstants"
 import { findDgsuBanForDiscordLogin, findDgsuBanForUser } from "@/lib/dgsuBans"
-import { getDiscordOAuthConfig } from "@/lib/discordOAuthConfig"
+import { getDiscordOAuthConfig, isDiscordOAuthConfigured } from "@/lib/discordOAuthConfig"
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin"
 
 type TokenShape = {
@@ -225,7 +226,21 @@ export const authOptions: AuthOptions = {
     debug: process.env.NODE_ENV === 'development',
 }
 
-const handler = NextAuth(authOptions)
+const nextAuthHandler = NextAuth(authOptions)
+
+async function handler(request: NextRequest, context: { params: Promise<{ nextauth: string[] }> }) {
+    const { nextauth } = await context.params
+    if (nextauth[0] === "signin" && nextauth[1] === "discord" && !isDiscordOAuthConfigured()) {
+        console.warn("[AUTH] Configure DISCORD_OAUTH_CLIENT_ID and DISCORD_OAUTH_CLIENT_SECRET (or DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET) in .env.local, then restart the server.")
+        const destination = new URL("/auth/signin?error=Configuration", request.url)
+        const form = request.method === "POST" ? await request.clone().formData() : null
+        const callbackUrl = form?.get("callbackUrl") || request.nextUrl.searchParams.get("callbackUrl")
+        if (typeof callbackUrl === "string") destination.searchParams.set("callbackUrl", callbackUrl)
+        if (form?.get("json") === "true") return NextResponse.json({ url: destination.toString() })
+        return NextResponse.redirect(destination, 303)
+    }
+    return nextAuthHandler(request, context)
+}
 
 export { handler as GET, handler as POST }
 

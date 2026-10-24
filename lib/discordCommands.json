@@ -93,5 +93,75 @@
     "name": "report",
     "description": "Submit a report against a player for rule violations",
     "options": []
+  },
+  {
+    "name": "shift-manage",
+    "description": "Start, stop, or take a break from your staff shift",
+    "dm_permission": false,
+    "options": [
+      {
+        "name": "start",
+        "description": "Start your shift or resume after a break",
+        "type": 1
+      },
+      {
+        "name": "stop",
+        "description": "End your current shift",
+        "type": 1
+      },
+      {
+        "name": "break",
+        "description": "Pause your shift without counting break time",
+        "type": 1
+      }
+    ]
+  },
+  {
+    "name": "shift-leaderboard",
+    "description": "View staff shift rankings (requires View Staff Shifts)",
+    "dm_permission": false,
+    "options": [
+      {
+        "name": "period",
+        "description": "Time period to rank (defaults to latest wave)",
+        "type": 3,
+        "required": false,
+        "choices": [
+          {
+            "name": "Past day",
+            "value": "day"
+          },
+          {
+            "name": "Past week",
+            "value": "week"
+          },
+          {
+            "name": "Past 30 days",
+            "value": "30-days"
+          },
+          {
+            "name": "Past 6 months",
+            "value": "6-months"
+          },
+          {
+            "name": "Latest wave",
+            "value": "latest-wave"
+          }
+        ]
+      },
+      {
+        "name": "page",
+        "description": "Leaderboard page",
+        "type": 4,
+        "required": false,
+        "min_value": 1,
+        "max_value": 10000
+      }
+    ]
+  },
+  {
+    "name": "shift",
+    "description": "View your current staff shift and wave quota progress",
+    "dm_permission": false
   }
 ]

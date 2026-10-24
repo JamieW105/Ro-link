@@ -6,6 +6,7 @@ import SignInClient from '@/components/auth/SignInClient';
 import { isAllowedDashboardUrl } from '@/lib/customDashboardDomains';
 import { DGSU_BAN_AUTH_ERROR } from '@/lib/dgsuBanConstants';
 import { getCanonicalAuthOrigin } from '@/lib/authOrigin';
+import { isDiscordOAuthConfigured } from '@/lib/discordOAuthConfig';
 
 type SignInPageProps = {
     searchParams: Promise<{
@@ -52,5 +53,6 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
         error={error || session?.error}
         authOrigin={getCanonicalAuthOrigin(callbackUrl)}
         allowRootAlias={process.env.VERCEL === '1'}
+        discordConfigured={isDiscordOAuthConfigured()}
     />;
 }

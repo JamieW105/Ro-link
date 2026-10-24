@@ -6,7 +6,6 @@ import { supabase } from "@/lib/supabase";
 import { createStaffActionForumThread } from "@/lib/staffForumNotifications";
 import {
     createStaffModerationAction,
-    recordStaffModerationActionLog,
     updateStaffModerationActionForumThread,
 } from "@/lib/staffModerationActions";
 
@@ -89,16 +88,6 @@ export async function POST(req: Request) {
             .single();
 
         if (error) throw error;
-
-        try {
-            await recordStaffModerationActionLog({
-                action,
-                logAction: 'RO_LINK_BLOCKED',
-                target: guildId,
-            });
-        } catch (logErr) {
-            console.error("[Management/Blocking] Failed to record staff moderation log:", logErr);
-        }
 
         try {
             const thread = await createStaffActionForumThread({

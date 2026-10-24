@@ -1,4 +1,14 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
+
+import { Card } from '@/components/ui/card';
+
+import { Switch } from '@/components/ui/switch';
+
+import { Button } from '@/components/ui/button';
+
+
+import { Select } from '@/components/ui/select';
 import { Info, Save, Shield, UserRoundCheck } from "lucide-react";
 
 import { useParams, useRouter } from "next/navigation";
@@ -110,44 +120,42 @@ export default function VerificationPage() {
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-[400px]">
-            <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-8 h-8 border-2 border-border border-t-transparent rounded-full animate-spin"></div>
         </div>
     );
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 w-full pb-20">
             {/* Page Header - Integrated Layout */}
-            <div className="mb-10 pb-8 border-b border-slate-800/60">
+            <div className="mb-10 pb-8 border-b border-border">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-5">
-                        <div className="w-14 h-14 bg-sky-600/10 rounded-2xl flex items-center justify-center text-sky-500 border border-sky-500/20 shadow-2xl shadow-sky-900/10">
-                            <ShieldIcon />
-                        </div>
+                        <PageIcon name="verification" />
                         <div>
-                            <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">Verification</h1>
+                            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Verification</h1>
                             <div className="flex items-center gap-2 mt-1">
-                                <span className={`w-2 h-2 rounded-full ${enabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`}></span>
-                                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+                                <span className={`w-2 h-2 rounded-full ${enabled ? 'bg-emerald-500 animate-pulse' : 'bg-muted'}`}></span>
+                                <p className="text-muted-foreground text-xs font-medium">
                                     {enabled ? 'System Operational' : 'System Disabled'}
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    <button
+                    <Button variant="default" size="default"
                         onClick={handleSave}
                         disabled={saving}
-                        className="hidden md:flex bg-sky-600 hover:bg-sky-500 text-white font-bold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-sky-900/20 text-xs disabled:opacity-50 items-center justify-center gap-3 active:scale-95 border border-sky-400/20"
+                        className="hidden md:flex transition-all disabled:opacity-50 items-center justify-center active:scale-95"
                     >
                         {saving ? (
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin"></div>
                         ) : (
                             <>
                                 <SaveIcon />
                                 SAVE CHANGES
                             </>
                         )}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -155,124 +163,110 @@ export default function VerificationPage() {
                 {/* Main Settings Column */}
                 <div className="col-span-12 lg:col-span-8 space-y-8">
                     {/* Primary Config Section */}
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-8 opacity-[0.02] text-white">
+                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
+                        <div aria-hidden="true" className="pointer-events-none absolute top-0 right-0 p-8 opacity-[0.02] text-foreground">
                             <ShieldIcon />
                         </div>
 
                         <div className="flex items-center justify-between mb-12">
                             <div>
-                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Toggle Verification</h3>
-                                <p className="text-sm text-slate-500">Enable or disable the Roblox-to-Discord linking flow for this server.</p>
+                                <h3 className="text-lg font-medium text-foreground mb-2">Toggle Verification</h3>
+                                <p className="text-sm text-muted-foreground">Enable or disable the Roblox-to-Discord linking flow for this server.</p>
                             </div>
-                            <button
-                                onClick={() => setEnabled(!enabled)}
-                                className={`w-16 h-8 rounded-full transition-all duration-500 relative border-2 ${enabled ? 'bg-sky-600/20 border-sky-500 shadow-[0_0_20px_rgba(2,132,199,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
-                            >
-                                <div className={`absolute top-1 w-4.5 h-4.5 rounded-full transition-all duration-500 shadow-md ${enabled ? 'left-9 bg-sky-400' : 'left-1.5 bg-slate-500'}`} />
-                            </button>
+                            <Switch checked={enabled} onCheckedChange={setEnabled} aria-label="Roblox verification" />
                         </div>
 
                         <div className={`grid grid-cols-1 md:grid-cols-2 gap-10 transition-all duration-700 ${!enabled ? 'opacity-30 pointer-events-none' : ''}`}>
                             <div className="space-y-4">
-                                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-[0.2em] pl-1 flex items-center gap-2">
+                                <label className="text-xs font-medium text-muted-foreground pl-1 flex items-center gap-2">
                                     <RoleIcon />
                                     Verified Role
                                 </label>
                                 <div className="relative">
-                                    <select
-                                        className="w-full bg-slate-950/50 border border-slate-800/80 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-600/30 transition-all cursor-pointer hover:border-slate-700"
+                                    <Select
+                                        className="w-full transition-all cursor-pointer"
                                         value={verifiedRole}
-                                        onChange={(e) => setVerifiedRole(e.target.value)}
-                                    >
-                                        <option value="">None (Disabled)</option>
-                                        {roles.map(role => (
-                                            <option key={role.id} value={role.id}>{role.name}</option>
-                                        ))}
-                                    </select>
+                                        onValueChange={(nextValue) => setVerifiedRole(nextValue)}
+                                        disabled={!enabled}
+                                        aria-label="Verified role"
+                                        options={[{ value: '', label: 'None (Disabled)' }, ...roles.map(role => ({ value: role.id, label: role.name }))]}
+                                    />
                                 </div>
-                                <p className="text-[10px] text-slate-500 font-medium pl-2 leading-relaxed italic">Awarded automatically after a successful Roblox link.</p>
+                                <p className="text-xs text-muted-foreground font-medium pl-2 leading-relaxed">Awarded automatically after a successful Roblox link.</p>
                             </div>
 
                             <div className="space-y-4">
-                                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-[0.2em] pl-1 flex items-center gap-2">
+                                <label className="text-xs font-medium text-muted-foreground pl-1 flex items-center gap-2">
                                     <RoleIcon />
                                     On Join Role
                                 </label>
                                 <div className="relative">
-                                    <select
-                                        className="w-full bg-slate-950/50 border border-slate-800/80 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-600/30 transition-all cursor-pointer hover:border-slate-700"
+                                    <Select
+                                        className="w-full transition-all cursor-pointer"
                                         value={onJoinRole}
-                                        onChange={(e) => setOnJoinRole(e.target.value)}
-                                    >
-                                        <option value="">None (Disabled)</option>
-                                        {roles.map(role => (
-                                            <option key={role.id} value={role.id}>{role.name}</option>
-                                        ))}
-                                    </select>
+                                        onValueChange={(nextValue) => setOnJoinRole(nextValue)}
+                                        disabled={!enabled}
+                                        aria-label="On join role"
+                                        options={[{ value: '', label: 'None (Disabled)' }, ...roles.map(role => ({ value: role.id, label: role.name }))]}
+                                    />
                                 </div>
-                                <p className="text-[10px] text-slate-500 font-medium pl-2 leading-relaxed italic">Awarded immediately when a member joins the Discord server.</p>
+                                <p className="text-xs text-muted-foreground font-medium pl-2 leading-relaxed">Awarded immediately when a member joins the Discord server.</p>
                             </div>
                         </div>
 
                         {/* Extra Safety Setting */}
-                        <div className={`mt-12 pt-10 border-t border-slate-800/60 transition-all duration-700 ${!enabled ? 'opacity-30 pointer-events-none' : ''}`}>
-                            <div className="flex items-center justify-between p-6 bg-red-500/5 border border-red-500/10 rounded-2xl">
+                        <div className={`mt-12 pt-10 border-t border-border transition-all duration-700 ${!enabled ? 'opacity-30 pointer-events-none' : ''}`}>
+                            <div className="flex items-center justify-between p-6 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl">
                                 <div className="flex items-center gap-5">
-                                    <div className="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center text-red-500 border border-red-500/20 shadow-lg shadow-red-900/5">
+                                    <div className="w-10 h-10 bg-red-50 dark:bg-red-950/30 rounded-xl flex items-center justify-center text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900">
                                         <ShieldIcon />
                                     </div>
                                     <div>
-                                        <h4 className="text-sm font-bold text-white uppercase tracking-tight">Block Unverified Joins</h4>
-                                        <p className="text-[11px] text-slate-500 font-medium mt-1">Automatically kick players from the Roblox game if they haven&apos;t linked their Discord account.</p>
+                                        <h4 className="text-sm font-medium text-foreground tracking-tight">Block Unverified Joins</h4>
+                                        <p className="text-xs text-muted-foreground font-medium mt-1">Automatically kick players from the Roblox game if they haven&apos;t linked their Discord account.</p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => setBlockUnverified(!blockUnverified)}
-                                    className={`w-14 h-7 rounded-full transition-all duration-500 relative border-2 ${blockUnverified ? 'bg-red-600/20 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
-                                >
-                                    <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${blockUnverified ? 'left-8 bg-red-500' : 'left-1.5 bg-slate-500'}`} />
-                                </button>
+                                <Switch checked={blockUnverified} onCheckedChange={setBlockUnverified} disabled={!enabled} aria-label="Block unverified joins" />
                             </div>
                         </div>
 
                         <div className="mt-12 md:hidden">
-                            <button
+                            <Button variant="default" size="default"
                                 onClick={handleSave}
                                 disabled={saving}
-                                className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-sky-900/10 text-xs disabled:opacity-50 flex items-center justify-center gap-3 active:scale-95"
+                                className="w-full transition-all disabled:opacity-50 flex items-center justify-center active:scale-95"
                             >
-                                {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "SAVE SETTINGS"}
-                            </button>
+                                {saving ? <div className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin"></div> : "SAVE SETTINGS"}
+                            </Button>
                         </div>
-                    </div>
+                    </Card>
 
                     {/* Status Box */}
-                    <div className="p-5 sm:p-6 md:p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
+                    <Card className="p-5 sm:p-6 md:p-8 bg-card border border-border rounded-xl flex items-center justify-between">
                         <div className="flex items-center gap-5">
-                            <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/10">
+                            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
                                 <InfoIcon />
                             </div>
                             <div>
-                                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-tight">System Status</h4>
-                                <p className="text-[11px] text-slate-500 font-medium tracking-tight mt-0.5">Ro-Link authentication servers are currently synced and stable.</p>
+                                <h4 className="text-xs font-medium text-foreground tracking-tight">System Status</h4>
+                                <p className="text-xs text-muted-foreground font-medium tracking-tight mt-0.5">Ro-Link authentication servers are currently synced and stable.</p>
                             </div>
                         </div>
                         {success && (
-                            <div className="flex items-center gap-2 text-emerald-500 animate-in fade-in slide-in-from-right-2 duration-300">
+                            <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 animate-in fade-in slide-in-from-right-2 duration-300">
                                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                                <span className="text-[10px] font-bold uppercase tracking-widest">Changes Saved</span>
+                                <span className="text-xs font-medium">Changes Saved</span>
                             </div>
                         )}
-                        {error && <span className="text-red-500 text-[10px] font-bold uppercase tracking-widest">{error}</span>}
-                    </div>
+                        {error && <span className="text-red-700 dark:text-red-400 text-xs font-medium">{error}</span>}
+                    </Card>
                 </div>
 
                 {/* Info Column */}
                 <div className="col-span-12 lg:col-span-4 space-y-8">
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8">
-                        <h4 className="text-xs font-bold text-white uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
-                            <span className="w-6 h-px bg-sky-600"></span>
+                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8">
+                        <h4 className="text-xs font-medium text-foreground mb-8 flex items-center gap-3">
+                            <span className="w-6 h-px bg-primary"></span>
                             Documentation
                         </h4>
                         <div className="space-y-8">
@@ -282,41 +276,41 @@ export default function VerificationPage() {
                                 { step: "03", text: "Administrators can pull verification data via API." }
                             ].map((item, i) => (
                                 <div key={i} className="flex gap-4 group">
-                                    <span className="text-sky-500 font-black text-xs mt-0.5 group-hover:scale-110 transition-transform">
+                                    <span className="text-foreground font-semibold text-xs mt-0.5 group-hover:scale-110 transition-transform">
                                         {item.step}
                                     </span>
-                                    <p className="text-xs text-slate-500 leading-relaxed group-hover:text-slate-300 transition-colors">
+                                    <p className="text-xs text-muted-foreground leading-relaxed group-hover:text-foreground transition-colors">
                                         {item.text}
                                     </p>
                                 </div>
                             ))}
                         </div>
-                    </div>
+                    </Card>
 
-                    <div className="bg-sky-600/5 border border-sky-500/10 rounded-[2rem] p-5 sm:p-6 md:p-8 relative overflow-hidden group hover:border-sky-500/30 transition-all">
-                        <div className="absolute -bottom-6 -right-6 opacity-[0.03] text-sky-400 group-hover:rotate-12 transition-transform duration-700">
+                    <div className="bg-accent border border-border rounded-xl p-5 sm:p-6 md:p-8 relative overflow-hidden group hover:border-border transition-all">
+                        <div className="absolute -bottom-6 -right-6 opacity-[0.03] text-foreground group-hover:rotate-12 transition-transform duration-700">
                             <ShieldIcon />
                         </div>
-                        <h4 className="text-sm font-bold text-sky-400 mb-2">Bot Context</h4>
-                        <p className="text-[11px] text-slate-500 leading-relaxed mb-6">Ro-Link requires its role to be above any roles it attempts to assign.</p>
-                        <div className="p-5 bg-slate-950/60 rounded-2xl border border-sky-500/20 text-[10px] font-mono text-sky-300 leading-loose">
-                            <div className="flex justify-between border-b border-sky-500/10 pb-2 mb-2">
+                        <h4 className="text-sm font-medium text-foreground mb-2">Bot Context</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed mb-6">Ro-Link requires its role to be above any roles it attempts to assign.</p>
+                        <Card className="p-5 bg-card rounded-xl border border-border text-xs font-mono text-foreground leading-loose">
+                            <div className="flex justify-between border-b border-border pb-2 mb-2">
                                 <span className="opacity-50">Role Hierarchy</span>
-                                <span className="text-sky-500 font-bold">Priority</span>
+                                <span className="text-foreground font-medium">Priority</span>
                             </div>
                             <div className="flex items-center gap-3">
-                                <span className="w-1.5 h-1.5 bg-sky-500 rounded-full"></span>
+                                <span className="w-1.5 h-1.5 bg-primary rounded-full"></span>
                                 Ro-Link Bot
                             </div>
                             <div className="flex items-center gap-3 ml-4 opacity-50">
-                                <span className="w-1 h-px bg-sky-900"></span>
+                                <span className="w-1 h-px bg-primary"></span>
                                 Verified Role
                             </div>
                             <div className="flex items-center gap-3 ml-4 opacity-50">
-                                <span className="w-1 h-px bg-sky-900"></span>
+                                <span className="w-1 h-px bg-primary"></span>
                                 On Join Role
                             </div>
-                        </div>
+                        </Card>
                     </div>
                 </div>
             </div>

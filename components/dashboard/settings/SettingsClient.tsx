@@ -1,4 +1,21 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Status, StatusLabel } from '@/components/ui/status';
+import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+
+import { Switch } from '@/components/ui/switch';
+
+import { Checkbox } from '@/components/ui/checkbox';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+
+
+import { Select } from '@/components/ui/select';
 
 import { ArrowRight as LucideArrowRight, Check as LucideCheck, ChevronDown as LucideChevronDown, FileText as LucideFileText, TriangleAlert as LucideTriangleAlert, X as LucideX } from 'lucide-react';
 
@@ -20,13 +37,12 @@ import {
     type CustomDashboardTheme,
 } from "@/lib/customDashboardSettings";
 import { useSession } from "next-auth/react";
-import { Command, Info, Save, Settings, Shield, Trash2 } from "lucide-react";
+import { Command, Hash, Info, Plus, Save, Settings, Shield, Trash2 } from "lucide-react";
 
 const SettingsIcon = () => <Settings size={24} aria-hidden="true" />;
 const SaveIcon = () => <Save size={18} aria-hidden="true" />;
 const CommandIcon = () => <Command size={18} aria-hidden="true" />;
 const InfoIcon = () => <Info size={18} aria-hidden="true" />;
-const ShieldIcon = () => <Shield size={18} aria-hidden="true" />;
 const TrashIcon = () => <Trash2 size={14} aria-hidden="true" />;
 
 interface DiscordRole {
@@ -56,6 +72,8 @@ interface DashboardRole {
     can_view_logs: boolean;
     can_view_runtime_logs: boolean;
     can_manage_staff_notes: boolean;
+    can_view_staff_shifts: boolean;
+    can_manage_staff_shifts: boolean;
     allowed_misc_cmds: string[];
 }
 
@@ -67,6 +85,8 @@ type DashboardRoleBooleanField =
     | 'can_view_logs'
     | 'can_view_runtime_logs'
     | 'can_manage_staff_notes'
+    | 'can_view_staff_shifts'
+    | 'can_manage_staff_shifts'
     | 'can_lookup'
     | 'can_kick'
     | 'can_ban'
@@ -81,6 +101,8 @@ const ROLE_PERMISSION_OPTIONS: Array<{ key: DashboardRoleBooleanField; label: st
     { key: 'can_view_logs', label: 'View /cmds Logs' },
     { key: 'can_view_runtime_logs', label: 'View In-Game Console Logs' },
     { key: 'can_manage_staff_notes', label: 'Manage Staff Notes' },
+    { key: 'can_view_staff_shifts', label: 'View Staff Shifts' },
+    { key: 'can_manage_staff_shifts', label: 'Manage Staff Shift Settings' },
     { key: 'can_lookup', label: 'Lookup Users' },
     { key: 'can_kick', label: 'Kick Users' },
     { key: 'can_ban', label: 'Ban Users' },
@@ -260,7 +282,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     const [channels, setChannels] = useState<DiscordChannel[]>([]);
     const [selectedRoleForAdd, setSelectedRoleForAdd] = useState("");
     const [addingRole, setAddingRole] = useState(false);
-    const [isRolesCollapsed, setIsRolesCollapsed] = useState(false);
+    const [roleToRemove, setRoleToRemove] = useState<DashboardRole | null>(null);
     const [collapsedRoleIds, setCollapsedRoleIds] = useState<string[]>([]);
 
     const isLoggingChannelAccessible = !loggingChannelId || channels.some(channel => channel.id === loggingChannelId);
@@ -620,6 +642,8 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         view_logs: false,
                         view_runtime_logs: false,
                         manage_staff_notes: false,
+                        view_staff_shifts: false,
+                        manage_staff_shifts: false,
                     },
                     panelCmds: []
                 })
@@ -669,6 +693,8 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                         view_logs: targetRole.can_view_logs,
                         view_runtime_logs: targetRole.can_view_runtime_logs,
                         manage_staff_notes: targetRole.can_manage_staff_notes,
+                        view_staff_shifts: targetRole.can_view_staff_shifts,
+                        manage_staff_shifts: targetRole.can_manage_staff_shifts,
                     },
                     panelCmds: normalizeAdminPanelCommandList(targetRole.allowed_misc_cmds)
                 })
@@ -680,7 +706,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     }
 
     async function handleDeleteRole(roleId: string) {
-        if (!confirm("Are you sure you want to remove this role configuration?")) return;
+        setRoleToRemove(null);
 
         // Optimistic Remove
         setDashboardRoles(dashboardRoles.filter(r => r.id !== roleId));
@@ -774,7 +800,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-[400px]">
-            <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-8 h-8 border-2 border-border border-t-transparent rounded-full animate-spin"></div>
         </div>
     );
 
@@ -867,309 +893,213 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
 
     return (
         <div className={`animate-in fade-in slide-in-from-bottom-4 duration-700 w-full ${showsSaveButton ? 'pb-32' : 'pb-20'}`}>
-            {/* Page Header */}
-            <div className="mb-10 pb-8 border-b border-slate-800/60">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-5">
-                        <div className="w-14 h-14 bg-sky-600/10 rounded-2xl flex items-center justify-center text-sky-500 border border-sky-500/20 shadow-2xl shadow-sky-900/10">
-                            <SettingsIcon />
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">{pageCopy.title}</h1>
-                            <p className="text-slate-500 text-sm font-medium mt-1">{pageCopy.description}</p>
-                        </div>
-                    </div>
-
-                </div>
+            <div className="mb-7">
+                <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight"><PageIcon name={view === "overview" ? "settings" : view} />{pageCopy.title}</h1>
+                <p className="mt-1 text-sm text-muted-foreground">{pageCopy.description}</p>
             </div>
 
-            <div className="grid grid-cols-12 gap-6 xl:gap-8">
-                {/* Main Settings Column */}
-                <div className={`col-span-12 space-y-12 ${view === 'overview' ? '' : 'lg:col-span-8'}`}>
+            <div className="space-y-6">
+                <div className="space-y-6">
 
                     {view === 'overview' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             {settingsTiles.map((tile) => {
                                 const toneClass = tile.tone === 'emerald'
-                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 group-hover:border-emerald-500/40'
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900 group-hover:border-emerald-200'
                                     : tile.tone === 'purple'
-                                        ? 'bg-purple-500/10 text-purple-400 border-purple-500/20 group-hover:border-purple-500/40'
+                                        ? 'bg-accent text-foreground border-border group-hover:border-border'
                                         : tile.tone === 'indigo'
-                                            ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 group-hover:border-indigo-500/40'
+                                            ? 'bg-accent text-foreground border-border group-hover:border-border'
                                             : tile.tone === 'red'
-                                                ? 'bg-red-500/10 text-red-400 border-red-500/20 group-hover:border-red-500/40'
+                                                ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900 group-hover:border-red-200'
                                                 : tile.tone === 'amber'
-                                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 group-hover:border-amber-500/40'
+                                                    ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900 group-hover:border-amber-200'
                                                 : tile.tone === 'sky'
-                                                    ? 'bg-sky-500/10 text-sky-400 border-sky-500/20 group-hover:border-sky-500/40'
-                                                    : 'bg-slate-500/10 text-slate-400 border-slate-500/20 group-hover:border-slate-500/40';
+                                                    ? 'bg-accent text-foreground border-border group-hover:border-border'
+                                                    : 'bg-muted text-muted-foreground border-border group-hover:border-border';
 
                                 return (
-                                    <button
+                                    <Button variant="outline" size="default"
                                         key={tile.href}
                                         type="button"
                                         onClick={() => router.push(tile.href)}
-                                        className="group min-h-44 rounded-[2rem] border border-slate-800 bg-slate-900/40 p-7 text-left transition-all hover:bg-slate-900/70 hover:border-slate-700"
+                                        className="h-auto min-h-9 justify-start whitespace-normal py-3 group min-h-44 text-left transition-all"
                                     >
                                         <div className={`mb-6 inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-colors ${toneClass}`}>
                                             <SettingsIcon />
                                         </div>
                                         <div className="flex items-start justify-between gap-4">
                                             <div>
-                                                <h3 className="text-sm font-black uppercase tracking-[0.16em] text-white">{tile.title}</h3>
-                                                <p className="mt-3 text-sm leading-relaxed text-slate-500">{tile.description}</p>
+                                                <h3 className="text-sm font-semibold text-foreground">{tile.title}</h3>
+                                                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{tile.description}</p>
                                             </div>
-                                            <LucideArrowRight className="mt-0.5 shrink-0 text-slate-600 transition-colors group-hover:text-white" width="18" height="18" strokeWidth="2.5" />
+                                            <LucideArrowRight className="mt-0.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" width="18" height="18" strokeWidth="2.5" />
                                         </div>
-                                    </button>
+                                    </Button>
                                 );
                             })}
                         </div>
                     )}
 
-                    {/* --- ROLE PERMISSIONS SECTION (NEW) --- */}
                     {view === 'roles' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden transition-all duration-300">
-                        <div className="flex items-start justify-between mb-8 cursor-pointer" onClick={() => setIsRolesCollapsed(!isRolesCollapsed)}>
-                            <div className="flex items-start gap-6">
-                                <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500 border border-purple-500/10">
-                                    <ShieldIcon />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Role Permissions</h3>
-                                    <p className="text-sm text-slate-500 leading-relaxed max-w-lg">
-                                        Assign specific dashboard and in-game capabilities to Discord roles.
-                                    </p>
-                                </div>
-                            </div>
-                            <button className={`p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-all transform ${isRolesCollapsed ? 'rotate-180' : ''}`}>
-                                <LucideChevronDown width="20" height="20" strokeWidth="2" />
-                            </button>
-                        </div>
+                        <div className="space-y-4">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2"><Shield className="size-4" aria-hidden="true" />Discord roles</CardTitle>
+                                    <CardDescription>Add a Discord role, then choose what its members can access. Changes save automatically.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                                    <div className="min-w-0 flex-1 space-y-2">
+                                        <label htmlFor="discord-role" className="text-sm font-medium">Discord role</label>
+                                        <Select
+                                            id="discord-role"
+                                            value={selectedRoleForAdd}
+                                            onValueChange={setSelectedRoleForAdd}
+                                            aria-label="Discord role"
+                                            options={[{ value: '', label: 'Select a Discord role…' }, ...discordRoles
+                                                .filter(dr => !dashboardRoles.some(dbr => dbr.discord_role_id === dr.id) && dr.name !== '@everyone')
+                                                .map(role => ({ value: role.id, label: role.name }))]}
+                                        />
+                                    </div>
+                                    <Button type="button" onClick={handleAddRole} disabled={!selectedRoleForAdd || addingRole}>
+                                        <Plus className="size-4" aria-hidden="true" />{addingRole ? 'Adding…' : 'Add Role'}
+                                    </Button>
+                                </CardContent>
+                            </Card>
 
-                        {!isRolesCollapsed && (
-                            <div className="animate-in fade-in slide-in-from-top-4 duration-300">
-                                {/* Add Role Section */}
-                                <div className="flex gap-4 mb-8 bg-slate-950/50 p-4 rounded-xl border border-slate-800/60">
-                                    <select
-                                        value={selectedRoleForAdd}
-                                        onChange={(e) => setSelectedRoleForAdd(e.target.value)}
-                                        className="flex-1 bg-black/40 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500 transition-all font-medium"
-                                    >
-                                        <option value="">Select a Discord Role...</option>
-                                        {discordRoles
-                                            .filter(dr => !dashboardRoles.some(dbr => dbr.discord_role_id === dr.id) && dr.name !== '@everyone')
-                                            .map(role => (
-                                                <option key={role.id} value={role.id} style={{ color: role.color ? `#${role.color.toString(16)}` : 'white' }}>
-                                                    {role.name}
-                                                </option>
-                                            ))}
-                                    </select>
-                                    <button
-                                        onClick={handleAddRole}
-                                        disabled={!selectedRoleForAdd || addingRole}
-                                        className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-2 rounded-lg text-xs transition-all shadow-lg shadow-purple-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {addingRole ? "Adding..." : "Add Role"}
-                                    </button>
-                                </div>
+                            {dashboardRoles.map((role) => {
+                                const roleCommands = getRolePanelCommands(role);
+                                const hasAllCommands = roleCommands.includes('*');
+                                const permissionCount = getRolePermissionCount(role);
+                                const collapsed = collapsedRoleIds.includes(role.id);
+                                const contentId = `role-permissions-${role.id}`;
 
-                                {/* Roles List */}
-                                <div className="space-y-4">
-                                    {dashboardRoles.map((role) => {
-                                        const roleCommands = getRolePanelCommands(role);
-                                        const hasAllCommands = roleCommands.includes('*');
-                                        const permissionCount = getRolePermissionCount(role);
-                                        const roleCardCollapsed = collapsedRoleIds.includes(role.id);
-
-                                        return (
-                                        <div key={role.id} className="bg-slate-950/40 border border-slate-800 rounded-xl p-6 transition-all hover:bg-slate-900/40">
-                                            <div className={`flex items-center justify-between ${roleCardCollapsed ? '' : 'mb-6 border-b border-slate-800/50 pb-4'}`}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => toggleRoleCollapsed(role.id)}
-                                                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                                                >
-                                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-700">
-                                                        #
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <div className="text-sm font-bold text-white tracking-wide">{role.role_name}</div>
-                                                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                                                            {permissionCount} permission{permissionCount === 1 ? '' : 's'}
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                                <div className="ml-4 flex items-center gap-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => toggleRoleCollapsed(role.id)}
-                                                        className={`p-2 rounded-lg bg-slate-900 text-slate-400 hover:text-white transition-all transform ${roleCardCollapsed ? 'rotate-180' : ''}`}
-                                                        title={roleCardCollapsed ? "Expand Role" : "Collapse Role"}
-                                                    >
-                                                        <LucideChevronDown width="16" height="16" strokeWidth="2" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteRole(role.id)}
-                                                        className="text-slate-500 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-500/10"
-                                                        title="Remove Configuration"
-                                                    >
-                                                        <TrashIcon />
-                                                    </button>
+                                return (
+                                    <Card key={role.id}>
+                                        <CardHeader className="flex-row items-center justify-between gap-3 px-4 py-3">
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"><Hash className="size-4" aria-hidden="true" /></div>
+                                                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                                                    <CardTitle className="max-w-full break-words text-sm leading-snug">{role.role_name}</CardTitle>
+                                                    <Status variant="info" className="px-2 py-0.5"><StatusLabel>{permissionCount} permission{permissionCount === 1 ? '' : 's'}</StatusLabel></Status>
                                                 </div>
                                             </div>
-
-                                            {!roleCardCollapsed && (
-                                                <>
-                                                    {/* Permissions Grid */}
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-3 xl:gap-4">
-                                                        {ROLE_PERMISSION_OPTIONS.map((perm) => (
-                                                            <label key={perm.key} className="flex items-center gap-3 cursor-pointer group select-none">
-                                                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
-                                                                    role[perm.key] ? 'bg-purple-600 border-purple-500' : 'bg-slate-900 border-slate-700 group-hover:border-slate-500'
-                                                                    }`}>
-                                                                    {role[perm.key] && (
-                                                                            <LucideCheck width="12" height="12" strokeWidth="3" className="text-white" />
-                                                                        )}
+                                            <div className="flex shrink-0 items-center gap-1">
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => toggleRoleCollapsed(role.id)} aria-expanded={!collapsed} aria-controls={contentId} aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${role.role_name}`}>
+                                                    <LucideChevronDown className={`size-4 transition-transform ${collapsed ? '' : 'rotate-180'}`} aria-hidden="true" />
+                                                </Button>
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => setRoleToRemove(role)} aria-label={`Remove ${role.role_name}`} className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+                                                    <Trash2 className="size-4" aria-hidden="true" />
+                                                </Button>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent id={contentId} hidden={collapsed} className="space-y-6">
+                                            <Separator />
+                                            <section aria-labelledby={`dashboard-access-${role.id}`} className="space-y-4">
+                                                <div>
+                                                    <h3 id={`dashboard-access-${role.id}`} className="text-sm font-semibold">Dashboard permissions</h3>
+                                                    <p className="mt-1 text-sm text-muted-foreground">Control access to dashboard pages and moderation tools.</p>
+                                                </div>
+                                                <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
+                                                    {ROLE_PERMISSION_OPTIONS.map((perm) => (
+                                                        <label key={perm.key} className="flex cursor-pointer items-start gap-3 text-sm leading-5">
+                                                            <Checkbox className="mt-0.5" checked={Boolean(role[perm.key])} onCheckedChange={(checked) => handleUpdateRole(role, perm.key, checked === true)} />
+                                                            {perm.label}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </section>
+                                            <Separator />
+                                            <section aria-labelledby={`panel-commands-${role.id}`} className="space-y-5">
+                                                <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+                                                    <div>
+                                                        <h3 id={`panel-commands-${role.id}`} className="text-sm font-semibold">Roblox admin panel commands</h3>
+                                                        <p className="mt-1 max-w-xl text-sm text-muted-foreground">Choose the commands this role can run in the dashboard and live Roblox panel.</p>
+                                                    </div>
+                                                    <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm font-medium">
+                                                        <Checkbox checked={hasAllCommands} onCheckedChange={() => handleToggleRoleAllCommands(role)} />
+                                                        All commands
+                                                    </label>
+                                                </div>
+                                                <div className="space-y-6">
+                                                    {ADMIN_PANEL_COMMAND_GROUPS.map((group) => {
+                                                        const selectedCount = hasAllCommands ? group.commands.length : group.commands.filter(command => hasAdminPanelCommandAccess(roleCommands, command.id)).length;
+                                                        return (
+                                                            <fieldset key={group.category} className="min-w-0 space-y-3">
+                                                                <legend className="mb-3 flex w-full items-center justify-between gap-3 text-sm font-medium">
+                                                                    {group.category}<Status><StatusLabel>{selectedCount}/{group.commands.length} selected</StatusLabel></Status>
+                                                                </legend>
+                                                                <div className="grid gap-3 lg:grid-cols-2">
+                                                                    {group.commands.map(command => {
+                                                                        const enabled = hasAllCommands || hasAdminPanelCommandAccess(roleCommands, command.id);
+                                                                        return (
+                                                                            <label key={command.id} className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-4 transition-colors hover:bg-accent has-[[data-state=checked]]:border-primary/40 has-[[data-state=checked]]:bg-accent/50">
+                                                                                <Checkbox className="mt-0.5" checked={enabled} aria-label={command.label} onCheckedChange={() => handleToggleRoleCommand(role, command.id)} aria-describedby={`${role.id}-${command.id}-description`} />
+                                                                                <span className="min-w-0 space-y-1">
+                                                                                    <span className="block text-sm font-medium">{command.label}</span>
+                                                                                    <span id={`${role.id}-${command.id}-description`} className="block text-sm leading-relaxed text-muted-foreground">{command.description}</span>
+                                                                                </span>
+                                                                            </label>
+                                                                        );
+                                                                    })}
                                                                 </div>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="hidden"
-                                                                    checked={role[perm.key]}
-                                                                    onChange={(e) => handleUpdateRole(role, perm.key, e.target.checked)}
-                                                                />
-                                                                <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${
-                                                                    role[perm.key] ? 'text-white' : 'text-slate-500 group-hover:text-slate-400'
-                                                                    }`}>
-                                                                    {perm.label}
-                                                                </span>
-                                                            </label>
-                                                        ))}
-                                                    </div>
-
-                                                    <div className="mt-6 pt-6 border-t border-slate-800/50 space-y-5">
-                                                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                                                            <div>
-                                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">
-                                                                    Roblox Admin Panel Commands
-                                                                </label>
-                                                                <p className="text-[11px] text-slate-500 max-w-xl leading-relaxed">
-                                                                    Choose exactly which Ro-Link in-game panel commands this role can run. The dashboard and live Roblox panel both use this same command list.
-                                                                </p>
-                                                            </div>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleToggleRoleAllCommands(role)}
-                                                                className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-[0.18em] transition-all border ${
-                                                                    hasAllCommands
-                                                                        ? 'bg-purple-600 text-white border-purple-500 shadow-lg shadow-purple-900/20'
-                                                                        : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-purple-500/50 hover:text-white'
-                                                                }`}
-                                                            >
-                                                                {hasAllCommands ? 'All Commands Enabled' : 'Enable All Commands'}
-                                                            </button>
-                                                        </div>
-
-                                                        <div className="space-y-4">
-                                                            {ADMIN_PANEL_COMMAND_GROUPS.map((group) => {
-                                                                const selectedCount = hasAllCommands
-                                                                    ? group.commands.length
-                                                                    : group.commands.filter((command) => hasAdminPanelCommandAccess(roleCommands, command.id)).length;
-
-                                                                return (
-                                                                    <div key={group.category} className="rounded-xl border border-slate-800/70 bg-slate-950/40 p-4">
-                                                                        <div className="flex items-center justify-between mb-4">
-                                                                            <div>
-                                                                                <h4 className="text-xs font-bold text-white uppercase tracking-[0.18em]">{group.category}</h4>
-                                                                                <p className="text-[10px] text-slate-600 mt-1">{selectedCount}/{group.commands.length} selected</p>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                                                                            {group.commands.map((command) => {
-                                                                                const enabled = hasAllCommands || hasAdminPanelCommandAccess(roleCommands, command.id);
-
-                                                                                return (
-                                                                                    <button
-                                                                                        key={command.id}
-                                                                                        type="button"
-                                                                                        onClick={() => handleToggleRoleCommand(role, command.id)}
-                                                                                        className={`text-left rounded-xl border px-4 py-3 transition-all ${
-                                                                                            enabled
-                                                                                                ? 'bg-purple-600/10 border-purple-500/40 shadow-[0_0_0_1px_rgba(168,85,247,0.12)]'
-                                                                                                : 'bg-black/20 border-slate-800 hover:border-slate-600'
-                                                                                        }`}
-                                                                                    >
-                                                                                        <div className="flex items-start gap-3">
-                                                                                            <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                                                                                                enabled
-                                                                                                    ? 'bg-purple-600 border-purple-500 text-white'
-                                                                                                    : 'bg-slate-900 border-slate-700 text-slate-700'
-                                                                                            }`}>
-                                                                                                {enabled ? (
-                                                                                                    <LucideCheck width="12" height="12" strokeWidth="3" />
-                                                                                                ) : null}
-                                                                                            </div>
-                                                                                            <div className="min-w-0">
-                                                                                                <div className={`text-xs font-bold uppercase tracking-[0.16em] ${enabled ? 'text-white' : 'text-slate-300'}`}>
-                                                                                                    {command.label}
-                                                                                                </div>
-                                                                                                <p className={`mt-1 text-[11px] leading-relaxed ${enabled ? 'text-slate-300' : 'text-slate-500'}`}>
-                                                                                                    {command.description}
-                                                                                                </p>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </button>
-                                                                                );
-                                                                            })}
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    )})}
-
-                                    {dashboardRoles.length === 0 && (
-                                        <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-xl">
-                                            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">No roles configured yet.</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                                                            </fieldset>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </section>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                            {dashboardRoles.length === 0 && (
+                                <Card>
+                                    <CardContent className="flex flex-col items-center gap-2 pt-6 text-center">
+                                        <Shield className="mb-2 size-6 text-muted-foreground" aria-hidden="true" />
+                                        <h2 className="text-sm font-semibold">No roles configured</h2>
+                                        <p className="text-sm text-muted-foreground">Add a Discord role above to start assigning permissions.</p>
+                                    </CardContent>
+                                </Card>
+                            )}
+                            <Dialog open={Boolean(roleToRemove)} onOpenChange={(open) => { if (!open) setRoleToRemove(null); }}>
+                                <DialogContent>
+                                    <DialogTitle>Remove role configuration?</DialogTitle>
+                                    <DialogDescription className="mt-2">Remove the permissions configured for {roleToRemove?.role_name}? The Discord role itself will remain.</DialogDescription>
+                                    <div className="mt-6 flex justify-end gap-2">
+                                        <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+                                        <Button type="button" variant="destructive" onClick={() => { if (roleToRemove) handleDeleteRole(roleToRemove.id); }}>Remove configuration</Button>
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
                     )}
 
 
                     {/* Custom Dashboard Config Section */}
                     {view === 'dashboard' && (
                     <div className="space-y-6">
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
+                        <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
                             <div className="flex items-start gap-6 mb-8">
-                                <div className="p-3 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/10">
+                                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
                                     <SettingsIcon />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Custom Dashboard</h3>
-                                    <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Set the custom dashboard address and control how the branded sign-in and dashboard shell appear.</p>
+                                    <h3 className="text-lg font-medium text-foreground mb-2">Custom Dashboard</h3>
+                                    <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">Set the custom dashboard address and control how the branded sign-in and dashboard shell appear.</p>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-6">
-                                <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Dashboard Subdomain</label>
-                                    <div className="flex rounded-xl border border-slate-800 bg-black/30 focus-within:border-amber-500">
-                                        <input
+                                <Card className="bg-card p-6 rounded-xl border border-border">
+                                    <label className="text-xs font-medium text-muted-foreground block mb-2">Dashboard Subdomain</label>
+                                    <div className="flex rounded-xl border border-border bg-muted focus-within:border-amber-500">
+                                        <Input
                                             value={customDashboardSubdomain}
                                             onChange={(e) => setCustomDashboardSubdomain(e.target.value)}
                                             placeholder="my-community"
-                                            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-white outline-none"
+                                            className="min-w-0 flex-1"
                                         />
-                                        <span className="hidden items-center border-l border-slate-800 px-4 font-mono text-xs text-slate-500 sm:flex">subdomain</span>
+                                        <span className="hidden items-center border-l border-border px-4 font-mono text-xs text-muted-foreground sm:flex">subdomain</span>
                                     </div>
                                     {currentDashboardHostname && (
                                         <div className="mt-4">
@@ -1177,297 +1107,272 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                                 href={`https://${currentDashboardHostname}`}
                                                 target="_blank"
                                                 rel="noreferrer"
-                                                className="inline-flex rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 font-mono text-[11px] text-amber-200 hover:border-amber-400/50"
+                                                className="inline-flex rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 font-mono text-xs text-amber-700 dark:text-amber-400 hover:border-amber-200"
                                             >
                                                 {currentDashboardHostname}
                                             </a>
                                         </div>
                                     )}
-                                </div>
+                                </Card>
 
                                 <div className="space-y-6">
                                     <div className="space-y-6">
-                                        <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                                            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Dashboard Title</label>
-                                            <input
+                                        <Card className="bg-card p-6 rounded-xl border border-border">
+                                            <label className="text-xs font-medium text-muted-foreground block mb-2">Dashboard Title</label>
+                                            <Input
                                                 value={customDashboardMetadata.title}
                                                 onChange={(e) => updateCustomDashboardMetadata('title', e.target.value)}
                                                 placeholder="Community Staff Dashboard"
                                                 maxLength={80}
-                                                className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                                className="w-full transition-colors"
                                             />
-                                        </div>
+                                        </Card>
 
-                                        <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                                            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Description</label>
-                                            <textarea
+                                        <Card className="bg-card p-6 rounded-xl border border-border">
+                                            <label className="text-xs font-medium text-muted-foreground block mb-2">Description</label>
+                                            <Textarea
                                                 value={customDashboardMetadata.description}
                                                 onChange={(e) => updateCustomDashboardMetadata('description', e.target.value)}
                                                 placeholder="Sign in with Discord to access this community dashboard."
                                                 maxLength={180}
-                                                className="h-28 w-full resize-none rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                                className="w-full resize-none transition-colors"
                                             />
-                                        </div>
+                                        </Card>
 
                                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Logo URL</label>
-                                                <input
+                                            <Card className="bg-card p-6 rounded-xl border border-border">
+                                                <label className="text-xs font-medium text-muted-foreground block mb-2">Logo URL</label>
+                                                <Input
                                                     value={customDashboardMetadata.logoUrl}
                                                     onChange={(e) => updateCustomDashboardMetadata('logoUrl', e.target.value)}
                                                     placeholder="https://..."
-                                                    className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                                    className="w-full transition-colors"
                                                 />
-                                            </div>
+                                            </Card>
 
-                                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Support URL</label>
-                                                <input
+                                            <Card className="bg-card p-6 rounded-xl border border-border">
+                                                <label className="text-xs font-medium text-muted-foreground block mb-2">Support URL</label>
+                                                <Input
                                                     value={customDashboardMetadata.supportUrl}
                                                     onChange={(e) => updateCustomDashboardMetadata('supportUrl', e.target.value)}
                                                     placeholder="https://discord.gg/..."
-                                                    className="w-full rounded-xl border border-slate-800 bg-black/30 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-amber-500"
+                                                    className="w-full transition-colors"
                                                 />
-                                            </div>
+                                            </Card>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </Card>
 
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm">
+                        <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10">
                             <div className="mb-6">
-                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Layout</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed">Choose how dense the custom-host dashboard shell should feel.</p>
+                                <h3 className="text-lg font-medium text-foreground mb-2">Layout</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed">Choose how dense the custom-host dashboard shell should feel.</p>
                             </div>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                 {CUSTOM_DASHBOARD_LAYOUTS.map((layout) => (
-                                    <button
+                                    <Button variant="outline" size="default"
                                         key={layout.id}
                                         type="button"
                                         onClick={() => setCustomDashboardLayout(layout.id)}
-                                        className={`rounded-xl border p-5 text-left transition-all ${customDashboardLayout === layout.id ? 'border-amber-500/50 bg-amber-500/10' : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'}`}
+                                        className={`h-auto min-h-9 justify-start whitespace-normal py-3    text-left transition-all ${customDashboardLayout === layout.id ? ' ' : '  '}`}
                                     >
                                         <div className="flex items-center justify-between gap-3">
-                                            <div className="text-sm font-black uppercase tracking-[0.16em] text-white">{layout.name}</div>
+                                            <div className="text-sm font-semibold text-foreground">{layout.name}</div>
                                             {customDashboardLayout === layout.id && (
-                                                <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-amber-200">
+                                                <span className="rounded-md border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
                                                     Selected
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="mt-2 text-xs leading-relaxed text-slate-500">{layout.description}</p>
-                                    </button>
+                                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{layout.description}</p>
+                                    </Button>
                                 ))}
                             </div>
-                        </div>
+                        </Card>
 
-                        <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm">
+                        <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10">
                             <div className="mb-6">
-                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Theme</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed">Choose one of seven color schemes for custom dashboard branding.</p>
+                                <h3 className="text-lg font-medium text-foreground mb-2">Theme</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed">Choose one of seven color schemes for custom dashboard branding.</p>
                             </div>
                             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                                 {CUSTOM_DASHBOARD_THEMES.map((theme) => (
-                                    <button
+                                    <Button variant="outline" size="default"
                                         key={theme.id}
                                         type="button"
                                         onClick={() => setCustomDashboardTheme(theme.id)}
-                                        className={`rounded-xl border p-4 text-left transition-all ${customDashboardTheme === theme.id ? 'border-white/40 bg-white/10' : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'}`}
+                                        className={`   text-left transition-all ${customDashboardTheme === theme.id ? ' ' : '  '}`}
                                     >
                                         <span
                                             className="mb-4 block h-9 w-full rounded-lg border"
                                             style={{
-                                                background: theme.gradient,
+                                                background: "var(--background)",
                                                 borderColor: theme.border,
                                             }}
                                         />
                                         <span className="flex items-center justify-between gap-2">
-                                            <span className="text-xs font-black uppercase tracking-[0.16em] text-white">{theme.name}</span>
+                                            <span className="text-xs font-semibold text-foreground">{theme.name}</span>
                                             {customDashboardTheme === theme.id && (
                                                 <span className="h-2 w-2 rounded-full" style={{ background: theme.accent }} />
                                             )}
                                         </span>
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
-                        </div>
+                        </Card>
                     </div>
                     )}
 
 
                     {/* Command Config Section */}
                     {view === 'commands' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
+                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
-                            <div className="p-3 bg-sky-500/10 rounded-xl text-sky-500 border border-sky-500/10">
+                            <div className="p-3 bg-accent rounded-xl text-foreground border border-border">
                                 <CommandIcon />
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Global Command Modules</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Enable or disable specific command categories server-wide. Disabled commands will not function in-game regardless of role.</p>
+                                <h3 className="text-lg font-medium text-foreground mb-2">Global Command Modules</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">Enable or disable specific command categories server-wide. Disabled commands will not function in-game regardless of role.</p>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 gap-6">
                             {/* Admin Commands Toggle */}
-                            <div className="flex items-center justify-between p-6 bg-slate-950/40 border border-slate-800 rounded-2xl">
+                            <Card className="flex items-center justify-between p-6 bg-card border border-border rounded-xl">
                                 <div>
-                                    <h4 className="text-sm font-bold text-slate-200 uppercase tracking-tight">Admin Commands</h4>
-                                    <p className="text-[11px] text-slate-500 font-medium mt-1">Kick, Ban, Unban, Shutdown, Update</p>
+                                    <h4 className="text-sm font-medium text-foreground tracking-tight">Admin Commands</h4>
+                                    <p className="text-xs text-muted-foreground font-medium mt-1">Kick, Ban, Unban, Shutdown, Update</p>
                                 </div>
-                                <button
-                                    onClick={() => setAdminCmds(!adminCmds)}
-                                    className={`w-14 h-7 rounded-full transition-all duration-500 relative border-2 ${adminCmds ? 'bg-sky-600/20 border-sky-500 shadow-[0_0_15px_rgba(2,132,199,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
-                                >
-                                    <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${adminCmds ? 'left-8 bg-sky-500' : 'left-1.5 bg-slate-500'}`} />
-                                </button>
-                            </div>
+                                <Switch checked={adminCmds} onCheckedChange={setAdminCmds} aria-label="Admin commands" />
+                            </Card>
 
                             {/* Misc Commands Toggle */}
-                            <div className="flex items-center justify-between p-6 bg-slate-950/40 border border-slate-800 rounded-2xl">
+                            <Card className="flex items-center justify-between p-6 bg-card border border-border rounded-xl">
                                 <div>
-                                    <h4 className="text-sm font-bold text-slate-200 uppercase tracking-tight">Misc Commands</h4>
-                                    <p className="text-[11px] text-slate-500 font-medium mt-1">Fly, Noclip, Heal, Teleport, etc.</p>
+                                    <h4 className="text-sm font-medium text-foreground tracking-tight">Misc Commands</h4>
+                                    <p className="text-xs text-muted-foreground font-medium mt-1">Fly, Noclip, Heal, Teleport, etc.</p>
                                 </div>
-                                <button
-                                    onClick={() => setMiscCmds(!miscCmds)}
-                                    className={`w-14 h-7 rounded-full transition-all duration-500 relative border-2 ${miscCmds ? 'bg-sky-600/20 border-sky-500 shadow-[0_0_15px_rgba(2,132,199,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
-                                >
-                                    <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${miscCmds ? 'left-8 bg-sky-500' : 'left-1.5 bg-slate-500'}`} />
-                                </button>
-                            </div>
+                                <Switch checked={miscCmds} onCheckedChange={setMiscCmds} aria-label="Miscellaneous commands" />
+                            </Card>
                         </div>
-                    </div>
+                    </Card>
                     )}
 
                     {/* Logging Config Section */}
                     {view === 'logging' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
+                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
-                            <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-500 border border-indigo-500/10">
+                            <div className="p-3 bg-accent rounded-xl text-foreground border border-border">
                                 <LucideFileText width="18" height="18" strokeWidth="2" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Audit Logging</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Select a Discord channel where administrative actions (kick, ban, etc) will be logged.</p>
+                                <h3 className="text-lg font-medium text-foreground mb-2">Audit Logging</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">Select a Discord channel where administrative actions (kick, ban, etc) will be logged.</p>
                             </div>
                         </div>
 
-                        <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                            <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-2">Logging Channel</label>
-                            <select
+                        <Card className="bg-card p-6 rounded-xl border border-border">
+                            <label className="text-xs font-medium text-muted-foreground block mb-2">Logging Channel</label>
+                            <Select
                                 value={loggingChannelId}
-                                onChange={(e) => setLoggingChannelId(e.target.value)}
-                                className="w-full bg-black/40 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all font-medium"
-                            >
-                                <option value="">Disabled (No Logging)</option>
-                                {channels.map(channel => (
-                                    <option key={channel.id} value={channel.id}>
-                                        #{channel.name}
-                                    </option>
-                                ))}
-                            </select>
+                                onValueChange={(nextValue) => setLoggingChannelId(nextValue)}
+                                className="w-full transition-all"
+                                aria-label="Audit logging channel"
+                                options={[{ value: '', label: 'Disabled (No Logging)' }, ...channels.map(channel => ({ value: channel.id, label: '#' + channel.name }))]}
+                            />
                             {!isLoggingChannelAccessible && (
-                                <p className="mt-3 text-[11px] font-medium text-amber-400">
+                                <p className="mt-3 text-xs font-medium text-amber-700 dark:text-amber-400">
                                     The saved logging channel is no longer accessible to the bot. Pick a visible channel the bot can send to, then save again.
                                 </p>
                             )}
-                        </div>
-                    </div>
+                        </Card>
+                    </Card>
                     )}
 
                     {/* Report System Config */}
                     {view === 'reports' && (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm relative overflow-hidden">
+                    <Card className="bg-card border border-border rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 relative overflow-hidden">
                         <div className="flex items-start gap-6 mb-8">
-                            <div className="p-3 bg-red-500/10 rounded-xl text-red-500 border border-red-500/10">
+                            <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-xl text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900">
                                 <LucideTriangleAlert width="18" height="18" strokeWidth="2" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Report System</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed max-w-lg">Enable player reports via Discord and configure where they are forwarded.</p>
+                                <h3 className="text-lg font-medium text-foreground mb-2">Report System</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">Enable player reports via Discord and configure where they are forwarded.</p>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60 flex items-center justify-between">
+                            <Card className="bg-card p-6 rounded-xl border border-border flex items-center justify-between">
                                 <div>
-                                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-1">Status</label>
-                                    <span className={`text-sm font-bold ${reportsEnabled ? 'text-red-500' : 'text-slate-500'}`}>
+                                    <label className="text-xs font-medium text-muted-foreground block mb-1">Status</label>
+                                    <span className={`text-sm font-medium ${reportsEnabled ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground'}`}>
                                         {reportsEnabled ? 'ENABLED' : 'DISABLED'}
                                     </span>
                                 </div>
-                                <button
-                                    onClick={() => setReportsEnabled(!reportsEnabled)}
-                                    className={`w-14 h-7 rounded-full transition-all duration-500 relative border-2 ${reportsEnabled ? 'bg-red-600/20 border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}
-                                >
-                                    <div className={`absolute top-1 w-3.5 h-3.5 rounded-full transition-all duration-500 shadow-md ${reportsEnabled ? 'left-8 bg-red-500' : 'left-1.5 bg-slate-500'}`} />
-                                </button>
-                            </div>
+                                <Switch checked={reportsEnabled} onCheckedChange={setReportsEnabled} aria-label="Player reports" />
+                            </Card>
 
-                            <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/60">
-                                <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block mb-1">Reports Channel</label>
-                                <select
+                            <Card className="bg-card p-6 rounded-xl border border-border">
+                                <label className="text-xs font-medium text-muted-foreground block mb-1">Reports Channel</label>
+                                <Select
                                     value={reportsChannelId}
-                                    onChange={(e) => setReportsChannelId(e.target.value)}
-                                    className="w-full bg-black/40 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500 transition-all font-medium"
-                                >
-                                    <option value="">None (Dashboard Only)</option>
-                                    {channels.map(channel => (
-                                        <option key={channel.id} value={channel.id}>
-                                            #{channel.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onValueChange={(nextValue) => setReportsChannelId(nextValue)}
+                                    className="w-full transition-all"
+                                    aria-label="Reports channel"
+                                    options={[{ value: '', label: 'None (Dashboard Only)' }, ...channels.map(channel => ({ value: channel.id, label: '#' + channel.name }))]}
+                                />
                                 {!isReportsChannelAccessible && (
-                                    <p className="mt-3 text-[11px] font-medium text-amber-400">
+                                    <p className="mt-3 text-xs font-medium text-amber-700 dark:text-amber-400">
                                         The saved reports channel is no longer accessible to the bot. Choose a different channel or restore the bot’s permissions there.
                                     </p>
                                 )}
-                            </div>
+                            </Card>
                         </div>
-                    </div>
+                    </Card>
                     )}
 
                     {/* Status Box */}
                     {showsSaveButton && (
-                        <div className="p-5 sm:p-6 md:p-8 bg-slate-900/20 border border-slate-800 rounded-2xl flex items-center justify-between">
+                        <Card className="p-5 sm:p-6 md:p-8 bg-card border border-border rounded-xl flex items-center justify-between">
                             <div className="flex items-center gap-5">
-                                <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/10">
+                                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
                                     <InfoIcon />
                                 </div>
                                 <div>
-                                    <h4 className="text-xs font-bold text-slate-200 uppercase tracking-tight">System Status</h4>
-                                    <p className="text-[11px] text-slate-500 font-medium tracking-tight mt-0.5">Settings changes propagate to game servers within ~30 seconds.</p>
+                                    <h4 className="text-xs font-medium text-foreground tracking-tight">System Status</h4>
+                                    <p className="text-xs text-muted-foreground font-medium tracking-tight mt-0.5">Settings changes propagate to game servers within ~30 seconds.</p>
                                 </div>
                             </div>
                             {success && (
-                                <div className="flex items-center gap-2 text-emerald-500 animate-in fade-in slide-in-from-right-2 duration-300">
+                                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 animate-in fade-in slide-in-from-right-2 duration-300">
                                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest">Changes Saved</span>
+                                    <span className="text-xs font-medium">Changes Saved</span>
                                 </div>
                             )}
-                            {error && <span className="text-red-500 text-[10px] font-bold uppercase tracking-widest">{error}</span>}
-                        </div>
+                            {error && <span className="text-red-700 dark:text-red-400 text-xs font-medium">{error}</span>}
+                        </Card>
                     )}
 
                     {/* Remove Ro-Link */}
                     {view === 'overview' && (
-                    <div className="bg-red-950/20 border border-red-500/20 rounded-[2rem] p-5 sm:p-6 md:p-8 xl:p-10 backdrop-blur-sm">
+                    <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl p-5 sm:p-6 md:p-8 xl:p-10">
                         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                             <div className="flex items-start gap-5">
-                                <div className="p-3 bg-red-500/10 rounded-xl text-red-400 border border-red-500/20">
+                                <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-xl text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900">
                                     <TrashIcon />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-white uppercase tracking-wider mb-2">Remove Ro-Link</h3>
-                                    <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
+                                    <h3 className="text-lg font-medium text-foreground mb-2">Remove Ro-Link</h3>
+                                    <p className="text-sm text-muted-foreground leading-relaxed max-w-xl">
                                         Open a removal panel for this server. You can remove the bot from the Discord server, delete the stored Ro-Link database data, or do both together.
                                     </p>
                                 </div>
                             </div>
-                            <button
+                            <Button variant="destructive" size="default"
                                 type="button"
                                 onClick={() => {
                                     setRemoveBotOption(true);
@@ -1475,163 +1380,145 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                                     setRemoveActionError(null);
                                     setIsRemoveModalOpen(true);
                                 }}
-                                className="w-full md:w-auto px-8 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-red-900/20 text-xs uppercase tracking-widest flex items-center justify-center gap-3"
+                                className="w-full md:w-auto transition-all flex items-center justify-center"
                             >
                                 <TrashIcon />
                                 Remove Ro-Link
-                            </button>
+                            </Button>
                         </div>
                     </div>
                     )}
                 </div>
 
-                {/* Info Column */}
                 {view !== 'overview' && (
-                <div className="col-span-12 lg:col-span-4 space-y-8">
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 md:p-8">
-                        <h4 className="text-xs font-bold text-white uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
-                            <span className="w-6 h-px bg-sky-600"></span>
-                            Information
-                        </h4>
-                        <div className="space-y-6">
-                            {infoItems.map((item, i) => (
-                                <div key={i} className="group">
-                                    <h5 className="text-xs font-bold text-sky-500 mb-1 group-hover:text-sky-400 transition-colors uppercase tracking-wide">
-                                        {item.title}
-                                    </h5>
-                                    <p className="text-xs text-slate-500 leading-relaxed group-hover:text-slate-400 transition-colors">
-                                        {item.text}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                    <aside aria-label="Settings information" className="grid gap-6 border-t border-border pt-6 sm:grid-cols-2">
+                        {infoItems.map(item => <div key={item.title}><h3 className="text-sm font-medium">{item.title}</h3><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.text}</p></div>)}
+                    </aside>
                 )}
             </div>
 
             {showsSaveButton && (hasUnsavedSettings || saving) && (
                 <div className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 pointer-events-none">
-                    <div className="pointer-events-auto flex w-full max-w-3xl flex-col gap-4 rounded-2xl border border-sky-500/30 bg-slate-950/95 p-4 shadow-2xl shadow-black/40 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
+                    <Card className="pointer-events-auto flex w-full max-w-3xl flex-col gap-4 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-500/20 bg-sky-500/10 text-sky-300">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-accent text-foreground">
                                 <SaveIcon />
                             </div>
                             <div>
-                                <p className="text-sm font-bold text-white">Save your settings</p>
-                                <p className="mt-0.5 text-xs font-medium text-slate-400">You have unsaved changes on this page.</p>
+                                <p className="text-sm font-medium text-foreground">Save your settings</p>
+                                <p className="mt-0.5 text-xs font-medium text-muted-foreground">You have unsaved changes on this page.</p>
                             </div>
                         </div>
-                        <button
+                        <Button variant="default" size="default"
                             type="button"
                             onClick={handleSave}
                             disabled={saving}
-                            className="flex min-h-11 items-center justify-center gap-3 rounded-xl border border-sky-400/20 bg-sky-600 px-6 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-sky-950/30 transition-all hover:bg-sky-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="flex min-h-11 items-center justify-center transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {saving ? (
-                                <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin"></div>
+                                <div className="h-4 w-4 rounded-full border-2 border-border border-t-transparent animate-spin"></div>
                             ) : (
                                 <>
                                     <SaveIcon />
                                     Save Settings
                                 </>
                             )}
-                        </button>
-                    </div>
+                        </Button>
+                    </Card>
                 </div>
             )}
 
             {view === 'overview' && isRemoveModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-2xl rounded-[2rem] border border-red-500/20 bg-[#020617] shadow-2xl overflow-hidden">
-                        <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-8 py-6">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-2xl rounded-xl border border-red-200 dark:border-red-900 bg-background overflow-hidden">
+                        <div className="flex items-start justify-between gap-4 border-b border-border px-8 py-6">
                             <div>
-                                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-red-400">Danger Zone</p>
-                                <h3 className="mt-2 text-2xl font-black tracking-tight text-white uppercase italic">Remove Ro-Link</h3>
-                                <p className="mt-2 text-sm text-slate-400 max-w-xl">
+                                <p className="text-xs font-medium text-red-700 dark:text-red-400">Danger Zone</p>
+                                <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">Remove Ro-Link</h3>
+                                <p className="mt-2 text-sm text-muted-foreground max-w-xl">
                                     Choose what should happen for this server. You can remove the bot, wipe the saved Ro-Link data, or perform both actions together.
                                 </p>
                             </div>
-                            <button
+                            <Button variant="outline" size="icon"
                                 type="button"
                                 onClick={closeRemoveModal}
                                 disabled={removingRoLink}
-                                className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-slate-500 hover:text-white transition-colors disabled:opacity-50"
+                                className="transition-colors disabled:opacity-50"
                             >
                                 <LucideX width="18" height="18" strokeWidth="2.5" />
-                            </button>
+                            </Button>
                         </div>
 
                         <div className="space-y-5 px-8 py-8">
-                            <button
+                            <Button variant="outline" size="default"
                                 type="button"
                                 onClick={() => setRemoveBotOption((current) => !current)}
-                                className={`w-full rounded-2xl border p-5 text-left transition-all ${removeBotOption ? 'border-red-500/40 bg-red-500/10' : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'}`}
+                                className={`h-auto min-h-9 justify-start whitespace-normal py-3 w-full    text-left transition-all ${removeBotOption ? ' ' : '  '}`}
                             >
                                 <div className="flex items-start gap-4">
-                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${removeBotOption ? 'border-red-500 bg-red-500 text-white' : 'border-slate-700 bg-slate-950 text-transparent'}`}>
+                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${removeBotOption ? 'border-red-500 bg-red-500 text-foreground' : 'border-border bg-card text-transparent'}`}>
                                         <LucideCheck width="12" height="12" strokeWidth="3" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold uppercase tracking-[0.16em] text-white">Remove Bot from Server</div>
-                                        <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                                        <div className="text-sm font-medium text-foreground">Remove Bot from Server</div>
+                                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                                             Makes Ro-Link leave this Discord server. Existing database data stays unless you also enable the delete option below.
                                         </p>
                                     </div>
                                 </div>
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button variant="outline" size="default"
                                 type="button"
                                 onClick={() => setDeleteDataOption((current) => !current)}
-                                className={`w-full rounded-2xl border p-5 text-left transition-all ${deleteDataOption ? 'border-red-500/40 bg-red-500/10' : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'}`}
+                                className={`h-auto min-h-9 justify-start whitespace-normal py-3 w-full    text-left transition-all ${deleteDataOption ? ' ' : '  '}`}
                             >
                                 <div className="flex items-start gap-4">
-                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${deleteDataOption ? 'border-red-500 bg-red-500 text-white' : 'border-slate-700 bg-slate-950 text-transparent'}`}>
+                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${deleteDataOption ? 'border-red-500 bg-red-500 text-foreground' : 'border-border bg-card text-transparent'}`}>
                                         <LucideCheck width="12" height="12" strokeWidth="3" />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-bold uppercase tracking-[0.16em] text-white">Delete Ro-Link Data</div>
-                                        <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                                        <div className="text-sm font-medium text-foreground">Delete Ro-Link Data</div>
+                                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                                             Deletes this server’s stored Ro-Link setup, logs, live server cache, command queue, reports, and dashboard role configuration from the database.
                                         </p>
                                     </div>
                                 </div>
-                            </button>
+                            </Button>
 
-                            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-5 py-4 text-sm text-amber-200">
+                            <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-5 py-4 text-sm text-amber-700 dark:text-amber-400">
                                 Deleting data is permanent. If you want a full disconnect, enable both options before confirming.
                             </div>
 
                             {removeActionError && (
-                                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
+                                <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-5 py-4 text-sm font-medium text-red-700 dark:text-red-400">
                                     {removeActionError}
                                 </div>
                             )}
                         </div>
 
-                        <div className="flex flex-col-reverse gap-3 border-t border-slate-800 px-8 py-6 sm:flex-row sm:items-center sm:justify-end">
-                            <button
+                        <div className="flex flex-col-reverse gap-3 border-t border-border px-8 py-6 sm:flex-row sm:items-center sm:justify-end">
+                            <Button variant="ghost" size="default"
                                 type="button"
                                 onClick={closeRemoveModal}
                                 disabled={removingRoLink}
-                                className="px-5 py-3 text-sm font-semibold text-slate-400 hover:text-white transition-colors disabled:opacity-50"
+                                className="transition-colors disabled:opacity-50"
                             >
                                 Cancel
-                            </button>
-                            <button
+                            </Button>
+                            <Button variant="destructive" size="default"
                                 type="button"
                                 onClick={handleRemoveRoLink}
                                 disabled={removingRoLink || (!removeBotOption && !deleteDataOption)}
-                                className="flex items-center justify-center gap-3 rounded-xl bg-red-600 px-6 py-3 text-sm font-bold uppercase tracking-widest text-white transition-all hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex items-center justify-center transition-all disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {removingRoLink ? (
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    <div className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin"></div>
                                 ) : (
                                     <TrashIcon />
                                 )}
                                 Confirm Removal
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

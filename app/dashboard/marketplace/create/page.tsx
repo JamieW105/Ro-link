@@ -1,4 +1,15 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
+
+import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
+import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
+
+import { Checkbox } from '@/components/ui/checkbox';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -84,143 +95,151 @@ export default function CreateMarketplaceModulePage() {
 
     if (status === 'loading') {
         return (
-            <div className="min-h-screen bg-[#020617] flex items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent"></div>
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-transparent"></div>
             </div>
         );
     }
 
     if (status === 'unauthenticated') {
         return (
-            <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-6 text-center">
-                <h1 className="text-2xl font-bold mb-2 tracking-tight">Sign in required</h1>
-                <p className="text-slate-400 mb-8 max-w-sm text-sm">Authenticate with Discord before submitting a marketplace module.</p>
-                <button
+            <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6 text-center">
+                <h1 className="text-2xl font-medium mb-2 tracking-tight">Sign in required</h1>
+                <p className="text-muted-foreground mb-8 max-w-sm text-sm">Authenticate with Discord before submitting a marketplace module.</p>
+                <Button variant="default" size="default"
                     onClick={() => signIn('discord')}
-                    className="bg-sky-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-sky-500 transition-all text-sm"
+                    className="transition-all"
                 >
                     Sign In with Discord
-                </button>
+                </Button>
             </div>
         );
     }
 
     return (
-        <main className="min-h-screen bg-[#020617] text-slate-200">
+        <main className="min-h-screen bg-background text-foreground">
+            <DashboardHeader contained>
+                <DashboardBrand label="Create module" />
+                <div className="flex shrink-0 items-center gap-2"><ThemeToggle /><Button asChild variant="outline" size="sm"><Link href="/dashboard">All servers</Link></Button></div>
+            </DashboardHeader>
             <form onSubmit={submitModule} className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-6 sm:px-8 md:py-10">
-                <header className="mb-8 flex flex-col gap-5 border-b border-slate-800 pb-6 md:flex-row md:items-end md:justify-between">
-                    <div>
-                        <Link href="/dashboard/marketplace" className="text-xs font-bold uppercase tracking-widest text-sky-300 hover:text-sky-200">
-                            Back to Marketplace
-                        </Link>
-                        <Link href="/dashboard/creator/modules" className="ml-4 text-xs font-bold uppercase tracking-widest text-emerald-300 hover:text-emerald-200">
-                            Creator Dashboard
-                        </Link>
-                        <h1 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">Create Module</h1>
-                        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
-                            Submit a Luau module for moderation. You can install and use your own module while it waits for review.
-                        </p>
+                <header className="mb-8 space-y-5 border-b border-border pb-6">
+                    <div className="flex items-start justify-between gap-4">
+                        <nav aria-label="Module navigation" className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                            <Link href="/dashboard/marketplace" className="text-xs font-medium text-foreground hover:text-foreground">
+                                Back to Marketplace
+                            </Link>
+                            <Link href="/dashboard/creator/modules" className="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-700">
+                                Creator Dashboard
+                            </Link>
+                        </nav>
                     </div>
-                    <button
-                        type="submit"
-                        disabled={saving}
-                        className="rounded-xl bg-sky-600 px-5 py-4 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
-                    >
-                        {saving ? 'Submitting' : 'Submit for Moderation'}
-                    </button>
+                    <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+                        <div className="min-w-0">
+                            <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-5xl flex items-center gap-3"><PageIcon name="creator" />Create Module</h1>
+                            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                                Submit a Luau module for moderation. You can install and use your own module while it waits for review.
+                            </p>
+                        </div>
+                        <Button variant="default" size="default"
+                            type="submit"
+                            disabled={saving}
+                            className="shrink-0 self-start transition-colors disabled:opacity-50 md:self-auto"
+                        >
+                            {saving ? 'Submitting' : 'Submit for Moderation'}
+                        </Button>
+                    </div>
                 </header>
 
                 {error && (
-                    <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
+                    <div className="mb-6 rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-5 py-4 text-sm font-medium text-red-700 dark:text-red-400">
                         {error}
                     </div>
                 )}
 
                 <div className="grid flex-1 grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-                    <section className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+                    <section className="space-y-4 rounded-xl border border-border bg-card p-6">
                         <div>
-                            <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Name</label>
-                            <input
+                            <label className="mb-2 block text-xs font-medium text-muted-foreground">Name</label>
+                            <Input
                                 value={form.name}
                                 onChange={(event) => updateForm('name', event.target.value)}
                                 required
-                                className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                className="w-full transition-colors"
                             />
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Slug</label>
-                                <input
+                                <label className="mb-2 block text-xs font-medium text-muted-foreground">Slug</label>
+                                <Input
                                     value={form.slug}
                                     onChange={(event) => updateForm('slug', event.target.value)}
                                     placeholder="auto"
-                                    className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                    className="w-full transition-colors"
                                 />
                             </div>
                             <div>
-                                <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Version</label>
-                                <input
+                                <label className="mb-2 block text-xs font-medium text-muted-foreground">Version</label>
+                                <Input
                                     value={form.version}
                                     onChange={(event) => updateForm('version', event.target.value)}
-                                    className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                    className="w-full transition-colors"
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Category</label>
-                            <input
+                            <label className="mb-2 block text-xs font-medium text-muted-foreground">Category</label>
+                            <Input
                                 value={form.category}
                                 onChange={(event) => updateForm('category', event.target.value)}
-                                className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                className="w-full transition-colors"
                             />
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Description</label>
-                            <textarea
+                            <label className="mb-2 block text-xs font-medium text-muted-foreground">Description</label>
+                            <Textarea
                                 value={form.description}
                                 onChange={(event) => updateForm('description', event.target.value)}
                                 required
-                                className="h-36 w-full resize-none rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-white outline-none transition-colors focus:border-sky-500"
+                                className="w-full resize-none transition-colors"
                             />
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Upload Source</label>
-                            <input
+                            <label className="mb-2 block text-xs font-medium text-muted-foreground">Upload Source</label>
+                            <Input
                                 type="file"
                                 accept=".lua,.luau,.txt"
                                 onChange={handleFileUpload}
-                                className="w-full rounded-xl border border-dashed border-slate-700 bg-slate-950/60 px-4 py-3 text-xs text-slate-400 file:mr-4 file:rounded-lg file:border-0 file:bg-sky-600 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white hover:border-sky-500"
+                                className="w-full file:mr-4"
                             />
                         </div>
 
-                        <div className="space-y-3 border-t border-slate-800 pt-4">
-                            <label className="flex items-start gap-3 text-xs leading-relaxed text-slate-300">
-                                <input
-                                    type="checkbox"
+                        <div className="space-y-3 border-t border-border pt-4">
+                            <label className="flex items-start gap-3 text-xs leading-relaxed text-foreground">
+                                <Checkbox
                                     checked={acceptedCreatorTerms}
-                                    onChange={(event) => setAcceptedCreatorTerms(event.target.checked)}
-                                    className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 accent-sky-500"
+                                    onCheckedChange={(checked) => setAcceptedCreatorTerms(checked === true)}
+                                    className="mt-1 w-4 accent-muted-foreground"
                                 />
-                                <span>I agree to the <Link href="/terms/modules/create" className="text-sky-300 hover:text-sky-200">module creator terms</Link>.</span>
+                                <span>I agree to the <Link href="/terms/modules/create" className="text-foreground hover:text-foreground">module creator terms</Link>.</span>
                             </label>
-                            <label className="flex items-start gap-3 text-xs leading-relaxed text-slate-300">
-                                <input
-                                    type="checkbox"
+                            <label className="flex items-start gap-3 text-xs leading-relaxed text-foreground">
+                                <Checkbox
                                     checked={acceptedUseTerms}
-                                    onChange={(event) => setAcceptedUseTerms(event.target.checked)}
-                                    className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 accent-sky-500"
+                                    onCheckedChange={(checked) => setAcceptedUseTerms(checked === true)}
+                                    className="mt-1 w-4 accent-muted-foreground"
                                 />
-                                <span>I understand the <Link href="/terms/modules/use" className="text-sky-300 hover:text-sky-200">module use and UGC terms</Link>.</span>
+                                <span>I understand the <Link href="/terms/modules/use" className="text-foreground hover:text-foreground">module use and UGC terms</Link>.</span>
                             </label>
                         </div>
                     </section>
 
-                    <section className="flex min-h-[620px] flex-col rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
-                        <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Source Code</label>
+                    <section className="flex min-h-[620px] flex-col rounded-xl border border-border bg-card p-6">
+                        <label className="mb-2 block text-xs font-medium text-muted-foreground">Source Code</label>
                         <LuauCodeEditor
                             value={form.sourceCode}
                             onChange={(event) => updateForm('sourceCode', event.target.value)}

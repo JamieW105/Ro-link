@@ -95,12 +95,12 @@ export default function Home() {
 
                 if (!response.ok) throw new Error(`Stats request failed with ${response.status}`);
 
-                const data = await response.json() as { guild_count?: number; command_count?: number };
+                const data = await response.json() as { guild_count?: number | null; command_count?: number | null };
                 if (cancelled) return;
 
                 setStats({
-                    guildCount: data.guild_count ?? 0,
-                    commandCount: data.command_count ?? 0,
+                    guildCount: data.guild_count ?? null,
+                    commandCount: data.command_count ?? null,
                     latency: Math.round(performance.now() - startedAt),
                 });
             } catch (error) {

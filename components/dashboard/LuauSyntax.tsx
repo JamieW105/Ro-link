@@ -1,5 +1,8 @@
 'use client';
 
+import { Textarea } from '@/components/ui/textarea';
+
+
 import { ChangeEvent, UIEvent, useMemo, useRef } from 'react';
 
 type LuauTokenType = 'keyword' | 'builtin' | 'string' | 'number' | 'comment' | 'operator' | 'identifier' | 'plain';
@@ -91,13 +94,13 @@ const LUAU_BUILTINS = new Set([
 ]);
 
 function tokenClassName(type: LuauTokenType) {
-    if (type === 'keyword') return 'text-sky-300';
-    if (type === 'builtin') return 'text-cyan-300';
-    if (type === 'string') return 'text-emerald-300';
-    if (type === 'number') return 'text-amber-300';
-    if (type === 'comment') return 'text-slate-500';
+    if (type === 'keyword') return 'text-foreground';
+    if (type === 'builtin') return 'text-foreground';
+    if (type === 'string') return 'text-emerald-700 dark:text-emerald-400';
+    if (type === 'number') return 'text-amber-700 dark:text-amber-400';
+    if (type === 'comment') return 'text-muted-foreground';
     if (type === 'operator') return 'text-fuchsia-300';
-    return 'text-slate-200';
+    return 'text-foreground';
 }
 
 function isIdentifierStart(char: string) {
@@ -274,7 +277,7 @@ export function LuauCodeEditor({
     }
 
     return (
-        <div className={`relative overflow-hidden rounded-xl border border-slate-800 bg-black/50 transition-colors focus-within:border-sky-500 ${className}`}>
+        <div className={`relative overflow-hidden rounded-xl border border-border bg-muted transition-colors focus-within:border-border ${className}`}>
             <pre
                 ref={highlightRef}
                 aria-hidden="true"
@@ -284,13 +287,13 @@ export function LuauCodeEditor({
                     <LuauHighlightedCode code={highlightedValue} />
                 </code>
             </pre>
-            <textarea
+            <Textarea
                 value={value}
                 onChange={onChange}
                 onScroll={syncScroll}
                 required={required}
                 wrap="off"
-                className={`relative z-10 w-full resize-y overflow-auto bg-transparent p-4 font-mono text-xs leading-relaxed text-transparent caret-sky-100 outline-none selection:bg-sky-500/35 ${minHeightClassName}`}
+                className={`relative z-10 w-full border-0  focus-visible:ring-0 resize-y overflow-auto bg-transparent p-4 font-mono text-xs leading-relaxed text-transparent caret-muted-foreground outline-none selection:bg-accent ${minHeightClassName}`}
                 spellCheck={false}
             />
         </div>

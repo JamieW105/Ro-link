@@ -4,24 +4,22 @@ import { useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 
 import { DGSU_BAN_AUTH_ERROR, DGSU_BAN_ERROR_MESSAGE } from '@/lib/dgsuBanConstants';
-import { DiscordIcon as DiscordBrandIcon } from '@/components/ui/DiscordIcon';
+import { LogIn } from 'lucide-react';
 import { getCanonicalSignInUrl } from '@/lib/signInNavigation';
+import { Button } from '@/components/ui/button';
 
 type SignInClientProps = {
     callbackUrl: string;
     error?: string;
     authOrigin?: string;
     allowRootAlias?: boolean;
+    discordConfigured?: boolean;
 };
 
-function DiscordIcon() {
-    return (
-        <DiscordBrandIcon aria-hidden="true" className="h-5 w-5" />
-    );
-}
-
-export default function SignInClient({ callbackUrl, error, authOrigin, allowRootAlias }: SignInClientProps) {
-    const errorMessage = error === DGSU_BAN_AUTH_ERROR
+export default function SignInClient({ callbackUrl, error, authOrigin, allowRootAlias, discordConfigured = true }: SignInClientProps) {
+    const errorMessage = !discordConfigured || error === 'Configuration'
+        ? 'Discord sign in is temporarily unavailable. Please contact the site administrator.'
+        : error === DGSU_BAN_AUTH_ERROR
         ? DGSU_BAN_ERROR_MESSAGE
         : 'Discord sign in could not be completed. Please try again.';
     const [isSigningIn, setIsSigningIn] = useState(false);
@@ -43,6 +41,7 @@ export default function SignInClient({ callbackUrl, error, authOrigin, allowRoot
     }, [callbackUrl, error, authOrigin, allowRootAlias]);
 
     async function handleDiscordSignIn() {
+        if (!discordConfigured) return;
         const nextUrl = getCanonicalSignInUrl(window.location.origin, authOrigin, callbackUrl, error, allowRootAlias);
         if (nextUrl) {
             window.location.replace(nextUrl);
@@ -83,21 +82,23 @@ export default function SignInClient({ callbackUrl, error, authOrigin, allowRoot
                     <p className="mt-1 truncate text-sm font-semibold text-slate-200">{destination}</p>
                 </div>
 
-                {error || hasRequestError ? (
-                    <div className="mb-5 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                {error || hasRequestError || !discordConfigured ? (
+                    <div role="alert" className="mb-5 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
                         {errorMessage}
                     </div>
                 ) : null}
 
-                <button
+                <Button
+                    variant="default"
+                    size="lg"
                     type="button"
                     onClick={handleDiscordSignIn}
-                    disabled={isSigningIn}
+                    disabled={isSigningIn || !discordConfigured}
                     className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#5865F2] px-5 text-sm font-bold text-white transition hover:bg-[#4752C4] disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                    <DiscordIcon />
+                    <LogIn aria-hidden="true" className="h-5 w-5" />
                     {isSigningIn ? 'Opening Discord...' : 'Sign in with Discord'}
-                </button>
+                </Button>
 
                 <p className="mt-5 text-center text-xs leading-5 text-slate-500">
                     Ro-Link uses Discord to verify your account and dashboard access.
