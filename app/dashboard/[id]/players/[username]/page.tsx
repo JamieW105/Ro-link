@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Card } from '@/components/ui/card';
@@ -85,7 +86,7 @@ export default function DashboardPlayerPage() {
     const [linkedPlaceId, setLinkedPlaceId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [notice, setNotice] = useSuccessNotice<{ type: 'success' | 'error'; text: string } | null>(null);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [setCharValue, setSetCharValue] = useState("");
     const [teamValue, setTeamValue] = useState("");
@@ -212,7 +213,7 @@ export default function DashboardPlayerPage() {
                 clearInterval(interval);
             }
         };
-    }, [guildId, decodedUsername, loadDashboardData, resolveRobloxProfile]);
+    }, [guildId, decodedUsername, loadDashboardData, resolveRobloxProfile, setNotice]);
 
     async function sendPlayerCommand(commandId: string, extraArgs: Record<string, unknown> = {}, confirmMessage?: string) {
         if (!guildId || !player) {

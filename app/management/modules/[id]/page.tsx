@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 
 import { Check as LucideCheck, X as LucideX } from 'lucide-react';
 
@@ -126,7 +127,7 @@ export default function ManagementModuleReviewPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
+    const [success, setSuccess] = useSuccessNotice<string | null>(null);
     const [editingSource, setEditingSource] = useState(false);
     const [editedSourceCode, setEditedSourceCode] = useState('');
     const [codeEditReason, setCodeEditReason] = useState('');

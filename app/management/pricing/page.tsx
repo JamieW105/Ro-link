@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 
 import { ArrowDown, ArrowUp, CircleDollarSign, Clock3, Eye, EyeOff, Pencil, Plus, Save, Search, Sparkles, Trash2 } from 'lucide-react';
 import Link from 'next/link';
@@ -12,7 +13,7 @@ export default function ManagePricingPage() {
     const [query, setQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+    const [message, setMessage] = useSuccessNotice<{ type: 'error' | 'success'; text: string } | null>(null);
 
     useEffect(() => {
         fetch('/api/management/site-content/pricing', { cache: 'no-store' })
@@ -23,7 +24,7 @@ export default function ManagePricingPage() {
             })
             .catch((error) => setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not load pricing content.' }))
             .finally(() => setLoading(false));
-    }, []);
+    }, [setMessage]);
 
     const filteredPlans = useMemo(() => {
         const normalized = query.trim().toLowerCase();

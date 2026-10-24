@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 import StaffShiftProgress from '@/components/dashboard/StaffShiftProgress';
 
@@ -796,7 +797,7 @@ export default function LivePanelPage() {
     const [logs, setLogs] = useState<NormalizedDashboardLog[]>([]);
     const [pendingReports, setPendingReports] = useState<PendingReport[]>([]);
     const [loading, setLoading] = useState(true);
-    const [notice, setNotice] = useState<NoticeState>(null);
+    const [notice, setNotice] = useSuccessNotice<NoticeState>(null);
     const [serverSearch, setServerSearch] = useState('');
     const [logSearch, setLogSearch] = useState('');
     const [profileSearch, setProfileSearch] = useState('');
@@ -827,7 +828,7 @@ export default function LivePanelPage() {
     const [reportSearch, setReportSearch] = useState('');
     const [panelReports, setPanelReports] = useState<LiveReport[]>([]);
     const [reportsLoading, setReportsLoading] = useState(false);
-    const [reportsNotice, setReportsNotice] = useState<NoticeState>(null);
+    const [reportsNotice, setReportsNotice] = useSuccessNotice<NoticeState>(null);
     const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
     const [selectedReport, setSelectedReport] = useState<LiveReport | null>(null);
     const [selectedReportProfile, setSelectedReportProfile] = useState<ReportTargetProfile | null>(null);
@@ -898,7 +899,7 @@ export default function LivePanelPage() {
                 setLoading(false);
             }
         }
-    }, [guildId]);
+    }, [guildId, setNotice]);
 
     const refreshLiveServers = useCallback(async () => {
         if (!guildId || liveServersRefreshPending.current) return;
@@ -950,7 +951,7 @@ export default function LivePanelPage() {
         } finally {
             setReportsLoading(false);
         }
-    }, [canManageReports, guildId]);
+    }, [canManageReports, guildId, setReportsNotice]);
 
     const loadReportDetail = useCallback(async (reportId: string) => {
         if (!guildId || !canManageReports || !reportId) return;
@@ -991,7 +992,7 @@ export default function LivePanelPage() {
         } finally {
             setReportDetailLoading(false);
         }
-    }, [canManageReports, guildId]);
+    }, [canManageReports, guildId, setReportsNotice]);
 
     useEffect(() => {
         loadPanel(true);

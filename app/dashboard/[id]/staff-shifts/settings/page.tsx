@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { useCallback, useEffect, useState } from 'react';
@@ -25,7 +26,7 @@ export default function StaffShiftSettingsPage() {
   const canManage = permissions.is_admin || permissions.can_manage_staff_shifts;
   const [draft, setDraft] = useState<ShiftSettings | null>(null);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useSuccessNotice<string>('');
   const [saving, setSaving] = useState(false);
   const load = useCallback(
     async (signal?: AbortSignal) => {

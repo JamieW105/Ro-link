@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 
 import { X as LucideX } from 'lucide-react';
 
@@ -80,7 +81,7 @@ export default function ManagementDmsPage() {
     const [thumbnailUrl, setThumbnailUrl] = useState('');
     const [loadingCounts, setLoadingCounts] = useState(true);
     const [sending, setSending] = useState(false);
-    const [notice, setNotice] = useState('');
+    const [notice, setNotice] = useSuccessNotice<string>('');
     const [error, setError] = useState('');
     const [result, setResult] = useState<SendResult | null>(null);
     const [mounted, setMounted] = useState(false);

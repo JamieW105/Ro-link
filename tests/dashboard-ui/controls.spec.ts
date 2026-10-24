@@ -854,3 +854,29 @@ test("dashboard panels use Dice headers without repeating page icons", async ({ 
   await expect(dialog).toBeHidden();
   expect(errors).toEqual([]);
 });
+
+test('save confirmations expire after three seconds and errors remain visible', async ({ page }) => {
+  await mockDashboard(page);
+  await page.goto(`/dashboard/${serverId}/staff-shifts/settings`);
+  const save = page.getByRole('button', { name: 'Save shift settings', exact: true });
+  await expect(save).toBeEnabled();
+  await page.clock.install();
+  await page.clock.pauseAt(new Date());
+  await save.click();
+  const confirmation = page.getByRole('status');
+  await expect(confirmation).toHaveText('Shift settings saved.');
+  await page.clock.runFor(2999);
+  await expect(confirmation).toBeVisible();
+  // Repeating the same message starts a fresh timer.
+  await save.click();
+  await page.clock.runFor(1);
+  await expect(confirmation).toBeVisible();
+  await page.clock.runFor(2999);
+  await expect(confirmation).toBeHidden();
+  await page.route('**/api/dashboard/staff-shifts/settings', route =>
+    route.fulfill({ status: 500, json: { error: 'Could not save shift settings.' } }));
+  await save.click();
+  await expect(page.getByText('Could not save shift settings.', { exact: true })).toBeVisible();
+  await page.clock.runFor(5000);
+  await expect(page.getByText('Could not save shift settings.', { exact: true })).toBeVisible();
+});

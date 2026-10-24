@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 
 import { ArrowLeft, ListChecks, Save } from 'lucide-react';
 import Link from 'next/link';
@@ -27,7 +28,7 @@ export default function FeatureEditor({ featureId }: { featureId?: string }) {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [notFound, setNotFound] = useState(false);
-    const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+    const [message, setMessage] = useSuccessNotice<{ type: 'error' | 'success'; text: string } | null>(null);
 
     useEffect(() => {
         fetch('/api/management/site-content/features', { cache: 'no-store' })
@@ -44,7 +45,7 @@ export default function FeatureEditor({ featureId }: { featureId?: string }) {
             })
             .catch((error) => setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not load features content.' }))
             .finally(() => setLoading(false));
-    }, [featureId]);
+    }, [featureId, setMessage]);
 
     async function submit(event: React.FormEvent) {
         event.preventDefault();

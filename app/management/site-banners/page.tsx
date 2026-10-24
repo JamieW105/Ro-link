@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 
 import { CalendarClock, ExternalLink, Megaphone, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
@@ -67,7 +68,7 @@ export default function SiteBannersPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    const [notice, setNotice] = useState('');
+    const [notice, setNotice] = useSuccessNotice<string>('');
     const [formOpen, setFormOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [form, setForm] = useState<BannerForm>(emptyForm);

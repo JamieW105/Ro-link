@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -38,7 +39,7 @@ export default function VerificationPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState(false);
+    const [success, setSuccess] = useSuccessNotice<boolean>(false);
 
     const [roles, setRoles] = useState<any[]>([]);
     const [enabled, setEnabled] = useState(false);
@@ -113,7 +114,6 @@ export default function VerificationPage() {
             setError(String(payload.error || 'Failed to save verification settings.'));
         } else {
             setSuccess(true);
-            setTimeout(() => setSuccess(false), 3000);
         }
         setSaving(false);
     }

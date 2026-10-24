@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
@@ -133,7 +134,7 @@ export default function CreatorModulesPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
+    const [success, setSuccess] = useSuccessNotice<string | null>(null);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<CreatorFilter>('ALL');
 
@@ -189,7 +190,7 @@ export default function CreatorModulesPage() {
         setAcceptedUseTerms(false);
         setError(null);
         setSuccess(null);
-    }, [selectedModule]);
+    }, [selectedModule, setSuccess]);
 
     async function loadModules() {
         setLoading(true);

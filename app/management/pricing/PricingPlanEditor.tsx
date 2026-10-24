@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 
 import { ArrowLeft, CircleDollarSign, Save } from 'lucide-react';
 import Link from 'next/link';
@@ -33,7 +34,7 @@ export default function PricingPlanEditor({ planId }: { planId?: string }) {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [notFound, setNotFound] = useState(false);
-    const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+    const [message, setMessage] = useSuccessNotice<{ type: 'error' | 'success'; text: string } | null>(null);
 
     useEffect(() => {
         fetch('/api/management/site-content/pricing', { cache: 'no-store' })
@@ -50,7 +51,7 @@ export default function PricingPlanEditor({ planId }: { planId?: string }) {
             })
             .catch((error) => setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not load pricing content.' }))
             .finally(() => setLoading(false));
-    }, [planId]);
+    }, [planId, setMessage]);
 
     async function submit(event: React.FormEvent) {
         event.preventDefault();

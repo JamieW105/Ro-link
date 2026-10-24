@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -248,7 +249,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState(false);
+    const [success, setSuccess] = useSuccessNotice<boolean>(false);
     const [savedSettings, setSavedSettings] = useState<SavedSettingsSnapshot | null>(null);
     const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
     const [removeBotOption, setRemoveBotOption] = useState(true);
@@ -551,7 +552,6 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                     },
                 }));
                 setSuccess(true);
-                setTimeout(() => setSuccess(false), 3000);
             }
 
             setSaving(false);
@@ -601,7 +601,6 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                 ...nextServerSettings,
             }));
             setSuccess(true);
-            setTimeout(() => setSuccess(false), 3000);
         }
         setSaving(false);
     }
@@ -795,7 +794,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
         if (hasUnsavedSettings && success) {
             setSuccess(false);
         }
-    }, [hasUnsavedSettings, success]);
+    }, [hasUnsavedSettings, setSuccess, success]);
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-[400px]">

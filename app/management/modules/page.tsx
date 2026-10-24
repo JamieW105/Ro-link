@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -135,7 +136,7 @@ export default function ManagementModulesPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
+    const [success, setSuccess] = useSuccessNotice<string | null>(null);
     const [search, setSearch] = useState('');
 
     const filteredModules = useMemo(() => {

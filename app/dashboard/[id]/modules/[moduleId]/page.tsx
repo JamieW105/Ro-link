@@ -1,4 +1,5 @@
 'use client';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Card } from '@/components/ui/card';
@@ -372,7 +373,7 @@ export default function DashboardModuleConfigPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
+    const [success, setSuccess] = useSuccessNotice<string | null>(null);
 
     const fields = useMemo(() => Object.values(module?.configSchema || {}), [module]);
     const savedFields = useMemo(() => fields.filter((field) => !field.live), [fields]);
