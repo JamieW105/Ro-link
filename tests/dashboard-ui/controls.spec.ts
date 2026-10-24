@@ -559,6 +559,32 @@ test("Live Panel retains the personal shift summary and manual shift action", as
   expect(errors).toEqual([]);
 });
 
+for (const scenario of [
+  { name: 'staff shifts are disabled', enabled: false, quota: 5 },
+  { name: 'the wave has no quota', enabled: true, quota: 0 },
+]) {
+  test(`Live Panel hides quota progress when ${scenario.name}`, async ({ page }) => {
+    const errors = await mockDashboard(page);
+    await page.route('**/api/dashboard/staff-shifts?*', route => route.fulfill({json: {
+      ...sampleShiftReport,
+      settings: {...sampleShiftReport.settings, enabled: scenario.enabled},
+      wave: {...sampleShiftReport.wave, quota_hours: scenario.quota},
+    }}));
+    await page.goto(`/dashboard/${serverId}/live-panel`);
+    const personal = page.getByRole('region', {name:'Your staff shifts',exact:true});
+    await expect(personal.getByText('4.00 total hours · 6 shifts', {exact:true})).toBeVisible();
+    await expect(personal.getByText('Wave quota', {exact:true})).toHaveCount(0);
+    await expect(personal.getByRole('progressbar')).toHaveCount(0);
+    if (scenario.enabled) {
+      await expect(personal.getByRole('button', {name:'End shift',exact:true})).toBeVisible();
+    } else {
+      await expect(personal.getByText('Staff shifts are disabled.', {exact:true})).toBeVisible();
+      await expect(personal.getByRole('button')).toHaveCount(0);
+    }
+    expect(errors).toEqual([]);
+  });
+}
+
 test("sidebar account shows the Discord avatar above a compact server switch and falls back on image errors", async ({ page, isMobile }) => {
   const errors = await mockDashboard(page);
   await page.route('**/api/auth/session', route => route.fulfill({json:{user:{id:'test-user',name:'UI Tester',image:'https://cdn.discordapp.com/avatars/test-user/avatar.png'},expires:'2099-01-01T00:00:00Z'}}));

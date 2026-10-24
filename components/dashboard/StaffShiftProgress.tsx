@@ -93,16 +93,17 @@ export default function StaffShiftProgress({ serverId }: { serverId: string }) {
       </div>
       {report ? (
         <>
-          <div className="min-w-40 flex-1 space-y-1">
-            <div className="flex justify-between gap-3 text-xs tabular-nums text-muted-foreground">
-              <span>Wave quota</span>
-              <span>
-                {hours.toFixed(2)} / {quota} hours
-                {quota === 0 ? ' · No quota' : ''}
-              </span>
+          {report.settings.enabled && quota > 0 && (
+            <div className="min-w-40 flex-1 space-y-1">
+              <div className="flex justify-between gap-3 text-xs tabular-nums text-muted-foreground">
+                <span>Wave quota</span>
+                <span>
+                  {hours.toFixed(2)} / {quota} hours
+                </span>
+              </div>
+              <Progress className="h-1" value={progress} aria-label="Progress toward wave quota" />
             </div>
-            <Progress className="h-1" value={progress} aria-label="Progress toward wave quota" />
-          </div>
+          )}
           <p className="text-xs tabular-nums text-muted-foreground">
             {shiftHours(staff?.total_seconds || 0)} total hours ·{' '}
             {staff?.total_shifts || 0} shifts
