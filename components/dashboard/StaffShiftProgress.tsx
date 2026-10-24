@@ -71,8 +71,8 @@ export default function StaffShiftProgress({ serverId }: { serverId: string }) {
     }
   }
   return (
-    <Card className="w-full p-4" aria-label="Your staff shifts">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <Card className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2" aria-label="Your staff shifts">
+      <div className="flex shrink-0 items-center gap-3">
         <h2 className="text-sm font-medium">Your staff shifts</h2>
         <Status
           variant={
@@ -93,15 +93,17 @@ export default function StaffShiftProgress({ serverId }: { serverId: string }) {
       </div>
       {report ? (
         <>
-          <div className="mb-2 mt-3 flex justify-between gap-3 text-xs tabular-nums text-muted-foreground">
-            <span>Wave quota</span>
-            <span>
-              {hours.toFixed(2)} / {quota} hours
-              {quota === 0 ? ' · No quota' : ''}
-            </span>
+          <div className="min-w-40 flex-1 space-y-1">
+            <div className="flex justify-between gap-3 text-xs tabular-nums text-muted-foreground">
+              <span>Wave quota</span>
+              <span>
+                {hours.toFixed(2)} / {quota} hours
+                {quota === 0 ? ' · No quota' : ''}
+              </span>
+            </div>
+            <Progress className="h-1" value={progress} aria-label="Progress toward wave quota" />
           </div>
-          <Progress value={progress} aria-label="Progress toward wave quota" />
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="text-xs tabular-nums text-muted-foreground">
             {shiftHours(staff?.total_seconds || 0)} total hours ·{' '}
             {staff?.total_shifts || 0} shifts
           </p>
@@ -115,7 +117,7 @@ export default function StaffShiftProgress({ serverId }: { serverId: string }) {
               type="button"
               variant="outline"
               size="sm"
-              className="mt-3"
+              className="shrink-0"
               onClick={changeShift}
               disabled={busy}
             >

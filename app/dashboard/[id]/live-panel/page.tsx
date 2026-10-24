@@ -2282,15 +2282,22 @@ export default function LivePanelPage() {
             <div className="shrink-0 border-b border-border bg-background">
                 <DashboardHeader>
                     <div className="flex min-w-0 items-center gap-3"><Button asChild variant="ghost" size="icon" className="size-8"><Link href={`/dashboard/${guildId}`} aria-label="Back to dashboard"><PanelBackIcon className="size-4" /></Link></Button><div className="min-w-0"><h1 className="text-sm font-semibold tracking-tight flex items-center gap-3"><PageIcon name="live" compact />Live panel</h1><p className="truncate text-xs text-muted-foreground">{serverName}</p></div><Status variant="success" className="hidden sm:inline-flex"><StatusIndicator />Live</Status></div>
+                    <div className="flex min-w-0 flex-1 items-center gap-4 overflow-x-auto text-xs" aria-label="Live panel counts">
+                        {[
+                            { label: 'Servers', value: enrichedServers.length },
+                            { label: 'Players', value: totalPlayers },
+                            { label: 'Events', value: logs.length },
+                            ...(canManageReports ? [{ label: 'Pending reports', value: pendingReports.length }] : []),
+                        ].map(({ label, value }) => (
+                            <Stat key={label} className="flex shrink-0 items-center gap-1.5 rounded-none border-0 bg-transparent p-0 shadow-none">
+                                <StatLabel className="text-xs font-normal">{label}</StatLabel>
+                                <StatValue className="text-xs font-medium tabular-nums tracking-normal">{value}</StatValue>
+                            </Stat>
+                        ))}
+                    </div>
                     <div className="flex shrink-0 items-center gap-2"><ThemeToggle /><Button asChild variant="outline" size="sm"><Link href="/dashboard">All servers</Link></Button></div>
                 </DashboardHeader>
-                <div className="grid gap-4 border-t border-border bg-muted/20 p-4 md:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] md:px-6">
-                    <div className={`grid gap-3 content-start ${canManageReports ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
-                    <Stat className="gap-y-1 p-3"><StatLabel>Servers</StatLabel><StatValue>{enrichedServers.length}</StatValue></Stat>
-                    <Stat className="gap-y-1 p-3"><StatLabel>Players</StatLabel><StatValue>{totalPlayers}</StatValue></Stat>
-                    <Stat className="gap-y-1 p-3"><StatLabel>Events</StatLabel><StatValue>{logs.length}</StatValue></Stat>
-                    {canManageReports && <Stat className="gap-y-1 p-3"><StatLabel>Pending reports</StatLabel><StatValue>{pendingReports.length}</StatValue></Stat>}
-                    </div>
+                <div className="border-t border-border bg-muted/20 px-4 py-2 sm:px-8">
                     <StaffShiftProgress serverId={guildId} />
                 </div>
             </div>

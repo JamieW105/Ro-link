@@ -541,6 +541,16 @@ test("Live Panel retains the personal shift summary and manual shift action", as
   await page.goto(`/dashboard/${serverId}/live-panel`);
   const personal = page.getByRole('region', {name:'Your staff shifts',exact:true});
   await expect(personal).toBeVisible();
+  const header = page.locator('[data-dashboard-header]');
+  const counts = header.getByLabel('Live panel counts');
+  await expect(counts.getByText('Servers', {exact:true})).toBeVisible();
+  await expect(counts.getByText('Pending reports', {exact:true})).toBeAttached();
+  await expect(counts.locator('[data-slot="stat-value"]').first()).toHaveCSS('font-size', '12px');
+  const summaryBox = (await personal.boundingBox())!;
+  expect(summaryBox.width).toBeGreaterThan(page.viewportSize()!.width - 70);
+  if (test.info().project.name === 'desktop') expect(summaryBox.height).toBeLessThan(65);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
   await expect(personal.getByRole('progressbar', {name:'Progress toward wave quota',exact:true})).toHaveAttribute('aria-valuenow', '40');
   const stopped = page.waitForRequest(request => request.url().includes('/api/dashboard/staff-shifts') && request.method() === 'POST');
   await personal.getByRole('button', {name:'End shift',exact:true}).click();
