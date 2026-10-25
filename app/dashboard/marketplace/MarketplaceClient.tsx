@@ -1,19 +1,24 @@
 'use client';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 import { useRouter } from 'next/navigation';
 import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { ArrowLeft, ArrowRight, Package, Plus, Search, X } from 'lucide-react';
+import { CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { ArrowLeft, ArrowRight, Loader2, Plus, Search, X } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Status, StatusLabel } from '@/components/ui/status';
+import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
+import Image from 'next/image';
 
 
 import { ShieldAlert as LucideShieldAlert } from 'lucide-react';
@@ -64,20 +69,38 @@ interface InstallTarget {
     moduleLimit: number;
 }
 
-type SessionUserWithId = {
-    id?: string;
-};
-
 function formatDate(value: string | null) {
     if (!value) return 'Unpublished';
     return new Date(value).toLocaleDateString();
 }
 
-function statusClassName(status: string) {
-    if (status === 'PUBLISHED') return 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400';
-    if (status === 'PENDING_REVIEW') return 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400';
-    if (status === 'REJECTED') return 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400';
-    return 'border-border bg-card text-muted-foreground';
+function statusVariant(status: string) {
+    if (status === 'PUBLISHED') return 'success';
+    if (status === 'PENDING_REVIEW') return 'warning';
+    if (status === 'REJECTED') return 'error';
+    return 'default';
+}
+
+function ModuleBadges({ addon }: { addon: MarketplaceModule }) {
+    return <div className="flex flex-wrap items-center gap-2">
+        <Status><StatusLabel>{addon.category}</StatusLabel></Status>
+        <Status variant={statusVariant(addon.status)}><StatusLabel>{statusLabel(addon.status)}</StatusLabel></Status>
+        {addon.isOfficial && <Status><StatusLabel>Official</StatusLabel></Status>}
+        {addon.creatorIsVerified && <Status variant="info"><StatusLabel>Verified creator</StatusLabel></Status>}
+    </div>;
+}
+
+function ServerIdentity({ server }: { server: InstallTarget }) {
+    const [failed, setFailed] = useState(false);
+    return <>
+        {server.icon && !failed
+            ? <Image unoptimized width={32} height={32} src={getDiscordGuildIconProxyUrl(server.id, server.icon)} alt="" onError={() => setFailed(true)} className="size-8 shrink-0 rounded-md object-cover" />
+            : <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground">{server.name.slice(0, 1)}</span>}
+        <span className="min-w-0 flex-1 space-y-1 text-left">
+            <span className="block break-words text-sm font-medium">{server.name}</span>
+            <span className="block text-xs text-muted-foreground">{server.installedModuleCount}/{server.moduleLimit} installed{server.installedModuleCount >= server.moduleLimit ? ' · Limit reached' : ''}</span>
+        </span>
+    </>;
 }
 
 function statusLabel(status: string) {
@@ -94,7 +117,7 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
     const router = useRouter();
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('all');
-    const { data: session, status } = useSession();
+    const { status } = useSession();
     const [modules, setModules] = useState<MarketplaceModule[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -106,7 +129,6 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
     const [installing, setInstalling] = useState(false);
     const [installMessage, setInstallMessage] = useState<string | null>(null);
     const [installError, setInstallError] = useState<string | null>(null);
-    const sessionUserId = (session?.user as SessionUserWithId | undefined)?.id;
 
     const selectedModule = useMemo(
         () => modules.find((addon) => addon.id === selectedModuleId) || null,
@@ -243,308 +265,184 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
     const categories = [...new Set(modules.map(addon => addon.category))].sort();
 
     if (status === 'loading') {
-        return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-transparent"></div>
-            </div>
-        );
+        return <div role="status" className="flex min-h-dvh items-center justify-center gap-2 bg-background text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" aria-hidden="true" />Loading marketplace…</div>;
     }
 
     if (status === 'unauthenticated') {
-        return (
-            <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6 text-center">
-                <div className="w-16 h-16 bg-muted rounded-xl flex items-center justify-center mb-6 text-muted-foreground border border-border">
-                    <LucideShieldAlert width="32" height="32" strokeWidth="2" />
-                </div>
-                <h1 className="text-2xl font-medium mb-2 tracking-tight">Access Denied</h1>
-                <p className="text-muted-foreground mb-8 max-w-sm text-sm">Please authenticate with Discord to browse marketplace modules.</p>
-                <Button variant="default" size="default"
-                    onClick={() => signIn('discord')}
-                    className="transition-all"
-                >
-                    Sign In with Discord
-                </Button>
-            </div>
-        );
+        return <main className="flex min-h-dvh items-center justify-center bg-background p-4 text-foreground">
+            <Card className="w-full max-w-md">
+                <CardHeader>
+                    <LucideShieldAlert className="mb-2 size-5 text-muted-foreground" aria-hidden="true" />
+                    <CardTitle>Sign in to the marketplace</CardTitle>
+                    <CardDescription>Authenticate with Discord to browse community modules.</CardDescription>
+                </CardHeader>
+                <CardFooter><Button type="button" onClick={() => signIn('discord', { callbackUrl: '/dashboard/marketplace' })}>Sign In with Discord</Button></CardFooter>
+            </Card>
+        </main>;
     }
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="min-h-dvh bg-background text-foreground">
             <DashboardHeader contained>
                 <DashboardBrand label="Marketplace" />
-                <div className="flex shrink-0 items-center gap-2"><ThemeToggle /><Button asChild variant="outline" size="sm"><Link href="/dashboard"><ArrowLeft className="size-3.5" />All servers</Link></Button></div>
+                <div className="flex shrink-0 items-center gap-2">
+                    <ThemeToggle />
+                    <Button asChild variant="outline" size="sm"><Link href="/dashboard"><ArrowLeft className="size-3.5" aria-hidden="true" />All servers</Link></Button>
+                </div>
             </DashboardHeader>
 
-            <main className="mx-auto max-w-7xl px-4 py-6 sm:px-8 md:py-12">
+            <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8">
                 {!productView && <>
-                <header className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-start">
-                    <div><h1 className="text-2xl font-semibold tracking-tight flex items-center gap-3"><PageIcon name="marketplace" />Module marketplace</h1><p className="mt-2 text-sm text-muted-foreground">Extend your workspace with tools built for your community.</p></div>
-                    <div className="flex flex-wrap gap-2"><Button asChild variant="outline"><Link href="/dashboard/creator/modules">My modules</Link></Button><Button asChild><Link href="/dashboard/marketplace/create"><Plus className="size-4" />Create module</Link></Button></div>
-                </header>
-                <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-                    <div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Search modules" placeholder="Search modules…" value={search} onChange={event => setSearch(event.target.value)} className="pl-9" /></div>
-                    <div className="sm:w-56"><Select aria-label="Module category" value={category} onValueChange={setCategory} options={[{value: 'all', label: 'All categories'}, ...categories.map(value => ({value, label: value}))]} /></div>
-                </div>
+                    <header className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+                        <div>
+                            <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight"><PageIcon name="marketplace" />Module marketplace</h1>
+                            <p className="mt-1 text-sm text-muted-foreground">Extend your workspace with tools built for your community.</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <Button asChild variant="outline" size="sm"><Link href="/dashboard/creator/modules">My modules</Link></Button>
+                            <Button asChild size="sm"><Link href="/dashboard/marketplace/create"><Plus className="size-4" aria-hidden="true" />Create module</Link></Button>
+                        </div>
+                    </header>
+                    <Card aria-label="Filter modules" className="mb-4">
+                        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-end">
+                            <div className="min-w-0 flex-1 space-y-2">
+                                <label htmlFor="marketplace-search" className="text-sm font-medium">Search modules</label>
+                                <div className="relative">
+                                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                                    <Input id="marketplace-search" aria-label="Search modules" placeholder="Search modules…" value={search} onChange={event => setSearch(event.target.value)} className="pl-9" />
+                                </div>
+                            </div>
+                            <div className="space-y-2 sm:w-56">
+                                <label htmlFor="marketplace-category" className="text-sm font-medium">Category</label>
+                                <Select id="marketplace-category" aria-label="Module category" value={category} onValueChange={setCategory} options={[{ value: 'all', label: 'All categories' }, ...categories.map(value => ({ value, label: value }))]} />
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                {loading ? (
-                    <div className="flex min-h-[360px] items-center justify-center">
-                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-transparent"></div>
+                    {loading ? (
+                        <Card><CardContent role="status" className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" aria-hidden="true" />Loading modules…</CardContent></Card>
+                    ) : error ? (
+                        <Card role="alert"><CardHeader><CardTitle>Marketplace unavailable</CardTitle><CardDescription>{error}</CardDescription></CardHeader></Card>
+                    ) : filteredModules.length === 0 ? (
+                        <Card><CardHeader>
+                            <CardTitle>No modules found</CardTitle>
+                            <CardDescription>{modules.length ? 'Try another search or category.' : 'There are no modules available to browse yet.'}</CardDescription>
+                        </CardHeader>{modules.length > 0 && <CardFooter><Button type="button" variant="outline" size="sm" onClick={() => { setSearch(''); setCategory('all'); }}>Reset filters</Button></CardFooter>}</Card>
+                    ) : (
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {filteredModules.map(addon => <Card key={addon.id} aria-label={addon.name} className="flex min-w-0 flex-col">
+                                <CardHeader className="gap-3 p-4">
+                                    <ModuleBadges addon={addon} />
+                                    <CardTitle className="break-words leading-snug">{addon.name}</CardTitle>
+                                    <CardDescription className="line-clamp-3 leading-relaxed">{addon.description || 'No description provided.'}</CardDescription>
+                                </CardHeader>
+                                <CardFooter className="mt-auto justify-between border-t border-border p-4">
+                                    <span className="text-xs text-muted-foreground">v{addon.version}</span>
+                                    <Button asChild variant="outline" size="sm"><Link href={`/dashboard/marketplace/${encodeURIComponent(addon.slug)}`} aria-label={`View ${addon.name}`}>View module<ArrowRight className="size-4" aria-hidden="true" /></Link></Button>
+                                </CardFooter>
+                            </Card>)}
+                        </div>
+                    )}
+                    <div className="mt-4 flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+                        <p role="status">{filteredModules.length} module{filteredModules.length === 1 ? '' : 's'}</p>
+                        <Button asChild variant="link" className="h-auto p-0 text-xs"><Link href="/terms/modules/use">Module terms</Link></Button>
                     </div>
-                ) : error ? (
-                    <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-5 py-4 text-sm font-medium text-red-700 dark:text-red-400">
-                        {error}
-                    </div>
-                ) : filteredModules.length === 0 ? (
-                    <Card><CardContent className="flex min-h-60 flex-col items-center justify-center gap-3 pt-6 text-center"><Package className="size-8 text-muted-foreground" /><p className="text-sm font-medium">No modules found</p><p className="text-sm text-muted-foreground">Try another search or category.</p></CardContent></Card>
-                ) : (
-                    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                        {filteredModules.map(addon => <Card key={addon.id} className="flex flex-col">
-                            <CardHeader><div className="mb-3 flex items-start justify-between gap-3"><span className="rounded-md bg-secondary px-2 py-1 text-xs text-secondary-foreground">{addon.category}</span></div><CardTitle>{addon.name}</CardTitle><CardDescription className="line-clamp-3 min-h-16 leading-relaxed">{addon.description || 'No description provided.'}</CardDescription></CardHeader>
-                            <CardContent className="mt-auto"><div className="mb-5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>v{addon.version}</span>{addon.isOfficial && <span>· Official</span>}{addon.creatorIsVerified && <span>· Verified creator</span>}<span className={`ml-auto rounded-md px-2 py-1 ${statusClassName(addon.status)}`}>{statusLabel(addon.status)}</span></div><Button asChild variant="outline" className="w-full"><Link href={`/dashboard/marketplace/${encodeURIComponent(addon.slug)}`} aria-label={`View ${addon.name}`}>View module<ArrowRight className="size-4" /></Link></Button></CardContent>
-                        </Card>)}
-                    </div>
-                )}
-                <p className="mt-6 text-xs text-muted-foreground">{filteredModules.length} modules · <Link href="/terms/modules/use" className="underline underline-offset-4">Module terms</Link></p>
                 </>}
-                {productView && <div className="mb-6"><Button variant="ghost" size="sm" onClick={closeModulePreview}><ArrowLeft className="size-4" />Back to marketplace</Button></div>}
-                {moduleSlug && loading && <Card><CardContent className="py-12 text-center text-muted-foreground">Loading module…</CardContent></Card>}
+                {productView && <Button type="button" variant="ghost" size="sm" onClick={closeModulePreview} className="mb-6"><ArrowLeft className="size-4" aria-hidden="true" />Back to marketplace</Button>}
+                {moduleSlug && loading && <Card><CardContent role="status" className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" aria-hidden="true" />Loading module…</CardContent></Card>}
                 {moduleSlug && !loading && !selectedModule && <Card><CardHeader><CardTitle>{error ? 'Module unavailable' : 'Module not found'}</CardTitle><CardDescription>{error || 'This module is unavailable or you do not have access to it.'}</CardDescription></CardHeader></Card>}
 
-                {selectedModule && (
-                    <div className="w-full">
-                        <Card className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                            <div className="flex flex-col gap-4 border-b border-border bg-card px-5 py-5 md:flex-row md:items-start md:justify-between md:px-7">
-                                <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-foreground">
-                                            {selectedModule.category}
-                                        </span>
-                                        <span className="rounded-md border border-border bg-card px-2 py-1 text-xs font-medium text-muted-foreground">
-                                            v{selectedModule.version}
-                                        </span>
-                                        <span className={`rounded-md border px-2 py-1 text-xs font-medium   ${statusClassName(selectedModule.status)}`}>
-                                            {statusLabel(selectedModule.status)}
-                                        </span>
-                                        {selectedModule.isOfficial && (
-                                            <span className="rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-foreground">
-                                                Official
-                                            </span>
-                                        )}
-                                        {selectedModule.creatorIsVerified && (
-                                            <span className="rounded-md border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                                                Verified Creator
-                                            </span>
-                                        )}
-                                    </div>
-                                    <h1 className="mt-4 flex items-center gap-3 text-3xl font-semibold tracking-tight"><PageIcon name="modules" />{selectedModule.name}</h1>
-                                    <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-                                        {selectedModule.description || 'No description provided.'}
-                                    </p>
-                                </div>
-                                <Button variant="ghost" size="icon"
-                                    type="button"
-                                    onClick={closeModulePreview}
-                                    className="inline-flex shrink-0 items-center justify-center transition-colors"
-                                    aria-label="Close module preview"
-                                >
-                                    <X className="size-4" aria-hidden="true" />
-                                </Button>
-                            </div>
-
-                            <div className="px-5 py-6 md:px-7">
-                                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-                                    <section>
-                                        <h3 className="text-sm font-medium text-foreground">Configuration Fields</h3>
-                                        {Object.values(selectedModule.configSchema || {}).length === 0 ? (
-                                            <Card className="mt-4 rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
-                                                This module does not expose configurable fields.
-                                            </Card>
-                                        ) : (
-                                            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                {Object.values(selectedModule.configSchema || {}).map((field) => (
-                                                    <Card key={field.key} className="rounded-xl border border-border bg-card p-4">
-                                                        <div className="flex items-start justify-between gap-3">
-                                                            <div>
-                                                                <p className="text-sm font-medium text-foreground">{field.label}</p>
-                                                                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                                                                    {field.shortDescription || 'No field description provided.'}
-                                                                </p>
-                                                            </div>
-                                                            <span className="rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground">
-                                                                {field.type}
-                                                            </span>
-                                                        </div>
-                                                        {field.options.length > 0 && (
-                                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                                {field.options.slice(0, 6).map((option) => (
-                                                                    <span key={option} className="rounded-md border border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">
-                                                                        {option}
-                                                                    </span>
-                                                                ))}
-                                                                {field.options.length > 6 && (
-                                                                    <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">
-                                                                        +{field.options.length - 6} more
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </Card>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </section>
-
-                                    <aside className="space-y-4">
-                                        <Card className="rounded-xl border border-border bg-card p-5">
-                                            <p className="text-xs font-medium text-muted-foreground">Slug</p>
-                                            <p className="mt-2 break-all font-mono text-sm text-foreground">{selectedModule.slug}</p>
-                                        </Card>
-                                        <Card className="rounded-xl border border-border bg-card p-5">
-                                            <p className="text-xs font-medium text-muted-foreground">Review Status</p>
-                                            <p className="mt-2 text-sm font-semibold text-foreground">{statusLabel(selectedModule.status)}</p>
-                                            {selectedModule.status === 'REJECTED' && selectedModule.moderationNote && (
-                                                <p className="mt-2 text-xs leading-relaxed text-red-700 dark:text-red-400">{selectedModule.moderationNote}</p>
-                                            )}
-                                        </Card>
-                                        <Card className="rounded-xl border border-border bg-card p-5">
-                                            <p className="text-xs font-medium text-muted-foreground">Published</p>
-                                            <p className="mt-2 text-sm font-semibold text-foreground">{formatDate(selectedModule.publishedAt)}</p>
-                                        </Card>
-                                        <Card className="rounded-xl border border-border bg-card p-5">
-                                            <p className="text-xs font-medium text-muted-foreground">Checksum</p>
-                                            <p className="mt-2 break-all font-mono text-xs text-foreground">{selectedModule.sourceChecksum || 'Unavailable'}</p>
-                                        </Card>
-                                        <Button variant="default" size="default"
-                                            type="button"
-                                            onClick={() => openInstallPicker(selectedModule.id)}
-                                            className="inline-flex w-full items-center justify-center transition-colors"
-                                        >
-                                            Select Server To Install
-                                        </Button>
-                                    </aside>
-                                </div>
-                            </div>
+                {selectedModule && <>
+                    <header className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+                        <div className="min-w-0 space-y-3">
+                            <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight"><PageIcon name="modules" /><span className="min-w-0 break-words">{selectedModule.name}</span></h1>
+                            <ModuleBadges addon={selectedModule} />
+                            <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{selectedModule.description || 'No description provided.'}</p>
+                        </div>
+                        <Button type="button" onClick={() => openInstallPicker(selectedModule.id)} className="shrink-0"><Plus className="size-4" aria-hidden="true" />Select Server To Install</Button>
+                    </header>
+                    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                        <Card className="min-w-0">
+                            <CardHeader className="p-4"><CardTitle>Configuration fields</CardTitle><CardDescription>Settings available after installing this module.</CardDescription></CardHeader>
+                            {Object.values(selectedModule.configSchema || {}).length === 0 ? (
+                                <CardContent className="px-4 pb-4 text-sm text-muted-foreground">This module does not expose configurable fields.</CardContent>
+                            ) : (
+                                <Table className="table-fixed">
+                                    <caption className="sr-only">Module configuration fields</caption>
+                                    <TableHeader><TableRow><TableHead className="pl-4">Field</TableHead><TableHead className="w-28 pr-4">Type</TableHead></TableRow></TableHeader>
+                                    <TableBody>{Object.values(selectedModule.configSchema || {}).map(field => <TableRow key={field.key}>
+                                        <TableCell className="space-y-2 py-4 pl-4 align-top">
+                                            <p className="break-words font-medium">{field.label}</p>
+                                            <p className="break-words text-sm leading-relaxed text-muted-foreground">{field.shortDescription || 'No field description provided.'}</p>
+                                            {field.options.length > 0 && <div className="flex flex-wrap gap-1.5">
+                                                {field.options.slice(0, 6).map(option => <Status key={option} className="max-w-full"><StatusLabel className="whitespace-normal break-words leading-relaxed">{option}</StatusLabel></Status>)}
+                                                {field.options.length > 6 && <Status><StatusLabel>+{field.options.length - 6} more</StatusLabel></Status>}
+                                            </div>}
+                                        </TableCell>
+                                        <TableCell className="py-4 pr-4 align-top"><Status><StatusLabel>{field.type}</StatusLabel></Status></TableCell>
+                                    </TableRow>)}</TableBody>
+                                </Table>
+                            )}
+                        </Card>
+                        <Card className="min-w-0">
+                            <CardHeader className="p-4"><CardTitle>Module details</CardTitle><CardDescription>Version and publication information.</CardDescription></CardHeader>
+                            <CardContent className="px-4 pb-4">
+                                <dl className="space-y-4 text-sm">
+                                    <div className="flex flex-wrap justify-between gap-2"><dt className="text-muted-foreground">Version</dt><dd>v{selectedModule.version}</dd></div>
+                                    <div className="flex flex-wrap justify-between gap-2"><dt className="text-muted-foreground">Review status</dt><dd><Status variant={statusVariant(selectedModule.status)}><StatusLabel>{statusLabel(selectedModule.status)}</StatusLabel></Status></dd></div>
+                                    <div className="flex flex-wrap justify-between gap-2"><dt className="text-muted-foreground">Published</dt><dd>{formatDate(selectedModule.publishedAt)}</dd></div>
+                                    <div className="space-y-1"><dt className="text-muted-foreground">Slug</dt><dd className="break-all font-mono text-xs">{selectedModule.slug}</dd></div>
+                                    <div className="space-y-1"><dt className="text-muted-foreground">Checksum</dt><dd className="break-all font-mono text-xs">{selectedModule.sourceChecksum || 'Unavailable'}</dd></div>
+                                </dl>
+                                {selectedModule.status === 'REJECTED' && selectedModule.moderationNote && <Status role="alert" variant="error" className="mt-4 w-full rounded-md"><StatusLabel className="whitespace-normal leading-relaxed">{selectedModule.moderationNote}</StatusLabel></Status>}
+                            </CardContent>
                         </Card>
                     </div>
-                )}
+                </>}
 
-                {installPickerModule && (
-                    <Dialog open onOpenChange={(next) => { if (!next) closeInstallPicker(); }}><DialogContent aria-describedby={undefined} className="max-h-[90vh] max-w-2xl overflow-y-auto p-0">
-                            <div className="flex items-start justify-between gap-4 border-b border-border bg-card px-5 py-5">
-                                <div>
-                                    <p className="text-xs font-medium text-foreground">Install Module</p>
-                                    <DialogTitle className="mt-2 text-2xl">{installPickerModule.name}</DialogTitle>
-                                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                                        Click a server to install. Right-click a server to start multi-select.
-                                    </p>
-                                </div>
-                                <Button variant="outline" size="default"
-                                    type="button"
-                                    onClick={closeInstallPicker}
-                                    className="inline-flex shrink-0 items-center justify-center transition-colors disabled:opacity-50"
-                                    aria-label="Close install picker"
-                                    disabled={installing}
-                                >
-                                    <X className="size-4" aria-hidden="true" />
-                                </Button>
+                {installPickerModule && <Dialog open onOpenChange={open => { if (!open) closeInstallPicker(); }}>
+                    <DialogContent className="flex max-h-[calc(100dvh-2rem)] max-w-2xl flex-col overflow-hidden p-0" onEscapeKeyDown={event => { if (installing) event.preventDefault(); }} onInteractOutside={event => { if (installing) event.preventDefault(); }}>
+                        <DialogHeader className="shrink-0 flex-row items-start justify-between gap-4 border-b border-border p-4">
+                            <div className="space-y-2">
+                                <DialogTitle>{installPickerModule.name}</DialogTitle>
+                                <DialogDescription>Choose a server to install immediately, or enable multi-server selection.</DialogDescription>
                             </div>
-
-                            <div className="custom-scrollbar max-h-[calc(90vh-170px)] overflow-y-auto px-5 py-5">
-                                {installError && (
-                                    <div className="mb-4 rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm font-medium text-red-700 dark:text-red-400">
-                                        {installError}
-                                    </div>
-                                )}
-                                {installMessage && (
-                                    <div className="mb-4 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                                        {installMessage}
-                                    </div>
-                                )}
-
-                                {installTargets.length === 0 ? (
-                                    <Card className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-                                        No servers are available for module installs.
-                                    </Card>
-                                ) : (
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                        {installTargets.map((server) => {
-                                            const selected = selectedServerIds.includes(server.id);
-                                            const full = server.installedModuleCount >= server.moduleLimit;
-
-                                            return (
-                                                <Button variant="outline" size="default"
-                                                    key={server.id}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        if (multiSelectInstall) {
-                                                            toggleServerSelection(server.id);
-                                                            return;
-                                                        }
-
-                                                        installModuleToServers(installPickerModule.id, [server.id]);
-                                                    }}
-                                                    onContextMenu={(event) => {
-                                                        event.preventDefault();
-                                                        setMultiSelectInstall(true);
-                                                        toggleServerSelection(server.id);
-                                                    }}
-                                                    disabled={installing || full}
-                                                    className={`flex min-h-20 items-center     text-left transition-colors disabled:opacity-50 ${selected ? ' ' : '  '}`}
-                                                >
-                                                    {server.icon ? (
-                                                        <img
-                                                            src={getDiscordGuildIconProxyUrl(server.id, server.icon)}
-                                                            alt=""
-                                                            className="h-11 w-11 shrink-0 rounded-lg border border-border object-cover"
-                                                        />
-                                                    ) : (
-                                                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-sm font-medium text-foreground">
-                                                            {server.name.substring(0, 1)}
-                                                        </span>
-                                                    )}
-                                                    <span className="min-w-0">
-                                                        <span className="block break-words text-sm font-medium text-foreground">{server.name}</span>
-                                                        <span className="mt-1 block font-mono text-xs font-medium text-muted-foreground">
-                                                            {full ? `${server.installedModuleCount}/${server.moduleLimit} installed` : selected ? 'Selected' : `${server.installedModuleCount}/${server.moduleLimit} installed`}
-                                                        </span>
-                                                    </span>
-                                                </Button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-
-                            {multiSelectInstall && installTargets.length > 0 && (
-                                <div className="flex flex-col gap-3 border-t border-border bg-card px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <p className="text-xs font-semibold text-muted-foreground">
-                                        {selectedServerIds.length} server{selectedServerIds.length === 1 ? '' : 's'} selected
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <Button variant="outline" size="default"
-                                            type="button"
-                                            onClick={() => {
-                                                setMultiSelectInstall(false);
-                                                setSelectedServerIds([]);
-                                            }}
-                                            disabled={installing}
-                                            className="transition-colors disabled:opacity-50"
-                                        >
-                                            Cancel
-                                        </Button>
-                                        <Button variant="default" size="default"
-                                            type="button"
-                                            onClick={() => installModuleToServers(installPickerModule.id, selectedServerIds)}
-                                            disabled={installing || selectedServerIds.length === 0}
-                                            className="transition-colors disabled:opacity-50"
-                                        >
-                                            {installing ? 'Installing' : 'Install Selected'}
-                                        </Button>
-                                    </div>
+                            <Button type="button" variant="ghost" size="icon" className="size-8 shrink-0" aria-label="Close install picker" onClick={closeInstallPicker} disabled={installing}><X className="size-4" aria-hidden="true" /></Button>
+                        </DialogHeader>
+                        <div className="custom-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+                            {installError && <Status role="alert" variant="error" className="w-full rounded-md"><StatusLabel className="whitespace-normal leading-relaxed">{installError}</StatusLabel></Status>}
+                            {installMessage && <Status role="status" variant="success" className="w-full rounded-md"><StatusLabel className="whitespace-normal leading-relaxed">{installMessage}</StatusLabel></Status>}
+                            {installTargets.length === 0 ? (
+                                <p className="py-6 text-center text-sm text-muted-foreground">No servers are available for module installs.</p>
+                            ) : <>
+                                <label className="flex cursor-pointer items-center justify-between gap-4 text-sm font-medium">Multi-server selection<Switch checked={multiSelectInstall} disabled={installing} onCheckedChange={checked => { setMultiSelectInstall(checked); setSelectedServerIds([]); }} /></label>
+                                <div className="space-y-2">
+                                    {installTargets.map(server => {
+                                        const selected = selectedServerIds.includes(server.id);
+                                        const full = server.installedModuleCount >= server.moduleLimit;
+                                        return multiSelectInstall ? (
+                                            <label key={server.id} className="flex items-center gap-3 rounded-md border border-border p-3 has-[[data-state=checked]]:border-primary/40 has-[[data-state=checked]]:bg-accent/50 has-[[data-disabled]]:cursor-not-allowed has-[[data-disabled]]:opacity-50">
+                                                <Checkbox aria-label={`Select ${server.name}`} checked={selected} disabled={installing || full} onCheckedChange={() => toggleServerSelection(server.id)} />
+                                                <ServerIdentity server={server} />
+                                            </label>
+                                        ) : (
+                                            <Button key={server.id} type="button" variant="outline" disabled={installing || full} onClick={() => installModuleToServers(installPickerModule.id, [server.id])} onContextMenu={event => { event.preventDefault(); if (!installing && !full) { setMultiSelectInstall(true); toggleServerSelection(server.id); } }} className="h-auto min-h-16 w-full justify-start gap-3 whitespace-normal p-3 text-left">
+                                                <ServerIdentity server={server} />
+                                            </Button>
+                                        );
+                                    })}
                                 </div>
-                            )}
-                        </DialogContent></Dialog>
-                )}
+                            </>}
+                        </div>
+                        {multiSelectInstall && installTargets.length > 0 && <DialogFooter className="shrink-0 items-center justify-between border-t border-border p-4 sm:justify-between">
+                            <p className="text-xs text-muted-foreground">{selectedServerIds.length} server{selectedServerIds.length === 1 ? '' : 's'} selected</p>
+                            <div className="flex gap-2">
+                                <Button type="button" variant="outline" onClick={() => { setMultiSelectInstall(false); setSelectedServerIds([]); }} disabled={installing}>Cancel</Button>
+                                <Button type="button" onClick={() => installModuleToServers(installPickerModule.id, selectedServerIds)} disabled={installing || selectedServerIds.length === 0}>{installing ? 'Installing…' : 'Install Selected'}</Button>
+                            </div>
+                        </DialogFooter>}
+                    </DialogContent>
+                </Dialog>}
             </main>
         </div>
     );

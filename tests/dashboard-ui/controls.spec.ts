@@ -1200,3 +1200,95 @@ test("Live Panel searches connected accounts before Roblox and labels the link",
   expect(remoteQueries).toEqual([]);
   expect(errors).toEqual([]);
 });
+
+test("marketplace Dice filters, product fields, and multi-server installs work in both themes", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await mockDashboard(page);
+  const targets = [
+    {...guild,installedModuleCount:0,moduleLimit:5},
+    {...guild,id:'second-server',name:'Second community',installedModuleCount:1,moduleLimit:5},
+    {...guild,id:'full-server',name:'Full community',installedModuleCount:5,moduleLimit:5},
+  ];
+  const audit = {...sampleModule,id:'audit-module',slug:'audit-tools',name:'Audit tools',category:'Moderation',isOfficial:false,creatorIsVerified:false};
+  await page.route('**/api/dashboard/marketplace', route => route.fulfill({json:{modules:[sampleModule,audit],installTargets:targets}}));
+  let failInstall = false;
+  await page.route('**/api/dashboard/modules', route => route.fulfill({status:failInstall ? 500 : 200,json:failInstall ? {error:'Installation fixture failed.'} : {ok:true}}));
+  for (const theme of ['light','dark']) {
+    failInstall = false;
+    await page.addInitScript(value => localStorage.setItem('rolink-theme',value),theme);
+    await page.goto('/dashboard/marketplace');
+    const welcome = page.getByRole('region',{name:sampleModule.name,exact:true});
+    await expect(welcome.locator('[data-slot="card-footer"]')).toBeVisible();
+    await expect(welcome.getByText('Published',{exact:true})).toBeVisible();
+    const category = page.getByRole('combobox',{name:'Module category',exact:true});
+    await category.fill('Moderation');
+    await page.getByRole('option',{name:'Moderation',exact:true}).click();
+    await expect(welcome).toHaveCount(0);
+    await expect(page.getByRole('link',{name:'View Audit tools',exact:true})).toBeVisible();
+    const search = page.getByRole('textbox',{name:'Search modules',exact:true});
+    await search.fill('nothing matches');
+    await expect(page.getByRole('heading',{name:'No modules found',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Reset filters',exact:true}).click();
+    await expect(welcome).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({path:`/workspace/artifacts/dice-${theme}-marketplace-${test.info().project.name}.png`});
+    await page.getByRole('link',{name:`View ${sampleModule.name}`,exact:true}).click();
+    await expect(page.getByRole('table',{name:'Module configuration fields',exact:true})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Module details',exact:true})).toBeVisible();
+    await page.screenshot({path:`/workspace/artifacts/dice-${theme}-marketplace-product-${test.info().project.name}.png`});
+    await page.getByRole('button',{name:'Select Server To Install',exact:true}).click();
+    const dialog = page.getByRole('dialog',{name:sampleModule.name,exact:true});
+    await expect(dialog).toHaveCSS('color-scheme',theme);
+    const multi = dialog.getByRole('switch',{name:'Multi-server selection',exact:true});
+    await multi.click();
+    await expect(dialog.getByRole('checkbox',{name:'Select Full community',exact:true})).toBeDisabled();
+    await expect(dialog.getByRole('button',{name:'Install Selected',exact:true})).toBeDisabled();
+    const first = dialog.getByRole('checkbox',{name:`Select ${guild.name}`,exact:true});
+    await first.focus();
+    await page.keyboard.press('Space');
+    await expect(first).toBeChecked();
+    await dialog.getByRole('checkbox',{name:'Select Second community',exact:true}).click();
+    await expect(dialog.getByText('2 servers selected',{exact:true})).toBeVisible();
+    const bounds = (await dialog.boundingBox())!;
+    expect(bounds.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    expect(bounds.height).toBeLessThanOrEqual(page.viewportSize()!.height - 30);
+    await page.screenshot({path:`/workspace/artifacts/dice-${theme}-marketplace-install-${test.info().project.name}.png`});
+    const firstRequest = page.waitForRequest(r=>r.url().includes('/api/dashboard/modules')&&r.method()==='POST'&&r.postDataJSON().serverId===serverId);
+    const secondRequest = page.waitForRequest(r=>r.url().includes('/api/dashboard/modules')&&r.method()==='POST'&&r.postDataJSON().serverId==='second-server');
+    await dialog.getByRole('button',{name:'Install Selected',exact:true}).click();
+    for (const request of await Promise.all([firstRequest,secondRequest])) expect(request.postDataJSON()).toMatchObject({moduleId:sampleModule.id,action:'install'});
+    await expect(dialog.getByText('Installed to 2 servers.',{exact:true})).toBeVisible();
+    await expect(multi).not.toBeChecked();
+    failInstall = true;
+    await dialog.getByRole('button',{name:new RegExp(guild.name)}).click();
+    await expect(dialog.getByRole('alert')).toContainText('Installation fixture failed.');
+    await expect(dialog.getByRole('button',{name:'Close install picker',exact:true})).toBeEnabled();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+  }
+  expect(errors).toEqual([]);
+});
+
+test("marketplace empty, unavailable, and missing-product states use shared cards", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  for (const theme of ['light','dark']) {
+    await page.addInitScript(value => localStorage.setItem('rolink-theme',value),theme);
+    await page.route('**/api/dashboard/marketplace',route=>route.fulfill({json:{modules:[],installTargets:[]}}));
+    await page.goto('/dashboard/marketplace');
+    await expect(page.getByRole('heading',{name:'No modules found',exact:true})).toHaveAttribute('data-slot','card-title');
+    await page.goto('/dashboard/marketplace/missing-module');
+    await expect(page.getByRole('heading',{name:'Module not found',exact:true})).toHaveAttribute('data-slot','card-title');
+    await page.route('**/api/dashboard/marketplace',route=>route.fulfill({status:500,json:{error:'Marketplace fixture unavailable.'}}));
+    await page.goto('/dashboard/marketplace');
+    await expect(page.getByRole('main').getByRole('alert')).toHaveAttribute('data-slot','card');
+    await expect(page.getByRole('main').getByRole('alert')).toContainText('Marketplace fixture unavailable.');
+    await page.route('**/api/dashboard/marketplace',route=>route.fulfill({json:{modules:[sampleModule],installTargets:[]}}));
+    await page.goto(`/dashboard/marketplace/${sampleModule.slug}`);
+    await page.getByRole('button',{name:'Select Server To Install',exact:true}).click();
+    const emptyPicker = page.getByRole('dialog',{name:sampleModule.name,exact:true});
+    await expect(emptyPicker.getByText('No servers are available for module installs.',{exact:true})).toBeVisible();
+    await expect(emptyPicker.getByRole('switch')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+  }
+  expect(errors).toEqual([]);
+});
