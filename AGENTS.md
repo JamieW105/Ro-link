@@ -62,6 +62,11 @@ and management screens. This requirement applies to future feature changes too. 
   configuration previews use Table. Marketplace listing cards use a 16:9 preview,
   compact title/description, and creator/category footer. Keep at least three columns
   at widths of 768px and above, with one column on phones and two on small tablets.
+  Product pages use a preview/about/configuration/reviews column and an install/creator
+  sidebar. Use the official Dice Rating component for ratings. Review identity and
+  creator/installer eligibility must be enforced by the API; never trust client-supplied
+  reviewer IDs or permissions. Keep review tables/RPCs service-role-only and document
+  required migrations.
   Keep installation multi-select visible with
   Switch and Checkbox controls, including disabled server-limit states.
   Specialized native inputs (color, number, file, etc.) may use the shared Input;

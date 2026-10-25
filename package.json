@@ -13,10 +13,12 @@
     "lint": "eslint",
     "bot": "node scripts/bot.js",
     "test:dashboard-ui": "playwright test",
-    "test:staff-shifts": "tsx --test scripts/staff-shifts.test.ts"
+    "test:staff-shifts": "tsx --test scripts/staff-shifts.test.ts",
+    "test:module-reviews": "tsx --test scripts/module-reviews.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
+    "@base-ui/utils": "0.5.0",
     "@diceui/combobox": "^2.0.0",
     "@radix-ui/react-checkbox": "^1.4.1",
     "@radix-ui/react-dialog": "^1.3.1",

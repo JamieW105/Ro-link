@@ -41,6 +41,7 @@ async function mockDashboard(page: Page, themed = false, permissions: Record<str
     else if (pathname === "/api/settings/roles") body = [{ id: "configured-role", discord_role_id: "role-2", role_name: "Moderators", can_access_dashboard: true, can_kick: false, allowed_misc_cmds: [] }];
     else if (pathname === "/api/site-banners") body = { banners: [] };
     else if (pathname === "/api/ping") body = { ok: true };
+    else if (/^\/api\/dashboard\/marketplace\/[^/]+\/reviews$/.test(pathname)) body = {total:0,average:0,reviews:[],ownReview:null,hasMore:false,canReview:true,ownModule:false};
     else if (pathname === "/api/dashboard/marketplace") body = { modules: [sampleModule], installTargets: [{ ...guild, installedModuleCount: 0, moduleLimit: 5 }] };
     else if (pathname === "/api/dashboard/staff-shifts") body = sampleShiftReport;
     else if (pathname === "/api/dashboard/staff-shifts/settings") body = { ok: true };
@@ -442,7 +443,7 @@ test("marketplace search opens a real product page and installs through the exis
   await page.getByRole('link', { name: `View ${sampleModule.name}`, exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/dashboard/marketplace/${sampleModule.slug}$`), { timeout: 20_000 });
   await expect(page.getByRole('heading', { name: sampleModule.name, exact: true })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole('button', { name: 'Select Server To Install', exact: true }).click();
+  await page.getByRole('button', { name: 'Install module', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: sampleModule.name, exact: true });
   await expect(dialog).toBeVisible();
   const install = page.waitForRequest(request => request.url().includes('/api/dashboard/modules') && request.method() === 'POST');
@@ -1236,7 +1237,7 @@ test("marketplace Dice filters, product fields, and multi-server installs work i
     await expect(page.getByRole('table',{name:'Module configuration fields',exact:true})).toBeVisible();
     await expect(page.getByRole('heading',{name:'Module details',exact:true})).toBeVisible();
     await page.screenshot({path:`/workspace/artifacts/dice-${theme}-marketplace-product-${test.info().project.name}.png`});
-    await page.getByRole('button',{name:'Select Server To Install',exact:true}).click();
+    await page.getByRole('button',{name:'Install module',exact:true}).click();
     const dialog = page.getByRole('dialog',{name:sampleModule.name,exact:true});
     await expect(dialog).toHaveCSS('color-scheme',theme);
     const multi = dialog.getByRole('switch',{name:'Multi-server selection',exact:true});
@@ -1284,7 +1285,7 @@ test("marketplace empty, unavailable, and missing-product states use shared card
     await expect(page.getByRole('main').getByRole('alert')).toContainText('Marketplace fixture unavailable.');
     await page.route('**/api/dashboard/marketplace',route=>route.fulfill({json:{modules:[sampleModule],installTargets:[]}}));
     await page.goto(`/dashboard/marketplace/${sampleModule.slug}`);
-    await page.getByRole('button',{name:'Select Server To Install',exact:true}).click();
+    await page.getByRole('button',{name:'Install module',exact:true}).click();
     const emptyPicker = page.getByRole('dialog',{name:sampleModule.name,exact:true});
     await expect(emptyPicker.getByText('No servers are available for module installs.',{exact:true})).toBeVisible();
     await expect(emptyPicker.getByRole('switch')).toHaveCount(0);
@@ -1356,7 +1357,7 @@ test('marketplace synchronizes installs and removals without reloading', async (
     installedIds = [];
     await page.addInitScript(value => localStorage.setItem('rolink-theme', value), theme);
     await page.goto(`/dashboard/marketplace/${sampleModule.slug}`);
-    await page.getByRole('button', { name: 'Select Server To Install', exact: true }).click();
+    await page.getByRole('button', { name: 'Install module', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: sampleModule.name, exact: true });
     const install = dialog.getByRole('button', { name: `Install module on ${guild.name}`, exact: true });
     const remove = dialog.getByRole('button', { name: `Remove module on ${guild.name}`, exact: true });
@@ -1378,5 +1379,100 @@ test('marketplace synchronizes installs and removals without reloading', async (
     await expect(install).toBeEnabled({ timeout: 10_000 });
     await page.keyboard.press('Escape');
   }
+  expect(errors).toEqual([]);
+});
+test("module product reviews publish, edit, persist, paginate, and delete with Dice ratings", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors=await mockDashboard(page);
+  let own: {id:string;rating:number;comment:string}|null=null;
+  let peers=0;
+  await page.route(`**/api/dashboard/marketplace/${sampleModule.id}/reviews**`,async route=>{
+    if(route.request().method()==='POST') { own={id:'own-review',...route.request().postDataJSON()};await route.fulfill({json:{ok:true}});return; }
+    if(route.request().method()==='DELETE') {own=null;await route.fulfill({json:{ok:true}});return;}
+    const offset=Number(new URL(route.request().url()).searchParams.get('offset')||0);
+    const reviews=[...(own?[{...own,name:'UI Tester',avatarUrl:null,createdAt:'2026-10-25T00:00:00Z',updatedAt:'2026-10-25T00:00:00Z',isOwn:true}]:[]),...Array.from({length:peers},(_,index)=>({id:`peer-${index}`,rating:4,comment:`Installer feedback ${index}`,name:`Installer ${index}`,avatarUrl:null,createdAt:'2026-10-24T00:00:00Z',updatedAt:'2026-10-24T00:00:00Z',isOwn:false}))];
+    await route.fulfill({json:{total:reviews.length,average:reviews.length?Number((reviews.reduce((sum,row)=>sum+row.rating,0)/reviews.length).toFixed(1)):0,reviews:reviews.slice(offset,offset+10),ownReview:own,canReview:true,ownModule:true,hasMore:reviews.length>offset+10}});
+  });
+  for(const theme of ['light','dark']) {
+    own=null;peers=0;
+    await page.addInitScript(value=>localStorage.setItem('rolink-theme',value),theme);
+    await page.goto(`/dashboard/marketplace/${sampleModule.slug}`);
+    const reviews=page.locator('#module-reviews');
+    await expect(reviews.getByText('You are reviewing your own module.',{exact:true})).toBeVisible();
+    const rating=reviews.getByRole('radiogroup',{name:'Your rating',exact:true});
+    const comment=reviews.getByRole('textbox',{name:'Your review',exact:true});
+    const publish=reviews.getByRole('button',{name:'Publish review',exact:true});
+    await expect(publish).toBeDisabled();
+    await rating.getByRole('radio',{name:'4 stars',exact:true}).focus();
+    await page.keyboard.press('Space');
+    await expect(rating.getByRole('radio',{name:'4 stars',exact:true})).toBeChecked();
+    await expect(rating.getByRole('radio',{checked:true})).toHaveCount(1);
+    await comment.fill('Useful tools for our community.');
+    await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+    await page.screenshot({path:`/workspace/artifacts/dice-${theme}-module-product-reference-${test.info().project.name}.png`,fullPage:true});
+    let saved=page.waitForRequest(r=>r.url().includes('/reviews')&&r.method()==='POST');
+    await publish.click();
+    expect((await saved).postDataJSON()).toEqual({rating:4,comment:'Useful tools for our community.'});
+    await expect(reviews.getByRole('button',{name:'Update review',exact:true})).toBeVisible();
+    await expect(page.getByRole('link',{name:'4.0 · 1 review',exact:true})).toBeVisible();
+    await rating.getByRole('radio',{name:'5 stars',exact:true}).click();
+    await comment.fill('Updated: excellent tools.');
+    saved=page.waitForRequest(r=>r.url().includes('/reviews')&&r.method()==='POST');
+    await reviews.getByRole('button',{name:'Update review',exact:true}).click();
+    expect((await saved).postDataJSON()).toEqual({rating:5,comment:'Updated: excellent tools.'});
+    await expect(page.getByRole('link',{name:'5.0 · 1 review',exact:true})).toBeVisible();
+    peers=11;
+    await page.reload();
+    await expect(comment).toHaveValue('Updated: excellent tools.');
+    await reviews.getByRole('button',{name:'Next reviews',exact:true}).click();
+    await expect(reviews.getByText('Installer feedback 10',{exact:true})).toBeVisible();
+    await expect(comment).toHaveValue('Updated: excellent tools.');
+    await reviews.getByRole('button',{name:'Previous reviews',exact:true}).click();
+    await reviews.getByRole('button',{name:'Delete your review',exact:true}).click();
+    const confirmation=page.getByRole('dialog',{name:'Delete your review?',exact:true});
+    await confirmation.getByRole('button',{name:'Cancel',exact:true}).click();
+    await expect(comment).toHaveValue('Updated: excellent tools.');
+    await reviews.getByRole('button',{name:'Delete your review',exact:true}).click();
+    const removed=page.waitForRequest(r=>r.url().includes('/reviews')&&r.method()==='DELETE');
+    await confirmation.getByRole('button',{name:'Delete review',exact:true}).click();
+    expect((await removed).method()).toBe('DELETE');
+    await expect(comment).toHaveValue('');
+    await expect(publish).toBeDisabled();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    const layout=await page.locator('[data-slot="module-product-layout"]').boundingBox();
+    if(test.info().project.name==='desktop') {
+      const preview=await page.getByRole('region',{name:'Module preview',exact:true}).boundingBox();
+      const sidebar=await page.getByRole('complementary',{name:'Module installation and creator',exact:true}).boundingBox();
+      expect(sidebar!.x).toBeGreaterThan(preview!.x+preview!.width);
+      expect(preview!.width).toBeGreaterThan(layout!.width/2);
+    }
+  }
+  expect(errors).toEqual([]);
+});
+
+test("module review access and failures stay readable and recoverable", async ({ page }) => {
+  const errors=await mockDashboard(page);
+  let unavailable=true;
+  let canReview=false;
+  await page.route(`**/api/dashboard/marketplace/${sampleModule.id}/reviews**`,route=>{
+    if(route.request().method()==='POST') return route.fulfill({status:403,json:{error:'Your review access has changed.'}});
+    return route.fulfill({status:unavailable?503:200,json:unavailable?{error:'Reviews temporarily unavailable.'}:{total:0,average:0,reviews:[],ownReview:null,hasMore:false,canReview,ownModule:false}});
+  });
+  await page.goto(`/dashboard/marketplace/${sampleModule.slug}`);
+  const reviews=page.locator('#module-reviews');
+  await expect(reviews.getByRole('alert')).toContainText('Reviews temporarily unavailable.');
+  unavailable=false;
+  await reviews.getByRole('button',{name:'Retry reviews',exact:true}).click();
+  await expect(reviews.getByText('Install this module on a server you manage to leave a review.',{exact:true})).toBeVisible();
+  await expect(reviews.getByRole('button',{name:'Publish review',exact:true})).toHaveCount(0);
+  canReview=true;
+  await page.reload();
+  await reviews.getByRole('radiogroup',{name:'Your rating',exact:true}).getByRole('radio',{name:'3 stars',exact:true}).click();
+  const comment=reviews.getByRole('textbox',{name:'Your review',exact:true});
+  await comment.fill('Keep my draft after a failed save.');
+  await reviews.getByRole('button',{name:'Publish review',exact:true}).click();
+  await expect(reviews.getByRole('alert')).toContainText('Your review access has changed.');
+  await expect(comment).toHaveValue('Keep my draft after a failed save.');
+  await expect(reviews.getByRole('button',{name:'Publish review',exact:true})).toBeEnabled();
   expect(errors).toEqual([]);
 });

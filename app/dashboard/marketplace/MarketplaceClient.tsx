@@ -1,4 +1,5 @@
 'use client';
+import ModuleReviews, { ReviewRating, type ReviewSummary } from '@/components/marketplace/ModuleReviews';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -9,7 +10,7 @@ import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, ArrowRight, BadgeCheck, Loader2, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BadgeCheck, CalendarDays, Clock3, Download, Loader2, Package, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 
@@ -70,8 +71,8 @@ interface InstallTarget {
     moduleLimit: number;
 }
 
-function formatDate(value: string | null) {
-    if (!value) return 'Unpublished';
+function formatDate(value: string | null, fallback = 'Unpublished') {
+    if (!value) return fallback;
     return new Date(value).toLocaleDateString();
 }
 
@@ -82,9 +83,10 @@ function statusVariant(status: string) {
     return 'default';
 }
 
-function ModuleBadges({ addon }: { addon: MarketplaceModule }) {
+function ModuleBadges({ addon, version = false }: { addon: MarketplaceModule; version?: boolean }) {
     return <div className="flex flex-wrap items-center gap-2">
         <Status><StatusLabel>{addon.category}</StatusLabel></Status>
+        {version && <Status><StatusLabel>v{addon.version}</StatusLabel></Status>}
         <Status variant={statusVariant(addon.status)}><StatusLabel>{statusLabel(addon.status)}</StatusLabel></Status>
         {addon.isOfficial && <Status><StatusLabel>Official</StatusLabel></Status>}
         {addon.creatorIsVerified && <Status variant="info"><StatusLabel>Verified creator</StatusLabel></Status>}
@@ -96,11 +98,11 @@ interface CreatorProfile {
     avatar_url: string | null;
 }
 
-function CreatorAvatar({ creator }: { creator?: CreatorProfile }) {
+function CreatorAvatar({ creator, large = false }: { creator?: CreatorProfile; large?: boolean }) {
     const [failed, setFailed] = useState(false);
     return creator?.avatar_url && !failed
-        ? <Image unoptimized src={creator.avatar_url} alt="" width={20} height={20} onError={() => setFailed(true)} className="size-5 shrink-0 rounded-full object-cover" />
-        : <span aria-hidden="true" className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">{creator?.username.slice(0, 1).toUpperCase() || '?'}</span>;
+        ? <Image unoptimized src={creator.avatar_url} alt="" width={large ? 40 : 20} height={large ? 40 : 20} onError={() => setFailed(true)} className={`${large ? 'size-10' : 'size-5'} shrink-0 rounded-full object-cover`} />
+        : <span aria-hidden="true" className={`flex ${large ? 'size-10 text-sm' : 'size-5 text-[10px]'} shrink-0 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground`}>{creator?.username.slice(0, 1).toUpperCase() || '?'}</span>;
 }
 
 function MarketplaceModuleCard({ addon, creator, owned }: { addon: MarketplaceModule; creator?: CreatorProfile; owned: boolean }) {
@@ -159,6 +161,7 @@ function getModuleParam() {
 export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string }) {
     const router = useRouter();
     const [search, setSearch] = useState('');
+    const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
     const [category, setCategory] = useState('all');
     const { data: session, status } = useSession();
     const currentUserId = (session?.user as { id?: string } | undefined)?.id;
@@ -272,9 +275,9 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
     }, [modules, syncSelectedModuleFromUrl]);
 
     useEffect(() => {
-        if (moduleSlug || selectedModuleId) return;
         const controller = new AbortController();
-        const authorIds = [...new Set(modules.map(addon => addon.authorDiscordId).filter((id): id is string => Boolean(id && id !== currentUserId && /^\d{17,20}$/.test(id))))];
+        const visibleModules = moduleSlug || selectedModuleId ? modules.filter(addon => addon.id === selectedModuleId) : modules;
+        const authorIds = [...new Set(visibleModules.map(addon => addon.authorDiscordId).filter((id): id is string => Boolean(id && id !== currentUserId && /^\d{17,20}$/.test(id))))];
         let next = 0;
         async function loadCreators() {
             while (next < authorIds.length && !controller.signal.aborted) {
@@ -375,6 +378,9 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
         }
     }
 
+    const selectedCreator = selectedModule?.authorDiscordId === currentUserId && session?.user?.name
+        ? { username: session.user.name, avatar_url: session.user.image ? getDiscordMediaProxyUrl(session.user.image) || null : null }
+        : creators[selectedModule?.authorDiscordId || ''];
     const productView = Boolean(moduleSlug || selectedModule);
     const filteredModules = modules.filter(addon => (category === 'all' || addon.category === category)
         && `${addon.name} ${addon.description} ${addon.category}`.toLowerCase().includes(search.toLowerCase()));
@@ -407,7 +413,7 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
                 </div>
             </DashboardHeader>
 
-            <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8">
+            <main className={`mx-auto w-full ${productView ? 'max-w-5xl' : 'max-w-7xl'} px-4 py-6 sm:px-8 sm:py-8`}>
                 {!productView && <>
                     <header className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
                         <div>
@@ -466,15 +472,26 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
                 {moduleSlug && !loading && !selectedModule && <Card><CardHeader><CardTitle>{error ? 'Module unavailable' : 'Module not found'}</CardTitle><CardDescription>{error || 'This module is unavailable or you do not have access to it.'}</CardDescription></CardHeader></Card>}
 
                 {selectedModule && <>
-                    <header className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                        <div className="min-w-0 space-y-3">
-                            <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight"><PageIcon name="modules" /><span className="min-w-0 break-words">{selectedModule.name}</span></h1>
-                            <ModuleBadges addon={selectedModule} />
-                            <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{selectedModule.description || 'No description provided.'}</p>
+                    <header className="mb-6 space-y-3">
+                        <ModuleBadges addon={selectedModule} version />
+                        <h1 className="flex items-center gap-3 text-3xl font-semibold tracking-tight"><PageIcon name="modules" /><span className="min-w-0 break-words">{selectedModule.name}</span></h1>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {reviewSummary?.moduleId === selectedModule.id && <ReviewRating label="Average module rating" readOnly value={reviewSummary.average} />}
+                            <Button asChild variant="link" className="h-auto p-0 text-xs text-muted-foreground"><a href="#module-reviews">{reviewSummary?.moduleId === selectedModule.id ? reviewSummary.total ? `${reviewSummary.average.toFixed(1)} · ${reviewSummary.total} review${reviewSummary.total === 1 ? '' : 's'}` : 'No reviews yet' : 'Reviews'}</a></Button>
                         </div>
-                        <Button type="button" onClick={() => openInstallPicker(selectedModule.id)} className="shrink-0"><Plus className="size-4" aria-hidden="true" />Select Server To Install</Button>
                     </header>
-                    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                    <div data-slot="module-product-layout" className="grid items-start gap-6 md:grid-cols-[minmax(0,1fr)_260px]">
+                        <div className="min-w-0 space-y-6">
+                            <Card aria-label="Module preview" className="overflow-hidden p-2">
+                                <div data-slot="module-product-preview" className="flex aspect-video items-center justify-center rounded-md border border-border bg-background">
+                                    <Package className="size-12 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
+                                    <span className="sr-only">No preview image available</span>
+                                </div>
+                            </Card>
+                            <Card>
+                                <CardHeader className="p-4"><CardTitle>About this module</CardTitle></CardHeader>
+                                <CardContent className="px-4 pb-4"><p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{selectedModule.description || 'No description provided.'}</p></CardContent>
+                            </Card>
                         <Card className="min-w-0">
                             <CardHeader className="p-4"><CardTitle>Configuration fields</CardTitle><CardDescription>Settings available after installing this module.</CardDescription></CardHeader>
                             {Object.values(selectedModule.configSchema || {}).length === 0 ? (
@@ -497,19 +514,39 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
                                 </Table>
                             )}
                         </Card>
-                        <Card className="min-w-0">
-                            <CardHeader className="p-4"><CardTitle>Module details</CardTitle><CardDescription>Version and publication information.</CardDescription></CardHeader>
-                            <CardContent className="px-4 pb-4">
-                                <dl className="space-y-4 text-sm">
-                                    <div className="flex flex-wrap justify-between gap-2"><dt className="text-muted-foreground">Version</dt><dd>v{selectedModule.version}</dd></div>
-                                    <div className="flex flex-wrap justify-between gap-2"><dt className="text-muted-foreground">Review status</dt><dd><Status variant={statusVariant(selectedModule.status)}><StatusLabel>{statusLabel(selectedModule.status)}</StatusLabel></Status></dd></div>
-                                    <div className="flex flex-wrap justify-between gap-2"><dt className="text-muted-foreground">Published</dt><dd>{formatDate(selectedModule.publishedAt)}</dd></div>
-                                    <div className="space-y-1"><dt className="text-muted-foreground">Slug</dt><dd className="break-all font-mono text-xs">{selectedModule.slug}</dd></div>
-                                    <div className="space-y-1"><dt className="text-muted-foreground">Checksum</dt><dd className="break-all font-mono text-xs">{selectedModule.sourceChecksum || 'Unavailable'}</dd></div>
-                                </dl>
-                                {selectedModule.status === 'REJECTED' && selectedModule.moderationNote && <Status role="alert" variant="error" className="mt-4 w-full rounded-md"><StatusLabel className="whitespace-normal leading-relaxed">{selectedModule.moderationNote}</StatusLabel></Status>}
-                            </CardContent>
-                        </Card>
+                            <ModuleReviews key={selectedModule.id} moduleId={selectedModule.id} onSummaryChange={setReviewSummary} />
+                        </div>
+                        <aside aria-label="Module installation and creator" className="row-start-1 min-w-0 space-y-4 md:col-start-2 md:row-start-1">
+                            <Button type="button" onClick={() => openInstallPicker(selectedModule.id)} className="w-full"><Download className="size-4" aria-hidden="true" />Install module</Button>
+                            <Card>
+                                <CardHeader className="flex-row items-center gap-3 p-4">
+                                    <CreatorAvatar key={selectedCreator?.avatar_url || selectedModule.authorDiscordId} creator={selectedCreator} large />
+                                    <div className="min-w-0 space-y-1">
+                                        <p className="text-xs text-muted-foreground">Created by</p>
+                                        <CardTitle className="flex items-center gap-1.5 text-sm leading-snug"><span className="min-w-0 truncate">{selectedCreator?.username || (selectedModule.isOfficial ? 'Ro-Link' : 'Community creator')}</span>{selectedModule.creatorIsVerified && <BadgeCheck className="size-4 shrink-0 text-muted-foreground" aria-label="Verified creator" />}</CardTitle>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="border-t border-border p-4">
+                                    <dl className="space-y-3 text-xs">
+                                        <div className="flex justify-between gap-3"><dt className="flex items-center gap-2 text-muted-foreground"><CalendarDays className="size-3.5" aria-hidden="true" />Published</dt><dd>{formatDate(selectedModule.publishedAt)}</dd></div>
+                                        <div className="flex justify-between gap-3"><dt className="flex items-center gap-2 text-muted-foreground"><Clock3 className="size-3.5" aria-hidden="true" />Updated</dt><dd>{formatDate(selectedModule.updatedAt, 'Not available')}</dd></div>
+                                        <div className="flex justify-between gap-3"><dt className="flex items-center gap-2 text-muted-foreground"><Package className="size-3.5" aria-hidden="true" />Version</dt><dd>v{selectedModule.version}</dd></div>
+                                        <div className="flex justify-between gap-3"><dt className="flex items-center gap-2 text-muted-foreground"><SlidersHorizontal className="size-3.5" aria-hidden="true" />Fields</dt><dd>{Object.keys(selectedModule.configSchema || {}).length}</dd></div>
+                                    </dl>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="p-4"><CardTitle>Module details</CardTitle></CardHeader>
+                                <CardContent className="space-y-4 px-4 pb-4">
+                                    <ModuleBadges addon={selectedModule} version />
+                                    <dl className="space-y-3 text-xs">
+                                        <div className="space-y-1"><dt className="text-muted-foreground">Slug</dt><dd className="break-all font-mono">{selectedModule.slug}</dd></div>
+                                        <div className="space-y-1"><dt className="text-muted-foreground">Checksum</dt><dd className="break-all font-mono">{selectedModule.sourceChecksum || 'Unavailable'}</dd></div>
+                                    </dl>
+                                    {selectedModule.status === 'REJECTED' && selectedModule.moderationNote && <Status role="alert" variant="error" className="w-full rounded-md"><StatusLabel className="whitespace-normal leading-relaxed">{selectedModule.moderationNote}</StatusLabel></Status>}
+                                </CardContent>
+                            </Card>
+                        </aside>
                     </div>
                 </>}
 

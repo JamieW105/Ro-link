@@ -153,3 +153,12 @@ Shift commands require a staff role and work only in Discord servers. Starting o
 resuming also requires a linked Roblox account and a recent game roster. Replies
 are private and cannot ping users or roles. The dashboard marks staff on break
 without adding extra controls to its compact layout.
+
+
+### Marketplace reviews
+
+Before deploying product reviews, apply `supabase/migrations/20261025193540_module_reviews.sql` to the database that already has `supabase_schema_modules.sql`. Set `SUPABASE_SERVICE_ROLE_KEY` on the server alongside `NEXT_PUBLIC_SUPABASE_URL`; the service role key must never be exposed through a public environment variable. No remote database changes are performed by this PR.
+
+Reviews are readable for published modules and for a creator’s own unpublished modules. Publishing or editing a review requires owning the module or managing a visible server with that module installed. Each Discord account has one editable rating/comment per module and can remove its own review after losing installer access. The API derives reviewer identity from the authenticated session; direct anonymous/authenticated database access to the review table and summary RPC is revoked.
+
+Run `npm run test:module-reviews` for the actual migration, API authorization, rating/length constraints, averages, pagination, and grants against isolated PostgreSQL (PGlite).
