@@ -21,7 +21,7 @@ function databaseAdapter() {
             let deleting = false;
             const execute = async () => {
                 const values: unknown[] = [];
-                const where = filters.map(([key,value]) => { assert.ok(['id','module_id','author_discord_id'].includes(key)); values.push(value); return `${key}=$${values.length}`; });
+                const where = filters.map(([key,value]) => { assert.ok(['id','module_id','reviewer_discord_id'].includes(key)); values.push(value); return `${key}=$${values.length}`; });
                 if (inValues) { values.push(inValues); where.push(`server_id = ANY($${values.length}::text[])`); }
                 const result = await db.query(`${deleting?'DELETE FROM':'SELECT * FROM'} public.${table}${where.length?' WHERE '+where.join(' AND '):''}`,values);
                 return {data:result.rows,error:null};
@@ -33,8 +33,8 @@ function databaseAdapter() {
                 delete: () => { deleting=true; return builder; },
                 maybeSingle: async () => { const result=await execute(); return {...result,data:result.data[0]||null}; },
                 upsert: async (row:Record<string,unknown>) => {
-                    await db.query(`INSERT INTO public.addon_module_reviews(module_id,author_discord_id,reviewer_name,reviewer_avatar_url,rating,comment,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7)
-                        ON CONFLICT(module_id,author_discord_id) DO UPDATE SET reviewer_name=excluded.reviewer_name,reviewer_avatar_url=excluded.reviewer_avatar_url,rating=excluded.rating,comment=excluded.comment,updated_at=excluded.updated_at`,[row.module_id,row.author_discord_id,row.reviewer_name,row.reviewer_avatar_url,row.rating,row.comment,row.updated_at]);
+                    await db.query(`INSERT INTO public.addon_module_reviews(module_id,reviewer_discord_id,reviewer_name,reviewer_avatar_url,rating,comment,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7)
+                        ON CONFLICT(module_id,reviewer_discord_id) DO UPDATE SET reviewer_name=excluded.reviewer_name,reviewer_avatar_url=excluded.reviewer_avatar_url,rating=excluded.rating,comment=excluded.comment,updated_at=excluded.updated_at`,[row.module_id,row.reviewer_discord_id,row.reviewer_name,row.reviewer_avatar_url,row.rating,row.comment,row.updated_at]);
                     return {error:null};
                 },
                 then: (resolve:(value:unknown)=>unknown,reject:(reason:unknown)=>unknown) => execute().then(resolve,reject),
@@ -53,8 +53,8 @@ before(async()=>{
     await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
         CREATE TABLE public.addon_modules(id uuid PRIMARY KEY,status text,author_discord_id text);
         CREATE TABLE public.server_addon_modules(server_id text,module_id uuid);`);
-    const file=(await readdir('supabase/migrations')).find(name=>name.endsWith('_module_reviews.sql'))!;
-    await db.exec(await readFile(`supabase/migrations/${file}`,'utf8'));
+    const files=(await readdir('supabase/migrations')).filter(name=>name.endsWith('_module_reviews.sql')).sort();
+    for (const file of files) await db.exec(await readFile(`supabase/migrations/${file}`,'utf8'));
 });
 after(()=>db.close());
 beforeEach(async()=>{
@@ -100,22 +100,22 @@ test('upserts are tied to the session, preserve creation time, and update real a
     const both=await (await handlers.GET(request(),moduleId)).json();assert.equal(both.total,2);assert.equal(both.average,3.5);assert.equal(both.ownReview.comment,'Second rating');assert.equal(JSON.stringify(both).includes('author_discord_id'),false);
 });
 test('pagination and averages are scoped to the module, with own review outside the page',async()=>{
-    for(let index=0;index<13;index++)await db.query("INSERT INTO public.addon_module_reviews(module_id,author_discord_id,reviewer_name,rating,comment,created_at) VALUES($1,$2,'Reviewer',5,'Review',$3)",[moduleId,index===0?session!.user!.id:String(index),new Date(2026,0,index+1).toISOString()]);
-    await db.query("INSERT INTO public.addon_module_reviews(module_id,author_discord_id,reviewer_name,rating,comment) VALUES($1,'other','Other',1,'Other module')",[otherModule]);
+    for(let index=0;index<13;index++)await db.query("INSERT INTO public.addon_module_reviews(module_id,reviewer_discord_id,reviewer_name,rating,comment,created_at) VALUES($1,$2,'Reviewer',5,'Review',$3)",[moduleId,index===0?session!.user!.id:String(index),new Date(2026,0,index+1).toISOString()]);
+    await db.query("INSERT INTO public.addon_module_reviews(module_id,reviewer_discord_id,reviewer_name,rating,comment) VALUES($1,'other','Other',1,'Other module')",[otherModule]);
     const first=await (await handlers.GET(request(),moduleId)).json();assert.equal(first.total,13);assert.equal(first.average,5);assert.equal(first.reviews.length,10);assert.equal(first.hasMore,true);assert.ok(first.ownReview);assert.equal(first.reviews.some((row:{isOwn:boolean})=>row.isOwn),false);
     const second=await (await handlers.GET(request('GET',undefined,10),moduleId)).json();assert.equal(second.reviews.length,3);assert.equal(second.hasMore,false);
 });
 test('reviewers can withdraw their own review after losing installer access',async()=>{
     managed=true;await handlers.POST(request('POST',{rating:5,comment:'Own review'}),moduleId);
-    await db.query("INSERT INTO public.addon_module_reviews(module_id,author_discord_id,reviewer_name,rating,comment) VALUES($1,'someone-else','Other',4,'Keep this review')",[moduleId]);
+    await db.query("INSERT INTO public.addon_module_reviews(module_id,reviewer_discord_id,reviewer_name,rating,comment) VALUES($1,'someone-else','Other',4,'Keep this review')",[moduleId]);
     managed=false;
     assert.equal((await handlers.POST(request('POST',{rating:1,comment:'Not allowed'}),moduleId)).status,403);
     assert.equal((await handlers.DELETE(request('DELETE',{author_discord_id:'someone-else'}),moduleId)).status,200);
     const data=await (await handlers.GET(request(),moduleId)).json();assert.equal(data.total,1);assert.equal(data.ownReview,null);assert.equal(data.reviews[0].comment,'Keep this review');
 });
 test('database constraints and grants protect the review table and RPC',async()=>{
-    await assert.rejects(db.query("INSERT INTO public.addon_module_reviews(module_id,author_discord_id,reviewer_name,rating,comment) VALUES($1,'bad','Name',6,'Invalid')",[moduleId]));
-    await assert.rejects(db.query("INSERT INTO public.addon_module_reviews(module_id,author_discord_id,reviewer_name,rating,comment) VALUES($1,'bad','Name',5,'  ')",[moduleId]));
+    await assert.rejects(db.query("INSERT INTO public.addon_module_reviews(module_id,reviewer_discord_id,reviewer_name,rating,comment) VALUES($1,'bad','Name',6,'Invalid')",[moduleId]));
+    await assert.rejects(db.query("INSERT INTO public.addon_module_reviews(module_id,reviewer_discord_id,reviewer_name,rating,comment) VALUES($1,'bad','Name',5,'  ')",[moduleId]));
     for(const role of ['anon','authenticated']){
         await db.exec(`SET ROLE ${role}`);
         try{await assert.rejects(db.query('SELECT * FROM public.addon_module_reviews'));await assert.rejects(db.query('SELECT public.module_review_summary($1,$2,0)',[moduleId,'someone']));}finally{await db.exec('RESET ROLE');}
@@ -125,4 +125,26 @@ test('database constraints and grants protect the review table and RPC',async()=
     managed=true;await handlers.POST(request('POST',{rating:5,comment:'Cascade'}),moduleId);
     await db.query('DELETE FROM public.addon_modules WHERE id=$1',[moduleId]);
     assert.equal((await db.query('SELECT * FROM public.addon_module_reviews')).rows.length,0);
+});
+
+test('missing database setup returns an actionable error without leaking query details', async () => {
+    const broken = createModuleReviewHandlers({session:async()=>session,configured:()=>true,visibleGuildIds:async()=>[],canManage:async()=>false,
+        db:()=>({...databaseAdapter(),rpc:async()=>({data:null,error:{code:'PGRST202',message:'private query detail'}})}) as unknown as SupabaseClient});
+    const response = await broken.GET(request(),moduleId);
+    assert.equal(response.status,503);
+    const body=await response.json();
+    assert.equal(body.code,'REVIEWS_SCHEMA_MISSING');
+    assert.match(body.error,/reconcile_module_reviews/);
+    assert.equal(JSON.stringify(body).includes('private query detail'),false);
+});
+test('repair preserves existing reviews and owner replies across both identity schemas', async () => {
+    const migration=await readFile('supabase/migrations/20261025204626_reconcile_module_reviews.sql','utf8');
+    await db.exec("ALTER TABLE public.addon_module_reviews ADD COLUMN owner_reply text; ALTER TABLE public.addon_module_reviews RENAME COLUMN reviewer_discord_id TO author_discord_id;");
+    await db.query("INSERT INTO public.addon_module_reviews(module_id,author_discord_id,reviewer_name,rating,comment,owner_reply) VALUES($1,'existing','Existing',4,'Keep me','Keep reply')",[moduleId]);
+    await db.exec(migration);
+    await db.exec(migration);
+    const rows=await db.query<{reviewer_discord_id:string;owner_reply:string}>('SELECT reviewer_discord_id,owner_reply FROM public.addon_module_reviews');
+    assert.equal(rows.rows[0].reviewer_discord_id,'existing');
+    assert.equal(rows.rows[0].owner_reply,'Keep reply');
+    assert.equal((await (await handlers.GET(request(),moduleId)).json()).total,1);
 });

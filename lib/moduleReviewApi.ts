@@ -27,7 +27,7 @@ export function createModuleReviewHandlers(deps: ReviewDependencies) {
         const session = await deps.session();
         if (!session?.user?.id || session.error) return { response: Response.json({ error: 'Sign in to access module reviews.' }, { status: 401 }) };
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(moduleId)) return { response: Response.json({ error: 'Invalid module.' }, { status: 400 }) };
-        if (!deps.configured()) return { response: Response.json({ error: 'Reviews are temporarily unavailable.' }, { status: 503 }) };
+        if (!deps.configured()) return { response: Response.json({ error: 'Reviews require server configuration. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the server.', code: 'REVIEWS_NOT_CONFIGURED' }, { status: 503 }) };
         const db = deps.db();
         const { data: module, error } = await db.from('addon_modules').select('id, status, author_discord_id').eq('id', moduleId).maybeSingle();
         if (error) throw error;
@@ -61,7 +61,7 @@ export function createModuleReviewHandlers(deps: ReviewDependencies) {
                 return Response.json({ ...data, canReview, ownModule }, { headers: { 'Cache-Control': 'private, no-store' } });
             }
             if (method === 'DELETE') {
-                const { error } = await db.from('addon_module_reviews').delete().eq('module_id', moduleId).eq('author_discord_id', discordId);
+                const { error } = await db.from('addon_module_reviews').delete().eq('module_id', moduleId).eq('reviewer_discord_id', discordId);
                 if (error) throw error;
                 return Response.json({ ok: true });
             }
@@ -70,16 +70,22 @@ export function createModuleReviewHandlers(deps: ReviewDependencies) {
             if (!await eligible(db, session, moduleId, ownModule)) return Response.json({ error: 'Install this module on a server you manage before reviewing it.' }, { status: 403 });
             const { error } = await db.from('addon_module_reviews').upsert({
                 module_id: moduleId,
-                author_discord_id: discordId,
+                reviewer_discord_id: discordId,
                 reviewer_name: session.user?.name?.trim().slice(0, 100) || 'Discord member',
                 reviewer_avatar_url: getDiscordMediaProxyUrl(session.user?.image) || null,
                 rating: body.rating,
                 comment: body.comment,
                 updated_at: new Date().toISOString(),
-            }, { onConflict: 'module_id,author_discord_id' });
+            }, { onConflict: 'module_id,reviewer_discord_id' });
             if (error) throw error;
             return Response.json({ ok: true });
-        } catch {
+        } catch (error) {
+            const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'UNKNOWN';
+            // Log only a database error code; query details can contain reviewer data.
+            console.error('[module-reviews]', { method, code });
+            if (['PGRST202', 'PGRST205', '42P01', '42703', '42883'].includes(code)) {
+                return Response.json({ error: 'Reviews database setup is incomplete. Apply the reconcile_module_reviews migration.', code: 'REVIEWS_SCHEMA_MISSING' }, { status: 503 });
+            }
             return Response.json({ error: 'Reviews are temporarily unavailable. Please try again.' }, { status: 503 });
         }
     }
