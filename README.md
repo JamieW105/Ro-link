@@ -164,3 +164,13 @@ Reviews are readable for published modules and for a creator’s own unpublished
 Apply `supabase/migrations/20261025205315_marketplace_card_ratings.sql` for batched average ratings on marketplace cards.
 
 Run `npm run test:module-reviews` for the actual migration, API authorization, rating/length constraints, averages, pagination, and grants against isolated PostgreSQL (PGlite).
+
+### Module cover images
+
+Apply `supabase/migrations/20261025211211_module_cover_images.sql` before running this feature. It adds the ordered `addon_modules.cover_images` field, service-only upload metadata, and the private `module-covers` Storage bucket with a 2 MB WebP limit. The server requires `SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_SUPABASE_URL`.
+
+Creators can add up to four JPG/PNG/WebP covers from either creation page or the dedicated editor, reorder them with drag handles or arrow buttons, and remove them before saving. Each source may be up to 9 MB. The browser compresses before sending; the server verifies and re-encodes the image, strips metadata, and caps the stored output at 2 MB. The first cover appears on the marketplace card; all covers appear in the product gallery. Empty or failed previews fall back to the default Package icon. Draft uploads can be viewed only by their creator; other signed-in users can view covers attached to published modules.
+
+Uploaded covers are staged until the module is saved. Removing a cover from the form does not delete its stored file, so cancelling edits cannot break a saved module. Unreferenced uploads can be removed during storage maintenance after checking all `addon_modules.cover_images` references.
+
+Run `npm run test:module-covers` for image compression, limits, upload authorization, persistence failures, cover ownership, draft visibility, database constraints and Storage configuration. Browser checks are in `tests/dashboard-ui/module-covers.spec.ts`.

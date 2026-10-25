@@ -1,4 +1,5 @@
 'use client';
+import { ModuleCoverEditor } from '@/components/creator/ModuleCoverEditor';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
 import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
@@ -21,6 +22,7 @@ import { ChangeEvent, FormEvent, useState } from 'react';
 import { LuauCodeEditor } from '@/components/dashboard/LuauSyntax';
 
 interface ModuleForm {
+    coverImages: string[];
     name: string;
     slug: string;
     description: string;
@@ -30,6 +32,7 @@ interface ModuleForm {
 }
 
 const emptyForm: ModuleForm = {
+    coverImages: [],
     name: '',
     slug: '',
     description: '',
@@ -45,6 +48,7 @@ export default function CreateMarketplaceModulePage() {
     const [acceptedCreatorTerms, setAcceptedCreatorTerms] = useState(false);
     const [acceptedUseTerms, setAcceptedUseTerms] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [coversUploading, setCoversUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     function updateForm<K extends keyof ModuleForm>(key: K, value: ModuleForm[K]) {
@@ -68,6 +72,7 @@ export default function CreateMarketplaceModulePage() {
 
     async function submitModule(event: FormEvent) {
         event.preventDefault();
+        if (coversUploading) return;
         if (!acceptedCreatorTerms || !acceptedUseTerms) {
             setError('You must accept both module terms before publishing a submission.');
             return;
@@ -145,7 +150,7 @@ export default function CreateMarketplaceModulePage() {
                         </div>
                         <Button variant="default" size="default"
                             type="submit"
-                            disabled={saving}
+                            disabled={saving || coversUploading}
                             className="shrink-0 self-start transition-colors disabled:opacity-50 md:self-auto"
                         >
                             {saving ? 'Submitting' : 'Submit for Moderation'}
@@ -213,6 +218,7 @@ export default function CreateMarketplaceModulePage() {
                             />
                         </div>
 
+                        <div className="md:col-span-2"><ModuleCoverEditor value={form.coverImages} onChange={paths => updateForm('coverImages', paths)} onBusyChange={setCoversUploading} disabled={saving} /></div>
                         <div>
                             <label className="mb-2 block text-xs font-medium text-muted-foreground">Upload Source</label>
                             <Input

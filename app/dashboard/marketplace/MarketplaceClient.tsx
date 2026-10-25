@@ -1,4 +1,5 @@
 'use client';
+import { ModuleCoverGallery, ModuleCoverImage } from '@/components/marketplace/ModuleCoverGallery';
 import ModuleReviews, { ReviewRating, type ReviewSummary } from '@/components/marketplace/ModuleReviews';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
@@ -41,6 +42,7 @@ interface ModuleConfigField {
 }
 
 interface MarketplaceModule {
+    coverImages?: string[];
     reviewRating?: { average: number; total: number } | null;
     id: string;
     slug: string;
@@ -110,7 +112,8 @@ function MarketplaceModuleCard({ addon, creator, owned }: { addon: MarketplaceMo
     const href = `/dashboard/marketplace/${encodeURIComponent(addon.slug)}`;
     const fieldCount = Object.keys(addon.configSchema || {}).length;
     return <Card aria-label={addon.name} className="flex min-w-0 flex-col overflow-hidden">
-        <div data-slot="module-preview" className="relative aspect-video border-b border-border bg-background">
+        <div data-slot="module-preview" className="relative flex aspect-video items-center justify-center border-b border-border bg-background">
+            <ModuleCoverImage key={addon.coverImages?.[0] || 'empty'} path={addon.coverImages?.[0]} alt={`${addon.name} cover`} compact />
             {owned && <Status className="absolute left-3 top-3 rounded-md border-border bg-background px-2 py-0.5"><StatusLabel>Yours</StatusLabel></Status>}
             {(addon.isOfficial || addon.creatorIsVerified) && <Status variant={addon.isOfficial ? 'default' : 'info'} className="absolute -bottom-3 left-3 rounded-md border-border bg-card px-2 py-1 shadow-sm"><StatusLabel>{addon.isOfficial ? 'Official' : 'Verified creator'}</StatusLabel></Status>}
         </div>
@@ -489,12 +492,7 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
                     </header>
                     <div data-slot="module-product-layout" className="grid items-start gap-6 md:grid-cols-[minmax(0,1fr)_260px]">
                         <div className="min-w-0 space-y-6">
-                            <Card aria-label="Module preview" className="overflow-hidden p-2">
-                                <div data-slot="module-product-preview" className="flex aspect-video items-center justify-center rounded-md border border-border bg-background">
-                                    <Package className="size-12 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
-                                    <span className="sr-only">No preview image available</span>
-                                </div>
-                            </Card>
+                            <ModuleCoverGallery key={`covers-${selectedModule.id}`} paths={selectedModule.coverImages || []} name={selectedModule.name} />
                             <Card>
                                 <CardHeader className="p-4"><CardTitle>About this module</CardTitle></CardHeader>
                                 <CardContent className="px-4 pb-4"><p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{selectedModule.description || 'No description provided.'}</p></CardContent>

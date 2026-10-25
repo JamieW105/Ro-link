@@ -1,3 +1,4 @@
+import { moduleCoverSelectionError } from '@/lib/moduleCoverSelection';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
@@ -101,7 +102,7 @@ export async function GET() {
     const userId = String((session.user as { id?: string }).id || '');
     const query = supabase
         .from('addon_modules')
-        .select('id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
+        .select('cover_images, id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
         .order('name', { ascending: true });
 
     const { data, error } = userId
@@ -230,6 +231,8 @@ export async function POST(req: Request) {
     }
 
     const input = sanitized.input;
+    const coverError = await moduleCoverSelectionError(input.coverImages, userId);
+    if (coverError) return coverError;
     try {
         const duplicateSubmission = await getDuplicateCreatorModuleSubmission(userId, input.sourceCode || '');
         if (duplicateSubmission) {
@@ -263,13 +266,14 @@ export async function POST(req: Request) {
             source_code: input.sourceCode,
             source_checksum: checksumModuleSource(input.sourceCode || ''),
             config_schema: input.configSchema || {},
+            ...(input.coverImages !== undefined ? { cover_images: input.coverImages } : {}),
             author_discord_id: userId,
             submitted_at: now,
             moderation_note: '',
             updated_at: now,
             published_at: null,
         })
-        .select('id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
+        .select('cover_images, id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
         .single();
 
     if (error) {

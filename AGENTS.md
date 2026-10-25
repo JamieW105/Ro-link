@@ -70,6 +70,12 @@ and management screens. This requirement applies to future feature changes too. 
   creator/installer eligibility must be enforced by the API; never trust client-supplied
   reviewer IDs or permissions. Keep review tables/RPCs service-role-only and document
   required migrations.
+  Module covers use the official Dice FileUpload and Sortable controls. Accept up
+  to four JPG/PNG/WebP images of up to 9 MB each; compress before upload and re-encode
+  on the server to WebP at 2 MB or less. Keep the ordered cover paths in `cover_images`;
+  verify each belongs to the authenticated creator. Store files in the private
+  `module-covers` bucket. The first image is the listing cover; the product preview
+  shows selectable thumbnails and the neutral Package placeholder when empty.
   Keep installation multi-select visible with
   Switch and Checkbox controls, including disabled server-limit states.
   Specialized native inputs (color, number, file, etc.) may use the shared Input;

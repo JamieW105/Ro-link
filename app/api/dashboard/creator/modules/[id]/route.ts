@@ -1,3 +1,4 @@
+import { moduleCoverSelectionError } from '@/lib/moduleCoverSelection';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
@@ -193,6 +194,8 @@ export async function PATCH(req: Request, context: RouteContext) {
     }
 
     const input = sanitized.input;
+    const coverError = await moduleCoverSelectionError(input.coverImages, auth.userId);
+    if (coverError) return coverError;
     if (input.sourceCode !== undefined && input.sourceCode !== String(existingModule.source_code || '')) {
         try {
             const duplicateSubmission = await getDuplicateCreatorModuleSubmission(auth.userId, input.sourceCode, id);
@@ -218,6 +221,7 @@ export async function PATCH(req: Request, context: RouteContext) {
         updated_at: now,
     };
 
+    if (input.coverImages !== undefined) updates.cover_images = input.coverImages;
     if (input.name !== undefined) updates.name = input.name;
     if (input.description !== undefined) updates.description = input.description;
     if (input.version !== undefined) updates.version = input.version;

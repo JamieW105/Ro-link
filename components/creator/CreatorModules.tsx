@@ -1,4 +1,5 @@
 'use client';
+import { ModuleCoverEditor } from '@/components/creator/ModuleCoverEditor';
 import { useSuccessNotice } from '@/hooks/use-success-notice';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
@@ -42,6 +43,7 @@ interface ModuleConfigField {
 }
 
 interface CreatorModule {
+    coverImages?: string[];
     id: string;
     slug: string;
     name: string;
@@ -65,6 +67,7 @@ interface CreatorModule {
 }
 
 interface ModuleForm {
+    coverImages: string[];
     name: string;
     slug: string;
     description: string;
@@ -74,6 +77,7 @@ interface ModuleForm {
 }
 
 const emptyForm: ModuleForm = {
+    coverImages: [],
     name: '',
     slug: '',
     description: '',
@@ -97,6 +101,7 @@ function moduleToForm(addon: CreatorModule): ModuleForm {
         description: addon.description,
         version: addon.version,
         category: addon.category,
+        coverImages: addon.coverImages || [],
         sourceCode: addon.sourceCode || '',
     };
 }
@@ -126,6 +131,7 @@ function buildPayload(form: ModuleForm, status: 'DRAFT' | 'PENDING_REVIEW') {
         version: form.version,
         category: form.category,
         sourceCode: form.sourceCode,
+        coverImages: form.coverImages,
         status,
     };
 }
@@ -141,6 +147,7 @@ export default function CreatorModules({ moduleId }: { moduleId?: string }) {
     const [acceptedUseTerms, setAcceptedUseTerms] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [coversUploading, setCoversUploading] = useState(false);
     const [confirmation, setConfirmation] = useState<'archive' | 'delete' | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useSuccessNotice<string | null>(null);
@@ -242,6 +249,7 @@ export default function CreatorModules({ moduleId }: { moduleId?: string }) {
     }
 
     async function saveModule(nextStatus: 'DRAFT' | 'PENDING_REVIEW') {
+        if (coversUploading) return;
         if (nextStatus === 'PENDING_REVIEW' && (!acceptedCreatorTerms || !acceptedUseTerms)) {
             setError('You must accept both module terms before submitting for moderation.');
             return;
@@ -516,14 +524,14 @@ export default function CreatorModules({ moduleId }: { moduleId?: string }) {
                                     <Button variant="outline" size="default"
                                         type="button"
                                         onClick={() => saveModule('DRAFT')}
-                                        disabled={saving}
+                                        disabled={saving || coversUploading}
                                         className="transition-colors disabled:opacity-50"
                                     >
                                         {saving ? 'Saving' : 'Save Draft'}
                                     </Button>
                                     <Button variant="default" size="default"
                                         type="submit"
-                                        disabled={saving}
+                                        disabled={saving || coversUploading}
                                         className="transition-colors disabled:opacity-50"
                                     >
                                         {saving ? 'Submitting' : 'Submit Review'}
@@ -532,7 +540,7 @@ export default function CreatorModules({ moduleId }: { moduleId?: string }) {
                                         <Button variant="outline" size="default"
                                             type="button"
                                             onClick={() => setConfirmation('archive')}
-                                            disabled={saving}
+                                            disabled={saving || coversUploading}
                                             className="transition-colors disabled:opacity-50"
                                         >
                                             Archive
@@ -542,7 +550,7 @@ export default function CreatorModules({ moduleId }: { moduleId?: string }) {
                                         <Button variant="destructive" size="default"
                                             type="button"
                                             onClick={() => setConfirmation('delete')}
-                                            disabled={saving}
+                                            disabled={saving || coversUploading}
                                             className="transition-colors disabled:opacity-50"
                                         >
                                             Delete
@@ -616,6 +624,7 @@ export default function CreatorModules({ moduleId }: { moduleId?: string }) {
                                         className="min-h-28 w-full resize-y leading-relaxed transition-colors"
                                     />
                                 </div>
+                                <div className="lg:col-span-2"><ModuleCoverEditor key={selectedModule?.id || 'new'} value={form.coverImages} onChange={paths => updateForm('coverImages', paths)} onBusyChange={setCoversUploading} disabled={saving} /></div>
                                 <div className="lg:col-span-2">
                                     <label htmlFor="module-upload" className="mb-2 block text-xs font-medium text-muted-foreground">Upload Source</label>
                                     <Input
@@ -725,8 +734,8 @@ export default function CreatorModules({ moduleId }: { moduleId?: string }) {
                         <DialogDescription>{confirmation === 'delete' ? 'This permanently deletes the module and cannot be undone.' : 'This removes the module from marketplace installs.'}</DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="mt-6">
-                        <Button type="button" variant="outline" disabled={saving} onClick={() => setConfirmation(null)}>Cancel</Button>
-                        <Button type="button" variant="destructive" disabled={saving} onClick={async () => {
+                        <Button type="button" variant="outline" disabled={saving || coversUploading} onClick={() => setConfirmation(null)}>Cancel</Button>
+                        <Button type="button" variant="destructive" disabled={saving || coversUploading} onClick={async () => {
                             if (confirmation === 'delete') await deleteModule(); else await archiveModule();
                             setConfirmation(null);
                         }}>{saving ? 'Saving…' : confirmation === 'delete' ? 'Delete module' : 'Archive module'}</Button>

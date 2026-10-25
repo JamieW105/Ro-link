@@ -1,9 +1,11 @@
 import { createHash } from 'crypto';
+import { parseModuleCoverPaths } from './moduleCovers';
 
 export type AddonModuleStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
 export type ServerCustomModuleStatus = 'READY' | 'NEEDS_REUPLOAD';
 
 export interface SanitizedAddonModuleInput {
+    coverImages?: string[];
     name?: string;
     slug?: string;
     description?: string;
@@ -957,6 +959,11 @@ export function sanitizeAddonModuleInput(body: Record<string, unknown>, partial 
         }
     }
 
+    if ('coverImages' in body) {
+        const covers = parseModuleCoverPaths(body.coverImages);
+        if (!covers) errors.push('Select up to four valid, unique cover images.');
+        else input.coverImages = covers;
+    }
     if (errors.length > 0) {
         return { errors } as const;
     }
@@ -981,6 +988,7 @@ export function normalizeAddonModule(row: Record<string, unknown> | null | undef
         creatorIsVerified: row.is_verified_creator === true,
         creatorApprovedModuleCount: Number(row.creator_approved_module_count || 0),
         creatorMaxModuleInstallCount: Number(row.creator_max_module_install_count || 0),
+        coverImages: parseModuleCoverPaths(row.cover_images) || [],
         sourceChecksum: String(row.source_checksum || ''),
         configSchema: parseStoredModuleConfigSchema(row.config_schema),
         authorDiscordId: row.author_discord_id ? String(row.author_discord_id) : null,

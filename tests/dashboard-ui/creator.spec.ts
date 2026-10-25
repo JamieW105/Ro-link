@@ -90,7 +90,7 @@ for (const theme of ['light', 'dark']) {
     await checks.nth(1).focus(); await page.keyboard.press('Space');
     await page.getByRole('button', { name: 'Submit Review', exact: true }).click();
     await expect.poll(() => writes.length).toBe(1);
-    expect(writes[0]).toEqual({ method: 'PATCH', body: { ...Object.fromEntries(['name', 'slug', 'description', 'version', 'category', 'sourceCode'].map(key => [key, addon[key as keyof typeof addon]])), category: 'Moderation', status: 'PENDING_REVIEW' } });
+    expect(writes[0]).toEqual({ method: 'PATCH', body: { ...Object.fromEntries(['name', 'slug', 'description', 'version', 'category', 'sourceCode'].map(key => [key, addon[key as keyof typeof addon]])), category: 'Moderation', status: 'PENDING_REVIEW', coverImages: [] } });
     await page.getByRole('button', { name: 'Archive', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
