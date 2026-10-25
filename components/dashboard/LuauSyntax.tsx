@@ -19,6 +19,7 @@ interface LuauCodeBlockProps {
 }
 
 interface LuauCodeEditorProps {
+    ariaLabel?: string;
     value: string;
     onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
     required?: boolean;
@@ -262,6 +263,7 @@ export function LuauCodeBlock({ code, emptyFallback = 'No source code available.
 
 export function LuauCodeEditor({
     value,
+    ariaLabel = "Luau source code",
     onChange,
     required = false,
     className = '',
@@ -277,7 +279,7 @@ export function LuauCodeEditor({
     }
 
     return (
-        <div className={`relative overflow-hidden rounded-xl border border-border bg-muted transition-colors focus-within:border-border ${className}`}>
+        <div className={`relative overflow-hidden rounded-xl border border-border bg-muted transition-colors focus-within:ring-2 focus-within:ring-ring ${className}`}>
             <pre
                 ref={highlightRef}
                 aria-hidden="true"
@@ -288,6 +290,7 @@ export function LuauCodeEditor({
                 </code>
             </pre>
             <Textarea
+                aria-label={ariaLabel}
                 value={value}
                 onChange={onChange}
                 onScroll={syncScroll}

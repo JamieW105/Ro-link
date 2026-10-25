@@ -5,7 +5,11 @@ import { PageIcon } from "@/components/dashboard/PageIcon";
 import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
 
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Stat, StatLabel, StatValue } from '@/components/ui/stat';
+import { Status } from '@/components/ui/status';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
 
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -96,15 +100,14 @@ function moduleToForm(addon: CreatorModule): ModuleForm {
 
 function statusLabel(status: ModuleStatus) {
     if (status === 'PENDING_REVIEW') return 'Awaiting Moderation';
-    return status.replace(/_/g, ' ');
+    return status.charAt(0) + status.slice(1).toLowerCase().replace(/_/g, ' ');
 }
 
-function statusClassName(status: ModuleStatus) {
-    if (status === 'PUBLISHED') return 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400';
-    if (status === 'PENDING_REVIEW') return 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400';
-    if (status === 'REJECTED') return 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400';
-    if (status === 'ARCHIVED') return 'border-border bg-card text-muted-foreground';
-    return 'border-border bg-accent text-foreground';
+function statusVariant(status: ModuleStatus) {
+    if (status === 'PUBLISHED') return 'success';
+    if (status === 'PENDING_REVIEW') return 'warning';
+    if (status === 'REJECTED') return 'error';
+    return 'default';
 }
 
 function formatDate(value: string | null) {
@@ -133,6 +136,7 @@ export default function CreatorModulesPage() {
     const [acceptedUseTerms, setAcceptedUseTerms] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [confirmation, setConfirmation] = useState<'archive' | 'delete' | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useSuccessNotice<string | null>(null);
     const [search, setSearch] = useState('');
@@ -292,7 +296,7 @@ export default function CreatorModulesPage() {
     }
 
     async function archiveModule() {
-        if (!selectedModule || !confirm(`Archive ${selectedModule.name}? It will be removed from marketplace installs.`)) return;
+        if (!selectedModule) return;
 
         setSaving(true);
         setError(null);
@@ -320,7 +324,7 @@ export default function CreatorModulesPage() {
     }
 
     async function deleteModule() {
-        if (!selectedModule || !confirm(`Delete ${selectedModule.name}? This cannot be undone.`)) return;
+        if (!selectedModule) return;
 
         setSaving(true);
         setError(null);
@@ -352,7 +356,7 @@ export default function CreatorModulesPage() {
     if (status === 'loading' || loading) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-transparent"></div>
+                <Status role="status">Loading creator modules…</Status>
             </div>
         );
     }
@@ -360,16 +364,15 @@ export default function CreatorModulesPage() {
     if (status === 'unauthenticated') {
         return (
             <div className="flex min-h-screen items-center justify-center bg-background p-6 text-center text-foreground">
-                <Card className="w-full max-w-md rounded-xl border border-border bg-card p-8">
-                    <Image src="/Media/Ro-LinkIcon.png" alt="" width={48} height={48} className="mx-auto mb-5 h-12 w-12 object-contain" />
-                    <h1 className="text-2xl font-medium">Sign in required</h1>
-                    <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Authenticate with Discord before managing creator modules and marketplace submissions.</p>
-                <Button variant="default" size="default"
-                    onClick={() => signIn('discord')}
-                        className="mt-8 transition-colors"
-                >
-                    Sign In with Discord
-                </Button>
+                <Card className="w-full max-w-md">
+                    <CardHeader>
+                        <Image src="/Media/Ro-LinkIcon.png" alt="" width={48} height={48} className="mx-auto mb-3 h-12 w-12 object-contain" />
+                        <CardTitle>Sign in required</CardTitle>
+                        <CardDescription>Authenticate with Discord before managing creator modules and marketplace submissions.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Button type="button" onClick={() => signIn('discord')}>Sign In with Discord</Button>
+                    </CardContent>
                 </Card>
             </div>
         );
@@ -393,7 +396,7 @@ export default function CreatorModulesPage() {
                             <Link href="/dashboard" className="text-xs font-medium text-foreground hover:text-foreground">
                                 Back to Dashboard
                             </Link>
-                            <h1 className="mt-4 text-3xl font-semibold text-foreground md:text-5xl flex items-center gap-3"><PageIcon name="creator" />Creator Dashboard</h1>
+                            <h1 className="mt-4 text-2xl font-semibold text-foreground md:text-3xl flex items-center gap-3"><PageIcon name="creator" />Creator Dashboard</h1>
                             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
                                 Build modules, track review progress, and manage published work from one focused workspace.
                             </p>
@@ -405,39 +408,36 @@ export default function CreatorModulesPage() {
                                 ['In Review', stats.pending, 'text-amber-700 dark:text-amber-400'],
                                 ['Needs Work', stats.rejected, 'text-red-700 dark:text-red-400'],
                             ].map(([label, value, color]) => (
-                                <div key={label} className="rounded-lg border border-border bg-background px-4 py-4">
-                                    <div className={`text-2xl font-semibold ${color}`}>{value}</div>
-                                    <div className="mt-1 text-xs font-medium text-muted-foreground">{label}</div>
-                                </div>
+                                <Stat key={label}><StatLabel>{label}</StatLabel><StatValue className={String(color)}>{value}</StatValue></Stat>
                             ))}
                         </div>
                     </div>
                 </header>
 
                 {error && (
-                    <div className="mb-6 rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-5 py-4 text-sm font-medium text-red-700 dark:text-red-400">
+                    <Status role="alert" variant="error" className="mb-6 max-w-full whitespace-normal">
                         {error}
-                    </div>
+                    </Status>
                 )}
                 {success && (
-                    <div className="mb-6 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-5 py-4 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                    <Status role="status" variant="success" className="mb-6 max-w-full whitespace-normal">
                         {success}
-                    </div>
+                    </Status>
                 )}
 
                 <div className="grid grid-cols-1 gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
                     <aside className="space-y-4 xl:sticky xl:top-28 xl:self-start">
-                        <Card className="rounded-xl border border-border bg-card p-4">
-                            <div className="flex items-center justify-between gap-3">
+                        <Card>
+                            <CardHeader className="flex-row items-center justify-between">
                                 <div>
-                                    <h2 className="text-sm font-medium text-foreground">Module Library</h2>
-                                    <p className="mt-1 text-xs text-muted-foreground">{filteredModules.length} of {modules.length} shown</p>
+                                    <CardTitle>Module Library</CardTitle>
+                                    <CardDescription>{filteredModules.length} of {modules.length} shown</CardDescription>
                                 </div>
-                                <span className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground">
-                                    {stats.drafts} drafts
-                                </span>
-                            </div>
+                                <Status>{stats.drafts} drafts</Status>
+                            </CardHeader>
+                            <CardContent>
                             <Input
+                                aria-label="Search creator modules"
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
                                 placeholder="Search name, slug, category..."
@@ -445,23 +445,25 @@ export default function CreatorModulesPage() {
                             />
                             <div className="mt-3 flex flex-wrap gap-2">
                                 {moduleFilters.map((filter) => (
-                                    <Button variant="outline" size="default"
+                                    <Button variant={statusFilter === filter.value ? "secondary" : "outline"} size="sm"
                                         key={filter.value}
                                         type="button"
                                         onClick={() => setStatusFilter(filter.value)}
-                                        className={`        transition-colors ${statusFilter === filter.value ? '  ' : '    '}`}
+                                        aria-pressed={statusFilter === filter.value}
                                     >
                                         {filter.label}
                                     </Button>
                                 ))}
                             </div>
+                            </CardContent>
                         </Card>
 
                         <div className="max-h-[68vh] space-y-3 overflow-y-auto pr-1 custom-scrollbar">
                             <Button variant="outline" size="default"
                                 type="button"
                                 onClick={startNewModule}
-                                className={`w-full    text-left transition-colors ${selectedModule ? '   ' : ' '}`}
+                                aria-pressed={!selectedModule}
+                                className="h-auto w-full flex-col items-start whitespace-normal py-3 text-left"
                             >
                                 <span className="text-sm font-medium text-foreground">Create a new module</span>
                                 <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">Start a draft with fresh metadata and source.</span>
@@ -472,21 +474,18 @@ export default function CreatorModulesPage() {
                                     key={addon.id}
                                     type="button"
                                     onClick={() => setSelectedModuleId(addon.id)}
-                                    className={`h-auto min-h-9 justify-start whitespace-normal py-3 group w-full    text-left transition-colors ${selectedModuleId === addon.id ? '   ' : '   '}`}
+                                    aria-pressed={selectedModuleId === addon.id}
+                                    className="h-auto w-full min-w-0 flex-col items-start whitespace-normal py-3 text-left aria-pressed:border-ring aria-pressed:bg-accent"
                                 >
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <span className={`rounded-md border px-2 py-1 text-xs font-medium   ${statusClassName(addon.status)}`}>
+                                        <Status variant={statusVariant(addon.status)}>
                                             {statusLabel(addon.status)}
-                                        </span>
+                                        </Status>
                                         {addon.isOfficial && (
-                                            <span className="rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-foreground">
-                                                Official
-                                            </span>
+                                            <Status>Official</Status>
                                         )}
                                         {addon.creatorIsVerified && (
-                                            <span className="rounded-md border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                                                Verified Creator
-                                            </span>
+                                            <Status variant="success">Verified Creator</Status>
                                         )}
                                     </div>
                                     <span className="mt-3 block break-words text-sm font-medium text-foreground group-hover:text-foreground">{addon.name}</span>
@@ -509,38 +508,34 @@ export default function CreatorModulesPage() {
                     </aside>
 
                     <form onSubmit={submitModule} className="min-w-0 space-y-5">
-                        <section className="overflow-hidden rounded-xl border border-border bg-card">
-                            <div className="flex flex-col gap-5 border-b border-border bg-background p-5 md:p-6 lg:flex-row lg:items-start lg:justify-between">
+                        <Card className="min-w-0">
+                            <CardHeader className="gap-5 border-b border-border lg:flex-row lg:items-start lg:justify-between">
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
                                         {selectedModule ? (
-                                            <span className={`rounded-md border px-2 py-1 text-xs font-medium   ${statusClassName(selectedModule.status)}`}>
+                                            <Status variant={statusVariant(selectedModule.status)}>
                                                 {statusLabel(selectedModule.status)}
-                                            </span>
+                                            </Status>
                                         ) : (
-                                            <span className="rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-foreground">
-                                                New Draft
-                                            </span>
+                                            <Status>New Draft</Status>
                                         )}
                                         {selectedModule?.sourceChecksum && (
-                                            <span className="rounded-md border border-border bg-card px-2 py-1 font-mono text-xs font-medium text-muted-foreground">
+                                            <Status className="font-mono">
                                                 checksum {selectedModule.sourceChecksum.slice(0, 12)}
-                                            </span>
+                                            </Status>
                                         )}
                                         {selectedModule?.creatorIsVerified && (
-                                            <span className="rounded-md border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                                                Verified Creator
-                                            </span>
+                                            <Status variant="success">Verified Creator</Status>
                                         )}
                                     </div>
-                                    <h2 className="mt-3 break-words text-2xl font-semibold text-foreground md:text-3xl">
+                                    <CardTitle className="mt-3 break-words text-xl">
                                         {selectedModule ? selectedModule.name : 'New Module'}
-                                    </h2>
-                                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                                    </CardTitle>
+                                    <CardDescription className="mt-2">
                                         {selectedModule
                                             ? `Updated ${formatDate(selectedModule.updatedAt)}. Submitted ${formatDate(selectedModule.submittedAt)}.`
                                             : 'Fill out the details, add source, then save or submit when it is ready.'}
-                                    </p>
+                                    </CardDescription>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:max-w-md lg:justify-end">
                                     <Button variant="outline" size="default"
@@ -561,7 +556,7 @@ export default function CreatorModulesPage() {
                                     {selectedModule && selectedModule.status !== 'ARCHIVED' && (
                                         <Button variant="outline" size="default"
                                             type="button"
-                                            onClick={archiveModule}
+                                            onClick={() => setConfirmation('archive')}
                                             disabled={saving}
                                             className="transition-colors disabled:opacity-50"
                                         >
@@ -569,9 +564,9 @@ export default function CreatorModulesPage() {
                                         </Button>
                                     )}
                                     {selectedModule && (
-                                        <Button variant="outline" size="default"
+                                        <Button variant="destructive" size="default"
                                             type="button"
-                                            onClick={deleteModule}
+                                            onClick={() => setConfirmation('delete')}
                                             disabled={saving}
                                             className="transition-colors disabled:opacity-50"
                                         >
@@ -579,15 +574,15 @@ export default function CreatorModulesPage() {
                                         </Button>
                                     )}
                                 </div>
-                            </div>
+                            </CardHeader>
 
                             {selectedModule?.status === 'REJECTED' && selectedModule.moderationNote && (
-                                <div className="mx-5 mt-5 rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm leading-relaxed text-red-700 dark:text-red-400 md:mx-6">
+                                <Status variant="error" className="mx-6 mt-5 whitespace-normal">
                                     {selectedModule.moderationNote}
-                                </div>
+                                </Status>
                             )}
 
-                            <div className="p-5 md:p-6">
+                            <CardContent className="pt-6">
                                 <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                                     <div>
                                         <h3 className="text-sm font-medium text-foreground">Module Details</h3>
@@ -597,8 +592,9 @@ export default function CreatorModulesPage() {
                                 </div>
                                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                 <div>
-                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Name</label>
+                                    <label htmlFor="module-name" className="mb-2 block text-xs font-medium text-muted-foreground">Name</label>
                                     <Input
+                                        id="module-name"
                                         value={form.name}
                                         onChange={(event) => updateForm('name', event.target.value)}
                                         required
@@ -606,8 +602,9 @@ export default function CreatorModulesPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Slug</label>
+                                    <label htmlFor="module-slug" className="mb-2 block text-xs font-medium text-muted-foreground">Slug</label>
                                     <Input
+                                        id="module-slug"
                                         value={form.slug}
                                         onChange={(event) => updateForm('slug', event.target.value)}
                                         placeholder="Auto from name"
@@ -615,24 +612,27 @@ export default function CreatorModulesPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Version</label>
+                                    <label htmlFor="module-version" className="mb-2 block text-xs font-medium text-muted-foreground">Version</label>
                                     <Input
+                                        id="module-version"
                                         value={form.version}
                                         onChange={(event) => updateForm('version', event.target.value)}
                                         className="w-full transition-colors"
                                     />
                                 </div>
                                 <div>
-                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Category</label>
+                                    <label htmlFor="module-category" className="mb-2 block text-xs font-medium text-muted-foreground">Category</label>
                                     <Input
+                                        id="module-category"
                                         value={form.category}
                                         onChange={(event) => updateForm('category', event.target.value)}
                                         className="w-full transition-colors"
                                     />
                                 </div>
                                 <div className="lg:col-span-2">
-                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Description</label>
+                                    <label htmlFor="module-description" className="mb-2 block text-xs font-medium text-muted-foreground">Description</label>
                                     <Textarea
+                                        id="module-description"
                                         value={form.description}
                                         onChange={(event) => updateForm('description', event.target.value)}
                                         required
@@ -640,8 +640,9 @@ export default function CreatorModulesPage() {
                                     />
                                 </div>
                                 <div className="lg:col-span-2">
-                                    <label className="mb-2 block text-xs font-medium text-muted-foreground">Upload Source</label>
+                                    <label htmlFor="module-upload" className="mb-2 block text-xs font-medium text-muted-foreground">Upload Source</label>
                                     <Input
+                                        id="module-upload"
                                         type="file"
                                         accept=".lua,.luau,.txt"
                                         onChange={handleFileUpload}
@@ -649,31 +650,32 @@ export default function CreatorModulesPage() {
                                     />
                                 </div>
                                 </div>
-                            </div>
-                        </section>
+                            </CardContent>
+                        </Card>
 
                         <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-                            <div className="overflow-hidden rounded-xl border border-border bg-card">
-                                <div className="flex items-center justify-between gap-3 border-b border-border bg-background px-5 py-4">
+                            <Card className="min-w-0 overflow-hidden">
+                                <CardHeader className="flex-row items-center justify-between border-b border-border">
                                     <div>
-                                        <label className="block text-sm font-medium text-foreground">Source Code</label>
-                                        <p className="mt-1 text-xs text-muted-foreground">Paste Luau source or upload a `.lua`, `.luau`, or `.txt` file.</p>
+                                        <CardTitle>Source Code</CardTitle>
+                                        <CardDescription>Paste Luau source or upload a .lua, .luau, or .txt file.</CardDescription>
                                     </div>
                                     <span className="shrink-0 font-mono text-xs text-muted-foreground">{form.sourceCode.length.toLocaleString()} chars</span>
-                                </div>
-                                <div className="p-4 md:p-5">
+                                </CardHeader>
+                                <CardContent className="pt-6">
                                     <LuauCodeEditor
                                         value={form.sourceCode}
                                         onChange={(event) => updateForm('sourceCode', event.target.value)}
                                         required
-                                        minHeightClassName="min-h-[620px]"
+                                        ariaLabel="Module source code"
+                                        minHeightClassName="min-h-[400px]"
                                     />
-                                </div>
-                            </div>
+                                </CardContent>
+                            </Card>
 
                             <aside className="space-y-4">
-                                <Card className="rounded-xl border border-border bg-card p-5">
-                                    <h3 className="text-sm font-medium text-foreground">Review State</h3>
+                                <Card>
+                                    <CardHeader><CardTitle>Review State</CardTitle><CardDescription>Publication and review history.</CardDescription></CardHeader><CardContent>
                                     <dl className="mt-4 divide-y divide-border text-sm">
                                         <div className="flex items-center justify-between gap-4 py-3 first:pt-0">
                                             <dt className="text-xs font-medium text-muted-foreground">Published</dt>
@@ -687,22 +689,20 @@ export default function CreatorModulesPage() {
                                             <dt className="text-xs font-medium text-muted-foreground">Config Fields</dt>
                                             <dd className="text-right text-foreground">{configFields.length}</dd>
                                         </div>
-                                    </dl>
+                                    </dl></CardContent>
                                 </Card>
 
-                                <Card className="rounded-xl border border-border bg-card p-5">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <h3 className="text-sm font-medium text-foreground">Submit Terms</h3>
-                                        <span className={`rounded-md border px-2 py-1 text-xs font-medium   ${acceptedCreatorTerms && acceptedUseTerms ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400' : 'border-border bg-card text-muted-foreground'}`}>
-                                            {acceptedCreatorTerms && acceptedUseTerms ? 'Ready' : 'Required'}
-                                        </span>
-                                    </div>
-                                    <div className="mt-4 space-y-3">
+                                <Card>
+                                    <CardHeader className="flex-row items-center justify-between">
+                                        <CardTitle>Submit Terms</CardTitle>
+                                        <Status variant={acceptedCreatorTerms && acceptedUseTerms ? "success" : "default"}>{acceptedCreatorTerms && acceptedUseTerms ? "Ready" : "Required"}</Status>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
                                         <label className="flex items-start gap-3 text-xs leading-relaxed text-foreground">
                                             <Checkbox
                                                 checked={acceptedCreatorTerms}
                                                 onCheckedChange={(checked) => setAcceptedCreatorTerms(checked === true)}
-                                                className="mt-1 w-4 accent-muted-foreground"
+                                                className="mt-1"
                                             />
                                             <span>I agree to the <Link href="/terms/modules/create" className="text-foreground hover:text-foreground">module creator terms</Link>.</span>
                                         </label>
@@ -710,45 +710,52 @@ export default function CreatorModulesPage() {
                                             <Checkbox
                                                 checked={acceptedUseTerms}
                                                 onCheckedChange={(checked) => setAcceptedUseTerms(checked === true)}
-                                                className="mt-1 w-4 accent-muted-foreground"
+                                                className="mt-1"
                                             />
                                             <span>I understand the <Link href="/terms/modules/use" className="text-foreground hover:text-foreground">module use and UGC terms</Link>.</span>
                                         </label>
-                                    </div>
+                                    </CardContent>
                                 </Card>
 
-                                <Card className="rounded-xl border border-border bg-card p-5">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <h3 className="text-sm font-medium text-foreground">Parsed Config</h3>
-                                        <span className="rounded-md border border-border bg-card px-2 py-1 text-xs font-medium text-muted-foreground">
-                                            {configFields.length}
-                                        </span>
-                                    </div>
+                                <Card>
+                                    <CardHeader className="flex-row items-center justify-between">
+                                        <CardTitle>Parsed Config</CardTitle>
+                                        <Status>{configFields.length}</Status>
+                                    </CardHeader>
+                                    <CardContent>
                                     {configFields.length > 0 ? (
-                                        <div className="mt-4 space-y-3">
-                                            {configFields.map((field) => (
-                                                <div key={field.key} className="rounded-lg border border-border bg-card p-3">
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="min-w-0">
-                                                            <p className="break-words text-sm font-semibold text-foreground">{field.label}</p>
-                                                            <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{field.key}</p>
-                                                        </div>
-                                                        <span className="shrink-0 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground">
-                                                            {field.type}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="mt-3 text-sm text-muted-foreground">No CONFIG fields are stored for this module yet.</p>
-                                    )}
+                                        <Table>
+                                            <TableHeader><TableRow><TableHead>Field</TableHead><TableHead>Type</TableHead></TableRow></TableHeader>
+                                            <TableBody>{configFields.map((field) => (
+                                                <TableRow key={field.key}>
+                                                    <TableCell className="whitespace-normal"><p className="break-words font-medium">{field.label}</p><p className="break-all font-mono text-xs text-muted-foreground">{field.key}</p></TableCell>
+                                                    <TableCell><Status>{field.type}</Status></TableCell>
+                                                </TableRow>
+                                            ))}</TableBody>
+                                        </Table>
+                                    ) : <p className="text-sm text-muted-foreground">No CONFIG fields are stored for this module yet.</p>}
+                                    </CardContent>
                                 </Card>
                             </aside>
                         </section>
                     </form>
                 </div>
             </main>
+            <Dialog open={confirmation !== null} onOpenChange={(open) => { if (!open && !saving) setConfirmation(null); }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{confirmation === 'delete' ? 'Delete' : 'Archive'} {selectedModule?.name}?</DialogTitle>
+                        <DialogDescription>{confirmation === 'delete' ? 'This permanently deletes the module and cannot be undone.' : 'This removes the module from marketplace installs.'}</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="mt-6">
+                        <Button type="button" variant="outline" disabled={saving} onClick={() => setConfirmation(null)}>Cancel</Button>
+                        <Button type="button" variant="destructive" disabled={saving} onClick={async () => {
+                            if (confirmation === 'delete') await deleteModule(); else await archiveModule();
+                            setConfirmation(null);
+                        }}>{saving ? 'Saving…' : confirmation === 'delete' ? 'Delete module' : 'Archive module'}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
