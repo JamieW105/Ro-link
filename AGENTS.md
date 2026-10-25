@@ -76,6 +76,11 @@ and management screens. This requirement applies to future feature changes too. 
 
 ## Dashboard navigation
 
+The creator dashboard at `/dashboard/creator/modules` opens to all modules as
+full-width cards. Keep editing on `/dashboard/creator/modules/[moduleId]/edit`
+and creation on `/dashboard/creator/modules/new`, with a return link to the library.
+Do not automatically select a module or show an editor beside the default list.
+
 Keep the Live Panel page at `/dashboard/[id]/live-panel` and its permission-aware
 entry from the overview. Do not add Live Servers, Live Panel, Player Lookup,
 Reports, or Misc Actions to the sidebar. Standalone `servers`, `lookup`, `reports`

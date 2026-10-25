@@ -45,6 +45,25 @@ for (const theme of ['light', 'dark']) {
     await page.goto('/dashboard/creator/modules');
     await expect(page.getByRole('heading', { name: 'Creator Dashboard', exact: true })).toBeVisible();
     await expect(page.locator('[data-slot="stat"]')).toHaveCount(4);
+    await expect(page.locator('form')).toHaveCount(0);
+    const moduleLink = page.getByRole('link', { name: `Edit ${addon.name}`, exact: true });
+    await expect(moduleLink).toHaveAttribute('href', '/dashboard/creator/modules/creator-module/edit');
+    const moduleCard = moduleLink.locator('xpath=ancestor::section');
+    const bounds = await moduleCard.boundingBox();
+    const main = await page.locator('main').boundingBox();
+    expect(bounds!.width).toBeGreaterThan(main!.width * 0.8);
+    await page.getByRole('button', { name: 'Published', exact: true }).click();
+    await expect(page.getByText('No modules match this view.')).toBeVisible();
+    await page.getByRole('button', { name: 'All', exact: true }).click();
+    await page.getByLabel('Search creator modules').fill('missing module');
+    await expect(page.getByText('No modules match this view.')).toBeVisible();
+    await page.getByLabel('Search creator modules').fill('');
+    await page.screenshot({ path: test.info().outputPath(`creator-list-${theme}.png`), fullPage: true });
+    await moduleLink.click();
+    await expect(page).toHaveURL(/\/creator\/modules\/creator-module\/edit$/);
+    await expect(page.getByRole('heading', { name: 'Edit Module', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Search creator modules')).toHaveCount(0);
+    await page.reload();
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue(addon.name);
     await expect(page.getByLabel('Module source code')).toHaveValue(addon.sourceCode);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -59,9 +78,6 @@ for (const theme of ['light', 'dark']) {
     await toggle.click(); await toggle.click();
     expect(await page.evaluate(() => localStorage.getItem('rolink-theme'))).toBe(theme);
     await page.screenshot({ path: test.info().outputPath(`creator-${theme}.png`), fullPage: true });
-    await page.getByRole('button', { name: 'Published', exact: true }).click();
-    await expect(page.getByText('No modules match this view.')).toBeVisible();
-    await page.getByRole('button', { name: 'All', exact: true }).click();
     await page.getByRole('button', { name: 'Submit Review', exact: true }).click();
     await expect(page.locator('main').getByRole('alert')).toContainText('accept both module terms');
     const checks = page.getByRole('checkbox');
@@ -84,6 +100,61 @@ for (const theme of ['light', 'dark']) {
     await page.keyboard.press('Escape');
     await expect(dialog).not.toBeVisible();
     expect(writes).toHaveLength(2);
+    await page.getByRole('link', { name: 'Back to My Modules', exact: true }).click();
+    await expect(page).toHaveURL(/\/creator\/modules$/);
+    await expect(page.locator('form')).toHaveCount(0);
+    await page.getByRole('link', { name: 'New Module', exact: true }).click();
+    await expect(page).toHaveURL(/\/creator\/modules\/new$/);
+    await expect(page.getByLabel('Name', { exact: true })).toHaveValue('');
+    await expect(page.getByLabel('Module source code')).toHaveValue('');
+    await expect(page.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
+    await page.goto('/dashboard/creator/modules/unavailable-module/edit');
+    await expect(page.getByRole('heading', { name: 'Module not found', exact: true })).toBeVisible();
+    await expect(page.locator('form')).toHaveCount(0);
+    expect(writes).toHaveLength(2);
     expect(errors).toEqual([]);
   });
 }
+
+test('creator new module uploads, saves to its edit URL, and returns to the library after deletion', async ({ page }) => {
+  test.setTimeout(120_000);
+  let saved: Record<string, unknown> | null = null;
+  const writes: { method: string; body: unknown }[] = [];
+  await page.route('**/api/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    const method = route.request().method();
+    let body: unknown = {};
+    if (path === '/api/auth/session') body = { user: { id: 'test-user', name: 'Creator' }, expires: '2099-01-01T00:00:00Z' };
+    if (path === '/api/site-banners') body = { banners: [] };
+    if (path === '/api/custom-dashboard/resolve') body = { isCustomDashboard: false };
+    if (path === '/api/dashboard/creator/modules') {
+      if (method === 'POST') {
+        const payload = route.request().postDataJSON();
+        writes.push({ method, body: payload });
+        saved = { ...addon, ...payload };
+        body = { module: saved };
+      } else body = { modules: saved ? [saved] : [] };
+    }
+    if (path === '/api/dashboard/creator/modules/creator-module' && method === 'DELETE') {
+      writes.push({ method, body: null }); saved = null;
+    }
+    await route.fulfill({ json: body });
+  });
+  await page.goto('/dashboard/creator/modules');
+  await expect(page.getByText('No modules yet.', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'New Module', exact: true }).click();
+  await page.getByLabel('Upload Source').setInputFiles({ name: 'Uploaded tools.luau', mimeType: 'text/plain', buffer: Buffer.from('return { uploaded = true }') });
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Uploaded tools');
+  await page.getByLabel('Description', { exact: true }).fill('An uploaded draft.');
+  await page.getByRole('button', { name: 'Save Draft', exact: true }).click();
+  await expect(page).toHaveURL(/\/creator\/modules\/creator-module\/edit$/);
+  await expect(page.getByLabel('Module source code')).toHaveValue('return { uploaded = true }');
+  expect(writes[0]).toMatchObject({ method: 'POST', body: { name: 'Uploaded tools', sourceCode: 'return { uploaded = true }', status: 'DRAFT' } });
+  await page.reload();
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Uploaded tools');
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete module', exact: true }).click();
+  await expect(page).toHaveURL(/\/creator\/modules$/);
+  await expect(page.getByText('No modules yet.', { exact: true })).toBeVisible();
+  expect(writes[1]).toEqual({ method: 'DELETE', body: null });
+});
