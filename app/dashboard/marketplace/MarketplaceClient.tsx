@@ -135,7 +135,7 @@ function MarketplaceModuleCard({ addon, creator, owned }: { addon: MarketplaceMo
                 <CreatorAvatar key={creator?.avatar_url || addon.authorDiscordId} creator={creator} />
                 <span className="truncate text-xs font-medium" title={creator?.username || undefined}>{creator?.username || (addon.isOfficial ? 'Ro-Link' : 'Community creator')}</span>
             </div>
-            <span className="max-w-14 truncate text-xs text-muted-foreground" title={addon.category}>{addon.category}</span>
+            <span className="max-w-16 truncate text-xs text-muted-foreground" title={addon.category}>{addon.category}</span>
             <span aria-label={`${fieldCount} configuration fields`} title="Configuration fields" className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><SlidersHorizontal className="size-3.5" aria-hidden="true" />{fieldCount}</span>
             <Button asChild variant="ghost" size="icon" className="size-7 shrink-0"><Link href={href} aria-label={`View ${addon.name}`}><ArrowRight className="size-4" aria-hidden="true" /></Link></Button>
         </CardFooter>
@@ -458,7 +458,7 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
                             <CardDescription>{modules.length ? 'Try another search or category.' : 'There are no modules available to browse yet.'}</CardDescription>
                         </CardHeader>{modules.length > 0 && <CardFooter><Button type="button" variant="outline" size="sm" onClick={() => { setSearch(''); setCategory('all'); }}>Reset filters</Button></CardFooter>}</Card>
                     ) : (
-                        <div data-slot="marketplace-grid" className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[repeat(auto-fill,minmax(228px,1fr))]">
+                        <div data-slot="marketplace-grid" className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
                             {filteredModules.map(addon => <MarketplaceModuleCard
                                 key={addon.id}
                                 addon={addon}

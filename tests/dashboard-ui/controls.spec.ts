@@ -1295,7 +1295,7 @@ test("marketplace empty, unavailable, and missing-product states use shared card
 });
 
 
-test("marketplace preview cards fit four to five across on laptops and expand on wider screens", async ({ page }) => {
+test("marketplace preview cards keep readable widths and expand on wider screens", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = await mockDashboard(page);
   const authorId = '234567890123456789';
@@ -1323,14 +1323,15 @@ test("marketplace preview cards fit four to five across on laptops and expand on
     await expect(cards.nth(1).getByText('CommunityBuilder',{exact:true})).toBeVisible();
     await expect(cards.first().getByText('UI Tester',{exact:true})).toBeVisible();
     await expect(cards.first().getByText('Official',{exact:true})).toHaveAttribute('data-slot','status-label');
-    for (const [width, expectedColumns] of [[640,2],[768,3],[1024,4],[1280,5],[1366,5],[1440,5],[1536,6],[1920,7],[2560,10]]) {
+    for (const [width, expectedColumns] of [[640,2],[768,3],[1024,3],[1280,4],[1366,4],[1440,4],[1536,5],[1920,6],[2560,8]]) {
       await page.setViewportSize({width,height:900});
       const columns = await grid.evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
       expect(columns).toBe(expectedColumns);
       const row = await Promise.all(Array.from({length:expectedColumns},(_,index)=>cards.nth(index).boundingBox()));
       if(width>=1024) {
-        expect(row[0]!.width).toBeLessThan(270);
-        expect(row[0]!.height).toBeLessThan(380);
+        expect(row[0]!.width).toBeGreaterThanOrEqual(280);
+        expect(row[0]!.width).toBeLessThan(350);
+        expect(row[0]!.height).toBeLessThan(400);
       }
       expect(Math.max(...row.map(box=>box!.y))-Math.min(...row.map(box=>box!.y))).toBeLessThan(1);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
