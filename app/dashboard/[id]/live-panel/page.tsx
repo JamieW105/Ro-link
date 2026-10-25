@@ -1026,7 +1026,7 @@ export default function LivePanelPage() {
         }
     }, [canManageReports, guildId, setReportsNotice]);
 
-    const loadReportDetail = useCallback(async (reportId: string) => {
+    const loadReportDetail = useCallback(async (reportId: string, signal: AbortSignal) => {
         if (!guildId || !canManageReports || !reportId) return;
 
         setReportDetailLoading(true);
@@ -1035,6 +1035,7 @@ export default function LivePanelPage() {
         try {
             const response = await fetch(`/api/reports/${encodeURIComponent(reportId)}/context?serverId=${encodeURIComponent(guildId)}`, {
                 cache: 'no-store',
+                signal,
             });
             const payload = await response.json().catch(() => ({})) as {
                 report?: LiveReport;
@@ -1042,6 +1043,8 @@ export default function LivePanelPage() {
                 logs?: unknown[];
                 error?: string;
             };
+
+            if (signal.aborted) return;
 
             if (!response.ok || !payload.report) {
                 setSelectedReport(null);
@@ -1057,13 +1060,14 @@ export default function LivePanelPage() {
             setSelectedReportLogs(normalizeDashboardLogs(payload.logs || []));
             setReportModeratorNote(trimString(payload.report.moderator_note));
         } catch (error) {
+            if (signal.aborted) return;
             setSelectedReport(null);
             setSelectedReportProfile(null);
             setSelectedReportLogs([]);
             setReportModeratorNote('');
             setReportsNotice({ type: 'error', text: `Failed to load report details: ${String(error)}` });
         } finally {
-            setReportDetailLoading(false);
+            if (!signal.aborted) setReportDetailLoading(false);
         }
     }, [canManageReports, guildId, setReportsNotice]);
 
@@ -1101,31 +1105,18 @@ export default function LivePanelPage() {
     }, [canManageReports, loadPanelReports, reportStatusFilter, rightPaneMode]);
 
     useEffect(() => {
-        if (rightPaneMode !== 'reports') {
-            return;
-        }
-
-        if (panelReports.length === 0) {
-            return;
-        }
-
-        if (selectedReportId && panelReports.some((report) => report.id === selectedReportId)) {
-            return;
-        }
-
-        setSelectedReportId(panelReports[0].id);
-    }, [panelReports, rightPaneMode, selectedReportId]);
-
-    useEffect(() => {
         if (rightPaneMode !== 'reports' || !selectedReportId) {
             setSelectedReport(null);
             setSelectedReportProfile(null);
             setSelectedReportLogs([]);
             setReportModeratorNote('');
+            setReportDetailLoading(false);
             return;
         }
 
-        loadReportDetail(selectedReportId);
+        const controller = new AbortController();
+        loadReportDetail(selectedReportId, controller.signal);
+        return () => controller.abort();
     }, [loadReportDetail, rightPaneMode, selectedReportId]);
 
     useEffect(() => {
@@ -2816,19 +2807,19 @@ export default function LivePanelPage() {
                                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                                     <div>
                                         <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Reports Manager</p>
-                                        <CardTitle className="mt-1">Live Reports</CardTitle>
+                                        <CardTitle className="mt-1">{selectedReportId ? 'Report details' : 'Live Reports'}</CardTitle>
                                         <p className="mt-1 text-xs font-medium text-muted-foreground">Review player reports without leaving live operations.</p>
                                     </div>
                                     <Button variant="outline" size="default"
                                         type="button"
-                                        onClick={() => setRightPaneMode('lookup')}
+                                        onClick={() => selectedReportId ? setSelectedReportId(null) : setRightPaneMode('lookup')}
                                         className="transition-colors"
                                     >
-                                        Lookup
+                                        {selectedReportId ? <><PanelBackIcon className="size-4" aria-hidden="true" />Back to reports</> : 'Lookup'}
                                     </Button>
                                 </div>
 
-                                <div className="mt-4">
+                                {!selectedReportId && <div className="mt-4">
                                     <Input
                                         aria-label="Search reports"
                                                 value={reportSearch}
@@ -2836,14 +2827,14 @@ export default function LivePanelPage() {
                                         placeholder="Search reports"
                                         className="w-full transition-all"
                                     />
-                                </div>
+                                </div>}
 
                                 {reportsNotice && <Status role={reportsNotice.type === 'error' ? 'alert' : 'status'} variant={reportsNotice.type === 'success' ? 'success' : 'error'} className="w-full rounded-md"><StatusLabel className="whitespace-normal leading-relaxed">{reportsNotice.text}</StatusLabel></Status>}
 
                             </CardHeader>
 
-                            <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(240px,0.8fr)_minmax(340px,1.2fr)]">
-                                <div className="custom-scrollbar min-h-0 overflow-y-auto border-b border-border xl:border-b-0 xl:border-r">
+                            <div className="flex min-h-0 flex-1 flex-col">
+                                {!selectedReportId && <div data-slot="report-list" className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
                                     {reportsLoading ? (
                                         <div className="p-10 text-center text-xs font-medium text-muted-foreground">Loading reports...</div>
                                     ) : filteredPanelReports.length === 0 ? (
@@ -2852,14 +2843,13 @@ export default function LivePanelPage() {
                                         <div className="divide-y divide-border">
                                             {filteredPanelReports.map((report) => {
                                                 const status = getReportStatus(report);
-                                                const selected = selectedReportId === report.id;
                                                 return (
                                                     <Button variant="ghost" size="default"
                                                         key={report.id}
                                                         type="button"
-                                                        onClick={() => setSelectedReportId(report.id)}
-                                                        aria-pressed={selected}
-                                                        className={`block h-auto min-h-9 w-full justify-start whitespace-normal rounded-none py-3 text-left ${selected ? 'bg-accent' : ''}`}
+                                                        onClick={() => { setSelectedReport(null); setReportDetailLoading(true); setSelectedReportId(report.id); }}
+                                                        aria-label={`Open report ${shortReportId(report.id)} for ${report.reported_roblox_username}`}
+                                                        className="block h-auto min-h-9 w-full justify-start whitespace-normal rounded-none py-3 text-left"
                                                     >
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div className="min-w-0">
@@ -2878,9 +2868,9 @@ export default function LivePanelPage() {
                                             })}
                                         </div>
                                     )}
-                                </div>
+                                </div>}
 
-                                <div className="custom-scrollbar min-h-0 overflow-y-auto p-5">
+                                {selectedReportId && <CardContent role="region" aria-label="Report details" className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4">
                                     {reportDetailLoading ? (
                                         <div className="flex min-h-72 items-center justify-center text-xs font-medium text-muted-foreground">Loading report details...</div>
                                     ) : selectedReport ? (
@@ -3075,10 +3065,10 @@ export default function LivePanelPage() {
                                         </div>
                                     ) : (
                                         <div className="flex min-h-72 items-center justify-center rounded-xl border border-dashed border-border text-center text-xs font-medium text-muted-foreground">
-                                            Select a report to review.
+                                            Could not load this report. Return to the report list and try again.
                                         </div>
                                     )}
-                                </div>
+                                </CardContent>}
                             </div>
                         </div>
                     ) : (
@@ -3096,6 +3086,7 @@ export default function LivePanelPage() {
                                     onClick={() => {
                                         clearSelectedProfile();
                                         setReportStatusFilter('PENDING');
+                                        setSelectedReportId(null);
                                         setRightPaneMode('reports');
                                     }}
                                     className="shrink-0 text-amber-700 dark:text-amber-400"
