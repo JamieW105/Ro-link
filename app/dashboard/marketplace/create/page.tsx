@@ -8,6 +8,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { moduleCategoryOptions } from '@/lib/moduleCategories';
 import { Textarea } from '@/components/ui/textarea';
 
 
@@ -190,11 +192,14 @@ export default function CreateMarketplaceModulePage() {
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-xs font-medium text-muted-foreground">Category</label>
-                            <Input
+                            <label htmlFor="module-category" className="mb-2 block text-xs font-medium text-muted-foreground">Category</label>
+                            <Select
+                                id="module-category"
+                                aria-label="Category"
                                 value={form.category}
-                                onChange={(event) => updateForm('category', event.target.value)}
-                                className="w-full transition-colors"
+                                onValueChange={(value) => updateForm('category', value)}
+                                options={moduleCategoryOptions([form.category])}
+                                disabled={saving}
                             />
                         </div>
 

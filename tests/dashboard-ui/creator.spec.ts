@@ -78,6 +78,11 @@ for (const theme of ['light', 'dark']) {
     await toggle.click(); await toggle.click();
     expect(await page.evaluate(() => localStorage.getItem('rolink-theme'))).toBe(theme);
     await page.screenshot({ path: test.info().outputPath(`creator-${theme}.png`), fullPage: true });
+    const category = page.getByRole('combobox', { name: 'Category', exact: true });
+    await expect(category).toHaveValue('General');
+    await category.fill('Moderation');
+    await page.getByRole('option', { name: 'Moderation', exact: true }).click();
+    await expect(category).toHaveValue('Moderation');
     await page.getByRole('button', { name: 'Submit Review', exact: true }).click();
     await expect(page.locator('main').getByRole('alert')).toContainText('accept both module terms');
     const checks = page.getByRole('checkbox');
@@ -85,7 +90,7 @@ for (const theme of ['light', 'dark']) {
     await checks.nth(1).focus(); await page.keyboard.press('Space');
     await page.getByRole('button', { name: 'Submit Review', exact: true }).click();
     await expect.poll(() => writes.length).toBe(1);
-    expect(writes[0]).toEqual({ method: 'PATCH', body: { ...Object.fromEntries(['name', 'slug', 'description', 'version', 'category', 'sourceCode'].map(key => [key, addon[key as keyof typeof addon]])), status: 'PENDING_REVIEW' } });
+    expect(writes[0]).toEqual({ method: 'PATCH', body: { ...Object.fromEntries(['name', 'slug', 'description', 'version', 'category', 'sourceCode'].map(key => [key, addon[key as keyof typeof addon]])), category: 'Moderation', status: 'PENDING_REVIEW' } });
     await page.getByRole('button', { name: 'Archive', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -146,10 +151,15 @@ test('creator new module uploads, saves to its edit URL, and returns to the libr
   await page.getByLabel('Upload Source').setInputFiles({ name: 'Uploaded tools.luau', mimeType: 'text/plain', buffer: Buffer.from('return { uploaded = true }') });
   await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Uploaded tools');
   await page.getByLabel('Description', { exact: true }).fill('An uploaded draft.');
+  const category = page.getByRole('combobox', { name: 'Category', exact: true });
+  await category.fill('Community');
+  await category.press('ArrowDown');
+  await category.press('Enter');
+  await expect(category).toHaveValue('Community');
   await page.getByRole('button', { name: 'Save Draft', exact: true }).click();
   await expect(page).toHaveURL(/\/creator\/modules\/creator-module\/edit$/);
   await expect(page.getByLabel('Module source code')).toHaveValue('return { uploaded = true }');
-  expect(writes[0]).toMatchObject({ method: 'POST', body: { name: 'Uploaded tools', sourceCode: 'return { uploaded = true }', status: 'DRAFT' } });
+  expect(writes[0]).toMatchObject({ method: 'POST', body: { name: 'Uploaded tools', category: 'Community', sourceCode: 'return { uploaded = true }', status: 'DRAFT' } });
   await page.reload();
   await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Uploaded tools');
   await page.getByRole('button', { name: 'Delete', exact: true }).click();
@@ -157,4 +167,35 @@ test('creator new module uploads, saves to its edit URL, and returns to the libr
   await expect(page).toHaveURL(/\/creator\/modules$/);
   await expect(page.getByText('No modules yet.', { exact: true })).toBeVisible();
   expect(writes[1]).toEqual({ method: 'DELETE', body: null });
+});
+
+test('module category dropdown preserves legacy values and is shared with marketplace creation', async ({ page }) => {
+  await page.route('**/api/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    let body: unknown = {};
+    if (path === '/api/auth/session') body = { user: { id: 'test-user', name: 'Creator' }, expires: '2099-01-01T00:00:00Z' };
+    if (path === '/api/site-banners') body = { banners: [] };
+    if (path === '/api/custom-dashboard/resolve') body = { isCustomDashboard: false };
+    if (path === '/api/dashboard/creator/modules') body = { modules: [{ ...addon, category: 'Legacy Custom' }] };
+    await route.fulfill({ json: body });
+  });
+  await page.goto('/dashboard/creator/modules/creator-module/edit');
+  const category = page.getByRole('combobox', { name: 'Category', exact: true });
+  await expect(category).toHaveValue('Legacy Custom');
+  for (const theme of ['light', 'dark']) {
+    const toggle = page.getByRole('button', { name: `Switch to ${theme} mode` });
+    if (await toggle.count()) await toggle.click();
+    await page.getByRole('button', { name: 'Show category options', exact: true }).click();
+    await expect(page.getByRole('option', { name: 'Legacy Custom', exact: true })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'General', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: test.info().outputPath(`category-${theme}.png`), fullPage: true });
+    await page.keyboard.press('Escape');
+  }
+  await page.goto('/dashboard/marketplace/create');
+  await expect(category).toHaveValue('General');
+  await category.fill('Utilities');
+  await category.press('ArrowDown');
+  await category.press('Enter');
+  await expect(category).toHaveValue('Utilities');
 });
