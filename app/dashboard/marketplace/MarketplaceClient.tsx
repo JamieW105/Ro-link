@@ -25,7 +25,7 @@ import { ShieldAlert as LucideShieldAlert } from 'lucide-react';
 
 import Link from 'next/link';
 import { signIn, useSession } from 'next-auth/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 
 type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
@@ -66,6 +66,7 @@ interface InstallTarget {
     name: string;
     icon: string | null;
     installedModuleCount: number;
+    installedModuleIds?: string[];
     moduleLimit: number;
 }
 
@@ -171,6 +172,8 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
     const [selectedServerIds, setSelectedServerIds] = useState<string[]>([]);
     const [multiSelectInstall, setMultiSelectInstall] = useState(false);
     const [installing, setInstalling] = useState(false);
+    const mutationVersion = useRef(0);
+    const mutationPending = useRef(false);
     const [installMessage, setInstallMessage] = useState<string | null>(null);
     const [installError, setInstallError] = useState<string | null>(null);
 
@@ -226,6 +229,39 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
             .finally(() => setLoading(false));
     }, [status, syncSelectedModuleFromUrl]);
 
+    // Poll the authenticated API: Discord sessions do not authorize browser DB subscriptions.
+    useEffect(() => {
+        if (status !== 'authenticated' || !installPickerModuleId) return;
+        const controller = new AbortController();
+        let refreshing = false;
+        async function refresh() {
+            if (refreshing || mutationPending.current || document.visibilityState === 'hidden') return;
+            refreshing = true;
+            const version = mutationVersion.current;
+            try {
+                const response = await fetch('/api/dashboard/marketplace', { cache: 'no-store', signal: controller.signal });
+                const payload = await response.json();
+                if (response.ok && !controller.signal.aborted && version === mutationVersion.current && Array.isArray(payload.installTargets)) {
+                    setInstallTargets(payload.installTargets);
+                }
+            } catch {
+                // Keep the last known state during transient network failures; retry on the next tick.
+            } finally {
+                refreshing = false;
+            }
+        }
+        void refresh();
+        const timer = window.setInterval(() => void refresh(), 3000);
+        window.addEventListener('focus', refresh);
+        document.addEventListener('visibilitychange', refresh);
+        return () => {
+            controller.abort();
+            window.clearInterval(timer);
+            window.removeEventListener('focus', refresh);
+            document.removeEventListener('visibilitychange', refresh);
+        };
+    }, [status, installPickerModuleId]);
+
     useEffect(() => {
         function handlePopState() {
             syncSelectedModuleFromUrl(modules);
@@ -277,7 +313,7 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
 
     function toggleServerSelection(serverId: string) {
         const target = installTargets.find((server) => server.id === serverId);
-        if (target && target.installedModuleCount >= target.moduleLimit && !selectedServerIds.includes(serverId)) {
+        if (target && target.installedModuleCount >= target.moduleLimit && !target.installedModuleIds?.includes(installPickerModuleId || '') && !selectedServerIds.includes(serverId)) {
             return;
         }
 
@@ -289,39 +325,52 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
     }
 
     async function installModuleToServers(moduleId: string, serverIds: string[]) {
-        if (serverIds.length === 0) return;
+        if (serverIds.length === 0 || mutationPending.current) return;
 
         setInstalling(true);
         setInstallError(null);
         setInstallMessage(null);
 
+        mutationPending.current = true;
+        mutationVersion.current += 1;
         try {
-            const results = await Promise.all(serverIds.map(async (serverId) => {
+            const results = await Promise.allSettled(serverIds.map(async (serverId) => {
+                const target = installTargets.find(server => server.id === serverId);
+                const action = target?.installedModuleIds?.includes(moduleId) ? 'remove' : 'install';
                 const response = await fetch('/api/dashboard/modules', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        serverId,
-                        moduleId,
-                        action: 'install',
-                    }),
+                    body: JSON.stringify({ serverId, moduleId, action }),
                 });
                 const payload = await response.json().catch(() => ({}));
-
                 if (!response.ok) {
-                    const target = installTargets.find((server) => server.id === serverId);
-                    throw new Error(`${target?.name || serverId}: ${String(payload.error || 'Install failed.')}`);
+                    throw new Error(`${target?.name || serverId}: ${String(payload.error || 'Module update failed.')}`);
                 }
-
-                return serverId;
+                setInstallTargets(current => current.map(server => {
+                    if (server.id !== serverId) return server;
+                    const ids = server.installedModuleIds || [];
+                    const wasInstalled = ids.includes(moduleId);
+                    return {
+                        ...server,
+                        installedModuleIds: action === 'remove' ? ids.filter(id => id !== moduleId) : [...new Set([...ids, moduleId])],
+                        installedModuleCount: Math.max(0, server.installedModuleCount + (action === 'remove' ? (wasInstalled ? -1 : 0) : (wasInstalled ? 0 : 1))),
+                    };
+                }));
+                return action;
             }));
-
-            setInstallMessage(`Installed to ${results.length} server${results.length === 1 ? '' : 's'}.`);
+            const installed = results.filter(result => result.status === 'fulfilled' && result.value === 'install').length;
+            const removed = results.filter(result => result.status === 'fulfilled' && result.value === 'remove').length;
+            const messages = [];
+            if (installed) messages.push(`Installed to ${installed} server${installed === 1 ? '' : 's'}.`);
+            if (removed) messages.push(`Removed from ${removed} server${removed === 1 ? '' : 's'}.`);
+            setInstallMessage(messages.join(' ') || null);
+            const failures = results.filter(result => result.status === 'rejected');
+            setInstallError(failures.map(result => result.reason instanceof Error ? result.reason.message : 'Module update failed.').join(' ') || null);
             setSelectedServerIds([]);
             setMultiSelectInstall(false);
-        } catch (installFailure) {
-            setInstallError(installFailure instanceof Error ? installFailure.message : 'Install failed.');
         } finally {
+            mutationVersion.current += 1;
+            mutationPending.current = false;
             setInstalling(false);
         }
     }
@@ -469,7 +518,7 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
                         <DialogHeader className="shrink-0 flex-row items-start justify-between gap-4 border-b border-border p-4">
                             <div className="space-y-2">
                                 <DialogTitle>{installPickerModule.name}</DialogTitle>
-                                <DialogDescription>Choose a server to install immediately, or enable multi-server selection.</DialogDescription>
+                                <DialogDescription>Choose a server to install or remove this module immediately, or enable multi-server selection.</DialogDescription>
                             </div>
                             <Button type="button" variant="ghost" size="icon" className="size-8 shrink-0" aria-label="Close install picker" onClick={closeInstallPicker} disabled={installing}><X className="size-4" aria-hidden="true" /></Button>
                         </DialogHeader>
@@ -483,15 +532,19 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
                                 <div className="space-y-2">
                                     {installTargets.map(server => {
                                         const selected = selectedServerIds.includes(server.id);
-                                        const full = server.installedModuleCount >= server.moduleLimit;
+                                        const installed = Boolean(server.installedModuleIds?.includes(installPickerModule.id));
+                                        const full = !installed && server.installedModuleCount >= server.moduleLimit;
+                                        const actionLabel = installed ? 'Remove module' : 'Install module';
                                         return multiSelectInstall ? (
                                             <label key={server.id} className="flex items-center gap-3 rounded-md border border-border p-3 has-[[data-state=checked]]:border-primary/40 has-[[data-state=checked]]:bg-accent/50 has-[[data-disabled]]:cursor-not-allowed has-[[data-disabled]]:opacity-50">
                                                 <Checkbox aria-label={`Select ${server.name}`} checked={selected} disabled={installing || full} onCheckedChange={() => toggleServerSelection(server.id)} />
                                                 <ServerIdentity server={server} />
+                                                <Status variant={installed ? 'error' : 'default'}><StatusLabel>{actionLabel}</StatusLabel></Status>
                                             </label>
                                         ) : (
-                                            <Button key={server.id} type="button" variant="outline" disabled={installing || full} onClick={() => installModuleToServers(installPickerModule.id, [server.id])} onContextMenu={event => { event.preventDefault(); if (!installing && !full) { setMultiSelectInstall(true); toggleServerSelection(server.id); } }} className="h-auto min-h-16 w-full justify-start gap-3 whitespace-normal p-3 text-left">
+                                            <Button key={server.id} type="button" variant="outline" aria-label={`${actionLabel} on ${server.name}`} disabled={installing || full} onClick={() => installModuleToServers(installPickerModule.id, [server.id])} onContextMenu={event => { event.preventDefault(); if (!installing && !full) { setMultiSelectInstall(true); toggleServerSelection(server.id); } }} className={`h-auto min-h-16 w-full justify-start gap-3 whitespace-normal p-3 text-left ${installed ? 'border-destructive/50 hover:bg-destructive/10' : ''}`}>
                                                 <ServerIdentity server={server} />
+                                                <Status variant={installed ? 'error' : 'default'}><StatusLabel>{actionLabel}</StatusLabel></Status>
                                             </Button>
                                         );
                                     })}
@@ -502,7 +555,7 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
                             <p className="text-xs text-muted-foreground">{selectedServerIds.length} server{selectedServerIds.length === 1 ? '' : 's'} selected</p>
                             <div className="flex gap-2">
                                 <Button type="button" variant="outline" onClick={() => { setMultiSelectInstall(false); setSelectedServerIds([]); }} disabled={installing}>Cancel</Button>
-                                <Button type="button" onClick={() => installModuleToServers(installPickerModule.id, selectedServerIds)} disabled={installing || selectedServerIds.length === 0}>{installing ? 'Installing…' : 'Install Selected'}</Button>
+                                <Button type="button" onClick={() => installModuleToServers(installPickerModule.id, selectedServerIds)} disabled={installing || selectedServerIds.length === 0}>{installing ? 'Updating…' : selectedServerIds.some(id => installTargets.find(server => server.id === id)?.installedModuleIds?.includes(installPickerModule.id)) ? 'Apply Selected Changes' : 'Install Selected'}</Button>
                             </div>
                         </DialogFooter>}
                     </DialogContent>

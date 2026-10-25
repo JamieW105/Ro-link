@@ -1338,3 +1338,45 @@ test("marketplace preview cards fit three across on laptops and desktops", async
   await expect(page.locator('[data-slot="marketplace-grid"] [data-slot="card"]').nth(2).getByText('Community creator',{exact:true})).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('marketplace synchronizes installs and removals without reloading', async ({ page }) => {
+  const errors = await mockDashboard(page);
+  let installedIds: string[] = [];
+  let fail = false;
+  await page.route('**/api/dashboard/marketplace', route => route.fulfill({ json: {
+    modules: [sampleModule], installTargets: [{ ...guild, installedModuleIds: installedIds, installedModuleCount: installedIds.length, moduleLimit: 1 }],
+  } }));
+  await page.route('**/api/dashboard/modules', async route => {
+    const { action, moduleId } = route.request().postDataJSON();
+    if (fail) return route.fulfill({ status: 500, json: { error: 'Please retry.' } });
+    installedIds = action === 'remove' ? [] : [moduleId];
+    await route.fulfill({ json: { success: true } });
+  });
+  for (const theme of ['light', 'dark']) {
+    installedIds = [];
+    await page.addInitScript(value => localStorage.setItem('rolink-theme', value), theme);
+    await page.goto(`/dashboard/marketplace/${sampleModule.slug}`);
+    await page.getByRole('button', { name: 'Select Server To Install', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: sampleModule.name, exact: true });
+    const install = dialog.getByRole('button', { name: `Install module on ${guild.name}`, exact: true });
+    const remove = dialog.getByRole('button', { name: `Remove module on ${guild.name}`, exact: true });
+    await install.click();
+    await expect(remove).toBeEnabled();
+    await expect(dialog.getByText('1/1 installed · Limit reached', { exact: true })).toBeVisible();
+    fail = true;
+    await remove.click();
+    await expect(dialog.getByRole('alert')).toContainText('Please retry.');
+    await expect(remove).toBeEnabled();
+    fail = false;
+    await remove.click();
+    await expect(install).toBeEnabled();
+    await expect(dialog.getByText('0/1 installed', { exact: true })).toBeVisible();
+    // Simulate another administrator installing and then removing the module.
+    installedIds = [sampleModule.id];
+    await expect(remove).toBeEnabled({ timeout: 10_000 });
+    installedIds = [];
+    await expect(install).toBeEnabled({ timeout: 10_000 });
+    await page.keyboard.press('Escape');
+  }
+  expect(errors).toEqual([]);
+});

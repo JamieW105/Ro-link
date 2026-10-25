@@ -112,7 +112,7 @@ export async function GET() {
     }
 
     const staffDiscordIds = await getRoLinkStaffDiscordIds();
-    let installTargets: Array<{ id: string; name: string; icon: string | null; installedModuleCount: number; moduleLimit: number }> = [];
+    let installTargets: Array<{ id: string; name: string; icon: string | null; installedModuleCount: number; installedModuleIds: string[]; moduleLimit: number }> = [];
 
     if (session.accessToken && userId) {
         try {
@@ -139,12 +139,12 @@ export async function GET() {
             const checkedGuilds = await Promise.all(guildChecks);
             const manageableGuilds = checkedGuilds
                 .filter((guild): guild is { id: string; name: string; icon: string | null } => Boolean(guild));
-            const installCountsByServer = new Map<string, number>();
+            const installedIdsByServer = new Map<string, string[]>();
 
             if (manageableGuilds.length > 0) {
                 const { data: installedRows, error: installedError } = await supabase
                     .from('server_addon_modules')
-                    .select('server_id')
+                    .select('server_id, module_id')
                     .in('server_id', manageableGuilds.map((guild) => guild.id));
 
                 if (installedError) {
@@ -153,14 +153,17 @@ export async function GET() {
 
                 for (const row of installedRows || []) {
                     const targetServerId = String((row as { server_id?: string }).server_id || '');
-                    installCountsByServer.set(targetServerId, (installCountsByServer.get(targetServerId) || 0) + 1);
+                    const ids = installedIdsByServer.get(targetServerId) || [];
+                    ids.push(String(row.module_id));
+                    installedIdsByServer.set(targetServerId, ids);
                 }
             }
 
             installTargets = manageableGuilds
                 .map((guild) => ({
                     ...guild,
-                    installedModuleCount: installCountsByServer.get(guild.id) || 0,
+                    installedModuleCount: installedIdsByServer.get(guild.id)?.length || 0,
+                    installedModuleIds: installedIdsByServer.get(guild.id) || [],
                     moduleLimit: MAX_SERVER_ADDON_MODULES,
                 }))
                 .sort((first, second) => first.name.localeCompare(second.name));
