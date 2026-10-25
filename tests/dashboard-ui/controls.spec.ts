@@ -1219,7 +1219,7 @@ test("marketplace Dice filters, product fields, and multi-server installs work i
     await page.goto('/dashboard/marketplace');
     const welcome = page.getByRole('region',{name:sampleModule.name,exact:true});
     await expect(welcome.locator('[data-slot="card-footer"]')).toBeVisible();
-    await expect(welcome.getByText('Published',{exact:true})).toBeVisible();
+    await expect(welcome.getByText('Official',{exact:true})).toBeVisible();
     const category = page.getByRole('combobox',{name:'Module category',exact:true});
     await category.fill('Moderation');
     await page.getByRole('option',{name:'Moderation',exact:true}).click();
@@ -1290,5 +1290,51 @@ test("marketplace empty, unavailable, and missing-product states use shared card
     await expect(emptyPicker.getByRole('switch')).toHaveCount(0);
     await page.keyboard.press('Escape');
   }
+  expect(errors).toEqual([]);
+});
+
+
+test("marketplace preview cards fit three across on laptops and desktops", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await mockDashboard(page);
+  const authorId = '234567890123456789';
+  const modules = Array.from({length:6},(_,index)=>({...sampleModule,id:`preview-${index}`,slug:`preview-${index}`,name:`Community module ${index + 1}`,authorDiscordId:index===0?'test-user':authorId,isOfficial:index===0,creatorIsVerified:index===1}));
+  const authorRequests: string[] = [];
+  await page.route('**/api/dashboard/marketplace',route=>route.fulfill({json:{modules,installTargets:[]}}));
+  await page.route('**/api/discord/user?*',route=>{
+    authorRequests.push(new URL(route.request().url()).searchParams.get('userId')!);
+    return route.fulfill({json:{id:authorId,username:'CommunityBuilder',avatar_url:'/Media/Ro-LinkIcon.png'}});
+  });
+  for (const theme of ['light','dark']) {
+    await page.addInitScript(value=>localStorage.setItem('rolink-theme',value),theme);
+    await page.goto('/dashboard/marketplace');
+    const grid = page.locator('[data-slot="marketplace-grid"]');
+    const cards = grid.locator('[data-slot="card"]');
+    await expect(cards).toHaveCount(6);
+    await expect(cards.first().getByText('Yours',{exact:true})).toBeVisible();
+    await expect(cards.nth(1).getByText('Yours',{exact:true})).toHaveCount(0);
+    await expect(cards.nth(1).getByText('CommunityBuilder',{exact:true})).toBeVisible();
+    await expect(cards.first().getByText('UI Tester',{exact:true})).toBeVisible();
+    await expect(cards.first().getByText('Official',{exact:true})).toHaveAttribute('data-slot','status-label');
+    for (const width of [768,1024,1280,1440,1920]) {
+      await page.setViewportSize({width,height:900});
+      const columns = await grid.evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
+      expect(columns).toBeGreaterThanOrEqual(3);
+      const row = await Promise.all([0,1,2].map(index=>cards.nth(index).boundingBox()));
+      expect(Math.max(...row.map(box=>box!.y))-Math.min(...row.map(box=>box!.y))).toBeLessThan(1);
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    }
+    await page.setViewportSize({width:1280,height:900});
+    const preview = await cards.first().locator('[data-slot="module-preview"]').boundingBox();
+    expect(Math.abs(preview!.width/preview!.height-16/9)).toBeLessThan(0.02);
+    await page.screenshot({path:`/workspace/artifacts/dice-${theme}-marketplace-preview-cards-${test.info().project.name}.png`});
+    await page.setViewportSize({width:390,height:844});
+    await expect.poll(()=>grid.evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(1);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+  expect(authorRequests).toEqual([authorId,authorId]);
+  await page.route('**/api/discord/user?*',route=>route.fulfill({status:503,json:{error:'Creator profile unavailable'}}));
+  await page.goto('/dashboard/marketplace');
+  await expect(page.locator('[data-slot="marketplace-grid"] [data-slot="card"]').nth(2).getByText('Community creator',{exact:true})).toBeVisible();
   expect(errors).toEqual([]);
 });

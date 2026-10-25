@@ -9,7 +9,7 @@ import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, ArrowRight, Loader2, Plus, Search, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BadgeCheck, Loader2, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 
@@ -26,7 +26,7 @@ import { ShieldAlert as LucideShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 import { signIn, useSession } from 'next-auth/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getDiscordGuildIconProxyUrl } from '@/lib/discordMedia';
+import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from '@/lib/discordMedia';
 
 type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
 
@@ -90,6 +90,48 @@ function ModuleBadges({ addon }: { addon: MarketplaceModule }) {
     </div>;
 }
 
+interface CreatorProfile {
+    username: string;
+    avatar_url: string | null;
+}
+
+function CreatorAvatar({ creator }: { creator?: CreatorProfile }) {
+    const [failed, setFailed] = useState(false);
+    return creator?.avatar_url && !failed
+        ? <Image unoptimized src={creator.avatar_url} alt="" width={20} height={20} onError={() => setFailed(true)} className="size-5 shrink-0 rounded-full object-cover" />
+        : <span aria-hidden="true" className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">{creator?.username.slice(0, 1).toUpperCase() || '?'}</span>;
+}
+
+function MarketplaceModuleCard({ addon, creator, owned }: { addon: MarketplaceModule; creator?: CreatorProfile; owned: boolean }) {
+    const href = `/dashboard/marketplace/${encodeURIComponent(addon.slug)}`;
+    const fieldCount = Object.keys(addon.configSchema || {}).length;
+    return <Card aria-label={addon.name} className="flex min-w-0 flex-col overflow-hidden">
+        <div data-slot="module-preview" className="relative aspect-video border-b border-border bg-background">
+            {owned && <Status className="absolute left-3 top-3 rounded-md border-border bg-background px-2 py-0.5"><StatusLabel>Yours</StatusLabel></Status>}
+            {(addon.isOfficial || addon.creatorIsVerified) && <Status variant={addon.isOfficial ? 'default' : 'info'} className="absolute -bottom-3 left-4 rounded-md border-border bg-card px-2 py-1 shadow-sm"><StatusLabel>{addon.isOfficial ? 'Official' : 'Verified creator'}</StatusLabel></Status>}
+        </div>
+        <CardHeader className="gap-2 px-4 pb-4 pt-6">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <CardTitle className="min-w-0 break-words text-sm leading-snug"><Link href={href} className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{addon.name}</Link></CardTitle>
+                {addon.isOfficial && <Image src="/Media/Ro-LinkIcon.png" alt="Ro-Link official module" width={16} height={16} className="size-4 shrink-0" />}
+                {!addon.isOfficial && addon.creatorIsVerified && <BadgeCheck aria-label="Verified creator" className="size-4 shrink-0 text-muted-foreground" />}
+                <span className="text-xs text-muted-foreground">v{addon.version}</span>
+                {addon.status !== 'PUBLISHED' && <Status variant={statusVariant(addon.status)} className="px-2 py-0.5"><StatusLabel>{statusLabel(addon.status)}</StatusLabel></Status>}
+            </div>
+            <CardDescription className="line-clamp-2 min-h-10 text-xs leading-5">{addon.description || 'No description provided.'}</CardDescription>
+        </CardHeader>
+        <CardFooter className="mt-auto gap-2 border-t border-border px-3 py-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+                <CreatorAvatar key={creator?.avatar_url || addon.authorDiscordId} creator={creator} />
+                <span className="truncate text-xs font-medium" title={creator?.username || undefined}>{creator?.username || (addon.isOfficial ? 'Ro-Link' : 'Community creator')}</span>
+            </div>
+            <span className="max-w-20 truncate text-xs text-muted-foreground" title={addon.category}>{addon.category}</span>
+            <span aria-label={`${fieldCount} configuration fields`} title="Configuration fields" className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><SlidersHorizontal className="size-3.5" aria-hidden="true" />{fieldCount}</span>
+            <Button asChild variant="ghost" size="icon" className="size-7 shrink-0"><Link href={href} aria-label={`View ${addon.name}`}><ArrowRight className="size-4" aria-hidden="true" /></Link></Button>
+        </CardFooter>
+    </Card>;
+}
+
 function ServerIdentity({ server }: { server: InstallTarget }) {
     const [failed, setFailed] = useState(false);
     return <>
@@ -117,7 +159,9 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
     const router = useRouter();
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('all');
-    const { status } = useSession();
+    const { data: session, status } = useSession();
+    const currentUserId = (session?.user as { id?: string } | undefined)?.id;
+    const [creators, setCreators] = useState<Record<string, CreatorProfile>>({});
     const [modules, setModules] = useState<MarketplaceModule[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -190,6 +234,29 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
     }, [modules, syncSelectedModuleFromUrl]);
+
+    useEffect(() => {
+        if (moduleSlug || selectedModuleId) return;
+        const controller = new AbortController();
+        const authorIds = [...new Set(modules.map(addon => addon.authorDiscordId).filter((id): id is string => Boolean(id && id !== currentUserId && /^\d{17,20}$/.test(id))))];
+        let next = 0;
+        async function loadCreators() {
+            while (next < authorIds.length && !controller.signal.aborted) {
+                const authorId = authorIds[next++];
+                try {
+                    const response = await fetch(`/api/discord/user?userId=${encodeURIComponent(authorId)}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]) });
+                    const profile = await response.json();
+                    if (response.ok && typeof profile.username === 'string' && !controller.signal.aborted) {
+                        setCreators(current => ({ ...current, [authorId]: { username: profile.username, avatar_url: typeof profile.avatar_url === 'string' ? profile.avatar_url : null } }));
+                    }
+                } catch {
+                    // Keep the creator fallback when Discord is unavailable.
+                }
+            }
+        }
+        void Promise.all(Array.from({ length: Math.min(3, authorIds.length) }, loadCreators));
+        return () => controller.abort();
+    }, [modules, currentUserId, moduleSlug, selectedModuleId]);
 
     function openInstallPicker(moduleId: string) {
         setInstallPickerModuleId(moduleId);
@@ -329,18 +396,15 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
                             <CardDescription>{modules.length ? 'Try another search or category.' : 'There are no modules available to browse yet.'}</CardDescription>
                         </CardHeader>{modules.length > 0 && <CardFooter><Button type="button" variant="outline" size="sm" onClick={() => { setSearch(''); setCategory('all'); }}>Reset filters</Button></CardFooter>}</Card>
                     ) : (
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                            {filteredModules.map(addon => <Card key={addon.id} aria-label={addon.name} className="flex min-w-0 flex-col">
-                                <CardHeader className="gap-3 p-4">
-                                    <ModuleBadges addon={addon} />
-                                    <CardTitle className="break-words leading-snug">{addon.name}</CardTitle>
-                                    <CardDescription className="line-clamp-3 leading-relaxed">{addon.description || 'No description provided.'}</CardDescription>
-                                </CardHeader>
-                                <CardFooter className="mt-auto justify-between border-t border-border p-4">
-                                    <span className="text-xs text-muted-foreground">v{addon.version}</span>
-                                    <Button asChild variant="outline" size="sm"><Link href={`/dashboard/marketplace/${encodeURIComponent(addon.slug)}`} aria-label={`View ${addon.name}`}>View module<ArrowRight className="size-4" aria-hidden="true" /></Link></Button>
-                                </CardFooter>
-                            </Card>)}
+                        <div data-slot="marketplace-grid" className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                            {filteredModules.map(addon => <MarketplaceModuleCard
+                                key={addon.id}
+                                addon={addon}
+                                owned={Boolean(currentUserId && addon.authorDiscordId === currentUserId)}
+                                creator={addon.authorDiscordId === currentUserId && session?.user?.name
+                                    ? { username: session.user.name, avatar_url: session.user.image ? getDiscordMediaProxyUrl(session.user.image) || null : null }
+                                    : creators[addon.authorDiscordId || '']}
+                            />)}
                         </div>
                     )}
                     <div className="mt-4 flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
