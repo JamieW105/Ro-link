@@ -1299,7 +1299,7 @@ test("marketplace preview cards fit three across on laptops and desktops", async
   test.setTimeout(120_000);
   const errors = await mockDashboard(page);
   const authorId = '234567890123456789';
-  const modules = Array.from({length:6},(_,index)=>({...sampleModule,id:`preview-${index}`,slug:`preview-${index}`,name:`Community module ${index + 1}`,authorDiscordId:index===0?'test-user':authorId,isOfficial:index===0,creatorIsVerified:index===1}));
+  const modules = Array.from({length:6},(_,index)=>({...sampleModule,id:`preview-${index}`,slug:`preview-${index}`,name:`Community module ${index + 1}`,reviewRating:index===0?{average:4.3,total:12}:index===1?{average:0,total:0}:null,authorDiscordId:index===0?'test-user':authorId,isOfficial:index===0,creatorIsVerified:index===1}));
   const authorRequests: string[] = [];
   await page.route('**/api/dashboard/marketplace',route=>route.fulfill({json:{modules,installTargets:[]}}));
   await page.route('**/api/discord/user?*',route=>{
@@ -1312,6 +1312,12 @@ test("marketplace preview cards fit three across on laptops and desktops", async
     const grid = page.locator('[data-slot="marketplace-grid"]');
     const cards = grid.locator('[data-slot="card"]');
     await expect(cards).toHaveCount(6);
+    await expect(cards.first().getByRole('img',{name:'4.3 out of 5 stars'})).toBeVisible();
+    await expect(cards.first().getByText('4.3 (12)',{exact:true})).toBeVisible();
+    await expect(cards.nth(1).getByText('No reviews yet',{exact:true})).toBeVisible();
+    await expect(cards.nth(2).getByText('Rating unavailable',{exact:true})).toBeVisible();
+    await expect(cards.first().getByRole('radio')).toHaveCount(0);
+
     await expect(cards.first().getByText('Yours',{exact:true})).toBeVisible();
     await expect(cards.nth(1).getByText('Yours',{exact:true})).toHaveCount(0);
     await expect(cards.nth(1).getByText('CommunityBuilder',{exact:true})).toBeVisible();

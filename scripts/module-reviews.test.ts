@@ -163,3 +163,19 @@ test('posting and editing support the deployed non-null avatar schema and long c
     }
     assert.equal((await handlers.DELETE(request('DELETE'),moduleId)).status,200);
 });
+
+test('catalog rating aggregates are scoped, accurate, and service-role-only', async () => {
+    await db.exec(await readFile('supabase/migrations/20261025205315_marketplace_card_ratings.sql','utf8'));
+    await db.query("INSERT INTO public.addon_module_reviews(module_id,reviewer_discord_id,reviewer_name,rating,comment) VALUES($1,'one','One',4,'Good'),($1,'two','Two',5,'Great'),($2,'other','Other',1,'Other module')",[moduleId,otherModule]);
+    const result=await db.query<{module_id:string;average:string;total:number}>('SELECT * FROM public.module_catalog_ratings($1::uuid[])',[[moduleId]]);
+    assert.equal(result.rows.length,1);
+    assert.equal(result.rows[0].module_id,moduleId);
+    assert.equal(Number(result.rows[0].average),4.5);
+    assert.equal(Number(result.rows[0].total),2);
+    assert.equal((await db.query('SELECT * FROM public.module_catalog_ratings(ARRAY[]::uuid[])')).rows.length,0);
+    for(const role of ['anon','authenticated']) {
+        await db.exec(`SET ROLE ${role}`);
+        try { await assert.rejects(db.query('SELECT * FROM public.module_catalog_ratings($1::uuid[])',[[moduleId]])); }
+        finally { await db.exec('RESET ROLE'); }
+    }
+});

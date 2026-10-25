@@ -161,4 +161,6 @@ Before deploying product reviews, apply `supabase/migrations/20261025193540_modu
 
 Reviews are readable for published modules and for a creator’s own unpublished modules. Publishing or editing a review requires owning the module or managing a visible server with that module installed. Each Discord account has one editable rating/comment per module and can remove its own review after losing installer access. The API derives reviewer identity from the authenticated session; direct anonymous/authenticated database access to the review table and summary RPC is revoked.
 
+Apply `supabase/migrations/20261025205315_marketplace_card_ratings.sql` for batched average ratings on marketplace cards.
+
 Run `npm run test:module-reviews` for the actual migration, API authorization, rating/length constraints, averages, pagination, and grants against isolated PostgreSQL (PGlite).

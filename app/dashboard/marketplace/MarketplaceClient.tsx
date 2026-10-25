@@ -41,6 +41,7 @@ interface ModuleConfigField {
 }
 
 interface MarketplaceModule {
+    reviewRating?: { average: number; total: number } | null;
     id: string;
     slug: string;
     name: string;
@@ -122,6 +123,12 @@ function MarketplaceModuleCard({ addon, creator, owned }: { addon: MarketplaceMo
                 {addon.status !== 'PUBLISHED' && <Status variant={statusVariant(addon.status)} className="px-2 py-0.5"><StatusLabel>{statusLabel(addon.status)}</StatusLabel></Status>}
             </div>
             <CardDescription className="line-clamp-2 min-h-10 text-xs leading-5">{addon.description || 'No description provided.'}</CardDescription>
+            <div data-slot="module-card-rating" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                {addon.reviewRating ? <>
+                    <ReviewRating readOnly value={addon.reviewRating.average} label={`${addon.reviewRating.average.toFixed(1)} out of 5 stars`} />
+                    <span>{addon.reviewRating.total > 0 ? `${addon.reviewRating.average.toFixed(1)} (${addon.reviewRating.total})` : 'No reviews yet'}</span>
+                </> : <span>Rating unavailable</span>}
+            </div>
         </CardHeader>
         <CardFooter className="mt-auto gap-2 border-t border-border px-3 py-2">
             <div className="flex min-w-0 flex-1 items-center gap-2">

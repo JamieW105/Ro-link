@@ -22,7 +22,7 @@ interface ReviewData {
     hasMore: boolean;
 }
 export function ReviewRating({ value, label, readOnly = false, disabled = false, onValueChange }: { value: number; label: string; readOnly?: boolean; disabled?: boolean; onValueChange?: (value: number) => void }) {
-    return <Rating {...(readOnly ? { role: 'img' as const, tabIndex: -1 } : {})} value={value} onValueChange={onValueChange} readOnly={readOnly} disabled={disabled} aria-label={label} className="text-amber-600 dark:text-amber-400" size="sm">
+    return <Rating {...(readOnly ? { role: 'img' as const, tabIndex: -1 } : {})} value={readOnly ? Math.round(value * 2) / 2 : value} step={readOnly ? 0.5 : 1} onValueChange={onValueChange} readOnly={readOnly} disabled={disabled} aria-label={label} className="text-amber-600 dark:text-amber-400" size="sm">
         {Array.from({ length: 5 }, (_, index) => <RatingItem key={index} index={index} aria-hidden={readOnly || undefined} aria-label={`${index + 1} star${index === 0 ? '' : 's'}`} />)}
     </Rating>;
 }

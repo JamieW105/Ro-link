@@ -16,6 +16,7 @@ import {
 import { applyVerifiedCreatorBadges } from '@/lib/moduleCreatorVerification';
 import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -176,10 +177,22 @@ export async function GET() {
         applyOfficialModuleLabels((data || []) as Record<string, unknown>[], staffDiscordIds),
     );
 
+    // Aggregate once for the authorized catalog; never fetch individual review rows.
+    const ratings = new Map<string, { average: number; total: number }>();
+    let ratingsAvailable = data?.length === 0;
+    if (data?.length && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        const { data: summaries, error: ratingsError } = await getSupabaseAdmin().rpc('module_catalog_ratings', { p_modules: data.map(row => row.id) });
+        ratingsAvailable = !ratingsError;
+        if (ratingsError) console.warn('[Marketplace ratings]', { code: ratingsError.code });
+        for (const summary of summaries || []) {
+            ratings.set(summary.module_id, { average: Number(summary.average), total: Number(summary.total) });
+        }
+    }
     return NextResponse.json({
         modules: labeledModules
             .map((row) => normalizeAddonModule(row, false))
-            .filter(Boolean),
+            .filter((addon): addon is NonNullable<typeof addon> => Boolean(addon))
+            .map(addon => ({ ...addon, reviewRating: ratingsAvailable ? ratings.get(addon.id) || { average: 0, total: 0 } : null })),
         installTargets,
     });
 }
