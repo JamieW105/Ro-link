@@ -189,6 +189,7 @@ type LivePanelUser = LivePlayer & {
     joinedAt?: number;
     leftAt?: number;
     sourceReason?: string;
+    connectedDiscordId?: string;
 };
 
 type EnrichedLiveServer = LiveServerRecord & {
@@ -395,7 +396,7 @@ function targetMatchScore(user: LivePanelUser, rawQuery: string) {
     if (username === query) return 0;
     if (username.startsWith(query)) return 1;
     if (username.includes(query)) return 2;
-    if (normalizeIdentity(user.userId) === query) return 3;
+    if (normalizeIdentity(user.userId) === query || normalizeIdentity(user.connectedDiscordId) === query) return 3;
     if (normalizeIdentity(user.displayName).includes(query)) return 4;
     // Roblox can return close matches that do not contain the literal query.
     if (user.presence === 'searched') return 5;
@@ -463,10 +464,17 @@ function useRobloxUserSuggestions(serverId: string, rawQuery: string, knownUsers
     }, []);
 
     useEffect(() => {
-        if (!ready || !serverId || query.length < 2 || useLocalMatches) return;
+        if (!ready || !serverId || query.length < 2) return;
         const controller = new AbortController();
         const timer = setTimeout(async () => {
             try {
+                const linkedParams = new URLSearchParams({ serverId, query });
+                const linkedResponse = await fetch(`/api/dashboard/linked-users?${linkedParams}`, { signal: controller.signal });
+                const linkedPayload = linkedResponse.ok ? await linkedResponse.json() : {};
+                const linkedUsers: LivePanelUser[] = (Array.isArray(linkedPayload.users) ? linkedPayload.users : [])
+                    .map((user: LivePanelUser) => ({ ...user, presence: 'searched' as const, serverId: null, sourceReason: 'Connected to Discord' }));
+                if (!controller.signal.aborted) setResult({ key, users: linkedUsers });
+                if (useLocalMatches || linkedUsers.length > 0 || controller.signal.aborted) return;
                 const params = new URLSearchParams({ serverId, type: 'player', source: 'roblox-users', query });
                 const response = await fetch(`/api/dashboard/modules/input-options?${params}`, { signal: controller.signal });
                 if (!response.ok) return;
@@ -498,10 +506,18 @@ function useRobloxUserSuggestions(serverId: string, rawQuery: string, knownUsers
 
     return useMemo(() => {
         const users = [...knownUsers];
-        if (!useLocalMatches && result.key === key) {
+        if (result.key === key) {
             for (const user of result.users) {
-                if (!users.some((known) => known.userId === user.userId
-                    || known.username.toLowerCase() === user.username.toLowerCase())) users.push(user);
+                const placeholderIndex = users.findIndex((known) => known.presence === 'history'
+                    && (known.username === user.connectedDiscordId || known.username === user.userId));
+                if (placeholderIndex >= 0 && user.connectedDiscordId) users.splice(placeholderIndex, 1);
+                const index = users.findIndex((known) => known.userId === user.userId
+                    || known.username.toLowerCase() === user.username.toLowerCase());
+                if (index < 0) users.push(user);
+                else if (user.connectedDiscordId) users[index] = {
+                    ...users[index], connectedDiscordId: user.connectedDiscordId,
+                    userId: users[index].userId || user.userId,
+                };
             }
         }
         const recentLogs = logs.filter((log) => {
@@ -513,7 +529,7 @@ function useRobloxUserSuggestions(serverId: string, rawQuery: string, knownUsers
             .sort((left, right) => Number(right.recent) - Number(left.recent))
             .slice(0, 5)
             .map(({ user }) => user);
-    }, [knownUsers, query, key, result, logs, now, useLocalMatches]);
+    }, [knownUsers, query, key, result, logs, now]);
 }
 
 function placeholderUser(identity: string, reason: string): LivePanelUser {
@@ -530,7 +546,7 @@ function placeholderUser(identity: string, reason: string): LivePanelUser {
 }
 
 function logIdentifiesUser(log: NormalizedDashboardLog, user: LivePanelUser) {
-    const identities = [user.username, user.userId].map(normalizeIdentity).filter(Boolean);
+    const identities = [user.username, user.userId, user.connectedDiscordId].map(normalizeIdentity).filter(Boolean);
     return [log.target, log.moderator, ...log.targetIdentities, ...log.moderatorIdentities]
         .some((value) => {
             const tokens: string[] = value.toLowerCase().match(/[a-z0-9_]+/g) || [];
@@ -1378,6 +1394,7 @@ export default function LivePanelPage() {
         const query = commandBarValue.trim().toLowerCase().replace(/^@/, '');
         const items: CommandBarSuggestion[] = [];
         const userReason = (user: LivePanelUser) => {
+            if (user.connectedDiscordId) return `${user.presence === 'live' ? 'In game · ' : ''}Connected to Discord`;
             const recentLog = logs.find((log) => logMentionsUser(log, user));
             if (user.presence === 'live') return user.joinedAt
                 ? `Joined ${formatTime(new Date(user.joinedAt).toISOString())} in ${formatServerId(user.serverId || '')}`
@@ -3121,6 +3138,7 @@ export default function LivePanelPage() {
                                             <span className="min-w-0 flex-1">
                                                 <span className="block truncate text-sm font-medium text-foreground">{user.displayName}</span>
                                                 <span className="block truncate text-xs font-medium text-muted-foreground">@{user.username}</span>
+                                                {user.connectedDiscordId && <span className="block text-xs text-muted-foreground">Connected to Discord</span>}
                                             </span>
                                             <span className="hidden shrink-0 rounded-lg border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground sm:block">
                                                 {reason}

@@ -1142,3 +1142,37 @@ test("Live Panel uses in-game identities without calling Roblox search", async (
   await expect.poll(() => queries).toEqual(['unknownuser']);
   expect(errors).toEqual([]);
 });
+
+test("Live Panel searches connected accounts before Roblox and labels the link", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  await page.route('**/api/dashboard/live-panel?**', route => route.fulfill({ json: {
+    server: { placeId: '1234' }, liveServers: [sampleServer], playerActivity: [], modulePanelCommands: [], pendingReports: [],
+    logs: [{ id: 'connected-log', action: 'STAFF_NOTE', target: '<@111222333>', moderator: 'Staff', timestamp: new Date(Date.now() - 60_000).toISOString() }],
+  } }));
+  await page.route('**/api/dashboard/linked-users?**', route => route.fulfill({ json: { users: [{
+    username: 'ConnectedJamie', displayName: 'ConnectedJamie', userId: '888777', connectedDiscordId: '111222333', avatarUrl: null,
+  }, { username: 'Connected', displayName: 'Connected', userId: '888999', connectedDiscordId: '444555666', avatarUrl: null }] } }));
+  const remoteQueries: string[] = [];
+  await page.route('**/api/dashboard/modules/input-options?**', route => {
+    remoteQueries.push(route.request().url());
+    return route.fulfill({ json: { options: [] } });
+  });
+  await page.goto(`/dashboard/${serverId}/live-panel`);
+  const profile = page.getByRole('textbox', { name: 'Search player profiles' });
+  await profile.fill('connected');
+  const result = profile.locator('..').getByRole('button').first();
+  await expect(result).toContainText('@ConnectedJamie');
+  await expect(result).toContainText('Connected to Discord');
+  await profile.fill('');
+  await page.getByRole('button', { name: 'Run Command', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  const command = dialog.getByRole('textbox', { name: 'Live command' });
+  await command.fill('Soft Ban 111222333');
+  const suggestion = dialog.getByRole('button').filter({ hasText: '@ConnectedJamie' });
+  await expect(suggestion).toContainText('Connected to Discord');
+  await suggestion.focus();
+  await page.keyboard.press('Enter');
+  await expect(command).toHaveValue('Soft Ban ConnectedJamie');
+  expect(remoteQueries).toEqual([]);
+  expect(errors).toEqual([]);
+});
