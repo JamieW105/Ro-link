@@ -33,7 +33,7 @@ for(const theme of ['light','dark']) {
     const writes:Record<string,unknown>[]=[];
     await page.route('**/api/dashboard/creator/module-covers',async route=>{
       if(failUpload)return route.fulfill({status:503,json:{error:'Please retry your cover upload.'}});
-      const body=await new Response(route.request().postDataBuffer()!,{headers:{'Content-Type':route.request().headers()['content-type']}}).formData();
+      const body=await new Response(new Uint8Array(route.request().postDataBuffer()!),{headers:{'Content-Type':route.request().headers()['content-type']}}).formData();
       const file=body.get('file') as File;
       expect(file.size).toBeLessThanOrEqual(2*1024*1024);
       const bytes=Buffer.from(await file.arrayBuffer());
