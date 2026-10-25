@@ -148,3 +148,18 @@ test('repair preserves existing reviews and owner replies across both identity s
     assert.equal(rows.rows[0].owner_reply,'Keep reply');
     assert.equal((await (await handlers.GET(request(),moduleId)).json()).total,1);
 });
+
+test('posting and editing support the deployed non-null avatar schema and long comments', async () => {
+    await db.exec("UPDATE public.addon_module_reviews SET reviewer_avatar_url='' WHERE reviewer_avatar_url IS NULL; ALTER TABLE public.addon_module_reviews ALTER COLUMN reviewer_avatar_url SET NOT NULL; ALTER TABLE public.addon_module_reviews DROP CONSTRAINT addon_module_reviews_comment_check; ALTER TABLE public.addon_module_reviews ADD CONSTRAINT addon_module_reviews_comment_check CHECK(char_length(comment)<=1000);");
+    await db.exec(await readFile('supabase/migrations/20261025205020_module_review_write_compatibility.sql','utf8'));
+    managed=true;
+    for (const image of [null, '/api/discord/media?url=already-proxied', 'https://example.test/untrusted.png']) {
+        session={...session!,user:{...session!.user!,image}};
+        const response=await handlers.POST(request('POST',{rating:5,comment:'x'.repeat(2000)}),moduleId);
+        assert.equal(response.status,200);
+        const saved=await db.query<{reviewer_avatar_url:string;comment:string}>('SELECT reviewer_avatar_url,comment FROM public.addon_module_reviews');
+        assert.equal(saved.rows[0].reviewer_avatar_url,'');
+        assert.equal(saved.rows[0].comment.length,2000);
+    }
+    assert.equal((await handlers.DELETE(request('DELETE'),moduleId)).status,200);
+});

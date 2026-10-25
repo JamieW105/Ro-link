@@ -72,7 +72,7 @@ export function createModuleReviewHandlers(deps: ReviewDependencies) {
                 module_id: moduleId,
                 reviewer_discord_id: discordId,
                 reviewer_name: session.user?.name?.trim().slice(0, 100) || 'Discord member',
-                reviewer_avatar_url: getDiscordMediaProxyUrl(session.user?.image) || null,
+                reviewer_avatar_url: getDiscordMediaProxyUrl(session.user?.image),
                 rating: body.rating,
                 comment: body.comment,
                 updated_at: new Date().toISOString(),
