@@ -60,8 +60,10 @@ and management screens. This requirement applies to future feature changes too. 
   DropdownMenu for server/player actions, and Table for moderation activity.
   Marketplace cards and products use shared Card sections and Dice Status badges;
   configuration previews use Table. Marketplace listing cards use a 16:9 preview,
-  compact title/description, and creator/category footer. Keep at least three columns
-  at widths of 768px and above, with one column on phones and two on small tablets.
+  compact title/description, and creator/category footer. Use one column on phones, two on small tablets, and three from 768px.
+  From 1024px, use an adaptive grid with a 228px minimum card width and compact
+  spacing: four to five cards across on laptops, increasing with wider screens.
+  Let the listing use the available width; do not cap it at max-w-7xl.
   Product pages use a preview/about/configuration/reviews column and an install/creator
   sidebar. Use the official Dice Rating component for ratings. Review identity and
   creator/installer eligibility must be enforced by the API; never trust client-supplied

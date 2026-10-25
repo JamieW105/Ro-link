@@ -1295,11 +1295,11 @@ test("marketplace empty, unavailable, and missing-product states use shared card
 });
 
 
-test("marketplace preview cards fit three across on laptops and desktops", async ({ page }) => {
+test("marketplace preview cards fit four to five across on laptops and expand on wider screens", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = await mockDashboard(page);
   const authorId = '234567890123456789';
-  const modules = Array.from({length:6},(_,index)=>({...sampleModule,id:`preview-${index}`,slug:`preview-${index}`,name:`Community module ${index + 1}`,reviewRating:index===0?{average:4.3,total:12}:index===1?{average:0,total:0}:null,authorDiscordId:index===0?'test-user':authorId,isOfficial:index===0,creatorIsVerified:index===1}));
+  const modules = Array.from({length:12},(_,index)=>({...sampleModule,id:`preview-${index}`,slug:`preview-${index}`,name:`Community module ${index + 1}`,reviewRating:index===0?{average:4.3,total:12}:index===1?{average:0,total:0}:null,authorDiscordId:index===0?'test-user':authorId,isOfficial:index===0,creatorIsVerified:index===1}));
   const authorRequests: string[] = [];
   await page.route('**/api/dashboard/marketplace',route=>route.fulfill({json:{modules,installTargets:[]}}));
   await page.route('**/api/discord/user?*',route=>{
@@ -1311,7 +1311,7 @@ test("marketplace preview cards fit three across on laptops and desktops", async
     await page.goto('/dashboard/marketplace');
     const grid = page.locator('[data-slot="marketplace-grid"]');
     const cards = grid.locator('[data-slot="card"]');
-    await expect(cards).toHaveCount(6);
+    await expect(cards).toHaveCount(12);
     await expect(cards.first().getByRole('img',{name:'4.3 out of 5 stars'})).toBeVisible();
     await expect(cards.first().getByText('4.3 (12)',{exact:true})).toBeVisible();
     await expect(cards.nth(1).getByText('No reviews yet',{exact:true})).toBeVisible();
@@ -1323,11 +1323,15 @@ test("marketplace preview cards fit three across on laptops and desktops", async
     await expect(cards.nth(1).getByText('CommunityBuilder',{exact:true})).toBeVisible();
     await expect(cards.first().getByText('UI Tester',{exact:true})).toBeVisible();
     await expect(cards.first().getByText('Official',{exact:true})).toHaveAttribute('data-slot','status-label');
-    for (const width of [768,1024,1280,1440,1920]) {
+    for (const [width, expectedColumns] of [[640,2],[768,3],[1024,4],[1280,5],[1366,5],[1440,5],[1536,6],[1920,7],[2560,10]]) {
       await page.setViewportSize({width,height:900});
       const columns = await grid.evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
-      expect(columns).toBeGreaterThanOrEqual(3);
-      const row = await Promise.all([0,1,2].map(index=>cards.nth(index).boundingBox()));
+      expect(columns).toBe(expectedColumns);
+      const row = await Promise.all(Array.from({length:expectedColumns},(_,index)=>cards.nth(index).boundingBox()));
+      if(width>=1024) {
+        expect(row[0]!.width).toBeLessThan(270);
+        expect(row[0]!.height).toBeLessThan(380);
+      }
       expect(Math.max(...row.map(box=>box!.y))-Math.min(...row.map(box=>box!.y))).toBeLessThan(1);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     }

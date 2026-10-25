@@ -112,9 +112,9 @@ function MarketplaceModuleCard({ addon, creator, owned }: { addon: MarketplaceMo
     return <Card aria-label={addon.name} className="flex min-w-0 flex-col overflow-hidden">
         <div data-slot="module-preview" className="relative aspect-video border-b border-border bg-background">
             {owned && <Status className="absolute left-3 top-3 rounded-md border-border bg-background px-2 py-0.5"><StatusLabel>Yours</StatusLabel></Status>}
-            {(addon.isOfficial || addon.creatorIsVerified) && <Status variant={addon.isOfficial ? 'default' : 'info'} className="absolute -bottom-3 left-4 rounded-md border-border bg-card px-2 py-1 shadow-sm"><StatusLabel>{addon.isOfficial ? 'Official' : 'Verified creator'}</StatusLabel></Status>}
+            {(addon.isOfficial || addon.creatorIsVerified) && <Status variant={addon.isOfficial ? 'default' : 'info'} className="absolute -bottom-3 left-3 rounded-md border-border bg-card px-2 py-1 shadow-sm"><StatusLabel>{addon.isOfficial ? 'Official' : 'Verified creator'}</StatusLabel></Status>}
         </div>
-        <CardHeader className="gap-2 px-4 pb-4 pt-6">
+        <CardHeader className="gap-1.5 px-3 pb-3 pt-5">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                 <CardTitle className="min-w-0 break-words text-sm leading-snug"><Link href={href} className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{addon.name}</Link></CardTitle>
                 {addon.isOfficial && <Image src="/Media/Ro-LinkIcon.png" alt="Ro-Link official module" width={16} height={16} className="size-4 shrink-0" />}
@@ -122,7 +122,7 @@ function MarketplaceModuleCard({ addon, creator, owned }: { addon: MarketplaceMo
                 <span className="text-xs text-muted-foreground">v{addon.version}</span>
                 {addon.status !== 'PUBLISHED' && <Status variant={statusVariant(addon.status)} className="px-2 py-0.5"><StatusLabel>{statusLabel(addon.status)}</StatusLabel></Status>}
             </div>
-            <CardDescription className="line-clamp-2 min-h-10 text-xs leading-5">{addon.description || 'No description provided.'}</CardDescription>
+            <CardDescription className="line-clamp-2 min-h-8 text-xs leading-4">{addon.description || 'No description provided.'}</CardDescription>
             <div data-slot="module-card-rating" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                 {addon.reviewRating ? <>
                     <ReviewRating readOnly value={addon.reviewRating.average} label={`${addon.reviewRating.average.toFixed(1)} out of 5 stars`} />
@@ -135,7 +135,7 @@ function MarketplaceModuleCard({ addon, creator, owned }: { addon: MarketplaceMo
                 <CreatorAvatar key={creator?.avatar_url || addon.authorDiscordId} creator={creator} />
                 <span className="truncate text-xs font-medium" title={creator?.username || undefined}>{creator?.username || (addon.isOfficial ? 'Ro-Link' : 'Community creator')}</span>
             </div>
-            <span className="max-w-20 truncate text-xs text-muted-foreground" title={addon.category}>{addon.category}</span>
+            <span className="max-w-14 truncate text-xs text-muted-foreground" title={addon.category}>{addon.category}</span>
             <span aria-label={`${fieldCount} configuration fields`} title="Configuration fields" className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><SlidersHorizontal className="size-3.5" aria-hidden="true" />{fieldCount}</span>
             <Button asChild variant="ghost" size="icon" className="size-7 shrink-0"><Link href={href} aria-label={`View ${addon.name}`}><ArrowRight className="size-4" aria-hidden="true" /></Link></Button>
         </CardFooter>
@@ -420,7 +420,7 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
                 </div>
             </DashboardHeader>
 
-            <main className={`mx-auto w-full ${productView ? 'max-w-5xl' : 'max-w-7xl'} px-4 py-6 sm:px-8 sm:py-8`}>
+            <main className={`mx-auto w-full ${productView ? 'max-w-5xl' : 'max-w-none'} px-4 py-6 sm:px-8 sm:py-8`}>
                 {!productView && <>
                     <header className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
                         <div>
@@ -458,7 +458,7 @@ export default function MarketplaceClient({ moduleSlug }: { moduleSlug?: string 
                             <CardDescription>{modules.length ? 'Try another search or category.' : 'There are no modules available to browse yet.'}</CardDescription>
                         </CardHeader>{modules.length > 0 && <CardFooter><Button type="button" variant="outline" size="sm" onClick={() => { setSearch(''); setCategory('all'); }}>Reset filters</Button></CardFooter>}</Card>
                     ) : (
-                        <div data-slot="marketplace-grid" className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                        <div data-slot="marketplace-grid" className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[repeat(auto-fill,minmax(228px,1fr))]">
                             {filteredModules.map(addon => <MarketplaceModuleCard
                                 key={addon.id}
                                 addon={addon}
