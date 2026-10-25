@@ -450,10 +450,12 @@ function rankTargetUsers(users: LivePanelUser[], query: string) {
         .map(({ user }) => user);
 }
 
-function useRobloxUserSuggestions(serverId: string, rawQuery: string, knownUsers: LivePanelUser[], logs: NormalizedDashboardLog[]) {
+function useRobloxUserSuggestions(serverId: string, rawQuery: string, knownUsers: LivePanelUser[], logs: NormalizedDashboardLog[], ready: boolean) {
     const query = rawQuery.trim().toLowerCase().replace(/^@/, '').split(/\s+/)[0] || '';
     const [result, setResult] = useState<{ key: string; users: LivePanelUser[] }>({ key: '', users: [] });
     const key = `${serverId}:${query}`;
+    const localMatches = useMemo(() => rankTargetUsers(knownUsers, query), [knownUsers, query]);
+    const useLocalMatches = localMatches.some((user) => user.presence === 'live') || localMatches.length >= 5;
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
         const timer = setInterval(() => setNow(Date.now()), 10_000);
@@ -461,7 +463,7 @@ function useRobloxUserSuggestions(serverId: string, rawQuery: string, knownUsers
     }, []);
 
     useEffect(() => {
-        if (!serverId || query.length < 2) return;
+        if (!ready || !serverId || query.length < 2 || useLocalMatches) return;
         const controller = new AbortController();
         const timer = setTimeout(async () => {
             try {
@@ -492,11 +494,11 @@ function useRobloxUserSuggestions(serverId: string, rawQuery: string, knownUsers
             clearTimeout(timer);
             controller.abort();
         };
-    }, [serverId, query, key]);
+    }, [serverId, query, key, useLocalMatches, ready]);
 
     return useMemo(() => {
         const users = [...knownUsers];
-        if (result.key === key) {
+        if (!useLocalMatches && result.key === key) {
             for (const user of result.users) {
                 if (!users.some((known) => known.userId === user.userId
                     || known.username.toLowerCase() === user.username.toLowerCase())) users.push(user);
@@ -511,7 +513,7 @@ function useRobloxUserSuggestions(serverId: string, rawQuery: string, knownUsers
             .sort((left, right) => Number(right.recent) - Number(left.recent))
             .slice(0, 5)
             .map(({ user }) => user);
-    }, [knownUsers, query, key, result, logs, now]);
+    }, [knownUsers, query, key, result, logs, now, useLocalMatches]);
 }
 
 function placeholderUser(identity: string, reason: string): LivePanelUser {
@@ -1345,12 +1347,12 @@ export default function LivePanelPage() {
     const commandBarParsed = useMemo(() => (
         parseCommandBarInput(commandBarValue, availableCommands)
     ), [availableCommands, commandBarValue]);
-    const profileUserMatches = useRobloxUserSuggestions(guildId, profileSearch, allKnownUsers, logs);
+    const profileUserMatches = useRobloxUserSuggestions(guildId, profileSearch, allKnownUsers, logs, !loading);
     const commandUserQuery = commandBarParsed.command
         ? (commandBarParsed.command.requiresTarget || commandBarParsed.command.id === 'VIEW'
             ? commandBarParsed.remainder : '')
         : commandBarValue;
-    const commandUserMatches = useRobloxUserSuggestions(guildId, commandUserQuery, allKnownUsers, logs);
+    const commandUserMatches = useRobloxUserSuggestions(guildId, commandUserQuery, allKnownUsers, logs, !loading);
 
     const suggestions = useMemo(() => {
         const query = profileSearch.trim().toLowerCase();

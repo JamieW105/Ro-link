@@ -1105,3 +1105,40 @@ test("Live Panel searches Roblox as users type and limits both lists to five mat
   expect(queries).not.toContain('soft');
   expect(errors).toEqual([]);
 });
+
+test("Live Panel uses in-game identities without calling Roblox search", async ({ page }) => {
+  const errors = await mockDashboard(page);
+  const inGameServer = { ...sampleServer, updated_at: new Date().toISOString(), players: [
+    { username: 'InGameJamie', displayName: 'Jamie Display', userId: '9876543' },
+  ] };
+  await page.route('**/api/dashboard/live-servers?**', route => route.fulfill({ json: [inGameServer] }));
+  await page.route('**/api/dashboard/live-panel?**', route => route.fulfill({ json: {
+    server: { placeId: '1234' },
+    liveServers: [inGameServer],
+    playerActivity: [], modulePanelCommands: [], logs: [], pendingReports: [],
+  } }));
+  const queries: string[] = [];
+  await page.route('**/api/dashboard/modules/input-options?**', route => {
+    queries.push(new URL(route.request().url()).searchParams.get('query')!);
+    return route.fulfill({ json: { options: [] } });
+  });
+  await page.goto(`/dashboard/${serverId}/live-panel`);
+  const profile = page.getByRole('textbox', { name: 'Search player profiles' });
+  await expect(page.getByRole('button', { name: 'Run Command', exact: true })).toBeVisible();
+  await profile.fill('ingame');
+  await expect(profile.locator('..').getByRole('button')).toContainText('@InGameJamie');
+  await page.waitForTimeout(500);
+  expect(queries).toEqual([]);
+  await profile.fill('');
+  await page.getByRole('button', { name: 'Run Command', exact: true }).click();
+  const command = page.getByRole('dialog').getByRole('textbox', { name: 'Live command' });
+  for (const query of ['ingame', 'InGameJamie', '9876543', 'Jamie Display']) {
+    await command.fill(`Soft Ban ${query}`);
+    await expect(page.getByRole('dialog').getByRole('button').filter({ hasText: '@InGameJamie' })).toBeVisible();
+    await page.waitForTimeout(500);
+    expect(queries).toEqual([]);
+  }
+  await command.fill('Soft Ban unknownuser');
+  await expect.poll(() => queries).toEqual(['unknownuser']);
+  expect(errors).toEqual([]);
+});
