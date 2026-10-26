@@ -110,3 +110,31 @@ Run `npm run typecheck`, `npm run lint`, and `npm run build` for UI migrations.
 Run the targeted browser checks with `npm run test:dashboard-ui` when changing
 shared dashboard controls. Report existing failures separately from regressions.
 Do not expose credentials in logs, screenshots, or test fixtures.
+
+## Compliance review — 27 October 2026 (PR #23)
+
+The review found and corrected these gaps in the Dice migration:
+
+| Flag | Required implementation |
+| --- | --- |
+| Management screens retained dark-only colors and custom controls | Keep the management shell, loading/access states, editors, and lists inside the local Dice theme. Use shared controls, Card structure, Stat metrics, Status labels, and Table configuration previews. |
+| Management navigation and overlays lacked the shared dashboard behavior | Keep the header/footer visible and scroll navigation/content independently. Mobile navigation, banner editing, and server removal use themed Dialog content with keyboard dismissal and focus handling. |
+| Browser popups interrupted actions; native moderation prompts continued after cancellation | Use `useDashboardFeedback` for confirmations, reason prompts, and notifications. A cancelled reason prompt must return before rejecting a module or blocking a creator. Await confirmation before sending a mutation; cancellation must send no request. Preserve existing purpose-built feature dialogs. |
+| Several fields lacked accessible names or explicit button intent | Label controls, preserve domain values through the shared searchable Select, and set button types explicitly. Use standard Button variants and sizing; multiline selection rows may grow to fit their content. |
+| Custom-module creation/reupload returned the wrong response value | Return the saved normalized custom module under `module`, retaining status codes, settings authorization, and source-code redaction. |
+| Runtime-log refresh could retain an outdated callback | Keep callback/effect dependencies current when the guild or runtime-log permission changes. |
+| UI tests still expected retired command buttons and raced repeated saves | Test role commands as Checkboxes, measure tick contrast against the checkbox surface, and await save completion before advancing the test clock. |
+
+Regression coverage includes `tests/dashboard-ui/management.spec.ts` for management
+screens in both themes, desktop/mobile layouts, labeled controls, permissions,
+confirmation cancellation, and banner submission. `npm run test:custom-modules`
+checks create/reupload response contracts and denied access using an isolated
+adapter, without writing to a live database. Run these alongside the existing
+validation commands above. When running separate Playwright processes, give each
+a distinct `--output` directory to avoid trace-file collisions.
+
+Remaining baseline flags: ESLint reports pre-existing unused bindings and native
+image optimization warnings in legacy API, bot, authentication, and image-rendering
+paths. These warnings are separate from Dice compliance and must not be hidden by
+disabling lint rules. Browser tests use mocked service responses; they do not
+certify live Discord/Roblox delivery or database policies.

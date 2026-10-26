@@ -1,4 +1,5 @@
 'use client';
+import { useDashboardFeedback } from '@/components/dashboard/DashboardFeedback';
 import { useSuccessNotice } from '@/hooks/use-success-notice';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
@@ -73,6 +74,7 @@ function formatCommandTarget(commandId: string) {
 }
 
 export default function DashboardPlayerPage() {
+    const { confirm } = useDashboardFeedback();
     const params = useParams();
     const perms = usePermissions();
 
@@ -230,7 +232,7 @@ export default function DashboardPlayerPage() {
             return;
         }
 
-        if (confirmMessage && !confirm(confirmMessage)) {
+        if (confirmMessage && !await confirm(confirmMessage)) {
             return;
         }
 

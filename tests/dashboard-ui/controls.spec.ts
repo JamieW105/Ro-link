@@ -806,11 +806,11 @@ test("workspace header displays the server name and icon with an initials fallba
 test("role command ticks contrast in light and dark modes", async ({ page }) => {
   const errors = await mockDashboard(page);
   await page.goto(`/dashboard/${serverId}/settings/roles`);
-  const command = page.getByRole('button', { name: 'Kick Remove a player from the live server.', exact: true });
-  await expect(command).toHaveAttribute('aria-pressed', 'false');
+  const command = page.getByRole('checkbox', { name: 'Kick', exact: true });
+  await expect(command).not.toBeChecked();
   await command.focus();
   await page.keyboard.press('Space');
-  await expect(command).toHaveAttribute('aria-pressed', 'true');
+  await expect(command).toBeChecked();
   for (const theme of ['light', 'dark']) {
     const toggle = page.getByRole('button', { name: `Switch to ${theme} mode`, exact: true });
     if (await toggle.count()) await toggle.click();
@@ -826,13 +826,13 @@ test("role command ticks contrast in light and dark modes", async ({ page }) => 
         return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
       };
       const tick = luminance(getComputedStyle(icon).color);
-      const box = luminance(getComputedStyle(icon.parentElement!).backgroundColor);
+      const box = luminance(getComputedStyle(icon.closest('[role=checkbox]')!).backgroundColor);
       if (tick === box) throw new Error(JSON.stringify({tick:getComputedStyle(icon).color,box:getComputedStyle(icon.parentElement!).backgroundColor}));
       return (Math.max(tick, box) + 0.05) / (Math.min(tick, box) + 0.05);
     })).toBeGreaterThanOrEqual(3);
   }
   await command.click();
-  await expect(command).toHaveAttribute('aria-pressed', 'false');
+  await expect(command).not.toBeChecked();
   await expect(command.locator('svg')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -890,13 +890,19 @@ test('save confirmations expire after three seconds and errors remain visible', 
   await expect(save).toBeEnabled();
   await page.clock.install();
   await page.clock.pauseAt(new Date());
+  const saved = page.waitForResponse(response => response.url().includes('/api/dashboard/staff-shifts/settings') && response.request().method() === 'PATCH');
   await save.click();
+  await saved;
+  await expect(save).toBeEnabled();
   const confirmation = page.getByRole('status');
   await expect(confirmation).toHaveText('Shift settings saved.');
   await page.clock.runFor(2999);
   await expect(confirmation).toBeVisible();
-  // Repeating the same message starts a fresh timer.
+  // Await the second save before advancing the paused clock for its new timer.
+  const savedAgain = page.waitForResponse(response => response.url().includes('/api/dashboard/staff-shifts/settings') && response.request().method() === 'PATCH');
   await save.click();
+  await savedAgain;
+  await expect(save).toBeEnabled();
   await page.clock.runFor(1);
   await expect(confirmation).toBeVisible();
   await page.clock.runFor(2999);

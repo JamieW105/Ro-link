@@ -15,7 +15,8 @@
     "test:dashboard-ui": "playwright test",
     "test:staff-shifts": "tsx --test scripts/staff-shifts.test.ts",
     "test:module-reviews": "tsx --test scripts/module-reviews.test.ts",
-    "test:module-covers": "tsx --test scripts/module-covers.test.ts"
+    "test:module-covers": "tsx --test scripts/module-covers.test.ts",
+    "test:custom-modules": "tsx --test scripts/custom-modules.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

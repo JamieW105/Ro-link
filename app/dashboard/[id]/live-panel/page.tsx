@@ -1713,7 +1713,7 @@ export default function LivePanelPage() {
         }
     }
 
-    async function openRuntimeLogs(jobId: string, user: LivePanelUser | null = null, isRefresh = false) {
+    const openRuntimeLogs = useCallback(async (jobId: string, user: LivePanelUser | null = null, isRefresh = false) => {
         if (!canViewRuntimeLogs) {
             setContextMenu(null);
             setNotice({ type: 'error', text: 'You do not have permission to view in-game console logs.' });
@@ -1744,7 +1744,7 @@ export default function LivePanelPage() {
         } finally {
             if (!isRefresh) setRuntimeLogsLoading(false);
         }
-    }
+    }, [canViewRuntimeLogs, guildId, setNotice]);
 
     useEffect(() => {
         if (rightPaneMode !== 'runtime-logs' || !runtimeLogTarget) {
@@ -1765,7 +1765,7 @@ export default function LivePanelPage() {
             window.clearInterval(interval);
             window.removeEventListener('keydown', onEscape);
         };
-    }, [rightPaneMode, runtimeLogTarget]);
+    }, [rightPaneMode, runtimeLogTarget, openRuntimeLogs]);
 
     function openPlayerMessage(user: LivePanelUser) {
         setContextMenu(null);

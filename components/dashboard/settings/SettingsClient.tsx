@@ -1,4 +1,5 @@
 'use client';
+import { useDashboardFeedback } from '@/components/dashboard/DashboardFeedback';
 import { useSuccessNotice } from '@/hooks/use-success-notice';
 import { PageIcon } from "@/components/dashboard/PageIcon";
 
@@ -242,6 +243,7 @@ function getComparableSettingsForView(settings: SavedSettingsSnapshot, view: Set
 }
 
 export default function SettingsClient({ view = 'overview' }: SettingsClientProps) {
+    const { notify } = useDashboardFeedback();
     const { id } = useParams();
     const { data: session } = useSession();
     const router = useRouter();
@@ -609,11 +611,11 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
         if (!selectedRoleForAdd) return;
         setAddingRole(true);
         const role = discordRoles.find(r => r.id === selectedRoleForAdd);
-        if (!role) return;
+        if (!role) { setAddingRole(false); return; }
 
         // Check if already exists
         if (dashboardRoles.some(r => r.discord_role_id === role.id)) {
-            alert("Role already configured!");
+            notify("Role already configured!");
             setAddingRole(false);
             return;
         }
@@ -652,7 +654,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
                 setDashboardRoles([...dashboardRoles, newRole]);
                 setSelectedRoleForAdd("");
             } else {
-                alert("Failed to add role");
+                notify("Failed to add role");
             }
         } catch (e) {
             console.error(e);
@@ -752,7 +754,7 @@ export default function SettingsClient({ view = 'overview' }: SettingsClientProp
             }
 
             if (payload.warning) {
-                alert(String(payload.warning));
+                notify(String(payload.warning));
             }
 
             router.push('/dashboard');
