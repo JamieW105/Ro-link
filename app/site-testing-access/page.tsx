@@ -1,10 +1,12 @@
+import { Card } from "@/components/ui/card";
+import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import Image from 'next/image';
 
 export default function SiteTestingAccessPage() {
     return (
-        <main className="flex min-h-screen items-center justify-center bg-[#020617] px-6 py-12 text-white">
-            <section className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-950/90 p-8 text-center shadow-2xl shadow-black/40">
+        <main className="flex min-h-screen items-center justify-center bg-background px-6 py-12 text-foreground">
+            <Card className="w-full max-w-md rounded-xl border border-border bg-card p-8 text-center shadow-sm">
                 <Image
                     src="/Media/Ro-LinkIcon.png"
                     alt="Ro-Link"
@@ -13,16 +15,16 @@ export default function SiteTestingAccessPage() {
                     className="mx-auto rounded-xl object-contain"
                 />
                 <h1 className="mt-6 text-2xl font-bold tracking-tight">Site testing access required</h1>
-                <p className="mt-3 text-sm leading-6 text-slate-400">
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">
                     Your Discord account is signed in, but it does not have permission to view the rolink.site testing environment.
                 </p>
-                <Link
+                <Button asChild className="mt-7"><Link
                     href="/auth/signin"
-                    className="mt-7 inline-flex h-11 items-center justify-center rounded-lg bg-sky-600 px-5 text-sm font-bold text-white transition hover:bg-sky-500"
+
                 >
                     Sign in with another account
-                </Link>
-            </section>
+                </Link></Button>
+            </Card>
         </main>
     );
 }

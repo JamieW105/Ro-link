@@ -3,7 +3,7 @@
 ## UI library for every feature change
 
 Use [Dice UI](https://diceui.com/) for all new or changed feature UI, including
-server dashboards, settings, live panels, modules, marketplace, custom dashboards,
+public pages, documentation, authentication, server dashboards, settings, live panels, modules, marketplace, custom dashboards,
 and management screens. This requirement applies to future feature changes too. Marketplace modules must have real product pages at
 `/dashboard/marketplace/[moduleSlug]`; preserve deep links and the installation flow.
 
@@ -80,6 +80,21 @@ and management screens. This requirement applies to future feature changes too. 
   Switch and Checkbox controls, including disabled server-limit states.
   Specialized native inputs (color, number, file, etc.) may use the shared Input;
   do not replace domain behavior merely to change presentation.
+
+## Public pages
+
+Use `PublicThemeGate` with the same local Dice palette and persistent ThemeToggle
+for public routes. Keep the public header, footer, notices, documentation, sign-in,
+Studio connection, verification, reports, careers, posts, and policy pages readable
+in both themes. Preserve public content, links, authentication callbacks, forms,
+validation, and custom-dashboard branding. Use shared Dice controls and Card panels;
+`app/public-theme.css` is for public layout and typography, not alternate component
+skins. Do not restore the old fixed dark palette, blue gradients, rotating hero
+backgrounds, bespoke dropdowns, or custom search overlays. Documentation search uses
+the shared Dialog, and its data tables use the shared Table components.
+Run `npm run test:dashboard-ui -- public.spec.ts` for public UI changes. The suite
+checks both themes on desktop/mobile, public navigation, documentation search,
+and report, appeal, and career form payloads using mocked service responses.
 
 ## Dashboard navigation
 

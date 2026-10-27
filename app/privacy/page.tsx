@@ -1,7 +1,5 @@
 'use client';
 
-import Link from 'next/link';
-
 import { PublicPolicyPage, PublicPolicySection } from '@/components/public/PublicPolicyPage';
 
 const SUPPORT_URL = 'https://discord.gg/C3n4nAwYMw';
@@ -24,7 +22,7 @@ export default function PrivacyPage() {
                     </Section>
 
                     <Section number="2" title="Information We Collect">
-                        <ul className="list-disc list-inside space-y-2 pl-4 text-slate-400">
+                        <ul className="list-disc list-inside space-y-2 pl-4 text-muted-foreground">
                             <li><b>Discord account and server information:</b> Discord user ID, username, avatar hash, OAuth access and refresh tokens, guild IDs, role IDs, channel IDs, and server configuration provided by administrators.</li>
                             <li><b>Roblox information:</b> Roblox user ID, username, display name, place and universe IDs, server/job IDs, and account-linking information.</li>
                             <li><b>Service and moderation data:</b> commands, action logs, reports, reasons, dashboard configuration, player-presence events, runtime diagnostics, and related metadata needed to run, secure, support, or moderate the Services.</li>
@@ -48,7 +46,7 @@ export default function PrivacyPage() {
 
                     <Section number="6" title="Sharing and Subprocessors">
                         <p>We share information only as needed to provide the Services, including with these service providers and platforms:</p>
-                        <ul className="list-disc list-inside space-y-2 pl-4 text-slate-400">
+                        <ul className="list-disc list-inside space-y-2 pl-4 text-muted-foreground">
                             <li><b>Discord</b>, for sign-in, bot operation, messages, server administration, and support.</li>
                             <li><b>Roblox</b>, for account linking, game integration, and commands or data needed by the connected experience.</li>
                             <li><b>Supabase</b>, for database and related backend services. Our production database is hosted in Singapore.</li>
@@ -62,7 +60,7 @@ export default function PrivacyPage() {
                     </Section>
 
                     <Section number="8" title="Retention">
-                        <ul className="list-disc list-inside space-y-2 pl-4 text-slate-400">
+                        <ul className="list-disc list-inside space-y-2 pl-4 text-muted-foreground">
                             <li>Account and account-link data are retained unless you request deletion.</li>
                             <li>Discord OAuth tokens are retained locally as part of the authenticated service session until the associated user data is deleted.</li>
                             <li>Moderation and action logs are deleted with the associated user data.</li>
@@ -77,7 +75,7 @@ export default function PrivacyPage() {
 
                     <Section number="9" title="Your Privacy Rights">
                         <p>Depending on where you live, you may have rights to ask for access to, correction of, deletion of, or restriction of the processing of your personal information; to object to certain processing; to withdraw consent; or to complain to a privacy regulator. New Zealand users may make requests under the Privacy Act 2020. United States residents, including California residents, may have additional rights under applicable state law.</p>
-                        <p>Ro-Link does not provide a self-service data export. You can request access, correction, deletion, or other privacy assistance through our <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="text-sky-400 hover:text-sky-300 font-bold">Support Server</a>. We may need to verify your identity before acting on a request. You may also complain to the Office of the Privacy Commissioner in New Zealand or your local privacy regulator.</p>
+                        <p>Ro-Link does not provide a self-service data export. You can request access, correction, deletion, or other privacy assistance through our <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="text-foreground hover:text-foreground font-bold">Support Server</a>. We may need to verify your identity before acting on a request. You may also complain to the Office of the Privacy Commissioner in New Zealand or your local privacy regulator.</p>
                     </Section>
 
                     <Section number="10" title="Children and Minors">
@@ -90,7 +88,7 @@ export default function PrivacyPage() {
 
                     <Section number="12" title="Changes and Contact">
                         <p>We may update this notice to reflect changes to our Services or legal obligations. We will post the revised version here and update the effective date.</p>
-                        <p>For privacy requests, questions, or formal privacy notices, contact Ro-Link through the <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="text-sky-400 hover:text-sky-300 font-bold">Ro-Link Support Server</a>.</p>
+                        <p>For privacy requests, questions, or formal privacy notices, contact Ro-Link through the <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="text-foreground hover:text-foreground font-bold">Ro-Link Support Server</a>.</p>
                     </Section>
         </PublicPolicyPage>
     );

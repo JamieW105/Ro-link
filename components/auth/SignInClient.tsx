@@ -1,5 +1,8 @@
 'use client';
+import { Status } from '@/components/ui/status';
 
+import { Card } from "@/components/ui/card";
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 
@@ -59,33 +62,31 @@ export default function SignInClient({ callbackUrl, error, authOrigin, allowRoot
     }
 
     return (
-        <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#020617] px-6 py-12 text-white">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(14,165,233,0.22),transparent_34%),linear-gradient(180deg,rgba(15,23,42,0)_0%,#020617_72%)]" />
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-400/50 to-transparent" />
+        <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-6 py-12 text-foreground">
 
-            <section className="relative w-full max-w-[440px] rounded-xl border border-slate-800 bg-slate-950/90 p-8 shadow-2xl shadow-black/40">
+            <Card className="relative w-full max-w-[440px] rounded-xl border border-border bg-card p-8 shadow-sm">
                 <div className="mb-7 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="h-11 w-11 rounded-lg object-contain" />
+                        <Image src="/Media/Ro-LinkIcon.png" alt="Ro-Link" width={44} height={44} className="size-11 rounded-lg object-contain" />
                         <div>
-                            <p className="text-sm font-semibold text-slate-400">Ro-Link</p>
+                            <p className="text-sm font-semibold text-muted-foreground">Ro-Link</p>
                             <h1 className="text-xl font-bold tracking-tight">Sign in to continue</h1>
                         </div>
                     </div>
-                    <div className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs font-semibold text-slate-400">
+                    <div className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
                         Secure
                     </div>
                 </div>
 
-                <div className="mb-6 rounded-lg border border-slate-800 bg-slate-900/70 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Destination</p>
-                    <p className="mt-1 truncate text-sm font-semibold text-slate-200">{destination}</p>
-                </div>
+                <Card className="mb-6 rounded-lg border border-border bg-card p-4">
+                    <p className="text-xs font-semibold text-muted-foreground">Destination</p>
+                    <p className="mt-1 truncate text-sm font-semibold text-foreground">{destination}</p>
+                </Card>
 
                 {error || hasRequestError || !discordConfigured ? (
-                    <div role="alert" className="mb-5 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                    <Status variant="error" role="alert" className="w-full whitespace-normal rounded-md p-4 text-sm leading-7">
                         {errorMessage}
-                    </div>
+                    </Status>
                 ) : null}
 
                 <Button
@@ -94,16 +95,16 @@ export default function SignInClient({ callbackUrl, error, authOrigin, allowRoot
                     type="button"
                     onClick={handleDiscordSignIn}
                     disabled={isSigningIn || !discordConfigured}
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#5865F2] px-5 text-sm font-bold text-white transition hover:bg-[#4752C4] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="flex w-full items-center justify-center gap-2 px-5 text-sm transition disabled:cursor-not-allowed disabled:opacity-70"
                 >
                     <LogIn aria-hidden="true" className="h-5 w-5" />
                     {isSigningIn ? 'Opening Discord...' : 'Sign in with Discord'}
                 </Button>
 
-                <p className="mt-5 text-center text-xs leading-5 text-slate-500">
+                <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
                     Ro-Link uses Discord to verify your account and dashboard access.
                 </p>
-            </section>
+            </Card>
         </main>
     );
 }

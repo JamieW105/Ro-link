@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./public-theme.css";
 import NextAuthProvider from "./providers";
+import { PublicThemeGate } from "@/components/public/PublicThemeGate";
 import { PublicHeaderGate } from "@/components/public/PublicHeaderGate";
 import { SiteBannerGate } from "@/components/SiteBannerGate";
 import { DgsuAppealRedirect } from "@/components/DgsuAppealRedirect";
@@ -50,9 +51,11 @@ export default function RootLayout({
       <body>
         <NextAuthProvider>
           <DgsuAppealRedirect />
-          <PublicHeaderGate />
-          <SiteBannerGate />
-          {children}
+          <PublicThemeGate>
+            <PublicHeaderGate />
+            <SiteBannerGate />
+            {children}
+          </PublicThemeGate>
         </NextAuthProvider>
       </body>
     </html>

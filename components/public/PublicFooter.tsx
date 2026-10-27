@@ -4,7 +4,7 @@ const STATUS_PAGE_URL = 'https://status.rolink.cloud';
 
 export function PublicFooter() {
     return (
-        <footer className="rl-public-footer">
+        <footer className="rl-public-footer text-sm text-muted-foreground">
             <div className="rl-footer-inner rl-shell">
                 <span>© {new Date().getFullYear()} Core Engine Solutions Management Group</span>
                 <div className="rl-footer-links">

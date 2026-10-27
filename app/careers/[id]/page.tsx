@@ -1,8 +1,15 @@
 'use client';
+import { PublicLoading } from '@/components/public/PublicLoading';
 
+import { Select } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Status } from "@/components/ui/status";
 import {
     ArrowLeft,
-    BriefcaseBusiness,
     Check,
     CircleCheck,
     Clock3,
@@ -16,7 +23,7 @@ import { use, useEffect, useState } from 'react';
 
 import { PublicFooter } from '@/components/public/PublicFooter';
 import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
-import { DiscordIcon } from '@/components/ui/DiscordIcon';
+import { LogIn as DiscordIcon } from 'lucide-react';
 
 interface Question {
     id: string;
@@ -116,6 +123,8 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
             return;
         }
 
+        const missing = job?.questions.find(question => question.required && question.type !== 'section' && (question.type === 'checkbox' ? answers[question.id] !== true : !String(answers[question.id] || '').trim()));
+        if (missing) { setSubmitError(`Please answer: ${missing.label}`); return; }
         setSubmitting(true);
         try {
             const response = await fetch(`/api/careers/${params.id}/submit`, {
@@ -145,7 +154,7 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
             <>
                 <main className="rl-public-page">
                     <section className="rl-utility-main rl-shell" aria-label="Loading application">
-                        <div className="rl-loading-line" />
+                        <PublicLoading />
                     </section>
                 </main>
                 <PublicFooter />
@@ -170,7 +179,7 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
                         </div>
                     </section>
                     <section className="rl-utility-main rl-shell">
-                        <Link className="rl-button" href="/careers"><ArrowLeft aria-hidden="true" />Back to careers</Link>
+                        <Button asChild variant="outline"><Link href="/careers"><ArrowLeft aria-hidden="true" />Back to careers</Link></Button>
                     </section>
                 </main>
                 <PublicFooter />
@@ -200,7 +209,7 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
                     </section>
 
                     <section className="rl-utility-main rl-shell">
-                        <div className="rl-application-status rl-surface">
+                        <Card className="rl-application-status rl-surface">
                             <span className="rl-application-status-icon"><CircleCheck aria-hidden="true" /></span>
                             <p className="rl-eyebrow">Submission complete</p>
                             <h2>{job.title}</h2>
@@ -208,11 +217,11 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
                                 Our team will review your answers and contact you through Discord if your application moves forward.
                             </p>
                             <div className="rl-application-status-actions">
-                                <Link className="rl-button rl-button-primary" href="/careers">
+                                <Button asChild variant="default"><Link href="/careers">
                                     <ArrowLeft aria-hidden="true" />Return to careers
-                                </Link>
+                                </Link></Button>
                             </div>
-                        </div>
+                        </Card>
                     </section>
                 </main>
                 <PublicFooter />
@@ -245,14 +254,14 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
                     <Link className="rl-back-link" href="/careers"><ArrowLeft aria-hidden="true" />All positions</Link>
 
                     <div className="rl-utility-grid">
-                        <section className="rl-surface" aria-labelledby="application-form-title">
-                            <div className="rl-surface-header">
+                        <Card className="rl-surface" aria-labelledby="application-form-title">
+                            <CardHeader className="rl-surface-header">
                                 <div>
-                                    <h2 id="application-form-title">Application form</h2>
-                                    <p>Required questions are marked with an asterisk.</p>
+                                    <CardTitle id="application-form-title">Application form</CardTitle>
+                                    <CardDescription>Required questions are marked with an asterisk.</CardDescription>
                                 </div>
-                                <span className="rl-surface-icon"><BriefcaseBusiness aria-hidden="true" /></span>
-                            </div>
+
+                            </CardHeader>
 
                             <form className="rl-surface-body" onSubmit={handleSubmit}>
                                 <div className="rl-application-summary">
@@ -279,7 +288,7 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
                                             </label>
 
                                             {question.type === 'short_answer' && (
-                                                <input
+                                                <Input
                                                     className="rl-field"
                                                     id={`application-${question.id}`}
                                                     type="text"
@@ -290,7 +299,7 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
                                             )}
 
                                             {question.type === 'long_answer' && (
-                                                <textarea
+                                                <Textarea
                                                     className="rl-textarea rl-application-textarea"
                                                     id={`application-${question.id}`}
                                                     required={question.required}
@@ -300,29 +309,15 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
                                             )}
 
                                             {question.type === 'multi_choice' && (
-                                                <div className="rl-option-list" id={`application-${question.id}`}>
-                                                    {question.options?.map((option) => (
-                                                        <label className="rl-option" key={option}>
-                                                            <input
-                                                                type="radio"
-                                                                name={question.id}
-                                                                required={question.required}
-                                                                checked={answers[question.id] === option}
-                                                                onChange={() => handleAnswer(question.id, option)}
-                                                            />
-                                                            <span>{option}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
+                                                <Select id={`application-${question.id}`} aria-label={question.label} value={String(answers[question.id] || '')} onValueChange={value => handleAnswer(question.id, value)} options={(question.options || []).map(option => ({value:option,label:option}))} />
                                             )}
 
                                             {question.type === 'checkbox' && (
                                                 <label className="rl-option" id={`application-${question.id}`}>
-                                                    <input
-                                                        type="checkbox"
+                                                    <Checkbox
                                                         required={question.required}
                                                         checked={Boolean(answers[question.id])}
-                                                        onChange={(event) => handleAnswer(question.id, event.target.checked)}
+                                                        onCheckedChange={checked => handleAnswer(question.id, checked === true)}
                                                     />
                                                     <span>I agree to the above terms.</span>
                                                 </label>
@@ -331,7 +326,7 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
                                     )
                                 ))}
 
-                                {submitError && <div className="rl-feedback rl-feedback-error">{submitError}</div>}
+                                {submitError && <Status variant="error" role="status" className="w-full whitespace-normal rounded-md">{submitError}</Status>}
 
                                 <div className="rl-form-footer rl-application-footer">
                                     <p>
@@ -341,43 +336,43 @@ export default function ApplicationForm({ params: paramsPromise }: { params: Pro
                                     </p>
 
                                     {authLoading ? (
-                                        <button className="rl-button" type="button" disabled>Checking verification…</button>
+                                        <Button variant="outline" type="button" disabled>Checking verification…</Button>
                                     ) : !session?.user ? (
-                                        <button className="rl-button rl-button-primary" type="button" onClick={handleDiscordSignIn}>
+                                        <Button variant="default" type="button" onClick={handleDiscordSignIn}>
                                             <DiscordIcon aria-hidden="true" width="15" height="15" />Sign in with Discord
-                                        </button>
+                                        </Button>
                                     ) : !linkedAccount?.roblox_id ? (
-                                        <button className="rl-button rl-button-primary" type="button" onClick={handleRobloxLink} disabled={linkingRoblox}>
+                                        <Button variant="default" type="button" onClick={handleRobloxLink} disabled={linkingRoblox}>
                                             <Image src="/Media/Roblox.png" alt="" width={15} height={15} />
                                             {linkingRoblox ? 'Opening Roblox…' : 'Link Roblox account'}
-                                        </button>
+                                        </Button>
                                     ) : (
-                                        <button className="rl-button rl-button-primary" type="submit" disabled={submitting}>
+                                        <Button variant="default" type="submit" disabled={submitting}>
                                             <Send aria-hidden="true" />
                                             {submitting ? 'Submitting…' : 'Submit application'}
-                                        </button>
+                                        </Button>
                                     )}
                                 </div>
                             </form>
-                        </section>
+                        </Card>
 
                         <aside className="rl-aside-stack">
-                            <div className="rl-surface rl-aside-panel">
+                            <Card className="rl-surface rl-aside-panel">
                                 <h2>Before submitting</h2>
                                 <ul className="rl-aside-list">
                                     <li><Check aria-hidden="true" /><span>Answer every required question.</span></li>
                                     <li><Check aria-hidden="true" /><span>Use an account you can access on Discord.</span></li>
                                     <li><Check aria-hidden="true" /><span>Review your answers before sending.</span></li>
                                 </ul>
-                            </div>
-                            <div className="rl-notice">
+                            </Card>
+                            <Card className="rl-notice">
                                 <LockKeyhole aria-hidden="true" />
                                 <div><strong>Verified applications</strong>Applications require connected Discord and Roblox accounts.</div>
-                            </div>
-                            <div className="rl-notice">
+                            </Card>
+                            <Card className="rl-notice">
                                 <Clock3 aria-hidden="true" />
                                 <div><strong>After you apply</strong>Watch your Discord DMs for confirmation and any follow-up from the team.</div>
-                            </div>
+                            </Card>
                         </aside>
                     </div>
                 </section>

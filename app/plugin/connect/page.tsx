@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { Suspense } from 'react';
 import { cookies, headers } from 'next/headers';
 import { getServerSession } from 'next-auth/next';
@@ -18,12 +19,12 @@ type SessionWithDiscord = Session & {
 
 function PluginConnectFallback() {
     return (
-        <main className="min-h-screen bg-[#07111f] text-white flex items-center justify-center px-6 py-12">
-            <section className="w-full max-w-xl rounded-[28px] border border-sky-900/40 bg-slate-950/80 shadow-[0_30px_80px_rgba(2,6,23,0.55)] backdrop-blur-xl p-10">
-                <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-5 py-4 text-sm text-slate-300">
+        <main className="min-h-screen bg-background text-foreground flex items-center justify-center px-6 py-12">
+            <Card className="w-full max-w-xl rounded-xl border border-border bg-card shadow-sm backdrop-blur-xl p-10">
+                <Card className="rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground">
                     Loading Studio connection details...
-                </div>
-            </section>
+                </Card>
+            </Card>
         </main>
     );
 }
