@@ -1,5 +1,8 @@
 'use client';
 
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Stat, StatValue, StatLabel } from "@/components/ui/stat";
 import { ArrowRight, Check, Server, ShieldCheck, UserRoundCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -95,12 +98,12 @@ export default function Home() {
 
                 if (!response.ok) throw new Error(`Stats request failed with ${response.status}`);
 
-                const data = await response.json() as { guild_count?: number; command_count?: number };
+                const data = await response.json() as { guild_count?: number | null; command_count?: number | null };
                 if (cancelled) return;
 
                 setStats({
-                    guildCount: data.guild_count ?? 0,
-                    commandCount: data.command_count ?? 0,
+                    guildCount: data.guild_count ?? null,
+                    commandCount: data.command_count ?? null,
                     latency: Math.round(performance.now() - startedAt),
                 });
             } catch (error) {
@@ -137,11 +140,11 @@ export default function Home() {
                                 Give staff one direct place to inspect live servers, identify players, review reports, and run supported moderation actions.
                             </p>
                             <div className="rl-hero-actions">
-                                <a className="rl-button rl-button-primary" href={getDiscordBotInviteUrl()} target="_blank" rel="noopener noreferrer">
+                                <Button asChild variant="default"><a href={getDiscordBotInviteUrl()} target="_blank" rel="noopener noreferrer">
                                     Install Ro-Link
                                     <ArrowRight aria-hidden="true" width={14} height={14} />
-                                </a>
-                                <Link className="rl-button" href="/features">Explore features</Link>
+                                </a></Button>
+                                <Button asChild variant="outline"><Link href="/features">Explore features</Link></Button>
                             </div>
                             <div className="rl-hero-note" aria-label="Platform highlights">
                                 <span><Check aria-hidden="true" /> Discord staff roles</span>
@@ -154,31 +157,27 @@ export default function Home() {
                 <section className="rl-feature-strip rl-shell" aria-label="Core Ro-Link features">
                     <div className="rl-feature-strip-inner">
                         {coreFeatures.map(({ href, icon: Icon, title, description }) => (
-                            <article className="rl-feature-summary" key={href}>
+                            <Card className="rl-feature-summary" key={href}>
                                 <span className="rl-feature-icon"><Icon aria-hidden="true" /></span>
-                                <div>
-                                    <strong>{title}</strong>
-                                    <p>{description}</p>
-                                    <Link className="rl-feature-link" href={href}>Learn more →</Link>
-                                </div>
-                            </article>
+                                <CardHeader className="gap-2 p-0"><CardTitle>{title}</CardTitle><CardDescription>{description}</CardDescription><Button asChild variant="link" className="h-auto justify-start p-0"><Link href={href}>Learn more <ArrowRight className="size-3.5" aria-hidden="true" /></Link></Button></CardHeader>
+                            </Card>
                         ))}
                     </div>
                 </section>
 
                 <section className="rl-stats-strip rl-shell" aria-label="Ro-Link live statistics">
-                    <article className="rl-stat-item">
-                        <strong>{formatStat(stats.guildCount)}</strong>
-                        <span>Servers using Ro-Link</span>
-                    </article>
-                    <article className="rl-stat-item">
-                        <strong>{formatStat(stats.commandCount)}</strong>
-                        <span>All-time commands run</span>
-                    </article>
-                    <article className="rl-stat-item">
-                        <strong>{stats.latency === null ? '—' : `${stats.latency} ms`}</strong>
-                        <span>Latency</span>
-                    </article>
+                    <Stat className="rl-stat-item">
+                        <StatValue>{formatStat(stats.guildCount)}</StatValue>
+                        <StatLabel>Servers using Ro-Link</StatLabel>
+                    </Stat>
+                    <Stat className="rl-stat-item">
+                        <StatValue>{formatStat(stats.commandCount)}</StatValue>
+                        <StatLabel>All-time commands run</StatLabel>
+                    </Stat>
+                    <Stat className="rl-stat-item">
+                        <StatValue>{stats.latency === null ? '—' : `${stats.latency} ms`}</StatValue>
+                        <StatLabel>Latency</StatLabel>
+                    </Stat>
                 </section>
 
                 <section className="rl-setup-section rl-shell" id="setup" aria-labelledby="setup-title">
@@ -193,22 +192,17 @@ export default function Home() {
                     </div>
                     <div className="rl-setup-grid">
                         {setupSteps.map((step) => (
-                            <article className="rl-setup-step" key={step.number}>
-                                <span className="rl-step-number">{step.number}</span>
-                                <h3>{step.title}</h3>
-                                <p>{step.description}</p>
-                            </article>
+                            <Card className="rl-setup-step" key={step.number}>
+                                <CardHeader className="gap-3 p-0"><span className="rl-step-number">{step.number}</span><CardTitle>{step.title}</CardTitle><CardDescription>{step.description}</CardDescription></CardHeader>
+                            </Card>
                         ))}
                     </div>
                 </section>
 
-                <section className="rl-compact-cta rl-shell" aria-labelledby="home-cta-title">
-                    <div>
-                        <h2 id="home-cta-title">Ready to connect your game?</h2>
-                        <p>Install Ro-Link and begin the guided setup.</p>
-                    </div>
-                    <a className="rl-button rl-button-primary" href={getDiscordBotInviteUrl()} target="_blank" rel="noopener noreferrer">Install Ro-Link</a>
-                </section>
+                <Card className="rl-compact-cta rl-shell" aria-labelledby="home-cta-title">
+                    <CardHeader className="p-0"><CardTitle id="home-cta-title">Ready to connect your game?</CardTitle><CardDescription>Install Ro-Link and begin the guided setup.</CardDescription></CardHeader>
+                    <Button asChild variant="default"><a href={getDiscordBotInviteUrl()} target="_blank" rel="noopener noreferrer">Install Ro-Link</a></Button>
+                </Card>
             </main>
             <PublicFooter />
         </>

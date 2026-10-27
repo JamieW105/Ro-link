@@ -69,3 +69,108 @@ Only the Discord Server Owner can run `/setup` to link a game.
 For detailed installation and configuration instructions, please read the [**Setup Guide**](guide.md).
 
 The setup guide also includes the marketplace **Module Developer API** for add-on authors, including `SendBotMessage`, lifecycle hooks, `CreateUI`, command registration, and player/helper functions.
+
+### Dashboard UI
+
+Dashboard features use [Dice UI](https://diceui.com/) with its neutral light/dark themes,
+Lucide icons, and shared shadcn-compatible foundations in `components/ui`. See [AGENTS.md](./AGENTS.md) for the requirements
+for future feature changes. Use the header switcher to choose light or dark mode;
+the selection persists across dashboard and marketplace routes. Modules have
+dedicated product pages at `/dashboard/marketplace/[moduleSlug]`.
+The `@diceui` registry is configured in
+`components.json`; copied Dice components retain their source URL and MIT notice.
+
+Run the dashboard interaction checks on desktop and mobile with:
+
+```bash
+npx playwright install chromium
+npm run test:dashboard-ui
+```
+
+To use an installed Chromium instead, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to its
+absolute path. Tests start a Next.js server on port 3100 and mock dashboard API
+responses; they do not write to Discord, Roblox, or the database.
+
+
+### Staff shifts
+
+Apply `supabase/migrations/20261016000137_staff_shifts.sql` to the target Supabase
+project before deploying this feature. It extends `dashboard_roles` and creates
+private shift settings, wave history, shift history, and service-role-only RPCs.
+The server must have `SUPABASE_SERVICE_ROLE_KEY`; browser credentials cannot access
+shift data. Existing root-level schema scripts remain the baseline for a new database.
+
+In **Settings → Roles**, grant **View Staff Shifts** and/or **Manage Staff Shift
+Settings** independently. Open **Staff Shifts** from the dashboard sidebar,
+and use its Shift settings button to enable shifts, choose automatic starts, and set the
+wave length (default seven days) and per-person quota (default five hours).
+Wave length and quota changes take effect in the next wave. Disabling shifts ends
+active shifts and preserves history. A zero-hour quota means no quota.
+
+A staff member must link their Roblox account and have a configured dashboard role
+permission (or Discord administrator/server-management access). The authenticated
+linked game's roster starts automatic shifts and confirms their time. Leaving the
+game ends the shift; a missing heartbeat expires after two minutes and caps time at
+the last confirmed heartbeat. Existing game polling is sufficient; no plugin update
+is required. If automatic start is off, staff can start/end their own shifts from
+the live panel while playing. Shift eligibility refreshes from Discord every minute.
+
+Reports cover a rolling day, week, 30 days, six calendar months, the current
+wave, or the previous completed wave. Previous-wave reports use that wave’s saved
+dates and quota, excluding current-wave time. Apply
+`supabase/migrations/20261023073855_staff_shift_previous_wave.sql` to enable this
+report; no completed wave is shown as an empty state. Overlapping game sessions count time only once; sessions crossing a reporting
+or wave boundary contribute only time within it. New waves start with zero hours
+without deleting historical shifts. The live panel shows the signed-in staff
+member's themed quota bar, lifetime confirmed hours, and total shift count.
+
+Run `npm run test:staff-shifts` for isolated PostgreSQL tests using PGlite. They
+exercise the actual migration, accounting, wave rollover, manual mode, pagination,
+server/self scoping, and database permissions without changing a remote database.
+
+
+### Discord shift commands
+
+Apply `supabase/migrations/20261016002647_staff_shift_commands.sql` after the staff
+shifts migration, and restart the standalone bot to register the updated slash
+command definitions. Both the bot and signed interaction endpoint use the same
+command handler. The standalone bot also needs `SUPABASE_SERVICE_ROLE_KEY` for the
+private shift records.
+
+- `/shift-manage start`: start a shift, or resume after a break, while in the linked
+  game. This works with automatic shifts enabled or disabled.
+- `/shift-manage break`: pause the current shift. Break time does not count toward
+  quota; resuming keeps the same shift count.
+- `/shift-manage stop`: end the current shift. Automatic heartbeats respect the
+  stopped state until the user starts again or leaves and rejoins.
+- `/shift`: privately view current shift time, status, wave quota progress, and
+  lifetime totals.
+- `/shift-leaderboard [period] [page]`: privately rank confirmed staff time for the
+  selected period (default latest wave), ten staff per page. Requires **View Staff
+  Shifts**; **Manage Staff Shift Settings** alone does not grant access.
+
+Shift commands require a staff role and work only in Discord servers. Starting or
+resuming also requires a linked Roblox account and a recent game roster. Replies
+are private and cannot ping users or roles. The dashboard marks staff on break
+without adding extra controls to its compact layout.
+
+
+### Marketplace reviews
+
+Before deploying product reviews, apply `supabase/migrations/20261025193540_module_reviews.sql` to the database that already has `supabase_schema_modules.sql`. Set `SUPABASE_SERVICE_ROLE_KEY` on the server alongside `NEXT_PUBLIC_SUPABASE_URL`; the service role key must never be exposed through a public environment variable. For an existing reviews table or a `REVIEWS_SCHEMA_MISSING` response, apply `supabase/migrations/20261025204626_reconcile_module_reviews.sql`. Also apply `supabase/migrations/20261025205020_module_review_write_compatibility.sql` to align the existing comment limit with the form. The repair preserves reviews and owner replies, accepts either historical identity column, restores the summary function and service-role grants, and reloads the API schema cache.
+
+Reviews are readable for published modules and for a creator’s own unpublished modules. Publishing or editing a review requires owning the module or managing a visible server with that module installed. Each Discord account has one editable rating/comment per module and can remove its own review after losing installer access. The API derives reviewer identity from the authenticated session; direct anonymous/authenticated database access to the review table and summary RPC is revoked.
+
+Apply `supabase/migrations/20261025205315_marketplace_card_ratings.sql` for batched average ratings on marketplace cards.
+
+Run `npm run test:module-reviews` for the actual migration, API authorization, rating/length constraints, averages, pagination, and grants against isolated PostgreSQL (PGlite).
+
+### Module cover images
+
+Apply `supabase/migrations/20261025211211_module_cover_images.sql` before running this feature. It adds the ordered `addon_modules.cover_images` field, service-only upload metadata, and the private `module-covers` Storage bucket with a 2 MB WebP limit. The server requires `SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_SUPABASE_URL`.
+
+Creators can add up to four JPG/PNG/WebP covers from either creation page or the dedicated editor, reorder them with drag handles or arrow buttons, and remove them before saving. Each source may be up to 9 MB. The browser compresses before sending; the server verifies and re-encodes the image, strips metadata, and caps the stored output at 2 MB. The first cover appears on the marketplace card; all covers appear in the product gallery. Empty or failed previews fall back to the default Package icon. Draft uploads can be viewed only by their creator; other signed-in users can view covers attached to published modules.
+
+Uploaded covers are staged until the module is saved. Removing a cover from the form does not delete its stored file, so cancelling edits cannot break a saved module. Unreferenced uploads can be removed during storage maintenance after checking all `addon_modules.cover_images` references.
+
+Run `npm run test:module-covers` for image compression, limits, upload authorization, persistence failures, cover ownership, draft visibility, database constraints and Storage configuration. Browser checks are in `tests/dashboard-ui/module-covers.spec.ts`.

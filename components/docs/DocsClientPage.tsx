@@ -1,5 +1,13 @@
 'use client';
 
+import { Button } from "@/components/ui/button";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Stat, StatLabel, StatValue } from '@/components/ui/stat';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
+import Image from 'next/image';
+import { Input } from "@/components/ui/input";
 import Link from 'next/link';
 import { isValidElement, useEffect, useMemo, useRef, useState, type ReactNode, type SVGProps } from 'react';
 import { Activity, AlertTriangle, BookOpen, Check, ChevronRight, Copy, ExternalLink, Globe2, KeyRound, Menu, Rocket, Search, Server, Settings, Shield, Terminal, Users, X } from 'lucide-react';
@@ -83,12 +91,12 @@ function cn(...classes: Array<string | false | null | undefined>) {
 }
 
 function InlineCode({ children }: { children: ReactNode }) {
-    return <code className="rounded-md border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 font-mono text-[0.92em] text-sky-300">{children}</code>;
+    return <code className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.92em] text-foreground">{children}</code>;
 }
 
 function ExternalAnchor({ href, children }: { href: string; children: ReactNode }) {
     return (
-        <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-sky-300 transition-colors hover:text-sky-200">
+        <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-foreground">
             {children}
             <Icons.ExternalLink className="h-3.5 w-3.5" />
         </a>
@@ -109,10 +117,10 @@ function SectionCard({
     children: ReactNode;
 }) {
     return (
-        <section id={id} className="scroll-mt-24 border-t border-white/8 pt-10 first:border-t-0 first:pt-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-sky-400/90">{eyebrow}</p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-[2.35rem]">{title}</h2>
-            <p className="mt-4 max-w-3xl text-base leading-8 text-slate-300">{description}</p>
+        <section id={id} className="scroll-mt-24 border-t border-border pt-10 first:border-t-0 first:pt-0">
+            <p className="text-[11px] font-bold text-foreground">{eyebrow}</p>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-[2.35rem]">{title}</h2>
+            <p className="mt-4 max-w-3xl text-base leading-8 text-muted-foreground">{description}</p>
             <div className="mt-7 space-y-5">{children}</div>
         </section>
     );
@@ -127,26 +135,12 @@ function Callout({
     tone?: 'info' | 'warn' | 'success';
     children: ReactNode;
 }) {
-    const tones = {
-        info: { border: 'border-sky-500/20', bg: 'bg-sky-500/8', text: 'text-sky-200/90', title: 'text-sky-300', icon: Icons.Activity },
-        warn: { border: 'border-amber-500/20', bg: 'bg-amber-500/8', text: 'text-amber-100/85', title: 'text-amber-300', icon: Icons.AlertTriangle },
-        success: { border: 'border-emerald-500/20', bg: 'bg-emerald-500/8', text: 'text-emerald-100/85', title: 'text-emerald-300', icon: Icons.Check },
-    }[tone];
-    const Icon = tones.icon;
-
-    return (
-        <div className={cn('w-full rounded-2xl border p-5', tones.border, tones.bg)}>
-            <div className="flex items-start gap-3">
-                <div className={cn('mt-0.5 shrink-0 rounded-xl border p-2', tones.border, tones.bg)}>
-                    <Icon className={cn('h-4 w-4', tones.title)} />
-                </div>
-                <div className="min-w-0 flex-1">
-                    <h3 className={cn('text-sm font-bold', tones.title)}>{title}</h3>
-                    <div className={cn('mt-2 text-sm leading-7', tones.text)}>{children}</div>
-                </div>
-            </div>
-        </div>
-    );
+    const Icon = tone === 'warn' ? Icons.AlertTriangle : tone === 'success' ? Icons.Check : Icons.Activity;
+    const color = tone === 'warn' ? 'text-amber-700 dark:text-amber-400' : tone === 'success' ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground';
+    return <Card>
+        <CardHeader className="p-4 pb-2"><CardTitle className="flex items-center gap-2 text-sm"><Icon className={cn('size-4', color)} aria-hidden="true" />{title}</CardTitle></CardHeader>
+        <CardContent className="px-4 pb-4 text-sm leading-7 text-muted-foreground">{children}</CardContent>
+    </Card>;
 }
 
 function CodeBlock({ children, label }: { children: ReactNode; label: string }) {
@@ -160,32 +154,21 @@ function CodeBlock({ children, label }: { children: ReactNode; label: string }) 
         window.setTimeout(() => setCopied(false), 1600);
     }
 
-    return (
-        <div className="min-w-0 overflow-hidden rounded-[18px] border border-white/10 bg-[#111827]">
-            <div className="flex items-center justify-between border-b border-white/8 bg-white/[0.02] px-4 py-3">
-                <span className="min-w-0 truncate pr-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{label}</span>
-                <button
-                    type="button"
-                    onClick={copyToClipboard}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-slate-400 transition-colors hover:text-white"
-                >
-                    {copied ? <Icons.Check className="h-3.5 w-3.5 text-emerald-400" /> : <Icons.Copy className="h-3.5 w-3.5" />}
-                    {copied ? 'Copied' : 'Copy'}
-                </button>
-            </div>
-            <pre id={codeId} className="custom-scrollbar w-full max-w-full overflow-x-auto p-4 text-sm leading-7 text-slate-300">
-                <code>{children}</code>
-            </pre>
-        </div>
-    );
+    return <Card className="min-w-0 overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border p-3">
+            <CardTitle className="truncate text-sm">{label}</CardTitle>
+            <Button type="button" variant="ghost" size="sm" onClick={copyToClipboard}>{copied ? <Icons.Check className="size-4" /> : <Icons.Copy className="size-4" />}{copied ? 'Copied' : 'Copy'}</Button>
+        </CardHeader>
+        <pre id={codeId} className="w-full max-w-full overflow-x-auto p-4 text-sm leading-7 text-foreground"><code>{children}</code></pre>
+    </Card>;
 }
 
 function Checklist({ items }: { items: string[] }) {
     return (
         <ul className="grid gap-3 md:grid-cols-2">
             {items.map((item) => (
-                <li key={item} className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4 text-sm leading-7 text-slate-300">
-                    <span className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-sky-500/25 bg-sky-500/10 text-sky-300">
+                <li key={item} className="flex items-start gap-3 rounded-xl border border-border bg-muted px-4 py-4 text-sm leading-7 text-muted-foreground">
+                    <span className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-foreground">
                         <Icons.Check className="h-3 w-3" />
                     </span>
                     <span>{item}</span>
@@ -196,32 +179,10 @@ function Checklist({ items }: { items: string[] }) {
 }
 
 function DataTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
-    return (
-        <div className="table-responsive overflow-hidden rounded-[18px] border border-white/10">
-            <table className="min-w-full border-collapse text-left text-sm">
-                <thead className="bg-white/[0.03]">
-                    <tr>
-                        {headers.map((header) => (
-                            <th key={header} className="px-4 py-3 text-xs font-bold uppercase tracking-[0.22em] text-slate-400">
-                                {header}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-white/8 bg-[#0f172a]/55">
-                    {rows.map((row) => (
-                        <tr key={row.join('-')}>
-                            {row.map((cell, index) => (
-                                <td key={`${row[0]}-${headers[index]}`} className={cn('px-4 py-3 align-top text-sm leading-7', index === 0 ? 'font-mono text-sky-300' : 'text-slate-300')}>
-                                    {cell}
-                                </td>
-                            ))}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    );
+    return <Card className="overflow-hidden">
+        <Table><TableHeader><TableRow>{headers.map(header => <TableHead key={header}>{header}</TableHead>)}</TableRow></TableHeader>
+        <TableBody>{rows.map(row => <TableRow key={row.join('-')}>{row.map((cell,index) => <TableCell key={`${row[0]}-${headers[index]}`} className={index === 0 ? 'font-mono' : 'text-muted-foreground'}>{cell}</TableCell>)}</TableRow>)}</TableBody></Table>
+    </Card>;
 }
 
 function InfoGrid({
@@ -231,30 +192,20 @@ function InfoGrid({
     items: Array<{ title: string; description: string; meta?: string }>;
     columns?: string;
 }) {
-    return (
-        <div className={cn('grid gap-4', columns)}>
-            {items.map((item) => (
-                <div key={item.title} className="rounded-2xl border border-white/8 bg-white/[0.02] p-5">
-                    {item.meta && <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-sky-400/85">{item.meta}</p>}
-                    <h3 className="mt-2 text-base font-semibold text-white first:mt-0">{item.title}</h3>
-                    <p className="mt-2 text-sm leading-7 text-slate-400">{item.description}</p>
-                </div>
-            ))}
-        </div>
-    );
+    return <div className={cn('grid gap-4', columns)}>{items.map(item => <Card key={item.title}><CardHeader className="p-4">{item.meta && <p className="text-xs text-muted-foreground">{item.meta}</p>}<CardTitle>{item.title}</CardTitle><CardDescription className="leading-7">{item.description}</CardDescription></CardHeader></Card>)}</div>;
 }
 
 function StepList({ steps }: { steps: Array<{ title: string; description: string }> }) {
     return (
         <ol className="space-y-3">
             {steps.map((step, index) => (
-                <li key={step.title} className="flex gap-4 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sky-500/25 bg-sky-500/10 text-sm font-bold text-sky-300">
+                <li key={step.title} className="flex gap-4 rounded-xl border border-border bg-muted p-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-sm font-bold text-foreground">
                         {index + 1}
                     </span>
                     <div>
-                        <h3 className="text-sm font-semibold text-white">{step.title}</h3>
-                        <p className="mt-1 text-sm leading-7 text-slate-400">{step.description}</p>
+                        <h3 className="text-sm font-semibold text-foreground">{step.title}</h3>
+                        <p className="mt-1 text-sm leading-7 text-muted-foreground">{step.description}</p>
                     </div>
                 </li>
             ))}
@@ -275,37 +226,12 @@ function ResourceCard({
     description: string;
     external?: boolean;
 }) {
-    const content = (
-        <div className="group flex h-full items-center gap-4 rounded-[18px] border border-white/10 bg-white/[0.02] p-5 transition-all duration-200 hover:border-sky-400/30 hover:bg-white/[0.04]">
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sky-300">
-                <Icon className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-                <h3 className="text-base font-semibold text-white transition-colors group-hover:text-sky-200">{title}</h3>
-                <p className="mt-1.5 text-sm leading-7 text-slate-400">{description}</p>
-            </div>
-            <Icons.ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-sky-200" />
-        </div>
-    );
-
-    if (external) {
-        return (
-            <a href={href} target="_blank" rel="noreferrer">
-                {content}
-            </a>
-        );
-    }
-
-    return <Link href={href}>{content}</Link>;
+    const content = <Card className="h-full transition-colors hover:bg-accent/50"><CardHeader className="flex flex-row items-start gap-3 p-4"><Icon className="size-5 shrink-0 text-muted-foreground" /><div className="min-w-0 flex-1 space-y-2"><CardTitle>{title}</CardTitle><CardDescription className="leading-7">{description}</CardDescription></div><Icons.ChevronRight className="size-4 text-muted-foreground" /></CardHeader></Card>;
+    return external ? <a href={href} target="_blank" rel="noreferrer" className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{content}</a> : <Link href={href} className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{content}</Link>;
 }
 
 function PageStat({ label, value }: StatItem) {
-    return (
-        <div className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-3 py-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">{label}</span>
-            <span className="text-sm font-medium text-slate-200">{value}</span>
-        </div>
-    );
+    return <Stat className="min-w-36 p-3"><StatLabel className="text-xs">{label}</StatLabel><StatValue className="text-sm">{value}</StatValue></Stat>;
 }
 
 function NavButton({
@@ -319,19 +245,7 @@ function NavButton({
     children: ReactNode;
     onClick: () => void;
 }) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={cn(
-                'group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-200',
-                active ? 'bg-sky-500/12 text-sky-200 shadow-[inset_0_0_0_1px_rgba(14,165,233,0.2)]' : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
-            )}
-        >
-            <Icon className={cn('h-4 w-4 shrink-0 transition-colors', active ? 'text-sky-300' : 'text-slate-500 group-hover:text-slate-300')} />
-            <span className="truncate">{children}</span>
-        </button>
-    );
+    return <Button type="button" variant="ghost" onClick={onClick} aria-current={active ? 'page' : undefined} className={cn('h-auto min-h-9 w-full justify-start px-3 py-2 text-left', active && 'bg-accent text-accent-foreground')}><Icon className="size-4 shrink-0" /><span className="truncate">{children}</span></Button>;
 }
 
 function normalizeSearchText(value: string) {
@@ -420,7 +334,7 @@ function scoreSearchEntry(entry: DocSearchEntry, query: string, queryParts: stri
 const commandGroups = [
     {
         title: 'Moderation',
-        accent: 'text-sky-300',
+        accent: 'text-muted-foreground',
         commands: [
             { name: 'KICK', args: '{ username: string, reason?: string }', description: 'Remove a player from the active server.' },
             { name: 'BAN', args: '{ username: string, reason?: string }', description: 'Ban a player through the Ro-Link moderation pipeline.' },
@@ -429,7 +343,7 @@ const commandGroups = [
     },
     {
         title: 'Server Control',
-        accent: 'text-sky-300',
+        accent: 'text-muted-foreground',
         commands: [
             { name: 'SHUTDOWN', args: '{ job_id?: string }', description: 'Shutdown one server or every active server when job_id is omitted.' },
             { name: 'UPDATE', args: '{}', description: 'Start the update flow for live servers before a release.' },
@@ -437,7 +351,7 @@ const commandGroups = [
     },
     {
         title: 'Player Actions',
-        accent: 'text-sky-300',
+        accent: 'text-muted-foreground',
         commands: [
             { name: 'FLY / NOCLIP / INVISIBLE', args: '{ username: string }', description: 'Core utility actions commonly used during moderation.' },
             { name: 'SET_CHAR', args: '{ username: string, char_user: string }', description: 'Swap a player into another character model.' },
@@ -506,13 +420,13 @@ const docsPages: DocPage[] = [
                         ].map((item) => {
                             const Icon = item.icon;
                             return (
-                                <div key={item.title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                                    <div className="inline-flex rounded-2xl border border-sky-500/20 bg-sky-500/10 p-3 text-sky-300">
+                                <Card key={item.title} className="rounded-xl border border-border bg-muted p-5">
+                                    <div className="inline-flex rounded-xl border border-border bg-muted p-3 text-foreground">
                                         <Icon className="h-5 w-5" />
                                     </div>
-                                    <h3 className="mt-4 text-lg font-semibold text-white">{item.title}</h3>
-                                    <p className="mt-2 text-sm leading-7 text-slate-400">{item.body}</p>
-                                </div>
+                                    <h3 className="mt-4 text-lg font-semibold text-foreground">{item.title}</h3>
+                                    <p className="mt-2 text-sm leading-7 text-muted-foreground">{item.body}</p>
+                                </Card>
                             );
                         })}
                     </div>
@@ -530,11 +444,11 @@ const docsPages: DocPage[] = [
                             ['03', 'Run the installer plugin', 'Install the RoLink installer plugin in Roblox Studio, paste in your dashboard security key, and let it configure the bridge for you.'],
                             ['04', 'Run a controlled live test', 'Test a low-risk command or lookup first, confirm logging is correct, then move into day-to-day moderation use.'],
                         ].map(([step, title, body]) => (
-                            <div key={step} className="rounded-2xl border border-white/10 bg-[#08101f]/70 p-5">
-                                <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-sky-300">{step}</div>
-                                <h3 className="mt-3 text-lg font-semibold text-white">{title}</h3>
-                                <p className="mt-2 text-sm leading-7 text-slate-400">{body}</p>
-                            </div>
+                            <Card key={step} className="rounded-xl border border-border bg-background p-5">
+                                <div className="text-[11px] font-bold text-foreground">{step}</div>
+                                <h3 className="mt-3 text-lg font-semibold text-foreground">{title}</h3>
+                                <p className="mt-2 text-sm leading-7 text-muted-foreground">{body}</p>
+                            </Card>
                         ))}
                     </div>
                 </SectionCard>
@@ -613,10 +527,10 @@ const docsPages: DocPage[] = [
                             ['Settings', 'Adjust configuration and use the removal controls when Ro-Link needs to be detached from a server.'],
                             ['Posts', 'Publish update posts, set a release version, and keep the landing page version marker aligned with the latest release.'],
                         ].map(([title, body]) => (
-                            <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                                <h3 className="text-lg font-semibold text-white">{title}</h3>
-                                <p className="mt-2 text-sm leading-7 text-slate-400">{body}</p>
-                            </div>
+                            <Card key={title} className="rounded-xl border border-border bg-muted p-5">
+                                <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+                                <p className="mt-2 text-sm leading-7 text-muted-foreground">{body}</p>
+                            </Card>
                         ))}
                     </div>
                 </SectionCard>
@@ -628,7 +542,7 @@ const docsPages: DocPage[] = [
                     description="Ro-Link should not be exposed to every staff member by default. Keep setup permissions narrow, and expand runtime permissions only to the people who actually need them."
                 >
                     <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                        <div className="space-y-4 text-sm leading-7 text-slate-300">
+                        <div className="space-y-4 text-sm leading-7 text-muted-foreground">
                             <p>Dashboard access should be limited to trusted Discord accounts that need to operate on the selected server. Separate configuration work from day-to-day moderation where possible.</p>
                             <p>If a staff member can publish updates, they should understand that the <InlineCode>Version</InlineCode> field is not cosmetic. The latest published update version is also what the landing page uses for its public release badge.</p>
                             <p>After permission changes, confirm that the affected user can still open the correct dashboard server and that the pages they should not control are no longer reachable.</p>
@@ -652,15 +566,15 @@ const docsPages: DocPage[] = [
                     description="Update posts are both public communication and release metadata. Keeping them structured makes the docs, posts page, and landing page feel consistent."
                 >
                     <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-                        <div className="space-y-4 rounded-2xl border border-white/10 bg-[#08101f]/70 p-5 text-sm leading-7 text-slate-300">
-                            <h3 className="text-lg font-semibold text-white">Recommended publishing flow</h3>
+                        <Card className="space-y-4 rounded-xl border border-border bg-background p-5 text-sm leading-7 text-muted-foreground">
+                            <h3 className="text-lg font-semibold text-foreground">Recommended publishing flow</h3>
                             <ol className="space-y-3">
                                 <li>1. Set the version to the exact release you want exposed publicly, for example <InlineCode>V2.01.0</InlineCode>.</li>
                                 <li>2. Write the title and summary around the actual release, not an internal task name.</li>
                                 <li>3. Split notes into major features, minor updates, QOL changes, and bug fixes so staff and users can scan quickly.</li>
                                 <li>4. Publish only after the release is live or your rollout plan is ready for public visibility.</li>
                             </ol>
-                        </div>
+                        </Card>
 
                         <Callout title="Version behavior" tone="success">
                             The landing page version badge reads from the newest published update post that contains a version. If you publish a post with an older or placeholder version, the public site will reflect that immediately.
@@ -714,19 +628,19 @@ const docsPages: DocPage[] = [
                     description="Ro-Link needs both the starting place and the universe-level experience record. These are not interchangeable, and using the wrong one usually shows up later as a failed lookup or delivery issue."
                 >
                     <div className="grid gap-6 xl:grid-cols-2">
-                        <div className="space-y-4 rounded-2xl border border-white/10 bg-[#08101f]/70 p-5">
-                            <h3 className="text-lg font-semibold text-white">Place ID</h3>
-                            <p className="text-sm leading-7 text-slate-400">This is the ID of the starting place or specific place you are targeting from the Roblox game URL.</p>
+                        <Card className="space-y-4 rounded-xl border border-border bg-background p-5">
+                            <h3 className="text-lg font-semibold text-foreground">Place ID</h3>
+                            <p className="text-sm leading-7 text-muted-foreground">This is the ID of the starting place or specific place you are targeting from the Roblox game URL.</p>
                             <CodeBlock label="Roblox game URL">{'https://www.roblox.com/games/1234567890/Your-Game'}</CodeBlock>
-                            <p className="text-sm leading-7 text-slate-400">In the example above, <InlineCode>1234567890</InlineCode> is the Place ID.</p>
-                        </div>
+                            <p className="text-sm leading-7 text-muted-foreground">In the example above, <InlineCode>1234567890</InlineCode> is the Place ID.</p>
+                        </Card>
 
-                        <div className="space-y-4 rounded-2xl border border-white/10 bg-[#08101f]/70 p-5">
-                            <h3 className="text-lg font-semibold text-white">Universe ID</h3>
-                            <p className="text-sm leading-7 text-slate-400">Also called the Experience ID. This is what Open Cloud and many platform-level Roblox services use.</p>
+                        <Card className="space-y-4 rounded-xl border border-border bg-background p-5">
+                            <h3 className="text-lg font-semibold text-foreground">Universe ID</h3>
+                            <p className="text-sm leading-7 text-muted-foreground">Also called the Experience ID. This is what Open Cloud and many platform-level Roblox services use.</p>
                             <CodeBlock label="Creator Dashboard URL">{'https://create.roblox.com/dashboard/creations/experiences/9876543210/overview'}</CodeBlock>
-                            <p className="text-sm leading-7 text-slate-400">In this example, <InlineCode>9876543210</InlineCode> is the Universe ID.</p>
-                        </div>
+                            <p className="text-sm leading-7 text-muted-foreground">In this example, <InlineCode>9876543210</InlineCode> is the Universe ID.</p>
+                        </Card>
                     </div>
                 </SectionCard>
 
@@ -737,7 +651,7 @@ const docsPages: DocPage[] = [
                     description="Most setup failures happen here. The key has to belong to the real experience owner, not just someone with edit permission."
                 >
                     <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                        <div className="space-y-4 text-sm leading-7 text-slate-300">
+                        <div className="space-y-4 text-sm leading-7 text-muted-foreground">
                             <p>Open the Roblox Creator Dashboard credentials screen and switch to the same owner context that owns the target experience. For a personal game, that means your personal owner scope. For a group game, switch to the group owner scope before creating the key.</p>
                             <p>A contributor-generated key with editing access can still fail with permission errors if it is not created under the true owner context. That distinction matters.</p>
                             <ExternalAnchor href="https://create.roblox.com/dashboard/open-cloud">Open Roblox Open Cloud credentials</ExternalAnchor>
@@ -824,7 +738,7 @@ const docsPages: DocPage[] = [
                             description="Open the Creator Store listing for the official Ro-Link installer plugin."
                             external
                         />
-                        <p className="text-sm leading-7 text-slate-300">
+                        <p className="text-sm leading-7 text-muted-foreground">
                             After installing it in Studio, open the plugin from the <InlineCode>Plugins</InlineCode> tab and follow its setup flow. The plugin is now the supported installation path for the runtime bridge.
                         </p>
                     </div>
@@ -876,16 +790,16 @@ const docsPages: DocPage[] = [
                     description="A successful install is one that can be observed end-to-end: dashboard or API action accepted, live server receives it, and the result appears in logs."
                 >
                     <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-                        <div className="rounded-2xl border border-white/10 bg-[#08101f]/70 p-5">
-                            <h3 className="text-lg font-semibold text-white">Suggested first test</h3>
-                            <ol className="mt-4 space-y-3 text-sm leading-7 text-slate-300">
+                        <Card className="rounded-xl border border-border bg-background p-5">
+                            <h3 className="text-lg font-semibold text-foreground">Suggested first test</h3>
+                            <ol className="mt-4 space-y-3 text-sm leading-7 text-muted-foreground">
                                 <li>1. Start one controlled server.</li>
                                 <li>2. Open the dashboard server view and confirm the live job is visible.</li>
                                 <li>3. Run a low-risk action such as a lookup or a harmless misc action.</li>
                                 <li>4. Confirm the expected result appears in the game and in dashboard logs.</li>
                                 <li>5. Only after that should you move on to broader staff use.</li>
                             </ol>
-                        </div>
+                        </Card>
 
                         <Callout title="If the command does not land" tone="info">
                             Check three things in order: whether a live server is actually running the latest plugin-installed bridge, whether the server config still matches the correct experience, and whether the Open Cloud key was created under the true owner scope.
@@ -1161,21 +1075,21 @@ print(result.user.robloxUsername, result.roles.serverStaff, result.presence.inGa
                 >
                     <div className="space-y-4">
                         {commandGroups.map((group) => (
-                            <div key={group.title} className="overflow-hidden rounded-2xl border border-white/10 bg-[#08101f]/70">
-                                <div className="border-b border-white/8 px-5 py-4">
+                            <div key={group.title} className="overflow-hidden rounded-xl border border-border bg-background">
+                                <div className="border-b border-border px-5 py-4">
                                     <h3 className={cn('text-lg font-semibold', group.accent)}>{group.title}</h3>
                                 </div>
-                                <div className="divide-y divide-white/8">
+                                <div className="divide-y divide-border">
                                     {group.commands.map((command) => (
                                         <div key={command.name} className="px-5 py-4">
                                             <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between">
                                                 <div>
-                                                    <div className="inline-flex rounded-lg border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 font-mono text-xs font-bold tracking-[0.22em] text-sky-300">
+                                                    <div className="inline-flex rounded-lg border border-border bg-muted px-2.5 py-1 font-mono text-xs font-bold text-foreground">
                                                         {command.name}
                                                     </div>
-                                                    <p className="mt-3 text-sm leading-7 text-slate-300">{command.description}</p>
+                                                    <p className="mt-3 text-sm leading-7 text-muted-foreground">{command.description}</p>
                                                 </div>
-                                                <code className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-xs text-slate-400">
+                                                <code className="rounded-xl border border-border bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
                                                     args: {command.args}
                                                 </code>
                                             </div>
@@ -1848,22 +1762,22 @@ end)`}
                     description="Permission issues show up in two places: Roblox credentials and dashboard-level access. Solve them independently so you do not chase the wrong layer."
                 >
                     <div className="grid gap-4 xl:grid-cols-2">
-                        <div className="rounded-2xl border border-white/10 bg-[#08101f]/70 p-5">
-                            <h3 className="text-lg font-semibold text-white">Roblox-side symptoms</h3>
-                            <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-300">
+                        <Card className="rounded-xl border border-border bg-background p-5">
+                            <h3 className="text-lg font-semibold text-foreground">Roblox-side symptoms</h3>
+                            <ul className="mt-4 space-y-3 text-sm leading-7 text-muted-foreground">
                                 <li>PermissionDenied when calling Roblox services.</li>
                                 <li>Command requests accepted by Ro-Link but never reaching the runtime.</li>
                                 <li>New credentials working in one experience but not the group-owned target experience.</li>
                             </ul>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-[#08101f]/70 p-5">
-                            <h3 className="text-lg font-semibold text-white">Dashboard-side symptoms</h3>
-                            <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-300">
+                        </Card>
+                        <Card className="rounded-xl border border-border bg-background p-5">
+                            <h3 className="text-lg font-semibold text-foreground">Dashboard-side symptoms</h3>
+                            <ul className="mt-4 space-y-3 text-sm leading-7 text-muted-foreground">
                                 <li>Selected tabs are missing for a staff member.</li>
                                 <li>The wrong Discord account is signed into the dashboard.</li>
                                 <li>A user can open the server record but cannot publish updates or run protected actions.</li>
                             </ul>
-                        </div>
+                        </Card>
                     </div>
                 </SectionCard>
 
@@ -1916,6 +1830,7 @@ export default function DocsClientPage() {
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const searchReturnFocusRef = useRef<HTMLElement | null>(null);
     const mainContentRef = useRef<HTMLElement>(null);
 
     const activePage = docsPages.find((page) => page.id === activePageId) || docsPages[0];
@@ -1964,6 +1879,7 @@ export default function DocsClientPage() {
             }
 
             if (event.key === 'Escape') {
+                setMobileMenuOpen(false);
                 setSearchOpen(false);
             }
         }
@@ -2043,53 +1959,50 @@ export default function DocsClientPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#181818] text-slate-100 selection:bg-sky-400/20">
-            <header className="sticky top-0 z-40 border-b border-white/8 bg-[#181818]/92 backdrop-blur-xl">
+        <div className="min-h-screen bg-background text-foreground selection:bg-muted">
+            <header className="sticky top-0 z-40 border-b border-border bg-background backdrop-blur-xl">
                 <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
                     <Link href="/" className="flex items-center gap-3">
-                        <div className="rounded-xl border border-sky-500/25 bg-sky-500/10 p-2 text-sky-300">
-                            <Icons.Book className="h-4 w-4" />
-                        </div>
-                        <span className="text-lg font-semibold text-white">Ro-Link</span>
+                        <Image src="/Media/Ro-LinkIcon.png" alt="" width={28} height={28} className="size-7 object-contain" />
+                        <span className="text-lg font-semibold text-foreground">Ro-Link</span>
                     </Link>
 
                     <div className="hidden items-center gap-4 lg:flex">
-                        <Link href="/report" className="rounded-full border border-white/10 bg-white/[0.02] px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:text-white">
+                        <Link href="/report" className="rounded-full border border-border bg-muted px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
                             Report
                         </Link>
-                        <button
+                        <Button variant="ghost"
                             type="button"
                             onClick={() => setSearchOpen(true)}
-                            className="flex min-w-[230px] items-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-4 py-2 text-left text-sm text-slate-400"
+                            className="flex min-w-[230px] items-center gap-3 border px-4 py-2 text-left text-sm"
                         >
                             <Icons.Search className="h-4 w-4" />
                             <span className="flex-1">Search...</span>
-                            <span className="rounded-md border border-white/10 px-2 py-0.5 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-500">Ctrl K</span>
-                        </button>
+                            <span className="rounded-md border border-border px-2 py-0.5 font-mono text-[11px] text-muted-foreground">Ctrl K</span>
+                        </Button>
                     </div>
 
-                    <button
+                    <div className="ml-auto flex items-center gap-2"><ThemeToggle /><Button type="button" variant="ghost" size="icon" className="lg:hidden" aria-label="Search documentation" onClick={() => setSearchOpen(true)}><Icons.Search className="size-4" /></Button></div>
+                    <Button variant="ghost"
                         type="button"
                         onClick={() => setMobileMenuOpen((current) => !current)}
-                        className="rounded-xl border border-white/10 bg-white/[0.03] p-2 text-slate-300 lg:hidden"
+                        className="border p-2 lg:hidden"
                         aria-label={mobileMenuOpen ? 'Close documentation navigation' : 'Open documentation navigation'}
                         aria-expanded={mobileMenuOpen}
                         aria-controls="docs-sidebar-navigation"
                     >
                         {mobileMenuOpen ? <Icons.X className="h-5 w-5" /> : <Icons.Menu className="h-5 w-5" />}
-                    </button>
+                    </Button>
                 </div>
             </header>
 
             {searchOpen && (
-                <div className="fixed inset-0 z-50 bg-black/65 px-4 py-20 backdrop-blur-sm" onMouseDown={() => setSearchOpen(false)}>
-                    <div
-                        className="mx-auto w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-[#181818] shadow-2xl shadow-black/40"
-                        onMouseDown={(event) => event.stopPropagation()}
-                    >
-                        <div className="flex items-center gap-3 border-b border-white/8 px-4 py-3">
-                            <Icons.Search className="h-5 w-5 shrink-0 text-slate-500" />
-                            <input
+                <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+                    <DialogContent className="max-w-2xl overflow-hidden p-0" onOpenAutoFocus={event => { event.preventDefault(); searchReturnFocusRef.current = document.activeElement as HTMLElement; searchInputRef.current?.focus(); }} onCloseAutoFocus={event => { event.preventDefault(); searchReturnFocusRef.current?.focus(); }}>
+                        <DialogTitle className="sr-only">Search documentation</DialogTitle><DialogDescription className="sr-only">Find a guide, command, or setup step.</DialogDescription>
+                        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                            <Icons.Search className="h-5 w-5 shrink-0 text-muted-foreground" />
+                            <Input
                                 ref={searchInputRef}
                                 value={searchQuery}
                                 onChange={(event) => setSearchQuery(event.target.value)}
@@ -2099,50 +2012,51 @@ export default function DocsClientPage() {
                                         openSearchResult(searchResults[0]);
                                     }
                                 }}
+                                aria-label="Search documentation"
                                 placeholder="Search docs..."
-                                className="h-11 min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-slate-500"
+                                className="h-11 min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
                             />
-                            <button
+                            <Button variant="ghost"
                                 type="button"
                                 onClick={() => setSearchOpen(false)}
-                                className="rounded-lg border border-white/10 px-2 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-500 transition-colors hover:text-white"
+                                className="border px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors"
                             >
                                 Esc
-                            </button>
+                            </Button>
                         </div>
 
                         <div className="max-h-[min(520px,65vh)] overflow-y-auto p-2">
                             {searchResults.length > 0 ? (
                                 <div className="space-y-1">
                                     {searchResults.map((result) => (
-                                        <button
+                                        <Button variant="ghost"
                                             key={result.key}
                                             type="button"
                                             onClick={() => openSearchResult(result)}
-                                            className="group flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-white/[0.04]"
+                                            className="group flex w-full items-start gap-3 px-4 py-3 text-left transition-colors h-auto whitespace-normal"
                                         >
-                                            <div className="mt-0.5 rounded-lg border border-white/10 bg-white/[0.03] p-2 text-sky-300">
+                                            <div className="mt-0.5 rounded-lg border border-border bg-muted p-2 text-foreground">
                                                 <Icons.Book className="h-4 w-4" />
                                             </div>
                                             <div className="min-w-0 flex-1">
-                                                <p className="truncate text-sm font-semibold text-white group-hover:text-sky-200">{result.title}</p>
-                                                <p className="mt-1 truncate text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                                                <p className="truncate text-sm font-semibold text-foreground group-hover:text-foreground">{result.title}</p>
+                                                <p className="mt-1 truncate text-xs font-medium text-muted-foreground">
                                                     {result.sectionId ? `${result.subtitle} / Section` : result.subtitle}
                                                 </p>
                                             </div>
-                                            <Icons.ChevronRight className="mt-2 h-4 w-4 text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-sky-200" />
-                                        </button>
+                                            <Icons.ChevronRight className="mt-2 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                                        </Button>
                                     ))}
                                 </div>
                             ) : (
                                 <div className="px-4 py-10 text-center">
-                                    <p className="text-sm font-semibold text-white">No results found</p>
-                                    <p className="mt-2 text-sm text-slate-500">Try a page name, setup step, API route, or command.</p>
+                                    <p className="text-sm font-semibold text-foreground">No results found</p>
+                                    <p className="mt-2 text-sm text-muted-foreground">Try a page name, setup step, API route, or command.</p>
                                 </div>
                             )}
                         </div>
-                    </div>
-                </div>
+                    </DialogContent>
+                </Dialog>
             )}
 
             <div className="relative flex h-[calc(100vh-4rem)]">
@@ -2150,7 +2064,7 @@ export default function DocsClientPage() {
                     id="docs-sidebar-navigation"
                     aria-label="Documentation navigation"
                     className={cn(
-                        'custom-scrollbar absolute inset-y-0 left-0 z-30 flex w-[280px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-white/8 bg-[#181818]/98 px-5 py-8 backdrop-blur-xl transition-transform duration-300 lg:static lg:z-auto',
+                        'custom-scrollbar absolute inset-y-0 left-0 z-30 flex w-[280px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-border bg-background px-5 py-8 backdrop-blur-xl transition-transform duration-300 lg:static lg:z-auto',
                         mobileMenuOpen ? 'translate-x-0' : '-translate-x-full',
                         'lg:translate-x-0',
                     )}
@@ -2162,7 +2076,7 @@ export default function DocsClientPage() {
 
                             return (
                                 <div key={category}>
-                                    <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">{category}</p>
+                                    <p className="mb-3 px-3 text-[11px] font-bold text-muted-foreground">{category}</p>
                                     <div className="space-y-1">
                                         {pages.map((page) => (
                                             <NavButton key={page.id} active={activePageId === page.id} icon={page.icon} onClick={() => openPage(page.id)}>
@@ -2177,36 +2091,36 @@ export default function DocsClientPage() {
 
                 </aside>
 
-                {mobileMenuOpen && <button type="button" aria-label="Close navigation" onClick={() => setMobileMenuOpen(false)} className="fixed inset-0 z-20 bg-black/50 lg:hidden" />}
+                {mobileMenuOpen && <Button variant="ghost" type="button" aria-label="Close navigation" onClick={() => setMobileMenuOpen(false)} className="fixed inset-0 z-20 h-full w-full rounded-none bg-black/40 p-0 lg:hidden" />}
 
-                <aside className="order-3 hidden h-full w-[270px] shrink-0 overflow-hidden border-l border-white/8 bg-[#181818] px-7 py-10 2xl:block">
+                <aside className="order-3 hidden h-full w-[270px] shrink-0 overflow-hidden border-l border-border bg-background px-7 py-10 2xl:block">
                     <nav className="space-y-1">
                         {activePage.toc.map((item) => (
-                            <button
+                            <Button variant="ghost"
                                 key={item.id}
                                 type="button"
                                 onClick={() => openSection(item.id)}
                                 className={cn(
-                                    'block w-full rounded-xl px-4 py-3 text-left text-sm leading-6 transition-colors',
-                                    activeSectionId === item.id ? 'bg-sky-500/12 text-sky-200' : 'text-sky-100/90 hover:text-white',
+                                    'block w-full  px-4 py-3 text-left text-sm leading-6 transition-colors',
+                                    activeSectionId === item.id ? ' ' : ' ',
                                 )}
                             >
                                 {item.title}
-                            </button>
+                            </Button>
                         ))}
                     </nav>
                 </aside>
 
                 <main ref={mainContentRef} className="custom-scrollbar order-2 h-full min-w-0 flex-1 overflow-y-auto overscroll-contain">
                     <div className="mx-auto max-w-[1080px] px-6 py-10 sm:px-10">
-                        <div className="flex flex-col gap-6 border-b border-white/8 pb-10 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex flex-col gap-6 border-b border-border pb-10 sm:flex-row sm:items-start sm:justify-between">
                             <div className="max-w-3xl">
-                                <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-sky-400">{activePage.category}</p>
+                                <p className="text-[11px] font-bold text-foreground">{activePage.category}</p>
                                 <div className="mt-4 flex items-center gap-4">
-                                    <ActivePageIcon className="h-10 w-10 text-slate-500" />
-                                    <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl">{activePage.title}</h1>
+                                    <ActivePageIcon className="h-10 w-10 text-muted-foreground" />
+                                    <h1 className="text-4xl font-black tracking-tight text-foreground sm:text-5xl">{activePage.title}</h1>
                                 </div>
-                                <p className="mt-6 text-lg leading-9 text-slate-200">{activePage.summary}</p>
+                                <p className="mt-6 text-lg leading-9 text-foreground">{activePage.summary}</p>
                                 <div className="mt-6 flex flex-wrap gap-2">
                                     {activePage.stats.map((stat) => (
                                         <PageStat key={stat.label} {...stat} />
@@ -2214,50 +2128,50 @@ export default function DocsClientPage() {
                                 </div>
                             </div>
 
-                            <button
+                            <Button variant="ghost"
                                 type="button"
                                 onClick={copyCurrentPageLink}
-                                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:text-white"
+                                className="inline-flex items-center gap-2 border px-4 py-2 text-sm font-medium transition-colors"
                             >
                                 {copiedPageLink ? <Icons.Check className="h-4 w-4 text-emerald-400" /> : <Icons.Copy className="h-4 w-4" />}
                                 {copiedPageLink ? 'Copied' : 'Copy'}
-                            </button>
+                            </Button>
                         </div>
 
                         <article className="space-y-12 pt-10">{activePage.content}</article>
 
-                        <div className="mt-14 border-t border-white/8 pt-10">
+                        <div className="mt-14 border-t border-border pt-10">
                             <div className={cn('grid gap-4', pagerPages.length > 1 ? 'md:grid-cols-2' : 'md:grid-cols-1')}>
                                 {previousPage && (
-                                    <button
+                                    <Button variant="ghost"
                                         type="button"
                                         onClick={() => openPage(previousPage.id)}
-                                        className="group flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.02] px-6 py-5 text-left transition-colors hover:bg-white/[0.04]"
+                                        className="group flex items-center justify-between border px-6 py-5 text-left transition-colors h-auto whitespace-normal"
                                     >
                                         <div>
-                                            <p className="text-sm text-slate-500">Previous</p>
-                                            <p className="mt-1 text-2xl font-semibold text-white">{previousPage.title}</p>
+                                            <p className="text-sm text-muted-foreground">Previous</p>
+                                            <p className="mt-1 text-2xl font-semibold text-foreground">{previousPage.title}</p>
                                         </div>
-                                        <Icons.ChevronRight className="h-5 w-5 rotate-180 text-slate-600 transition-transform group-hover:-translate-x-0.5 group-hover:text-white" />
-                                    </button>
+                                        <Icons.ChevronRight className="h-5 w-5 rotate-180 text-muted-foreground transition-transform group-hover:-translate-x-0.5 group-hover:text-foreground" />
+                                    </Button>
                                 )}
 
                                 {nextPage && (
-                                    <button
+                                    <Button variant="ghost"
                                         type="button"
                                         onClick={() => openPage(nextPage.id)}
-                                        className="group flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.02] px-6 py-5 text-left transition-colors hover:bg-white/[0.04]"
+                                        className="group flex items-center justify-between border px-6 py-5 text-left transition-colors h-auto whitespace-normal"
                                     >
                                         <div>
-                                            <p className="text-sm text-slate-500">Next</p>
-                                            <p className="mt-1 text-2xl font-semibold text-white">{nextPage.title}</p>
+                                            <p className="text-sm text-muted-foreground">Next</p>
+                                            <p className="mt-1 text-2xl font-semibold text-foreground">{nextPage.title}</p>
                                         </div>
-                                        <Icons.ChevronRight className="h-5 w-5 text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-white" />
-                                    </button>
+                                        <Icons.ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                                    </Button>
                                 )}
                             </div>
 
-                            <p className="mt-8 text-sm text-slate-500">Last updated August 25, 2026</p>
+                            <p className="mt-8 text-sm text-muted-foreground">Last updated August 25, 2026</p>
                         </div>
                     </div>
                 </main>

@@ -1,3 +1,4 @@
+import { moduleCoverSelectionError } from '@/lib/moduleCoverSelection';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
@@ -16,6 +17,7 @@ import {
 import { applyVerifiedCreatorBadges } from '@/lib/moduleCreatorVerification';
 import { applyOfficialModuleLabels, getRoLinkStaffDiscordIds } from '@/lib/moduleOfficial';
 import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,7 +102,7 @@ export async function GET() {
     const userId = String((session.user as { id?: string }).id || '');
     const query = supabase
         .from('addon_modules')
-        .select('id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
+        .select('cover_images, id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
         .order('name', { ascending: true });
 
     const { data, error } = userId
@@ -112,7 +114,7 @@ export async function GET() {
     }
 
     const staffDiscordIds = await getRoLinkStaffDiscordIds();
-    let installTargets: Array<{ id: string; name: string; icon: string | null; installedModuleCount: number; moduleLimit: number }> = [];
+    let installTargets: Array<{ id: string; name: string; icon: string | null; installedModuleCount: number; installedModuleIds: string[]; moduleLimit: number }> = [];
 
     if (session.accessToken && userId) {
         try {
@@ -139,12 +141,12 @@ export async function GET() {
             const checkedGuilds = await Promise.all(guildChecks);
             const manageableGuilds = checkedGuilds
                 .filter((guild): guild is { id: string; name: string; icon: string | null } => Boolean(guild));
-            const installCountsByServer = new Map<string, number>();
+            const installedIdsByServer = new Map<string, string[]>();
 
             if (manageableGuilds.length > 0) {
                 const { data: installedRows, error: installedError } = await supabase
                     .from('server_addon_modules')
-                    .select('server_id')
+                    .select('server_id, module_id')
                     .in('server_id', manageableGuilds.map((guild) => guild.id));
 
                 if (installedError) {
@@ -153,14 +155,17 @@ export async function GET() {
 
                 for (const row of installedRows || []) {
                     const targetServerId = String((row as { server_id?: string }).server_id || '');
-                    installCountsByServer.set(targetServerId, (installCountsByServer.get(targetServerId) || 0) + 1);
+                    const ids = installedIdsByServer.get(targetServerId) || [];
+                    ids.push(String(row.module_id));
+                    installedIdsByServer.set(targetServerId, ids);
                 }
             }
 
             installTargets = manageableGuilds
                 .map((guild) => ({
                     ...guild,
-                    installedModuleCount: installCountsByServer.get(guild.id) || 0,
+                    installedModuleCount: installedIdsByServer.get(guild.id)?.length || 0,
+                    installedModuleIds: installedIdsByServer.get(guild.id) || [],
                     moduleLimit: MAX_SERVER_ADDON_MODULES,
                 }))
                 .sort((first, second) => first.name.localeCompare(second.name));
@@ -173,10 +178,22 @@ export async function GET() {
         applyOfficialModuleLabels((data || []) as Record<string, unknown>[], staffDiscordIds),
     );
 
+    // Aggregate once for the authorized catalog; never fetch individual review rows.
+    const ratings = new Map<string, { average: number; total: number }>();
+    let ratingsAvailable = data?.length === 0;
+    if (data?.length && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        const { data: summaries, error: ratingsError } = await getSupabaseAdmin().rpc('module_catalog_ratings', { p_modules: data.map(row => row.id) });
+        ratingsAvailable = !ratingsError;
+        if (ratingsError) console.warn('[Marketplace ratings]', { code: ratingsError.code });
+        for (const summary of summaries || []) {
+            ratings.set(summary.module_id, { average: Number(summary.average), total: Number(summary.total) });
+        }
+    }
     return NextResponse.json({
         modules: labeledModules
             .map((row) => normalizeAddonModule(row, false))
-            .filter(Boolean),
+            .filter((addon): addon is NonNullable<typeof addon> => Boolean(addon))
+            .map(addon => ({ ...addon, reviewRating: ratingsAvailable ? ratings.get(addon.id) || { average: 0, total: 0 } : null })),
         installTargets,
     });
 }
@@ -214,6 +231,8 @@ export async function POST(req: Request) {
     }
 
     const input = sanitized.input;
+    const coverError = await moduleCoverSelectionError(input.coverImages, userId);
+    if (coverError) return coverError;
     try {
         const duplicateSubmission = await getDuplicateCreatorModuleSubmission(userId, input.sourceCode || '');
         if (duplicateSubmission) {
@@ -247,13 +266,14 @@ export async function POST(req: Request) {
             source_code: input.sourceCode,
             source_checksum: checksumModuleSource(input.sourceCode || ''),
             config_schema: input.configSchema || {},
+            ...(input.coverImages !== undefined ? { cover_images: input.coverImages } : {}),
             author_discord_id: userId,
             submitted_at: now,
             moderation_note: '',
             updated_at: now,
             published_at: null,
         })
-        .select('id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
+        .select('cover_images, id, slug, name, description, version, category, status, source_checksum, config_schema, author_discord_id, submitted_at, reviewed_at, reviewed_by_discord_id, moderation_note, created_at, updated_at, published_at')
         .single();
 
     if (error) {

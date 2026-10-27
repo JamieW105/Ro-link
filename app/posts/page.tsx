@@ -1,5 +1,8 @@
 'use client';
+import { PublicLoading } from '@/components/public/PublicLoading';
 
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 import { ArrowRight, CalendarDays, Newspaper, PackageOpen, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -60,7 +63,7 @@ export default function PostsPage() {
                         <div className="rl-search-wrap">
                             <Search aria-hidden="true" />
                             <label className="rl-sr-only" htmlFor="post-search">Search updates</label>
-                            <input
+                            <Input
                                 className="rl-search-field"
                                 id="post-search"
                                 type="search"
@@ -72,17 +75,17 @@ export default function PostsPage() {
                     </div>
 
                     {loading ? (
-                        <div className="rl-loading-line" aria-label="Loading current posts" />
+                        <PublicLoading />
                     ) : filtered.length === 0 ? (
-                        <div className="rl-empty-state">
+                        <Card className="rl-empty-state">
                             <Newspaper aria-hidden="true" />
                             <strong>No matching updates</strong>
                             <span>Try another search or check back after the next release.</span>
-                        </div>
+                        </Card>
                     ) : (
                         <div className="rl-data-list">
                             {filtered.map((post) => (
-                                <Link className="rl-data-row" href={`/posts/${post.slug}`} key={post.id}>
+                                <Card className="overflow-hidden" key={post.id}><Link className="rl-data-row" href={`/posts/${post.slug}`}>
                                     <div>
                                         <div className="rl-data-row-meta">
                                             <span><CalendarDays aria-hidden="true" />{formatPostDate(post.published_at)}</span>
@@ -93,7 +96,7 @@ export default function PostsPage() {
                                         <p>{post.description}</p>
                                     </div>
                                     <span className="rl-data-row-action"><ArrowRight aria-hidden="true" /></span>
-                                </Link>
+                                </Link></Card>
                             ))}
                         </div>
                     )}

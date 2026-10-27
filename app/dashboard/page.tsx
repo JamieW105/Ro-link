@@ -1,56 +1,18 @@
 'use client';
 
-import { BriefcaseBusiness as LucideBriefcaseBusiness } from 'lucide-react';
+import { DashboardHeader, DashboardBrand } from "@/components/dashboard/DashboardHeader";
+import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
 
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Status, StatusLabel } from '@/components/ui/status';
 import { useSession, signIn, signOut } from "next-auth/react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Image from 'next/image';
 import Link from 'next/link';
 import { getDiscordBotInviteUrl } from "@/lib/discordInvite";
-import { getDiscordGuildIconProxyUrl, getDiscordMediaProxyUrl } from "@/lib/discordMedia";
-import { LayoutDashboard, LogOut, MonitorPlay, Plus, ShieldAlert, Store } from "lucide-react";
-
-const LogOutIcon = () => <LogOut size={14} aria-hidden="true" />;
-const PlusIcon = () => <Plus size={14} strokeWidth={2.5} aria-hidden="true" />;
-const SettingsIcon = () => <LayoutDashboard size={15} aria-hidden="true" />;
-const MarketplaceIcon = () => <Store size={15} aria-hidden="true" />;
-const LivePanelIcon = () => <MonitorPlay size={15} aria-hidden="true" />;
-
-function ActionTooltip({ label }: { label: string }) {
-    return (
-        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-200 opacity-0 shadow-xl transition-all group-hover/server-action:translate-y-0 group-hover/server-action:opacity-100">
-            {label}
-        </span>
-    );
-}
-
-function ServerIconLink({
-    href,
-    label,
-    children,
-    tone = 'default',
-}: {
-    href: string;
-    label: string;
-    children: ReactNode;
-    tone?: 'default' | 'live' | 'market';
-}) {
-    const toneClass = tone === 'live'
-        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:border-emerald-300/70 hover:bg-emerald-500/20'
-        : tone === 'market'
-            ? 'border-sky-500/30 bg-sky-500/10 text-sky-200 hover:border-sky-300/70 hover:bg-sky-500/20'
-            : 'border-slate-700 bg-slate-800 text-slate-200 hover:border-sky-400/60 hover:bg-sky-500/15 hover:text-white';
-
-    return (
-        <Link
-            href={href}
-            aria-label={label}
-            className={`group/server-action relative flex h-10 w-10 items-center justify-center rounded-lg border transition-all ${toneClass}`}
-        >
-            {children}
-            <ActionTooltip label={label} />
-        </Link>
-    );
-}
+import { getDiscordGuildIconProxyUrl } from "@/lib/discordMedia";
+import { BriefcaseBusiness, Gauge, LayoutDashboard, Loader2, LogOut, MonitorPlay, Plus, ShieldAlert, Store } from "lucide-react";
 
 interface Guild {
     id: string;
@@ -63,6 +25,8 @@ interface Guild {
 }
 
 interface GuildDashboardPermissions {
+    can_view_staff_shifts: boolean;
+    can_manage_staff_shifts: boolean;
     can_access_dashboard: boolean;
     can_access_live_panel: boolean;
     is_admin: boolean;
@@ -212,187 +176,102 @@ export default function Dashboard() {
 
     if (status === "loading") {
         return (
-            <div className="min-h-screen bg-[#020617] flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-sky-600 border-t-transparent rounded-full animate-spin"></div>
+            <div role="status" className="flex min-h-dvh items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />Loading dashboard…
             </div>
         );
     }
 
     if (status === "unauthenticated") {
         return (
-            <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-6 text-center">
-                <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center mb-6 text-slate-400 border border-slate-700 shadow-xl">
-                    <ShieldAlert size={32} aria-hidden="true" />
-                </div>
-                <h1 className="text-2xl font-bold mb-2 tracking-tight">Access Denied</h1>
-                <p className="text-slate-400 mb-8 max-w-sm text-sm">Please authenticate with Discord to manage your community servers.</p>
-                <button
-                    onClick={() => signIn('discord')}
-                    className="bg-sky-600 px-6 py-2.5 rounded-lg font-semibold hover:bg-sky-500 transition-all shadow-lg shadow-sky-900/10 text-sm"
-                >
-                    Sign In with Discord
-                </button>
-            </div>
+            <main className="flex min-h-dvh items-center justify-center bg-background p-4 text-foreground">
+                <Card className="w-full max-w-md">
+                    <CardHeader>
+                        <ShieldAlert className="mb-2 size-5 text-muted-foreground" aria-hidden="true" />
+                        <CardTitle>Sign in to your dashboard</CardTitle>
+                        <CardDescription>Authenticate with Discord to manage your community servers.</CardDescription>
+                    </CardHeader>
+                    <CardFooter><Button type="button" onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}>Sign In with Discord</Button></CardFooter>
+                </Card>
+            </main>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-200">
-            {/* Sticky Professional Navbar */}
-            <nav className="sticky top-0 z-50 bg-[#020617]/80 backdrop-blur-md border-b border-slate-800">
-                <div className="max-w-7xl mx-auto flex min-h-16 items-center justify-between gap-3 px-4 py-3 sm:px-8 md:h-20 md:py-0">
-                    <Link href="/" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
-                        <img src="/Media/Ro-LinkIcon.png" alt="Ro-Link" className="w-8 h-8 md:w-9 md:h-9 rounded-lg object-contain shadow-lg border border-white/5" />
-                        <span className="text-base md:text-xl font-bold tracking-tight text-white">Ro-Link</span>
-                    </Link>
-
-                    <div className="ml-auto flex items-center gap-2 border-l border-slate-800 pl-3 sm:gap-4 md:pl-4">
-                        {(sessionUserId === '953414442060746854') && (
-                            <Link
-                                href="/management"
-                                className="hidden md:flex items-center gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-sky-900/20"
-                            >
-                                <LucideBriefcaseBusiness width="14" height="14" strokeWidth="2.5" />
-                                Management
-                            </Link>
-                        )}
-                        <div className="text-right hidden sm:block">
-                            <p className="text-sm font-semibold text-white leading-none mb-1">{session?.user?.name}</p>
-                            <button type="button" onClick={handleSignOut} className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest flex items-center gap-1.5 justify-end">
-                                <LogOutIcon />
-                                Sign Out
-                            </button>
-                        </div>
-                        <div className="relative group">
-                            <img src={getDiscordMediaProxyUrl(session?.user?.image)} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border border-slate-700 shadow-sm transition-transform group-hover:scale-105" />
-                            <button
-                                type="button"
-                                onClick={handleSignOut}
-                                className="sm:hidden absolute -bottom-1 -right-1 bg-slate-900 border border-slate-700 p-1 rounded-md text-slate-400 hover:text-red-400 shadow-xl"
-                                title="Sign Out"
-                            >
-                                <LogOutIcon />
-                            </button>
-                        </div>
-                    </div>
+        <div className="min-h-dvh bg-background text-foreground">
+            <DashboardHeader contained>
+                <DashboardBrand href="/" />
+                <div className="flex shrink-0 items-center gap-2">
+                    <ThemeToggle />
+                    {sessionUserId === '953414442060746854' && <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex"><Link href="/management"><BriefcaseBusiness className="size-3.5" aria-hidden="true" />Management</Link></Button>}
+                    <span className="hidden max-w-40 truncate text-xs text-muted-foreground sm:inline">{session?.user?.name}</span>
+                    <Button variant="outline" size="sm" type="button" onClick={handleSignOut}><LogOut className="size-3.5" aria-hidden="true" />Sign Out</Button>
                 </div>
-            </nav>
+            </DashboardHeader>
 
-            <div className="motion-page max-w-7xl mx-auto px-4 sm:px-8 py-6 md:py-12">
-                <header className="mb-6 flex flex-col gap-4 md:mb-12 md:flex-row md:items-end md:justify-between">
+            <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8">
+                <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                        <h1 className="text-xl md:text-4xl font-extrabold text-white tracking-tight mb-1">Select a Server</h1>
-                        <p className="text-slate-500 text-xs md:text-base font-medium">Choose a community to manage and monitor.</p>
+                        <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight"><span aria-hidden="true" data-slot="page-icon" className="inline-flex size-14 shrink-0 items-center justify-center text-foreground"><LayoutDashboard className="size-6" /></span>Select a Server</h1>
+                        <p className="mt-1 text-sm text-muted-foreground">Choose a community to manage and monitor.</p>
                     </div>
-                    <Link
-                        href="/dashboard/marketplace"
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-5 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:border-sky-400/60 hover:bg-sky-500/20"
-                    >
-                        <MarketplaceIcon />
-                        Open Marketplace
-                    </Link>
-                    <Link
-                        href="/dashboard/creator/modules"
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3 text-xs font-bold uppercase tracking-widest text-emerald-200 transition-colors hover:border-emerald-400/60 hover:bg-emerald-500/20"
-                    >
-                        <PlusIcon />
-                        Creator Dashboard
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button asChild variant="outline" size="sm"><Link href="/dashboard/marketplace" aria-label="Open Marketplace"><Store className="size-4" aria-hidden="true" />Marketplace</Link></Button>
+                        <Button asChild variant="outline" size="sm"><Link href="/dashboard/creator/modules" aria-label="Creator Dashboard"><Plus className="size-4" aria-hidden="true" />Creator Dashboard</Link></Button>
+                    </div>
                 </header>
 
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center py-32">
-                        <div className="w-10 h-10 border-2 border-sky-600 border-t-transparent rounded-full animate-spin mb-6"></div>
-                        <p className="text-slate-500 text-sm font-medium animate-pulse">Loading servers...</p>
-                    </div>
+                    <Card><CardContent role="status" className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" aria-hidden="true" />Loading servers…</CardContent></Card>
                 ) : guildsError ? (
-                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-8 text-center">
-                        <h2 className="text-lg font-bold text-white">
-                            {needsReauthentication ? 'Discord session expired' : 'Could not load servers'}
-                        </h2>
-                        <p className="mt-2 text-sm font-medium text-red-100/80">
-                            {needsReauthentication ? 'Sign in with Discord again to refresh your server access.' : guildsError}
-                        </p>
-                        <button
-                            onClick={() => needsReauthentication
-                                ? signIn('discord', { callbackUrl: '/dashboard' })
-                                : window.location.reload()}
-                            className="mt-6 rounded-lg bg-red-500 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-red-400"
-                        >
-                            {needsReauthentication ? 'Sign in again' : 'Retry'}
-                        </button>
-                    </div>
+                    <Card role="alert">
+                        <CardHeader>
+                            <CardTitle>{needsReauthentication ? 'Discord session expired' : 'Could not load servers'}</CardTitle>
+                            <CardDescription>{needsReauthentication ? 'Sign in with Discord again to refresh your server access.' : guildsError}</CardDescription>
+                        </CardHeader>
+                        <CardFooter><Button type="button" variant="outline" onClick={() => needsReauthentication ? signIn('discord', { callbackUrl: '/dashboard' }) : window.location.reload()}>{needsReauthentication ? 'Sign in again' : 'Retry'}</Button></CardFooter>
+                    </Card>
                 ) : sortedGuilds.length === 0 ? (
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-8 text-center">
-                        <h2 className="text-lg font-bold text-white">No servers available</h2>
-                        <p className="mt-2 text-sm font-medium text-slate-500">Ro-Link could not find any Discord servers you can manage.</p>
-                    </div>
+                    <Card><CardHeader>
+                        <CardTitle>No servers available</CardTitle>
+                        <CardDescription>Ro-Link could not find any Discord servers you can manage.</CardDescription>
+                    </CardHeader></Card>
                 ) : (
-                    <div className="motion-list grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
-                        {sortedGuilds.map(guild => (
-                            <div key={guild.id} className="interactive-lift subtle-glow group relative flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40 p-5 transition-all hover:border-sky-500/30 sm:p-6">
-                                <div className="mb-5 flex flex-col items-start gap-4 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
-                                    <div className="relative">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {sortedGuilds.map(guild => {
+                            const dashboardAccess = canOpenDashboardFromServerList(guild, guildPermissions[guild.id]);
+                            const livePanelAccess = canOpenLivePanelFromServerList(guild, guildPermissions[guild.id]);
+                            return (
+                                <Card key={guild.id} aria-label={guild.name} className="flex min-w-0 flex-col">
+                                    <CardHeader className="flex-row items-center gap-3 p-4">
                                         {guild.icon ? (
-                                            <img
-                                                src={getDiscordGuildIconProxyUrl(guild.id, guild.icon)}
-                                                alt={guild.name}
-                                                className="w-16 h-16 rounded-xl shadow-lg relative z-10 border border-white/5"
-                                            />
+                                            <Image unoptimized src={getDiscordGuildIconProxyUrl(guild.id, guild.icon)} alt="" width={40} height={40} className="size-10 shrink-0 rounded-md" />
                                         ) : (
-                                            <div className="w-16 h-16 rounded-xl bg-slate-800 flex items-center justify-center text-xl font-bold text-sky-500 relative z-10 border border-white/5">
-                                                {guild.name.substring(0, 1)}
-                                            </div>
+                                            <div aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-medium text-muted-foreground">{guild.name.substring(0, 1)}</div>
                                         )}
-                                        {guild.hasBot && (
-                                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-[#020617] z-20 shadow-lg"></div>
-                                        )}
-                                    </div>
-                                    <div className="break-all rounded-md border border-slate-700/50 bg-slate-800/50 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                        ID: {guild.id.substring(0, 8)}
-                                    </div>
-                                </div>
-
-                                <h3 className="mb-6 w-full break-words text-lg font-bold tracking-tight text-white sm:mb-8">{guild.name}</h3>
-
-                                <div className="mt-auto">
-                                    {guild.hasBot ? (
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex items-center gap-2">
-                                                {canOpenDashboardFromServerList(guild, guildPermissions[guild.id]) && (
-                                                    <ServerIconLink href={`/dashboard/${guild.id}`} label="Open Console">
-                                                        <SettingsIcon />
-                                                    </ServerIconLink>
-                                                )}
-                                                {canOpenLivePanelFromServerList(guild, guildPermissions[guild.id]) && (
-                                                    <ServerIconLink href={`/dashboard/${guild.id}/live-panel`} label="Live Panel" tone="live">
-                                                        <LivePanelIcon />
-                                                    </ServerIconLink>
-                                                )}
-                                                {canOpenMarketplaceFromServerList(guild) && (
-                                                    <ServerIconLink href="/dashboard/marketplace" label="Open Marketplace" tone="market">
-                                                        <MarketplaceIcon />
-                                                    </ServerIconLink>
-                                                )}
-                                            </div>
+                                        <div className="min-w-0 space-y-1.5">
+                                            <CardTitle className="break-words text-sm leading-snug">{guild.name}</CardTitle>
+                                            <Status variant={guild.hasBot ? 'success' : 'default'} className="px-2 py-0.5"><StatusLabel>{guild.hasBot ? 'Installed' : 'Not installed'}</StatusLabel></Status>
                                         </div>
-                                    ) : (
-                                        <a
-                                            href={getDiscordBotInviteUrl(guild.id)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-sky-900/10 flex items-center justify-center gap-2"
-                                        >
-                                            <PlusIcon />
-                                            Invite
-                                        </a>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-4"><p className="break-all text-xs text-muted-foreground">Server ID: {guild.id}</p></CardContent>
+                                    <CardFooter className="mt-auto flex-wrap border-t border-border p-4">
+                                        {guild.hasBot ? (
+                                            <>
+                                                {dashboardAccess && <Button asChild size="sm"><Link href={`/dashboard/${guild.id}`}><Gauge className="size-4" aria-hidden="true" />Dashboard</Link></Button>}
+                                                {livePanelAccess && <Button asChild variant="outline" size="sm"><Link href={`/dashboard/${guild.id}/live-panel`}><MonitorPlay className="size-4" aria-hidden="true" />Live Panel</Link></Button>}
+                                                {!dashboardAccess && !livePanelAccess && <p className="text-xs text-muted-foreground">Ask a server administrator for dashboard access.</p>}
+                                            </>
+                                        ) : (
+                                            <Button asChild size="sm"><a href={getDiscordBotInviteUrl(guild.id)} target="_blank" rel="noopener noreferrer"><Plus className="size-4" aria-hidden="true" />Invite</a></Button>
+                                        )}
+                                    </CardFooter>
+                                </Card>
+                            );
+                        })}
                     </div>
                 )}
-            </div>
+            </main>
         </div>
     );
 }

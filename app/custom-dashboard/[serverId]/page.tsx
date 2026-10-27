@@ -1,5 +1,10 @@
 'use client';
 
+import { Card } from '@/components/ui/card';
+
+import { Button } from '@/components/ui/button';
+
+
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -24,6 +29,8 @@ interface DashboardInfo {
 
 interface DashboardPermissions {
     can_access_dashboard: boolean;
+    can_view_staff_shifts: boolean;
+    can_manage_staff_shifts: boolean;
     can_access_live_panel: boolean;
     is_admin: boolean;
 }
@@ -77,6 +84,10 @@ export default function CustomDashboardLandingPage() {
                     return;
                 }
 
+                if (permissions?.can_view_staff_shifts || permissions?.can_manage_staff_shifts) {
+                    router.replace(`/dashboard/${serverId}/staff-shifts`);
+                    return;
+                }
                 setAccessDenied(true);
             } catch {
                 setAccessError('unavailable');
@@ -101,7 +112,7 @@ export default function CustomDashboardLandingPage() {
 
     if (loading || status === 'loading') {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-[#020617]" style={{ background: theme.gradient }}>
+            <div className="flex min-h-screen items-center justify-center bg-background">
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: theme.accent, borderTopColor: 'transparent' }} />
             </div>
         );
@@ -111,17 +122,17 @@ export default function CustomDashboardLandingPage() {
         const requiresSignIn = accessError === 'reauthenticate';
         const temporarilyUnavailable = accessError === 'unavailable';
         return (
-            <div className="flex min-h-screen items-center justify-center bg-[#020617] p-6 text-white" style={{ background: theme.gradient }}>
-                <div className="w-full max-w-md rounded-2xl border bg-slate-900/70 p-8 text-center shadow-2xl shadow-black/30" style={{ borderColor: theme.border }}>
-                    <img src={iconUrl} alt="" className="mx-auto mb-5 h-14 w-14 rounded-xl bg-slate-800 object-cover" />
-                    <h1 className="text-2xl font-bold tracking-tight">
+            <div className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
+                <Card className="w-full max-w-md rounded-xl border bg-card p-8 text-center">
+                    <img src={iconUrl} alt="" className="mx-auto mb-5 h-14 w-14 rounded-xl bg-muted object-cover" />
+                    <h1 className="text-2xl font-medium tracking-tight">
                         {requiresSignIn
                             ? 'Your Discord session has expired.'
                             : temporarilyUnavailable
                                 ? 'Dashboard access could not be checked.'
                                 : 'Sorry, you do not have access to this dashboard.'}
                     </h1>
-                    <p className="mt-3 text-sm leading-6 text-slate-400">
+                    <p className="mt-3 text-sm leading-6 text-muted-foreground">
                         {requiresSignIn
                             ? 'Sign in again to continue.'
                             : temporarilyUnavailable
@@ -129,31 +140,31 @@ export default function CustomDashboardLandingPage() {
                                 : 'If this is a mistake, please contact the server owner.'}
                     </p>
                     {(requiresSignIn || temporarilyUnavailable) && (
-                        <button
+                        <Button variant="default" size="default"
                             type="button"
                             onClick={() => requiresSignIn ? handleSignIn() : window.location.reload()}
-                            className="mt-6 w-full rounded-xl px-5 py-3 text-sm font-bold text-white transition-all hover:brightness-110"
-                            style={{ backgroundColor: theme.accent }}
+                            className="mt-6 w-full transition-all hover:brightness-110"
+
                         >
                             {requiresSignIn ? 'Sign in with Discord' : 'Try again'}
-                        </button>
+                        </Button>
                     )}
-                </div>
+                </Card>
             </div>
         );
     }
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-[#020617] p-6 text-white" style={{ background: theme.gradient }}>
-            <div className="w-full max-w-md rounded-2xl border bg-slate-900/70 p-8 text-center shadow-2xl shadow-black/30" style={{ borderColor: theme.border }}>
-                <img src={iconUrl} alt="" className="mx-auto mb-5 h-14 w-14 rounded-xl bg-slate-800 object-cover" />
+        <div className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
+            <Card className="w-full max-w-md rounded-xl border bg-card p-8 text-center">
+                <img src={iconUrl} alt="" className="mx-auto mb-5 h-14 w-14 rounded-xl bg-muted object-cover" />
                 {dashboard?.hostname && (
-                    <p className="mb-4 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: theme.accentText }}>
+                    <p className="mb-4 font-mono text-xs font-medium">
                         {dashboard.hostname}
                     </p>
                 )}
-                <h1 className="text-2xl font-bold tracking-tight">Sign into {serverName} Dashboard</h1>
-                <p className="mt-3 text-sm leading-6 text-slate-400">
+                <h1 className="text-2xl font-medium tracking-tight">Sign into {serverName} Dashboard</h1>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">
                     {description}
                 </p>
                 {dashboard?.metadata?.supportUrl && (
@@ -161,20 +172,20 @@ export default function CustomDashboardLandingPage() {
                         href={dashboard.metadata.supportUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-4 inline-flex text-xs font-bold uppercase tracking-widest hover:text-white"
-                        style={{ color: theme.accentText }}
+                        className="mt-4 inline-flex text-xs font-medium hover:text-foreground"
+
                     >
                         Contact Support
                     </a>
                 )}
-                <button
+                <Button variant="default" size="default"
                     onClick={handleSignIn}
-                    className="mt-6 w-full rounded-xl px-5 py-3 text-sm font-bold text-white transition-all hover:brightness-110"
-                    style={{ backgroundColor: theme.accent }}
+                    className="mt-6 w-full transition-all hover:brightness-110"
+
                 >
                     Sign in with Discord
-                </button>
-            </div>
+                </Button>
+            </Card>
         </div>
     );
 }

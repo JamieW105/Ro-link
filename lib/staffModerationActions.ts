@@ -79,28 +79,6 @@ export async function updateStaffModerationActionForumThread(actionId: string, f
     }
 }
 
-export async function recordStaffModerationActionLog(input: {
-    action: StaffModerationActionRecord;
-    logAction: string;
-    target?: string | null;
-}) {
-    const client = getSupabaseAdmin();
-    const { error } = await client
-        .from('logs')
-        .insert([{
-            server_id: input.action.guild_id,
-            action: input.logAction,
-            target: trimString(input.target) || input.action.guild_id,
-            moderator: input.action.created_by,
-            timestamp: new Date().toISOString(),
-            moderation_action_id: input.action.id,
-        }]);
-
-    if (error) {
-        throw new Error(error.message);
-    }
-}
-
 export async function fetchStaffModerationAction(actionId: string, client: SupabaseClientLike = getSupabaseAdmin()) {
     const normalizedActionId = trimString(actionId);
     if (!normalizedActionId) return null;

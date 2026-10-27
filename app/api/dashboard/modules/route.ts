@@ -275,7 +275,7 @@ export async function POST(req: Request) {
 
             return NextResponse.json({
                 success: true,
-                module,
+                module: customModule,
             }, { status: customAction === 'create' ? 201 : 200 });
         }
 

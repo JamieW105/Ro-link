@@ -1,0 +1,87 @@
+/* Keep the entire Dice palette local: public and legacy root tokens must not leak in. */
+.theme {
+  --dice-card: oklch(1 0 0);
+  --dice-popover: oklch(1 0 0);
+  --dice-foreground: oklch(0.145 0 0);
+  --dice-primary: oklch(0.205 0 0);
+  --dice-primary-foreground: oklch(0.985 0 0);
+  --dice-secondary: oklch(0.97 0 0);
+  --dice-muted: oklch(0.97 0 0);
+  --dice-muted-foreground: oklch(0.556 0 0);
+  --dice-accent: oklch(0.97 0 0);
+  --dice-border: oklch(0.922 0 0);
+  --dice-ring: oklch(0.708 0 0);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  color-scheme: light;
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+:global(.dark) .theme,
+.theme:global(.dark) {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --dice-card: oklch(0.205 0 0);
+  --dice-popover: oklch(0.205 0 0);
+  --dice-foreground: oklch(0.985 0 0);
+  --dice-primary: oklch(0.922 0 0);
+  --dice-primary-foreground: oklch(0.205 0 0);
+  --dice-secondary: oklch(0.269 0 0);
+  --dice-muted: oklch(0.269 0 0);
+  --dice-muted-foreground: oklch(0.708 0 0);
+  --dice-accent: oklch(0.269 0 0);
+  --dice-border: oklch(1 0 0 / 0.1);
+  --dice-ring: oklch(0.556 0 0);
+  color-scheme: dark;
+}
+
+.theme svg[stroke="currentColor"] {
+  stroke-width: 1.75;
+}
+
+/* Hide dashboard scrollbar chrome without changing overflow or scroll input.
+   Include the document, notices, and portaled themed dialogs. */
+:global(html):has(.theme),
+:global(body):has(.theme),
+:global(body):has(.theme) [data-slot="site-notices"],
+.theme,
+.theme * {
+  scrollbar-width: none;
+}
+
+:global(html):has(.theme)::-webkit-scrollbar,
+:global(body):has(.theme)::-webkit-scrollbar,
+:global(body):has(.theme) [data-slot="site-notices"]::-webkit-scrollbar,
+.theme::-webkit-scrollbar,
+.theme *::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Only an active server dashboard owns the viewport. Display-contents route and
+   theme wrappers let notices and the shell share the body's flex layout. */
+:global(body):has(.shell) {
+  display: flex;
+  height: 100dvh;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.shell {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Several or long notices must not push the dashboard outside the viewport. */
+:global(body):has(.shell) [data-slot="site-notices"] {
+  max-height: 35dvh;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}

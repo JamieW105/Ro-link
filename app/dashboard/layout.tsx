@@ -1,3 +1,4 @@
+import { DashboardTheme } from "@/components/dashboard/DashboardTheme";
 import { Metadata } from "next";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
@@ -36,5 +37,5 @@ export default async function DashboardLayout({
         redirect("/report#appeal");
     }
 
-    return <>{children}</>;
+    return <DashboardTheme>{children}</DashboardTheme>;
 }

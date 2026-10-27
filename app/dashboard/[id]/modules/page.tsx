@@ -1,7 +1,15 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
+
+import { Plus, X } from 'lucide-react';
+
+import { Card } from '@/components/ui/card';
+
+import { Button } from '@/components/ui/button';
+
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 type ModuleConfigFieldType = 'bool' | 'dropdown' | 'checkboxes' | 'color' | 'integer' | 'string' | 'group' | 'player' | 'server';
@@ -49,12 +57,12 @@ function formatDate(value: string | null) {
 }
 
 function reviewBadgeClassName(status: string) {
-    if (status === 'READY') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
-    if (status === 'NEEDS_REUPLOAD') return 'border-red-400/20 bg-red-400/10 text-red-300';
-    if (status === 'PUBLISHED') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300';
-    if (status === 'PENDING_REVIEW') return 'border-amber-400/20 bg-amber-400/10 text-amber-300';
-    if (status === 'REJECTED') return 'border-red-400/20 bg-red-400/10 text-red-300';
-    return 'border-slate-700 bg-slate-950 text-slate-500';
+    if (status === 'READY') return 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400';
+    if (status === 'NEEDS_REUPLOAD') return 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400';
+    if (status === 'PUBLISHED') return 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400';
+    if (status === 'PENDING_REVIEW') return 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400';
+    if (status === 'REJECTED') return 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400';
+    return 'border-border bg-card text-muted-foreground';
 }
 
 function reviewLabel(status: string) {
@@ -67,6 +75,7 @@ function reviewLabel(status: string) {
 
 export default function DashboardModulesPage() {
     const { id } = useParams();
+    const router = useRouter();
     const serverId = Array.isArray(id) ? id[0] : String(id || '');
     const [modules, setModules] = useState<MarketplaceModule[]>([]);
     const [loading, setLoading] = useState(true);
@@ -77,12 +86,6 @@ export default function DashboardModulesPage() {
     const [customModuleLimit, setCustomModuleLimit] = useState(20);
     const [installedTotal, setInstalledTotal] = useState(0);
     const [customInstalledTotal, setCustomInstalledTotal] = useState(0);
-    const [customName, setCustomName] = useState('');
-    const [customDescription, setCustomDescription] = useState('');
-    const [customVersion, setCustomVersion] = useState('');
-    const [customSourceCode, setCustomSourceCode] = useState('');
-    const [customUploadTarget, setCustomUploadTarget] = useState<MarketplaceModule | null>(null);
-    const [uploadingCustom, setUploadingCustom] = useState(false);
 
     const enabledCount = useMemo(() => modules.filter((addon) => addon.installed && addon.enabled).length, [modules]);
     const selectedModule = useMemo(
@@ -153,60 +156,11 @@ export default function DashboardModulesPage() {
         }
     }
 
-    function startCustomUpload(target?: MarketplaceModule) {
-        setCustomUploadTarget(target || null);
-        setCustomName(target?.name || '');
-        setCustomDescription(target?.description || '');
-        setCustomVersion(target?.version || '');
-        setCustomSourceCode('');
-        setError(null);
-    }
-
-    async function submitCustomModule() {
-        setUploadingCustom(true);
-        setError(null);
-
-        try {
-            const response = await fetch('/api/dashboard/modules', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    serverId,
-                    moduleId: customUploadTarget?.id,
-                    action: customUploadTarget ? 'custom-reupload' : 'custom-create',
-                    name: customName,
-                    description: customDescription,
-                    version: customVersion,
-                    sourceCode: customSourceCode,
-                }),
-            });
-            const payload = await response.json().catch(() => ({}));
-
-            if (!response.ok) {
-                throw new Error(String(payload.error || 'Custom module upload failed.'));
-            }
-
-            if (payload.warning) {
-                setError(`Custom module saved but cannot run yet. ${payload.warning}`);
-            }
-
-            setCustomName('');
-            setCustomDescription('');
-            setCustomVersion('');
-            setCustomSourceCode('');
-            setCustomUploadTarget(null);
-            await loadModules();
-        } catch (uploadError) {
-            setError(uploadError instanceof Error ? uploadError.message : 'Custom module upload failed.');
-        } finally {
-            setUploadingCustom(false);
-        }
-    }
 
     if (loading) {
         return (
             <div className="flex min-h-[400px] items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent"></div>
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-transparent"></div>
             </div>
         );
     }
@@ -215,103 +169,48 @@ export default function DashboardModulesPage() {
         <div className="space-y-8">
             <header className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-sky-400">Add-ons Marketplace</p>
-                    <h1 className="mt-2 text-3xl font-black tracking-tight text-white uppercase italic">Modules</h1>
-                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
+                    <p className="text-xs font-medium text-foreground">Add-ons Marketplace</p>
+                    <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground flex items-center gap-3"><PageIcon name="modules" />Modules</h1>
+                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
                         Manage server add-ons that the Roblox runtime loads from Ro-Link when the game bridge starts.
                     </p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 text-right">
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4">
-                        <div className="text-2xl font-black text-white">{installedTotal}</div>
-                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Marketplace / {moduleLimit}</div>
+                <div className="flex shrink-0 flex-wrap gap-3 text-right">
+                    <div className="group/create relative self-center">
+                        <Button asChild variant="outline" size="icon">
+                            <Link href={`/dashboard/${serverId}/modules/new`} aria-label="Create custom module" aria-describedby="create-custom-module-hint">
+                                <Plus className="size-4" aria-hidden="true" />
+                            </Link>
+                        </Button>
+                        <span id="create-custom-module-hint" role="tooltip" className="pointer-events-none absolute left-0 top-full z-30 mt-2 w-max rounded-lg border border-border bg-popover px-3 py-2 text-xs font-medium text-popover-foreground shadow-md opacity-0 transition-opacity group-hover/create:opacity-100 group-focus-within/create:opacity-100">
+                            Create custom module
+                        </span>
                     </div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4">
-                        <div className="text-2xl font-black text-white">{customInstalledTotal}</div>
-                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Custom / {customModuleLimit}</div>
+                    <div className="rounded-xl border border-border bg-card px-5 py-4">
+                        <div className="text-2xl font-semibold text-foreground">{installedTotal}</div>
+                        <div className="whitespace-nowrap text-xs font-medium text-muted-foreground">Marketplace / {moduleLimit}</div>
                     </div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4">
-                        <div className="text-2xl font-black text-emerald-400">{enabledCount}</div>
-                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Enabled</div>
+                    <div className="rounded-xl border border-border bg-card px-5 py-4">
+                        <div className="text-2xl font-semibold text-foreground">{customInstalledTotal}</div>
+                        <div className="whitespace-nowrap text-xs font-medium text-muted-foreground">Custom / {customModuleLimit}</div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-card px-5 py-4">
+                        <div className="text-2xl font-semibold text-emerald-700 dark:text-emerald-400">{enabledCount}</div>
+                        <div className="text-xs font-medium text-muted-foreground">Enabled</div>
                     </div>
                 </div>
             </header>
 
-            <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div>
-                        <h2 className="text-lg font-bold text-white">Server Custom Module</h2>
-                        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
-                            Upload Luau directly to this server without submitting it to the module marketplace.
-                        </p>
-                    </div>
-                    {customUploadTarget && (
-                        <button
-                            type="button"
-                            onClick={() => startCustomUpload()}
-                            className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
-                        >
-                            New Upload
-                        </button>
-                    )}
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
-                    <div className="space-y-3">
-                        <input
-                            value={customName}
-                            onChange={(event) => setCustomName(event.target.value)}
-                            placeholder="Module name"
-                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
-                        />
-                        <input
-                            value={customVersion}
-                            onChange={(event) => setCustomVersion(event.target.value)}
-                            placeholder="Version"
-                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
-                        />
-                        <textarea
-                            value={customDescription}
-                            onChange={(event) => setCustomDescription(event.target.value)}
-                            placeholder="Description"
-                            rows={4}
-                            className="w-full resize-none rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
-                        />
-                    </div>
-                    <div className="space-y-3">
-                        {customUploadTarget && (
-                            <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-xs font-semibold text-amber-200">
-                                Re-uploading {customUploadTarget.name}. Paste the replacement source below.
-                            </div>
-                        )}
-                        <textarea
-                            value={customSourceCode}
-                            onChange={(event) => setCustomSourceCode(event.target.value)}
-                            placeholder="Paste Luau module source"
-                            rows={10}
-                            className="custom-scrollbar w-full resize-y rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 font-mono text-xs text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
-                        />
-                        <button
-                            type="button"
-                            onClick={submitCustomModule}
-                            disabled={uploadingCustom || !customName.trim() || !customSourceCode.trim()}
-                            className="rounded-xl bg-sky-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
-                        >
-                            {uploadingCustom ? 'Uploading' : customUploadTarget ? 'Re-upload Module' : 'Upload Module'}
-                        </button>
-                    </div>
-                </div>
-            </section>
 
             {error && (
-                <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-300">
+                <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-5 py-4 text-sm font-medium text-red-700 dark:text-red-400">
                     {error}
                 </div>
             )}
 
             {modules.length === 0 ? (
-                <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-10 text-center text-slate-500">
+                <div className="rounded-xl border border-border bg-card p-10 text-center text-muted-foreground">
                     No modules are installed on this server.
                 </div>
             ) : (
@@ -320,41 +219,41 @@ export default function DashboardModulesPage() {
                         const busy = savingId === addon.id;
 
                         return (
-                            <article key={addon.id} className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+                            <article key={addon.id} className="rounded-xl border border-border bg-card p-6">
                                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">
+                                            <span className="rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-foreground">
                                                 {addon.category}
                                             </span>
-                                            <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${addon.enabled ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : addon.installed ? 'border-amber-400/20 bg-amber-400/10 text-amber-300' : 'border-slate-700 bg-slate-950 text-slate-500'}`}>
+                                            <span className={`rounded-md border px-2 py-1 text-xs font-medium   ${addon.enabled ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400' : addon.installed ? 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400' : 'border-border bg-card text-muted-foreground'}`}>
                                                 {addon.installed ? (addon.enabled ? 'Enabled' : 'Paused') : 'Available'}
                                             </span>
                                             {addon.status !== 'PUBLISHED' && (
-                                                <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${reviewBadgeClassName(addon.status)}`}>
+                                                <span className={`rounded-md border px-2 py-1 text-xs font-medium   ${reviewBadgeClassName(addon.status)}`}>
                                                     {reviewLabel(addon.status)}
                                                 </span>
                                             )}
                                             {addon.isCustom && (
-                                                <span className="rounded-md border border-violet-300/30 bg-violet-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-violet-200">
+                                                <span className="rounded-md border border-violet-300/30 bg-violet-300/10 px-2 py-1 text-xs font-medium text-violet-200">
                                                     Server Custom
                                                 </span>
                                             )}
                                             {addon.isOfficial && (
-                                                <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+                                                <span className="rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-foreground">
                                                     Official
                                                 </span>
                                             )}
                                             {addon.creatorIsVerified && (
-                                                <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
+                                                <span className="rounded-md border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                                                     Verified Creator
                                                 </span>
                                             )}
                                         </div>
-                                        <h2 className="mt-4 text-xl font-bold text-white">{addon.name}</h2>
-                                        <p className="mt-2 text-sm leading-relaxed text-slate-400">{addon.description || 'No description provided.'}</p>
+                                        <h2 className="mt-4 text-xl font-medium text-foreground">{addon.name}</h2>
+                                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{addon.description || 'No description provided.'}</p>
                                         {addon.isCustom && addon.status === 'NEEDS_REUPLOAD' && (
-                                            <div className="mt-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-xs leading-relaxed text-red-200">
+                                            <div className="mt-3 rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-xs leading-relaxed text-red-700 dark:text-red-400">
                                                 {(addon.reviewResults || [])
                                                     .filter((result) => result.status === 'fail')
                                                     .slice(0, 2)
@@ -365,66 +264,66 @@ export default function DashboardModulesPage() {
                                     </div>
 
                                     <div className="shrink-0 text-left sm:text-right">
-                                        <div className="font-mono text-xs text-slate-500">v{addon.version}</div>
-                                        <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-600">{addon.slug}</div>
-                                        <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                        <div className="font-mono text-xs text-muted-foreground">v{addon.version}</div>
+                                        <div className="mt-1 text-xs font-medium text-muted-foreground">{addon.slug}</div>
+                                        <div className="mt-1 text-xs font-medium text-muted-foreground">
                                             {Object.keys(addon.configSchema || {}).length} config fields
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="mt-5 flex flex-wrap items-center gap-2 md:justify-end">
-                                    <button
+                                    <Button variant="outline" size="default"
                                         type="button"
                                         onClick={() => setSelectedModuleId(addon.id)}
-                                        className="rounded-xl border border-sky-500/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10"
+                                        className="transition-colors"
                                     >
                                         Open
-                                    </button>
+                                    </Button>
                                     {!addon.installed ? (
-                                        <button
+                                        <Button variant="default" size="default"
                                             onClick={() => sendAction(addon, 'install')}
                                             disabled={busy}
-                                            className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
+                                            className="transition-colors disabled:opacity-50"
                                         >
                                             {busy ? 'Saving' : 'Install'}
-                                        </button>
+                                        </Button>
                                     ) : (
                                         <>
                                             {addon.isCustom && (
-                                                <button
-                                                    onClick={() => startCustomUpload(addon)}
+                                                <Button variant="outline" size="default"
+                                                    onClick={() => router.push(`/dashboard/${serverId}/modules/${addon.id}/reupload`)}
                                                     disabled={busy}
-                                                    className="rounded-xl border border-amber-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-amber-200 transition-colors hover:bg-amber-500/10 disabled:opacity-50"
+                                                    className="transition-colors disabled:opacity-50"
                                                 >
                                                     Re-upload
-                                                </button>
+                                                </Button>
                                             )}
                                             <Link
                                                 href={`/dashboard/${serverId}/modules/${addon.id}`}
-                                                className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white"
+                                                className="rounded-xl border border-border px-4 py-3 text-xs font-medium text-foreground transition-colors hover:border-border hover:text-foreground"
                                             >
                                                 Configure
                                             </Link>
-                                            <button
+                                            <Button variant="outline" size="default"
                                                 onClick={() => sendAction(addon, addon.enabled ? 'disable' : 'enable')}
                                                 disabled={busy || (addon.isCustom && addon.status === 'NEEDS_REUPLOAD')}
-                                                className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
+                                                className="transition-colors disabled:opacity-50"
                                             >
                                                 {addon.enabled ? 'Disable' : 'Enable'}
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button variant="outline" size="default"
                                                 onClick={() => sendAction(addon, 'remove')}
                                                 disabled={busy}
-                                                className="rounded-xl border border-red-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+                                                className="transition-colors disabled:opacity-50"
                                             >
                                                 Remove
-                                            </button>
+                                            </Button>
                                         </>
                                     )}
                                 </div>
 
-                                <div className="mt-4 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                                <div className="mt-4 flex flex-wrap gap-3 text-xs font-medium text-muted-foreground">
                                     <span>Installed: {formatDate(addon.installedAt)}</span>
                                     <span>Checksum: {addon.sourceChecksum.slice(0, 12)}</span>
                                 </div>
@@ -435,47 +334,47 @@ export default function DashboardModulesPage() {
             )}
 
             {selectedModule && (
-                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-                    <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-700 bg-[#020617] shadow-2xl">
-                        <div className="flex flex-col gap-4 border-b border-slate-800 bg-slate-950/80 px-5 py-5 md:flex-row md:items-start md:justify-between md:px-7">
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4">
+                    <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-xl border border-border bg-background">
+                        <div className="flex flex-col gap-4 border-b border-border bg-card px-5 py-5 md:flex-row md:items-start md:justify-between md:px-7">
                             <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <span className="rounded-md border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300">
+                                    <span className="rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-foreground">
                                         {selectedModule.category}
                                     </span>
-                                    <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${selectedModule.enabled ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : selectedModule.installed ? 'border-amber-400/20 bg-amber-400/10 text-amber-300' : 'border-slate-700 bg-slate-950 text-slate-500'}`}>
+                                    <span className={`rounded-md border px-2 py-1 text-xs font-medium   ${selectedModule.enabled ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400' : selectedModule.installed ? 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400' : 'border-border bg-card text-muted-foreground'}`}>
                                         {selectedModule.installed ? (selectedModule.enabled ? 'Enabled' : 'Paused') : 'Available'}
                                     </span>
                                     {selectedModule.status !== 'PUBLISHED' && (
-                                        <span className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${reviewBadgeClassName(selectedModule.status)}`}>
+                                        <span className={`rounded-md border px-2 py-1 text-xs font-medium   ${reviewBadgeClassName(selectedModule.status)}`}>
                                             {reviewLabel(selectedModule.status)}
                                         </span>
                                     )}
                                     {selectedModule.isCustom && (
-                                        <span className="rounded-md border border-violet-300/30 bg-violet-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-violet-200">
+                                        <span className="rounded-md border border-violet-300/30 bg-violet-300/10 px-2 py-1 text-xs font-medium text-violet-200">
                                             Server Custom
                                         </span>
                                     )}
                                     {selectedModule.isOfficial && (
-                                        <span className="rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+                                        <span className="rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-foreground">
                                             Official
                                         </span>
                                     )}
                                     {selectedModule.creatorIsVerified && (
-                                        <span className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
+                                        <span className="rounded-md border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                                             Verified Creator
                                         </span>
                                     )}
-                                    <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                    <span className="rounded-md border border-border bg-card px-2 py-1 text-xs font-medium text-muted-foreground">
                                         v{selectedModule.version}
                                     </span>
                                 </div>
-                                <h2 className="mt-4 text-2xl font-black tracking-tight text-white md:text-4xl">{selectedModule.name}</h2>
-                                <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
+                                <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground md:text-4xl">{selectedModule.name}</h2>
+                                <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
                                     {selectedModule.description || 'No description provided.'}
                                 </p>
                                 {selectedModule.isCustom && selectedModule.status === 'NEEDS_REUPLOAD' && (
-                                    <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-xs leading-relaxed text-red-200">
+                                    <div className="mt-4 rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-xs leading-relaxed text-red-700 dark:text-red-400">
                                         {(selectedModule.reviewResults || [])
                                             .filter((result) => result.status === 'fail')
                                             .map((result) => `${result.title}: ${result.details.join(' ')}`)
@@ -483,55 +382,55 @@ export default function DashboardModulesPage() {
                                     </div>
                                 )}
                             </div>
-                            <button
+                            <Button variant="outline" size="default"
                                 type="button"
                                 onClick={() => setSelectedModuleId(null)}
-                                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition-colors hover:border-slate-500 hover:text-white"
+                                className="inline-flex shrink-0 items-center justify-center transition-colors"
                                 aria-label="Close module preview"
                             >
-                                x
-                            </button>
+                                <X className="size-4" aria-hidden="true" />
+                            </Button>
                         </div>
 
                         <div className="custom-scrollbar max-h-[calc(90vh-180px)] overflow-y-auto px-5 py-6 md:px-7">
                             <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
                                 <section className="space-y-5">
                                     <div>
-                                        <h3 className="text-sm font-bold uppercase tracking-widest text-white">Configuration Fields</h3>
+                                        <h3 className="text-sm font-medium text-foreground">Configuration Fields</h3>
                                         {Object.values(selectedModule.configSchema || {}).length === 0 ? (
-                                            <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-5 text-sm text-slate-500">
+                                            <Card className="mt-4 rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
                                                 This module does not expose configurable fields.
-                                            </div>
+                                            </Card>
                                         ) : (
                                             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                                                 {Object.values(selectedModule.configSchema || {}).map((field) => (
-                                                    <div key={field.key} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                                                    <Card key={field.key} className="rounded-xl border border-border bg-card p-4">
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div>
-                                                                <p className="text-sm font-bold text-white">{field.label}</p>
-                                                                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                                                                <p className="text-sm font-medium text-foreground">{field.label}</p>
+                                                                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                                                                     {field.shortDescription || 'No field description provided.'}
                                                                 </p>
                                                             </div>
-                                                            <span className="rounded-md border border-slate-700 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                            <span className="rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground">
                                                                 {field.type}
                                                             </span>
                                                         </div>
                                                         {field.options.length > 0 && (
                                                             <div className="mt-3 flex flex-wrap gap-2">
                                                                 {field.options.slice(0, 6).map((option) => (
-                                                                    <span key={option} className="rounded-md border border-slate-800 bg-black/30 px-2 py-1 text-[10px] font-semibold text-slate-400">
+                                                                    <span key={option} className="rounded-md border border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">
                                                                         {option}
                                                                     </span>
                                                                 ))}
                                                                 {field.options.length > 6 && (
-                                                                    <span className="rounded-md border border-slate-800 bg-black/30 px-2 py-1 text-[10px] font-semibold text-slate-500">
+                                                                    <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">
                                                                         +{field.options.length - 6} more
                                                                     </span>
                                                                 )}
                                                             </div>
                                                         )}
-                                                    </div>
+                                                    </Card>
                                                 ))}
                                             </div>
                                         )}
@@ -540,56 +439,56 @@ export default function DashboardModulesPage() {
                                 </section>
 
                                 <aside className="space-y-4">
-                                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Slug</p>
-                                        <p className="mt-2 break-all font-mono text-sm text-slate-300">{selectedModule.slug}</p>
-                                    </div>
-                                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Checksum</p>
-                                        <p className="mt-2 break-all font-mono text-xs text-slate-300">{selectedModule.sourceChecksum || 'Unavailable'}</p>
-                                    </div>
-                                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Install Status</p>
-                                        <p className="mt-2 text-sm font-semibold text-slate-300">{selectedModule.installed ? `Installed ${formatDate(selectedModule.installedAt)}` : 'Not installed on this server'}</p>
-                                    </div>
+                                    <Card className="rounded-xl border border-border bg-card p-5">
+                                        <p className="text-xs font-medium text-muted-foreground">Slug</p>
+                                        <p className="mt-2 break-all font-mono text-sm text-foreground">{selectedModule.slug}</p>
+                                    </Card>
+                                    <Card className="rounded-xl border border-border bg-card p-5">
+                                        <p className="text-xs font-medium text-muted-foreground">Checksum</p>
+                                        <p className="mt-2 break-all font-mono text-xs text-foreground">{selectedModule.sourceChecksum || 'Unavailable'}</p>
+                                    </Card>
+                                    <Card className="rounded-xl border border-border bg-card p-5">
+                                        <p className="text-xs font-medium text-muted-foreground">Install Status</p>
+                                        <p className="mt-2 text-sm font-semibold text-foreground">{selectedModule.installed ? `Installed ${formatDate(selectedModule.installedAt)}` : 'Not installed on this server'}</p>
+                                    </Card>
                                     <div className="flex flex-col gap-3">
                                         <Link
                                             href={`/dashboard/${serverId}/modules/${selectedModule.id}`}
-                                            className="inline-flex items-center justify-center rounded-xl border border-sky-500/40 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-200 transition-colors hover:bg-sky-500/10"
+                                            className="inline-flex items-center justify-center rounded-xl border border-border px-4 py-3 text-xs font-medium text-foreground transition-colors hover:bg-accent"
                                         >
                                             {selectedModule.installed ? 'Open Config' : 'Open Setup'}
                                         </Link>
                                         {!selectedModule.installed ? (
-                                            <button
+                                            <Button variant="default" size="default"
                                                 type="button"
                                                 onClick={() => sendAction(selectedModule, 'install')}
                                                 disabled={savingId === selectedModule.id}
-                                                className="rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
+                                                className="transition-colors disabled:opacity-50"
                                             >
                                                 {savingId === selectedModule.id ? 'Installing' : 'Install Module'}
-                                            </button>
+                                            </Button>
                                         ) : (
                                             <>
                                                 {selectedModule.isCustom && (
-                                                    <button
+                                                    <Button variant="outline" size="default"
                                                         type="button"
                                                         onClick={() => {
-                                                            startCustomUpload(selectedModule);
+                                                            router.push(`/dashboard/${serverId}/modules/${selectedModule.id}/reupload`);
                                                             setSelectedModuleId(null);
                                                         }}
-                                                        className="rounded-xl border border-amber-500/30 px-4 py-3 text-xs font-bold uppercase tracking-widest text-amber-200 transition-colors hover:bg-amber-500/10"
+                                                        className="transition-colors"
                                                     >
                                                         Re-upload Module
-                                                    </button>
+                                                    </Button>
                                                 )}
-                                                <button
+                                                <Button variant="outline" size="default"
                                                     type="button"
                                                     onClick={() => sendAction(selectedModule, selectedModule.enabled ? 'disable' : 'enable')}
                                                     disabled={savingId === selectedModule.id || (selectedModule.isCustom && selectedModule.status === 'NEEDS_REUPLOAD')}
-                                                    className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-200 transition-colors hover:border-sky-500 hover:text-white disabled:opacity-50"
+                                                    className="transition-colors disabled:opacity-50"
                                                 >
                                                     {selectedModule.enabled ? 'Disable Module' : 'Enable Module'}
-                                                </button>
+                                                </Button>
                                             </>
                                         )}
                                     </div>

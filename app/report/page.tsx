@@ -1,13 +1,19 @@
 'use client';
 
-import { Check, ExternalLink, Gavel, LockKeyhole, Send, ShieldAlert } from 'lucide-react';
+import { Select } from '@/components/ui/select';
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Status } from "@/components/ui/status";
+import { Check, ExternalLink, Gavel, LockKeyhole, Send } from 'lucide-react';
 import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { PublicFooter } from '@/components/public/PublicFooter';
 import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
-import { DiscordIcon } from '@/components/ui/DiscordIcon';
+import { LogIn as DiscordIcon } from 'lucide-react';
 
 type TargetKind = 'user' | 'server' | 'game';
 type UserPlatform = 'roblox' | 'discord';
@@ -304,74 +310,74 @@ export default function ReportPage() {
 
                 <section className="rl-utility-main rl-shell">
                     <div className="rl-choice-row mb-8" role="group" aria-label="Choose reports or appeals">
-                        <button
-                            className="rl-choice"
+                        <Button variant="outline"
+                            className="h-auto min-h-12 items-start justify-start whitespace-normal py-3 text-left aria-pressed:bg-accent"
                             type="button"
                             aria-pressed={workflow === 'report'}
                             onClick={() => selectWorkflow('report')}
                         >
                             <strong>Report</strong>
                             <span>Submit a new public report</span>
-                        </button>
-                        <button
-                            className="rl-choice"
+                        </Button>
+                        <Button variant="outline"
+                            className="h-auto min-h-12 items-start justify-start whitespace-normal py-3 text-left aria-pressed:bg-accent"
                             type="button"
                             aria-pressed={workflow === 'appeal'}
                             onClick={() => selectWorkflow('appeal')}
                         >
                             <strong>Appeal</strong>
                             <span>Appeal a Ro-Link moderation</span>
-                        </button>
+                        </Button>
                     </div>
 
                     {workflow === 'report' ? (
                     <div className="rl-utility-grid">
-                        <section className="rl-surface" aria-labelledby="new-report-title">
-                            <div className="rl-surface-header">
+                        <Card className="rl-surface" aria-labelledby="new-report-title">
+                            <CardHeader className="rl-surface-header">
                                 <div>
-                                    <h2 id="new-report-title">New report</h2>
-                                    <p>Include enough context and direct evidence for staff review.</p>
+                                    <CardTitle id="new-report-title">New report</CardTitle>
+                                    <CardDescription>Include enough context and direct evidence for staff review.</CardDescription>
                                 </div>
-                                <span className="rl-surface-icon"><ShieldAlert aria-hidden="true" /></span>
-                            </div>
+
+                            </CardHeader>
 
                             {!formVisible ? (
-                                <div className="rl-surface-body">
+                                <CardContent className="rl-surface-body">
                                     {authLoading ? (
-                                        <div className="rl-notice">
-                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+                                        <Card className="rl-notice">
+                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-transparent" />
                                             <div><strong>Checking verification</strong>Confirming your Discord and Roblox account connection.</div>
-                                        </div>
+                                        </Card>
                                     ) : !session ? (
-                                        <div className="rl-notice">
+                                        <Card className="rl-notice">
                                             <DiscordIcon aria-hidden="true" width="16" height="16" />
                                             <div>
                                                 <strong>Sign in to submit a report</strong>
                                                 Public reports require a Discord sign-in before you can link and verify your Roblox account.
-                                                <button className="rl-button rl-button-primary mt-4" type="button" onClick={handleDiscordSignIn}>Sign in with Discord</button>
+                                                <Button variant="default" className="mt-4" type="button" onClick={handleDiscordSignIn}>Sign in with Discord</Button>
                                             </div>
-                                        </div>
+                                        </Card>
                                     ) : (
-                                        <div className="rl-notice">
+                                        <Card className="rl-notice">
                                             <Image src="/Media/Roblox.png" alt="" width={16} height={16} />
                                             <div>
                                                 <strong>Link your Roblox account</strong>
                                                 Reports can only be submitted by verified Ro-Link users.
-                                                <button className="rl-button rl-button-primary mt-4" type="button" onClick={handleRobloxLink} disabled={linkingRoblox}>
+                                                <Button variant="default" className="mt-4" type="button" onClick={handleRobloxLink} disabled={linkingRoblox}>
                                                     {linkingRoblox ? 'Opening Roblox…' : 'Link Roblox account'}
-                                                </button>
+                                                </Button>
                                             </div>
-                                        </div>
+                                        </Card>
                                     )}
-                                </div>
+                                </CardContent>
                             ) : (
                                 <form className="rl-surface-body" onSubmit={handleSubmit}>
                                     <div className="rl-form-section">
                                         <span className="rl-field-label">Target type</span>
                                         <div className="rl-choice-row" role="group" aria-label="Report target type">
                                             {targetOptions.map((option) => (
-                                                <button
-                                                    className="rl-choice"
+                                                <Button variant="outline"
+                                                    className="h-auto min-h-12 items-start justify-start whitespace-normal py-3 text-left aria-pressed:bg-accent"
                                                     key={option.value}
                                                     type="button"
                                                     aria-pressed={targetKind === option.value}
@@ -379,7 +385,7 @@ export default function ReportPage() {
                                                 >
                                                     <strong>{option.label}</strong>
                                                     <span>{option.description}</span>
-                                                </button>
+                                                </Button>
                                             ))}
                                         </div>
                                     </div>
@@ -387,20 +393,11 @@ export default function ReportPage() {
                                     <div className="rl-form-section rl-field-row">
                                         <div>
                                             <label className="rl-field-label" htmlFor="report-platform">Platform</label>
-                                            <select
-                                                className="rl-select"
-                                                id="report-platform"
-                                                value={userPlatform}
-                                                disabled={targetKind !== 'user'}
-                                                onChange={(event) => setUserPlatform(event.target.value as UserPlatform)}
-                                            >
-                                                <option value="roblox">Roblox</option>
-                                                <option value="discord">Discord</option>
-                                            </select>
+                                            <Select id="report-platform" aria-label="Platform" value={userPlatform} disabled={targetKind !== 'user'} onValueChange={value => setUserPlatform(value as UserPlatform)} options={[{value:'roblox',label:'Roblox'},{value:'discord',label:'Discord'}]} />
                                         </div>
                                         <div>
                                             <label className="rl-field-label" htmlFor="report-target-id">{targetLabel}</label>
-                                            <input
+                                            <Input
                                                 className="rl-field"
                                                 id="report-target-id"
                                                 type="text"
@@ -415,7 +412,7 @@ export default function ReportPage() {
 
                                     <div className="rl-form-section">
                                         <label className="rl-field-label" htmlFor="report-reason">What happened?</label>
-                                        <textarea
+                                        <Textarea
                                             className="rl-textarea"
                                             id="report-reason"
                                             value={reason}
@@ -427,7 +424,7 @@ export default function ReportPage() {
 
                                     <div className="rl-form-section">
                                         <label className="rl-field-label" htmlFor="report-evidence">Evidence links</label>
-                                        <textarea
+                                        <Textarea
                                             className="rl-textarea"
                                             id="report-evidence"
                                             value={evidenceLinks}
@@ -438,127 +435,115 @@ export default function ReportPage() {
                                         <p className="rl-field-hint">Only include material relevant to this report.</p>
                                     </div>
 
-                                    {result?.error && <div className="rl-feedback rl-feedback-error">{result.error}</div>}
+                                    {result?.error && <Status variant="error" role="status" className="w-full whitespace-normal rounded-md">{result.error}</Status>}
                                     {result?.reportId && !result.error && (
-                                        <div className="rl-feedback rl-feedback-success">
+                                        <Status variant="success" role="status" className="w-full whitespace-normal rounded-md">
                                             <strong>Report submitted</strong>
                                             <div>{result.reportId}</div>
                                             {result.threadUrl && <a href={result.threadUrl} target="_blank" rel="noreferrer">Open forum thread</a>}
-                                        </div>
+                                        </Status>
                                     )}
 
                                     <div className="rl-form-footer">
                                         <p>
                                             Signed in as {session?.user?.name || 'Discord user'} · {evidenceCount} evidence link{evidenceCount === 1 ? '' : 's'}
                                         </p>
-                                        <button
-                                            className="rl-button rl-button-primary"
+                                        <Button variant="default"
+
                                             type="submit"
                                             disabled={disabled || !targetId.trim() || !reason.trim() || !evidenceLinks.trim()}
                                         >
                                             <Send aria-hidden="true" width={14} height={14} />
                                             {submitting ? 'Submitting…' : 'Submit report'}
-                                        </button>
+                                        </Button>
                                     </div>
                                 </form>
                             )}
-                        </section>
+                        </Card>
 
                         <aside className="rl-aside-stack">
-                            <div className="rl-surface rl-aside-panel">
+                            <Card className="rl-surface rl-aside-panel">
                                 <h2>Before submitting</h2>
                                 <ul className="rl-aside-list">
                                     <li><Check aria-hidden="true" /><span>Sign in with Discord.</span></li>
                                     <li><Check aria-hidden="true" /><span>Link your Roblox account.</span></li>
                                     <li><Check aria-hidden="true" /><span>Use direct evidence links.</span></li>
                                 </ul>
-                            </div>
-                            <div className="rl-notice">
+                            </Card>
+                            <Card className="rl-notice">
                                 <LockKeyhole aria-hidden="true" />
                                 <div><strong>Verified submissions</strong>Reports are accepted only from users with both accounts connected.</div>
-                            </div>
+                            </Card>
                         </aside>
                     </div>
                     ) : (
                     <div className="rl-utility-grid" id="appeal">
-                        <section className="rl-surface" aria-labelledby="appeal-title">
-                            <div className="rl-surface-header">
+                        <Card className="rl-surface" aria-labelledby="appeal-title">
+                            <CardHeader className="rl-surface-header">
                                 <div>
-                                    <p className="rl-eyebrow">Ro-Link appeals</p>
-                                    <h2 id="appeal-title">Appeal a moderation action</h2>
-                                    <p>Select the exact user, server, or game moderation attached to your verified accounts.</p>
+                                    <CardDescription className="rl-eyebrow">Ro-Link appeals</CardDescription>
+                                    <CardTitle id="appeal-title">Appeal a moderation action</CardTitle>
+                                    <CardDescription>Select the exact user, server, or game moderation attached to your verified accounts.</CardDescription>
                                 </div>
-                                <span className="rl-surface-icon"><Gavel aria-hidden="true" /></span>
-                            </div>
+
+                            </CardHeader>
 
                             {appealLoading || status === 'loading' ? (
-                                <div className="rl-surface-body">
-                                    <div className="rl-notice">
-                                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+                                <CardContent className="rl-surface-body">
+                                    <Card className="rl-notice">
+                                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-transparent" />
                                         <div><strong>Loading moderation history</strong>Checking bans associated with your Discord, Roblox, servers, and games.</div>
-                                    </div>
-                                </div>
+                                    </Card>
+                                </CardContent>
                             ) : !session?.user ? (
-                                <div className="rl-surface-body">
-                                    <div className="rl-notice">
+                                <CardContent className="rl-surface-body">
+                                    <Card className="rl-notice">
                                         <DiscordIcon aria-hidden="true" width="16" height="16" />
                                         <div>
                                             <strong>Sign in to appeal</strong>
                                             Appeals require your Discord identity so Ro-Link can show only moderation associated with you.
-                                            <button className="rl-button rl-button-primary mt-4" type="button" onClick={handleAppealSignIn}>Sign in with Discord</button>
+                                            <Button variant="default" className="mt-4" type="button" onClick={handleAppealSignIn}>Sign in with Discord</Button>
                                         </div>
-                                    </div>
-                                </div>
+                                    </Card>
+                                </CardContent>
                             ) : appealContext?.error ? (
-                                <div className="rl-surface-body">
-                                    <div className="rl-feedback rl-feedback-error">{appealContext.error}</div>
-                                </div>
+                                <CardContent className="rl-surface-body">
+                                    <Status variant="error" role="status" className="w-full whitespace-normal rounded-md">{appealContext.error}</Status>
+                                </CardContent>
                             ) : !appealContext?.linked ? (
-                                <div className="rl-surface-body">
-                                    <div className="rl-notice">
+                                <CardContent className="rl-surface-body">
+                                    <Card className="rl-notice">
                                         <Image src="/Media/Roblox.png" alt="" width={16} height={16} />
                                         <div>
                                             <strong>Link your Roblox account to continue</strong>
                                             A linked Roblox account is required to verify your identity and load appealable moderation.
-                                            <button className="rl-button rl-button-primary mt-4" type="button" onClick={handleAppealRobloxLink} disabled={linkingRoblox}>
+                                            <Button variant="default" className="mt-4" type="button" onClick={handleAppealRobloxLink} disabled={linkingRoblox}>
                                                 {linkingRoblox ? 'Opening Roblox…' : 'Link Roblox account'}
-                                            </button>
+                                            </Button>
                                         </div>
-                                    </div>
-                                </div>
+                                    </Card>
+                                </CardContent>
                             ) : appealContext.options.length === 0 ? (
-                                <div className="rl-surface-body">
-                                    <div className="rl-notice">
+                                <CardContent className="rl-surface-body">
+                                    <Card className="rl-notice">
                                         <Check aria-hidden="true" />
                                         <div><strong>No appealable moderation found</strong>There are no active Ro-Link bans associated with your verified user, owned Discord servers, or connected Roblox games.</div>
-                                    </div>
-                                </div>
+                                    </Card>
+                                </CardContent>
                             ) : (
                                 <form className="rl-surface-body" onSubmit={handleAppealSubmit}>
                                     <div className="rl-form-section">
                                         <label className="rl-field-label" htmlFor="appeal-moderation">Moderation action</label>
-                                        <select
-                                            className="rl-select"
-                                            id="appeal-moderation"
-                                            value={moderationKey}
-                                            onChange={(event) => setModerationKey(event.target.value)}
-                                            required
-                                        >
-                                            {appealContext.options.map((option) => (
-                                                <option value={option.key} key={option.key}>
-                                                    {option.targetLabel}{option.moderatedAt ? ` · ${new Date(option.moderatedAt).toLocaleDateString()}` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
+                                        <Select id="appeal-moderation" aria-label="Moderation action" value={moderationKey} onValueChange={setModerationKey} options={appealContext.options.map(option => ({value:option.key,label:`${option.targetLabel}${option.moderatedAt ? ` · ${new Date(option.moderatedAt).toLocaleDateString()}` : ''}`}))} />
                                         {appealContext.options.find((option) => option.key === moderationKey) && (
-                                            <div className="rl-notice mt-4">
+                                            <Card className="rl-notice mt-4">
                                                 <Gavel aria-hidden="true" />
                                                 <div>
                                                     <strong>Original moderation reason</strong>
                                                     {appealContext.options.find((option) => option.key === moderationKey)?.reason}
                                                     {appealContext.options.find((option) => option.key === moderationKey)?.originalForumUrl && (
                                                         <a
-                                                            className="mt-2 inline-flex items-center gap-1 text-sky-400"
+                                                            className="mt-2 inline-flex items-center gap-1 text-foreground"
                                                             href={appealContext.options.find((option) => option.key === moderationKey)?.originalForumUrl || '#'}
                                                             target="_blank"
                                                             rel="noreferrer"
@@ -567,13 +552,13 @@ export default function ReportPage() {
                                                         </a>
                                                     )}
                                                 </div>
-                                            </div>
+                                            </Card>
                                         )}
                                     </div>
 
                                     <div className="rl-form-section">
                                         <label className="rl-field-label" htmlFor="appeal-reason">Why should this moderation be reviewed?</label>
-                                        <textarea
+                                        <Textarea
                                             className="rl-textarea"
                                             id="appeal-reason"
                                             value={appealReason}
@@ -585,8 +570,8 @@ export default function ReportPage() {
                                     </div>
 
                                     <div className="rl-form-section">
-                                        <label className="rl-field-label" htmlFor="appeal-evidence">Additional evidence links <span className="text-slate-500">(optional)</span></label>
-                                        <textarea
+                                        <label className="rl-field-label" htmlFor="appeal-evidence">Additional evidence links <span className="text-muted-foreground">(optional)</span></label>
+                                        <Textarea
                                             className="rl-textarea"
                                             id="appeal-evidence"
                                             value={appealEvidence}
@@ -595,34 +580,34 @@ export default function ReportPage() {
                                         />
                                     </div>
 
-                                    {appealResult?.error && <div className="rl-feedback rl-feedback-error">{appealResult.error}</div>}
+                                    {appealResult?.error && <Status variant="error" role="status" className="w-full whitespace-normal rounded-md">{appealResult.error}</Status>}
                                     {appealResult?.appealId && !appealResult.error && (
-                                        <div className="rl-feedback rl-feedback-success">
+                                        <Status variant="success" role="status" className="w-full whitespace-normal rounded-md">
                                             <strong>Appeal submitted</strong>
                                             <div>{appealResult.appealId}</div>
                                             {appealResult.threadUrl && <a href={appealResult.threadUrl} target="_blank" rel="noreferrer">Open appeal forum post</a>}
-                                        </div>
+                                        </Status>
                                     )}
 
                                     <div className="rl-form-footer">
                                         <p>
                                             {appealContext.identity.robloxUsername || `Roblox ${appealContext.identity.robloxId}`} · {session.user.name || 'Discord user'}
                                         </p>
-                                        <button
-                                            className="rl-button rl-button-primary"
+                                        <Button variant="default"
+
                                             type="submit"
                                             disabled={appealSubmitting || !moderationKey || appealReason.trim().length < 20}
                                         >
                                             <Send aria-hidden="true" width={14} height={14} />
                                             {appealSubmitting ? 'Submitting…' : 'Submit appeal'}
-                                        </button>
+                                        </Button>
                                     </div>
                                 </form>
                             )}
-                        </section>
+                        </Card>
 
                         <aside className="rl-aside-stack">
-                            <div className="rl-surface rl-aside-panel">
+                            <Card className="rl-surface rl-aside-panel">
                                 <h2>Appeal requirements</h2>
                                 <ul className="rl-aside-list">
                                     <li><Check aria-hidden="true" /><span>Use your signed-in Discord account.</span></li>
@@ -630,11 +615,11 @@ export default function ReportPage() {
                                     <li><Check aria-hidden="true" /><span>Select the exact moderation action.</span></li>
                                     <li><Check aria-hidden="true" /><span>Explain why staff should review it.</span></li>
                                 </ul>
-                            </div>
-                            <div className="rl-notice">
+                            </Card>
+                            <Card className="rl-notice">
                                 <LockKeyhole aria-hidden="true" />
                                 <div><strong>Identity protected</strong>The form only lists moderation tied to your verified identity, owned servers, and connected games.</div>
-                            </div>
+                            </Card>
                         </aside>
                     </div>
                     )}

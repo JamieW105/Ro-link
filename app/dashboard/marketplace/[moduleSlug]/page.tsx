@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { trimModuleString } from '@/lib/modules';
 import { supabase } from '@/lib/supabase';
 
-import ModuleMarketplaceRedirect from './ModuleMarketplaceRedirect';
+import MarketplaceClient from '../MarketplaceClient';
 
 type RouteContext = {
     params: Promise<{
@@ -28,13 +28,14 @@ function buildModuleUrl(moduleSlug: string) {
 
 async function getPublishedModuleBySlug(moduleSlug: string) {
     const slug = trimModuleString(moduleSlug, 80);
-    if (!slug) return null;
+    if (!slug || !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return null;
 
     const { data, error } = await supabase
         .from('addon_modules')
         .select('slug, name, description, category')
         .eq('slug', slug)
         .eq('status', 'PUBLISHED')
+        .abortSignal(AbortSignal.timeout(3000))
         .maybeSingle<ModulePreviewRow>();
 
     if (error) {
@@ -91,5 +92,5 @@ export async function generateMetadata(context: RouteContext): Promise<Metadata>
 export default async function MarketplaceModulePage(context: RouteContext) {
     const { moduleSlug } = await context.params;
 
-    return <ModuleMarketplaceRedirect moduleSlug={moduleSlug} />;
+    return <MarketplaceClient moduleSlug={moduleSlug} />;
 }
