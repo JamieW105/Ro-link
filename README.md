@@ -58,7 +58,7 @@ Ro-Link consists of three main components:
 ### Verified Owners Only
 Only the Discord Server Owner can run `/setup` to link a game.
 
-1.  **Run `/setup`**: Enter your Roblox Place ID, Universe ID, and Open Cloud API Key.
+1.  Run `/setup`, select **Open Setup Form**, and enter your Roblox Place ID, Universe ID, and Open Cloud API key.
 2.  **Install the Plugin**: Open the [RoLink installer](https://create.roblox.com/store/asset/87859041511603/RoLink-installer) in Roblox Studio and paste in your generated Security Key.
 3.  **Manage**: Use `/ban`, `/kick`, or `/misc` immediately.
 
