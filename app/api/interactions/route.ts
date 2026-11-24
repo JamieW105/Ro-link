@@ -35,6 +35,7 @@ import {
 import { closeStaffActionForumThread } from '@/lib/staffForumNotifications';
 import { fetchStaffModerationAction, voidStaffModerationAction } from '@/lib/staffModerationActions';
 import discordCommands from '@/lib/discordCommands.json';
+import { findSetupServer, saveSetupServer } from '@/lib/discordSetupStore';
 import {
     createStaffNote,
     fetchStaffNotes,
@@ -2021,6 +2022,45 @@ export async function POST(req: Request) {
         const userTag = user ? `${user.username}${user.discriminator !== '0' ? '#' + user.discriminator : ''}` : 'Unknown';
         const logActor = userId ? `<@${userId}>` : userTag;
 
+        const isSetupCommand = type === 2 && interactionData?.name === 'setup';
+        const isSetupSubmit = type === 5 && interactionData?.custom_id === 'setup_modal';
+        if (isSetupCommand || isSetupSubmit) {
+            if (!guild_id || !userId) {
+                return NextResponse.json({
+                    type: 4,
+                    data: buildEphemeralErrorResponse('This command can only be used in a Discord server.'),
+                });
+            }
+
+            const applicationId = interaction.application_id;
+            const interactionToken = interaction.token;
+            if (!applicationId || !interactionToken) {
+                return NextResponse.json({
+                    type: 4,
+                    data: buildEphemeralErrorResponse('Setup could not start. Run /setup again.'),
+                });
+            }
+
+            after(async () => {
+                let response: InteractionResponseData;
+                try {
+                    response = await resolveSetupResponse(guild_id, userId, isSetupSubmit ? interactionData : undefined);
+                } catch (error) {
+                    console.error(`[SETUP] Failed for guild ${guild_id}:`, error instanceof Error ? error.message : 'Database request failed');
+                    response = buildEphemeralErrorResponse('Setup could not be completed. Try again later.');
+                }
+                await editOriginalInteractionResponse(applicationId, interactionToken, response);
+            });
+
+            return NextResponse.json({ type: 5, data: { flags: 64 } });
+        }
+
+        // A modal must be the initial response to the button click. The button is
+        // sent only in the owner's private reply, and submission rechecks ownership.
+        if (type === 3 && interactionData?.custom_id === 'setup_open' && guild_id && userId) {
+            return openSetupModal();
+        }
+
         if (userId) {
             const dgsuUserBan = await findDgsuBanForUser(supabase, { discordUserId: userId });
             if (dgsuUserBan) {
@@ -2154,114 +2194,6 @@ export async function POST(req: Request) {
                     }
                 });
                 return NextResponse.json({ type: 5, data: { flags: 64 } });
-            }
-
-            // Handle Setup (Owner Only)
-            if (name === 'setup') {
-                if (!guild_id) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: `❌ This command can only be used in a Discord Server.`, flags: 64 }
-                    });
-                }
-
-                const blocked = await findBlockedServer(supabase, guild_id);
-                if (blocked) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: `âŒ ${getBlockedServerMessage(blocked)}`, flags: 64 }
-                    });
-                }
-
-                // Verify Owner via Discord API
-                const guildRes = await fetch(`https://discord.com/api/v10/guilds/${guild_id}`, {
-                    headers: { 'Authorization': `Bot ${process.env.DISCORD_TOKEN}` }
-                });
-
-                if (!guildRes.ok) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: `❌ Failed to verify server owner status.`, flags: 64 }
-                    });
-                }
-
-                const guildData = await guildRes.json();
-                if (userId !== guildData.owner_id) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: `❌ This command can only be run by the server owner.`, flags: 64 }
-                    });
-                }
-
-                // Check if already setup
-                const serverBan = await findDgsuBanForTargets(supabase, [{ type: 'DISCORD_SERVER', targetId: guild_id }]);
-                if (serverBan) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: DGSU_BAN_ERROR_MESSAGE, flags: 64 }
-                    });
-                }
-
-                const { data: existingServer } = await supabase
-                    .from('servers')
-                    .select('*')
-                    .eq('id', guild_id)
-                    .maybeSingle();
-
-                if (existingServer) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: {
-                            content: 'ℹ️ **This server is already set up!** Here are your integration details:',
-                            embeds: getSetupEmbeds(guild_id, existingServer.api_key),
-                            flags: 64
-                        }
-                    });
-                }
-
-                // Return Modal
-                return NextResponse.json({
-                    type: 9,
-                    data: {
-                        title: 'Ro-Link Server Setup',
-                        custom_id: 'setup_modal',
-                        components: [
-                            {
-                                type: 1,
-                                components: [{
-                                    type: 4,
-                                    custom_id: 'place_id',
-                                    label: 'Roblox Place ID',
-                                    style: 1,
-                                    placeholder: 'Enter your Roblox Place ID (e.g. 123456789)',
-                                    required: true
-                                }]
-                            },
-                            {
-                                type: 1,
-                                components: [{
-                                    type: 4,
-                                    custom_id: 'universe_id',
-                                    label: 'Roblox Universe ID',
-                                    style: 1,
-                                    placeholder: 'Enter your Roblox Universe ID',
-                                    required: true
-                                }]
-                            },
-                            {
-                                type: 1,
-                                components: [{
-                                    type: 4,
-                                    custom_id: 'api_key',
-                                    label: 'Roblox Open Cloud API Key',
-                                    style: 2,
-                                    placeholder: 'Paste your API Key here (Secure)',
-                                    required: true
-                                }]
-                            }
-                        ]
-                    }
-                });
             }
 
             // Handle 'ping' command immediately (No DB required)
@@ -4203,79 +4135,6 @@ export async function POST(req: Request) {
                     data: { content: `✅ **Report Submitted!** The moderation team has been notified.`, flags: 64 }
                 });
             }
-
-            if (custom_id === 'setup_modal') {
-                const placeId = getModalField(modalComponents, 'place_id').trim();
-                const universeId = getModalField(modalComponents, 'universe_id').trim();
-                const openCloudKey = getModalField(modalComponents, 'api_key').trim();
-                const modalServerBan = await findDgsuBanForTargets(supabase, [{ type: 'DISCORD_SERVER', targetId: guild_id }]);
-                if (modalServerBan) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: DGSU_BAN_ERROR_MESSAGE, flags: 64 }
-                    });
-                }
-
-                const modalGameBan = await findDgsuBanForRobloxGame(supabase, {
-                    placeId,
-                    universeId,
-                });
-                if (modalGameBan.ban) {
-                    await banUserForDgsuGameAttempt(supabase, {
-                        discordUserId: userId,
-                        serverId: guild_id,
-                        placeId,
-                        universeId: modalGameBan.universeId || universeId,
-                        sourceBan: modalGameBan.ban,
-                    });
-
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: DGSU_BAN_ERROR_MESSAGE, flags: 64 }
-                    });
-                }
-
-                const blocked = await findBlockedServer(supabase, guild_id);
-                if (blocked) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: `âŒ ${getBlockedServerMessage(blocked)}`, flags: 64 }
-                    });
-                }
-
-                const { data: existingServer } = await supabase
-                    .from('servers')
-                    .select('api_key')
-                    .eq('id', guild_id)
-                    .maybeSingle<{ api_key?: string | null }>();
-                const generatedKey = existingServer?.api_key?.trim() || ('rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
-
-                const { error: dbError } = await supabase
-                    .from('servers')
-                    .upsert({
-                        id: guild_id,
-                        place_id: placeId,
-                        universe_id: universeId,
-                        open_cloud_key: openCloudKey,
-                        api_key: generatedKey
-                    });
-
-                if (dbError) {
-                    return NextResponse.json({
-                        type: 4,
-                        data: { content: `❌ Setup failed: ${dbError.message}`, flags: 64 }
-                    });
-                }
-
-                return NextResponse.json({
-                    type: 4,
-                    data: {
-                        content: '✅ **Setup Successful!** Please follow the instructions below to complete the integration:',
-                        embeds: getSetupEmbeds(guild_id, generatedKey),
-                        flags: 64
-                    }
-                });
-            }
         }
 
         return NextResponse.json({ error: 'Unknown interaction type' }, { status: 400 });
@@ -4283,6 +4142,119 @@ export async function POST(req: Request) {
         console.error('Interaction error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
+}
+
+async function resolveSetupResponse(guildId: string, userId: string, submission?: InteractionData) {
+    const guild = await fetchDiscordApi<{ owner_id: string }>(`/guilds/${encodeURIComponent(guildId)}`);
+    if (guild?.owner_id !== userId) {
+        return buildEphemeralErrorResponse('This command can only be run by the server owner.');
+    }
+
+    const [blocked, banned] = await Promise.all([
+        findBlockedServer(supabase, guildId),
+        findDgsuBanForUser(supabase, { discordUserId: userId, ownedDiscordServerIds: [guildId] }),
+    ]);
+    if (blocked) {
+        return { content: getBlockedServerMessage(blocked), allowed_mentions: { parse: [] } };
+    }
+    if (banned) {
+        return { content: DGSU_BAN_ERROR_MESSAGE };
+    }
+
+    const existingServer = await findSetupServer(supabase, guildId);
+    const existingKey = existingServer?.api_key?.trim();
+    if (existingKey) {
+        return {
+            content: '**This server is already set up!** Here are your integration details:',
+            embeds: getSetupEmbeds(guildId, existingKey),
+        };
+    }
+
+    if (!submission) {
+        return {
+            content: 'Continue to enter your Roblox game details.',
+            components: [{
+                type: 1,
+                components: [{ type: 2, style: 1, label: 'Open Setup Form', custom_id: 'setup_open' }],
+            }],
+        };
+    }
+
+    const placeId = getModalField(submission.components, 'place_id').trim();
+    const universeId = getModalField(submission.components, 'universe_id').trim();
+    const openCloudKey = getModalField(submission.components, 'api_key').trim();
+    if (!placeId || !universeId || !openCloudKey) {
+        return buildEphemeralErrorResponse('Enter all three setup fields.');
+    }
+
+    const gameBan = await findDgsuBanForRobloxGame(supabase, { placeId, universeId });
+    if (gameBan.ban) {
+        await banUserForDgsuGameAttempt(supabase, {
+            discordUserId: userId,
+            serverId: guildId,
+            placeId,
+            universeId: gameBan.universeId || universeId,
+            sourceBan: gameBan.ban,
+        });
+        return { content: DGSU_BAN_ERROR_MESSAGE };
+    }
+
+    const apiKey = await saveSetupServer(supabase, {
+        id: guildId,
+        place_id: placeId,
+        universe_id: universeId,
+        open_cloud_key: openCloudKey,
+    }, existingServer);
+
+    return {
+        content: '**Setup Successful!** Please follow the instructions below to complete the integration:',
+        embeds: getSetupEmbeds(guildId, apiKey),
+    };
+}
+
+function openSetupModal() {
+    return NextResponse.json({
+        type: 9,
+        data: {
+            title: 'Ro-Link Server Setup',
+            custom_id: 'setup_modal',
+            components: [
+                {
+                    type: 1,
+                    components: [{
+                        type: 4,
+                        custom_id: 'place_id',
+                        label: 'Roblox Place ID',
+                        style: 1,
+                        placeholder: 'Enter your Roblox Place ID (e.g. 123456789)',
+                        required: true
+                    }]
+                },
+                {
+                    type: 1,
+                    components: [{
+                        type: 4,
+                        custom_id: 'universe_id',
+                        label: 'Roblox Universe ID',
+                        style: 1,
+                        placeholder: 'Enter your Roblox Universe ID',
+                        required: true
+                    }]
+                },
+                {
+                    type: 1,
+                    components: [{
+                        type: 4,
+                        custom_id: 'api_key',
+                        label: 'Roblox Open Cloud API Key',
+                        style: 2,
+                        placeholder: 'Paste your API Key here (Secure)',
+                        required: true
+                    }]
+                }
+            ]
+        }
+    });
 }
 
 // Helper for Setup Instructions

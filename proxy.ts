@@ -146,6 +146,8 @@ function isSiteTestingHost(req: NextRequest) {
 function isSiteTestingPublicPath(pathname: string) {
     return pathname === '/auth/signin'
         || pathname.startsWith('/api/auth')
+        // Discord authenticates webhook requests with its own signature.
+        || pathname === '/api/interactions'
         // Roblox game servers authenticate these routes with their server API
         // key. They cannot carry a browser session through the testing-site
         // gate, so redirecting them to /auth/signin turns POSTs into 405s.
