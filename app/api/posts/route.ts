@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 
+import { coalesceRead } from '@/lib/coalesceRead';
 import { supabase } from "@/lib/supabase";
 import { normalizeUpdatePost } from "@/lib/updatePosts";
 
-export async function GET() {
+const loadPublishedPosts = coalesceRead(async () => {
     const { data, error } = await supabase
         .from('update_posts')
         .select('*')
@@ -12,8 +13,13 @@ export async function GET() {
         .order('published_at', { ascending: false });
 
     if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return { body: { error: error.message }, status: 500 };
     }
 
-    return NextResponse.json((data || []).map((post) => normalizeUpdatePost(post)).filter(Boolean));
+    return { body: (data || []).map((post) => normalizeUpdatePost(post)).filter(Boolean), status: 200 };
+});
+
+export async function GET() {
+    const { body, status } = await loadPublishedPosts();
+    return NextResponse.json(body, { status });
 }

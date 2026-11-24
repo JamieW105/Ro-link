@@ -1,6 +1,16 @@
-import { excludeManagementLogs } from '@/lib/serverLogs';
 import { NextResponse } from 'next/server';
+import { coalesceRead } from '@/lib/coalesceRead';
+import { excludeManagementLogs } from '@/lib/serverLogs';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabaseAdmin';
+
+const STATS_TTL_MS = 15_000;
+
+type SiteStats = {
+    guild_count: number | null;
+    command_count: number | null;
+};
+
+let cachedStats: { data: SiteStats; expiresAt: number } | undefined;
 
 async function getGuildCount(): Promise<number | null> {
     const token = process.env.DISCORD_TOKEN?.trim();
@@ -43,9 +53,21 @@ async function getCommandCount(): Promise<number | null> {
     }
 }
 
-export async function GET() {
+const loadStats = coalesceRead(async () => {
     const [guildCount, commandCount] = await Promise.all([getGuildCount(), getCommandCount()]);
-    return NextResponse.json({ guild_count: guildCount, command_count: commandCount }, {
+    const data = { guild_count: guildCount, command_count: commandCount };
+
+    if (guildCount !== null && commandCount !== null) {
+        cachedStats = { data, expiresAt: Date.now() + STATS_TTL_MS };
+    }
+
+    return data;
+});
+
+export async function GET() {
+    const current = cachedStats;
+    const data = current && current.expiresAt > Date.now() ? current.data : await loadStats();
+    return NextResponse.json(data, {
         headers: { 'Cache-Control': 'no-store' },
     });
 }

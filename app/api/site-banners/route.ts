@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 
+import { coalesceRead } from '@/lib/coalesceRead';
 import { normalizeSiteBanner } from '@/lib/siteBanners';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-    const headers = { 'Cache-Control': 'no-store' };
-    if (!isSupabaseConfigured()) return NextResponse.json([], { headers });
+const loadActiveBanners = coalesceRead(async () => {
+    if (!isSupabaseConfigured()) return [];
 
     try {
         const now = new Date().toISOString();
@@ -22,16 +22,19 @@ export async function GET() {
 
         if (error) {
             console.warn('[Site Banners] Banners unavailable. Check Supabase configuration and connectivity.');
-            return NextResponse.json([], { headers });
+            return [];
         }
-        return NextResponse.json(
-            (data || [])
-                .map((row: Record<string, unknown>) => normalizeSiteBanner(row))
-                .filter(Boolean),
-            { headers },
-        );
+        return (data || [])
+            .map((row: Record<string, unknown>) => normalizeSiteBanner(row))
+            .filter(Boolean);
     } catch {
         console.warn('[Site Banners] Banners unavailable. Check Supabase configuration and connectivity.');
-        return NextResponse.json([], { headers });
+        return [];
     }
+});
+
+export async function GET() {
+    return NextResponse.json(await loadActiveBanners(), {
+        headers: { 'Cache-Control': 'no-store' },
+    });
 }

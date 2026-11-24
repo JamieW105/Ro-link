@@ -357,13 +357,22 @@ export async function proxy(req: NextRequest) {
         return siteTestingResponse;
     }
 
-    const apiRateLimit = getApiRateLimitRule(req.nextUrl.pathname, req.method);
+    const { pathname, search } = req.nextUrl;
+    const apiRateLimit = getApiRateLimitRule(pathname, req.method);
     if (apiRateLimit) {
         const clientIp = getRequestClientIp(req.headers);
         const rateLimit = consumeRateLimit(`proxy:${apiRateLimit.name}:${clientIp}`, apiRateLimit.rule);
         if (!rateLimit.allowed) {
             return rateLimitedResponse(rateLimit, req);
         }
+    }
+
+    if (
+        pathname.startsWith('/api')
+        || pathname.startsWith('/_next')
+        || pathname.startsWith('/custom-dashboard')
+    ) {
+        return applySecurityHeaders(NextResponse.next(), req);
     }
 
     const dashboardHost = resolveDashboardSubdomainFromHostnameCandidates(
@@ -375,15 +384,6 @@ export async function proxy(req: NextRequest) {
     );
     const subdomain = dashboardHost?.subdomain;
     if (!subdomain || subdomain.includes('.') || IGNORED_SUBDOMAINS.has(subdomain)) {
-        return applySecurityHeaders(NextResponse.next(), req);
-    }
-
-    const { pathname, search } = req.nextUrl;
-    if (
-        pathname.startsWith('/api')
-        || pathname.startsWith('/_next')
-        || pathname.startsWith('/custom-dashboard')
-    ) {
         return applySecurityHeaders(NextResponse.next(), req);
     }
 

@@ -95,13 +95,25 @@ test('database failure retains the Discord guild count including zero', async (t
     assert.equal(response.headers.get('cache-control'), 'no-store');
 });
 
-test('healthy sources return their actual counts and empty banner result', async (t) => {
+test('healthy sources share overlapping reads and temporarily cache stats', async (t) => {
     configure(t, { ...databaseEnv, DISCORD_TOKEN: 'test-only-token' });
-    t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+    t.mock.timers.enable({ apis: ['Date'] });
+    const fetchMock = t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
         if (String(input).startsWith('https://discord.com/')) return Response.json({ approximate_guild_count: 12 });
         if (String(input).includes('/logs')) return new Response(null, { headers: { 'content-range': '*/0' } });
         return Response.json([]);
     });
+
+    for (const response of await Promise.all([stats(), stats(), banners(), banners()])) {
+        assert.equal(response.headers.get('cache-control'), 'no-store');
+    }
+    assert.equal(fetchMock.mock.callCount(), 3);
     assert.deepEqual(await (await stats()).json(), { guild_count: 12, command_count: 0 });
+    assert.equal(fetchMock.mock.callCount(), 3);
     assert.deepEqual(await (await banners()).json(), []);
+    assert.equal(fetchMock.mock.callCount(), 4);
+
+    t.mock.timers.tick(15_000);
+    assert.deepEqual(await (await stats()).json(), { guild_count: 12, command_count: 0 });
+    assert.equal(fetchMock.mock.callCount(), 6);
 });
