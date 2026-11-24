@@ -3,8 +3,8 @@ import { getToken } from 'next-auth/jwt';
 import { resolveDashboardSubdomainFromHostnameCandidates } from '@/lib/customDashboardDomains';
 import { consumeRateLimit, rateLimitHeaders, type RateLimitRule, type RateLimitResult } from '@/lib/rateLimit';
 import { getRequestClientIp } from '@/lib/requestClientIp';
+import { SITE_TESTING_DOMAIN } from '@/lib/siteTestingDomain';
 
-const SITE_TESTING_DOMAIN = 'rolink.site';
 const SITE_TESTING_PERMISSION = 'SITE_TESTING_ACCESS';
 const FULL_MANAGEMENT_PERMISSION = 'MANAGE_RO_LINK';
 

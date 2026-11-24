@@ -126,3 +126,12 @@ test('sign-in navigation avoids www/apex loops and preserves custom dashboard de
     assert.equal(destination.searchParams.get('callbackUrl'), 'https://community.rolink.cloud/dashboard/123?tab=members');
     assert.equal(destination.searchParams.get('error'), 'OAuthCallback');
 });
+
+test('Vercel sign-in stays on the testing site for testing-site destinations', () => {
+    const authOrigin = 'https://rolink.cloud';
+    assert.equal(getCanonicalSignInUrl('https://rolink.site', authOrigin, 'https://rolink.site/', undefined, true), null);
+    assert.equal(getCanonicalSignInUrl('https://www.rolink.site', authOrigin, '/', undefined, true), null);
+    assert.equal(getCanonicalSignInUrl('https://rolink.site', authOrigin, 'https://www.rolink.site/', undefined, true), null);
+    assert.equal(new URL(getCanonicalSignInUrl('https://rolink.site', authOrigin, 'https://rolink.cloud/', undefined, true)!).origin, authOrigin);
+    assert.equal(new URL(getCanonicalSignInUrl('https://rolink.site', authOrigin, '/', undefined, false)!).origin, authOrigin);
+});
