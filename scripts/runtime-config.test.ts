@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import { NextRequest } from 'next/server';
+import { getGlobalDispatcher, MockAgent, setGlobalDispatcher } from 'undici';
 import { POST as signIn } from '../app/api/auth/[...nextauth]/route';
 import { GET as stats } from '../app/api/stats/route';
 import { GET as banners } from '../app/api/site-banners/route';
+import { createDiscordBotRest } from '../lib/discordBotRest';
 import { getDiscordOAuthConfig, isDiscordOAuthConfigured } from '../lib/discordOAuthConfig';
 
 function configure(t: TestContext, values: Record<string, string | undefined> = {}) {
@@ -116,4 +118,38 @@ test('healthy sources share overlapping reads and temporarily cache stats', asyn
     t.mock.timers.tick(15_000);
     assert.deepEqual(await (await stats()).json(), { guild_count: 12, command_count: 0 });
     assert.equal(fetchMock.mock.callCount(), 6);
+});
+
+test('dashboard permission lookup sends a clean bot authorization header', async (t) => {
+    configure(t, { DISCORD_TOKEN: '  fake.bot-token_value\r\n' });
+    const previousDispatcher = getGlobalDispatcher();
+    const discord = new MockAgent();
+    discord.disableNetConnect();
+    setGlobalDispatcher(discord);
+    t.after(async () => {
+        setGlobalDispatcher(previousDispatcher);
+        await discord.close();
+    });
+
+    const pool = discord.get('https://discord.com');
+    const headers = { authorization: 'Bot fake.bot-token_value' };
+    const responseOptions = { headers: { 'content-type': 'application/json' } };
+    pool.intercept({ path: '/api/v10/guilds/123', headers }).reply(200, { id: '123', owner_id: '456' }, responseOptions);
+    pool.intercept({ path: '/api/v10/guilds/123/members/456', headers }).reply(200, { roles: [] }, responseOptions);
+    pool.intercept({ path: '/api/v10/guilds/123/roles', headers }).reply(200, [], responseOptions);
+
+    const { resolveDashboardUserPermissions } = await import('../lib/gameAdmin');
+    const permissions = await resolveDashboardUserPermissions('123', '456');
+    assert.equal(permissions.can_access_dashboard, true);
+    assert.equal(permissions.is_admin, true);
+    discord.assertNoPendingInterceptors();
+});
+
+test('missing or malformed bot tokens do not create an authenticated Discord client', (t) => {
+    configure(t);
+    assert.equal(createDiscordBotRest(), null);
+    for (const value of [' \r\n ', 'fake.bot\r\n-token', 'Bot fake.bot-token']) {
+        process.env.DISCORD_TOKEN = value;
+        assert.equal(createDiscordBotRest(), null);
+    }
 });

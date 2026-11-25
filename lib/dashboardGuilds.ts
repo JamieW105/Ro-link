@@ -1,6 +1,6 @@
-import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
+import { createDiscordBotRest } from './discordBotRest';
 import { supabase } from './supabase';
 import { getSupabaseAdmin } from './supabaseAdmin';
 
@@ -24,9 +24,7 @@ export class DiscordRateLimitError extends Error {
 const ADMINISTRATOR_PERMISSION = 0x8n;
 const MANAGE_GUILD_PERMISSION = 0x20n;
 
-const rest = process.env.DISCORD_TOKEN
-    ? new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN)
-    : null;
+const rest = createDiscordBotRest();
 
 interface DiscordGuildRecord {
     id: string;
@@ -84,7 +82,7 @@ async function listBotGuilds() {
     const discordRest = rest;
 
     if (!discordRest) {
-        console.warn('[DASHBOARD][GUILDS] Missing DISCORD_TOKEN while loading bot guilds. Returning an empty bot guild list.');
+        console.warn('[DASHBOARD][GUILDS] DISCORD_TOKEN is missing or malformed. Returning an empty bot guild list.');
         return botGuilds;
     }
 

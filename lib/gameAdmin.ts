@@ -1,8 +1,8 @@
-import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
 import { normalizeAdminPanelCommandList } from './adminPanelCommands';
 import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from './dgsuBanConstants';
+import { createDiscordBotRest } from './discordBotRest';
 import { findServerByKeyWithDiagnostics } from './serverAuth';
 import { supabase } from './supabase';
 
@@ -94,9 +94,7 @@ export interface RoLinkAdminAccess {
 const ADMINISTRATOR_PERMISSION = 0x8n;
 const MANAGE_GUILD_PERMISSION = 0x20n;
 
-const rest = process.env.DISCORD_TOKEN
-    ? new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN)
-    : null;
+const rest = createDiscordBotRest();
 
 export class DgsuGameAdminAccessError extends Error {
     status: number;
@@ -153,7 +151,7 @@ function hasPanelAccess(perms: DashboardPermissions) {
 
 async function getGuildContext(serverId: string, discordUserId: string) {
     if (!rest) {
-        throw new Error('Missing DISCORD_TOKEN');
+        throw new Error('DISCORD_TOKEN is missing or malformed. Configure a raw Discord bot token on one line.');
     }
 
     const [guild, member, guildRoles] = await Promise.all([
