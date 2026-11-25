@@ -6,14 +6,8 @@ import { PublicThemeGate } from "@/components/public/PublicThemeGate";
 import { PublicHeaderGate } from "@/components/public/PublicHeaderGate";
 import { SiteBannerGate } from "@/components/SiteBannerGate";
 import { DgsuAppealRedirect } from "@/components/DgsuAppealRedirect";
+import { MetricoolTracker } from "@/components/MetricoolTracker";
 import { getSiteUrl, SITE_DESCRIPTION } from "@/lib/seo";
-import Script from "next/script";
-
-declare global {
-  interface Window {
-    beTracker?: { t: (options: { hash: string }) => void };
-  }
-}
 
 export const metadata: Metadata = {
   metadataBase: getSiteUrl(),
@@ -55,16 +49,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <Script
-          src="https://tracker.metricool.com/resources/be.js"
-          strategy="afterInteractive"
-          onLoad={() => {
-            window.beTracker?.t({ hash: "e171d0051cc25b8a22ff002c8b992d0b" });
-          }}
-        />
-      </head>
       <body>
+        <MetricoolTracker />
         <NextAuthProvider>
           <DgsuAppealRedirect />
           <PublicThemeGate>
