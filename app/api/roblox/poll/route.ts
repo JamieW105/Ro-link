@@ -5,6 +5,7 @@ import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanCons
 import { normalizeModulePanelCommandDefinition } from '@/lib/modulePanelCommands';
 import type { AdminPanelCommandDefinition } from '@/lib/adminPanelCommands';
 import { buildPlayerPresenceEvents, PLAYER_PRESENCE_RETENTION_MS } from '@/lib/playerPresence';
+import { readRobloxPollJobId } from '@/lib/robloxPollJobId';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 
@@ -298,14 +299,15 @@ export async function POST(req: Request) {
     const traceId = createPollTraceId();
     const startedAt = Date.now();
     try {
-        const body = await req.json().catch(() => ({}));
-        const { jobId, playerCount, players, status } = body;
+        const body = await req.json().catch(() => null) ?? {};
+        const { playerCount, players, status } = body;
+        const jobId = readRobloxPollJobId(body, req.headers);
         const modulePanelCommands = normalizeModulePanelCommandPayload(body.modulePanelCommands ?? body.module_panel_commands);
         const auth = readServerApiKeyDetails(req, body.apiKey ?? body.key ?? body.serverKey ?? body.securityKey);
         const authDebug = describeServerApiKeyDetails(auth);
         console.info('[RoLinkAPI][Poll] Request received', {
             traceId,
-            jobId: trimString(jobId) || null,
+            jobId,
             status: trimString(status) || 'ACTIVE',
             playerCount: Number.isFinite(Number(playerCount)) ? Number(playerCount) : null,
             rosterCount: Array.isArray(players) ? players.length : null,
@@ -447,6 +449,11 @@ export async function POST(req: Request) {
             const staleTime = new Date(Date.now() - 2 * 60 * 1000).toISOString();
             await removeStaleLiveServers(db, server.id, staleTime);
             await cleanupPlayerPresenceEvents(db, server.id);
+        } else {
+            console.warn('[RoLinkAPI][Poll] Skipped live heartbeat because the Roblox JobId is missing', {
+                traceId,
+                serverId: server.id,
+            });
         }
 
         // 3. Fetch Pending Commands
@@ -462,7 +469,7 @@ export async function POST(req: Request) {
         // 4. Mark as Processed
         const relevantCommands = ((commands || []) as QueuedCommand[]).filter((command) => {
             const targetJobId = getCommandTargetJobId(command);
-            return !targetJobId || targetJobId === trimString(jobId);
+            return !targetJobId || targetJobId === jobId;
         });
 
         if (relevantCommands.length > 0) {
@@ -478,13 +485,21 @@ export async function POST(req: Request) {
         console.info('[RoLinkAPI][Poll] Request complete', {
             traceId,
             serverId: server.id,
-            jobId: trimString(jobId) || null,
+            jobId,
             commandCount: relevantCommands.length,
             durationMs: Date.now() - startedAt,
         });
 
         return NextResponse.json({
             commands: relevantCommands,
+            ...(!jobId && {
+                heartbeat: {
+                    recorded: false,
+                    code: 'missing_job_id',
+                    message: 'Send game.JobId in the jobId field to show this instance in the Live Panel.',
+                    traceId,
+                },
+            }),
             settings: {
                 adminCmdsEnabled: server.admin_cmds_enabled !== false,
                 miscCmdsEnabled: server.misc_cmds_enabled !== false,
