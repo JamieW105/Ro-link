@@ -56,7 +56,6 @@ interface LivePanelPayload {
         id: string;
         placeId: string | null;
     };
-    liveServers?: LiveServerRecord[];
     modulePanelCommands?: AdminPanelCommandDefinition[];
     logs?: unknown[];
     playerActivity?: PlayerPresenceActivity[];
@@ -879,7 +878,7 @@ export default function LivePanelPage() {
     const [serverName, setServerName] = useState('Live Server');
     const [placeId, setPlaceId] = useState<string | null>(null);
     const [liveServers, setLiveServers] = useState<LiveServerRecord[]>([]);
-    const liveServersRefreshPending = useRef(false);
+    const [liveServersStatus, setLiveServersStatus] = useState<'loading' | 'ready' | 'error'>('loading');
     const [playerActivity, setPlayerActivity] = useState<PlayerPresenceActivity[]>([]);
     const [logs, setLogs] = useState<NormalizedDashboardLog[]>([]);
     const [pendingReports, setPendingReports] = useState<PendingReport[]>([]);
@@ -960,7 +959,6 @@ export default function LivePanelPage() {
             }
 
             setPlaceId(payload.server?.placeId || null);
-            setLiveServers(Array.isArray(payload.liveServers) ? payload.liveServers : []);
             setPlayerActivity(Array.isArray(payload.playerActivity) ? payload.playerActivity : []);
             setModulePanelCommands(Array.isArray(payload.modulePanelCommands) ? payload.modulePanelCommands : []);
             setLogs(normalizeDashboardLogs(payload.logs || []));
@@ -973,27 +971,6 @@ export default function LivePanelPage() {
             }
         }
     }, [guildId, setNotice]);
-
-    const refreshLiveServers = useCallback(async () => {
-        if (!guildId || liveServersRefreshPending.current) return;
-
-        liveServersRefreshPending.current = true;
-        try {
-            const response = await fetch(`/api/dashboard/live-servers?serverId=${encodeURIComponent(guildId)}`, {
-                cache: 'no-store',
-            });
-            const payload = await response.json().catch(() => ([])) as LiveServerRecord[] | { error?: string };
-
-            if (response.ok && Array.isArray(payload)) {
-                setLiveServers(payload);
-            }
-        } catch {
-            // The full panel refresh handles user-facing errors. Keep this fast
-            // server-list refresh silent so a brief network issue does not flash.
-        } finally {
-            liveServersRefreshPending.current = false;
-        }
-    }, [guildId]);
 
     const loadPanelReports = useCallback(async (status: ReportStatusFilter = 'PENDING') => {
         if (!guildId || !canManageReports) {
@@ -1078,23 +1055,52 @@ export default function LivePanelPage() {
     }, [loadPanel]);
 
     useEffect(() => {
-        const refreshWhenVisible = () => {
-            if (document.visibilityState === 'visible') {
-                refreshLiveServers();
+        if (!guildId) return;
+
+        const controller = new AbortController();
+        let refreshPending = false;
+
+        const refreshLiveServers = async () => {
+            if (refreshPending || controller.signal.aborted) return;
+
+            refreshPending = true;
+            try {
+                const response = await fetch(`/api/dashboard/live-servers?serverId=${encodeURIComponent(guildId)}`, {
+                    cache: 'no-store',
+                    signal: controller.signal,
+                });
+                const payload: unknown = await response.json();
+                if (!response.ok || !Array.isArray(payload)) {
+                    throw new Error('Failed to refresh live servers');
+                }
+
+                if (!controller.signal.aborted) {
+                    setLiveServers(payload);
+                    setLiveServersStatus('ready');
+                }
+            } catch {
+                if (!controller.signal.aborted) setLiveServersStatus('error');
+            } finally {
+                refreshPending = false;
             }
         };
 
-        refreshLiveServers();
+        const refreshWhenVisible = () => {
+            if (document.visibilityState === 'visible') void refreshLiveServers();
+        };
+
+        void refreshLiveServers();
         const interval = window.setInterval(refreshLiveServers, 2000);
         window.addEventListener('focus', refreshLiveServers);
         document.addEventListener('visibilitychange', refreshWhenVisible);
 
         return () => {
+            controller.abort();
             window.clearInterval(interval);
             window.removeEventListener('focus', refreshLiveServers);
             document.removeEventListener('visibilitychange', refreshWhenVisible);
         };
-    }, [refreshLiveServers]);
+    }, [guildId]);
 
     useEffect(() => {
         if (!canManageReports || rightPaneMode !== 'reports') {
@@ -2339,14 +2345,6 @@ export default function LivePanelPage() {
     const canRestartServers = canUseDashboardCommand(perms, 'UPDATE');
     const canShutdownServers = canUseDashboardCommand(perms, 'SHUTDOWN');
 
-    if (loading) {
-        return (
-            <div role="status" className="flex min-h-dvh items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" aria-hidden="true" />Loading Live Panel…
-            </div>
-        );
-    }
-
     return (
         <div className="live-panel fixed inset-0 flex flex-col overflow-hidden bg-background text-foreground">
             <div className="shrink-0 border-b border-border bg-background">
@@ -2429,7 +2427,7 @@ export default function LivePanelPage() {
                         <CardHeader className="shrink-0 gap-3 border-b border-border p-4">
                             <div className="flex items-center justify-between">
                                 <CardTitle>Live servers</CardTitle>
-                                <span className="text-xs font-medium text-muted-foreground">Update: 7s</span>
+                                <span className="text-xs font-medium text-muted-foreground">Update: 2s</span>
                             </div>
                             <Input
                                 aria-label="Search live servers"
@@ -2441,9 +2439,13 @@ export default function LivePanelPage() {
                         </CardHeader>
 
                         <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
-                            {filteredServers.length === 0 ? (
+                            {liveServersStatus === 'loading' ? (
+                                <div role="status" className="flex items-center justify-center gap-2 p-10 text-xs text-muted-foreground">
+                                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />Loading live servers…
+                                </div>
+                            ) : filteredServers.length === 0 ? (
                                 <div className="p-10 text-center text-xs font-medium text-muted-foreground">
-                                    No live servers matched.
+                                    {liveServersStatus === 'error' ? 'Unable to refresh live servers.' : 'No live servers matched.'}
                                 </div>
                             ) : (
                                 <div>

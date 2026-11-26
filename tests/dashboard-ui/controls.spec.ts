@@ -947,6 +947,32 @@ test("live command suggestions have room for descriptions without CMD badges", a
 });
 
 
+test("Live Panel keeps fresh servers when the panel snapshot arrives late", async ({ page }) => {
+  await mockDashboard(page);
+  let finishPanelSnapshot!: () => void;
+  const panelSnapshotReady = new Promise<void>(resolve => { finishPanelSnapshot = resolve; });
+  await page.route('**/api/dashboard/live-panel?*', async route => {
+    await panelSnapshotReady;
+    await route.fulfill({ json: {
+      server: { placeId: '1234' },
+      liveServers: [],
+      logs: [{ id: 'late-log', action: 'KICK', moderator: 'Moderator', target: 'LatePanelPlayer', timestamp: new Date().toISOString() }],
+    } });
+  });
+  await page.route('**/api/dashboard/live-servers?*', route => route.fulfill({ json: [sampleServer] }));
+
+  try {
+    await page.goto(`/dashboard/${serverId}/live-panel`);
+    const server = page.getByText('2 players active, last pulse', { exact: false });
+    await expect(server).toBeVisible();
+    finishPanelSnapshot();
+    await expect(page.getByRole('table', { name: 'Live moderation activity' })).toContainText('LatePanelPlayer');
+    await expect(server).toBeVisible();
+  } finally {
+    finishPanelSnapshot();
+  }
+});
+
 test("Live Panel Dice dialogs, menus, and controls preserve command flows", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = await mockDashboard(page);
