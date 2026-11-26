@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
-import { ADMIN_PANEL_COMMAND_IDS, normalizeAdminPanelCommand } from '@/lib/adminPanelCommands';
-import { buildDeliveryArgs, resolveDeliveryTargets, trimString, type CommandArgs } from '@/lib/commandDelivery';
+import { ADMIN_PANEL_COMMAND_IDS, isLocalTeleportCommand, normalizeAdminPanelCommand } from '@/lib/adminPanelCommands';
+import { buildDeliveryArgs, queueLocalTeleport, resolveDeliveryTargets, trimString, type CommandArgs } from '@/lib/commandDelivery';
 import { getServerByApiKey, isDgsuGameAdminAccessError } from '@/lib/gameAdmin';
 import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
 import { logAction } from '@/lib/logger';
@@ -91,6 +91,18 @@ export async function POST(req: Request) {
             if (!targetIdentity) {
                 return NextResponse.json({ error: 'A target player is required for that module command.' }, { status: 400 });
             }
+        }
+
+        if (isLocalTeleportCommand(command)) {
+            if (!moderatorRobloxUsername) {
+                return NextResponse.json({ error: 'Your Roblox username is required to use Bring or To.' }, { status: 400 });
+            }
+
+            const result = await queueLocalTeleport(server.id, command, baseArgs, trimString(body?.sourceJobId || args.source_job_id));
+            if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.status });
+
+            await logAction(server.id, command, trimString(args.username || args.usernames), moderator, 'In-game panel action');
+            return NextResponse.json({ success: true, queued: true, realtime: false, ...result });
         }
 
         const deliveryTargets = await resolveDeliveryTargets(server.id, command, baseArgs, {

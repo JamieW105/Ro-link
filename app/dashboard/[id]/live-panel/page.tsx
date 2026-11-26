@@ -35,6 +35,7 @@ import {
     VALUE_INPUT_COMMAND_IDS,
     canUseDashboardCommand,
     getAdminPanelCommandDefinition,
+    isLocalTeleportCommand,
     normalizeAdminPanelCommand,
     type AdminPanelCommandDefinition,
 } from '@/lib/adminPanelCommands';
@@ -1438,6 +1439,12 @@ export default function LivePanelPage() {
         }
 
         const command = commandBarParsed.command;
+        if (command.id === 'BRING' && !commandBarParsed.remainder.trim()) {
+            items.push(
+                { kind: 'command', title: 'Global', detail: 'Bring everyone else in your current server.', meta: 'Bring', value: 'Bring Global' },
+                { kind: 'command', title: 'Me', detail: 'Select yourself.', meta: 'Bring', value: 'Bring Me' },
+            );
+        }
         if (command.requiresTarget) {
             commandUserMatches.forEach((user) => {
                 items.push({
@@ -1951,6 +1958,16 @@ export default function LivePanelPage() {
                 setNotice({ type: 'error', text: `Add ${missingFields.join(', ')} before running ${commandDefinition.label}.` });
                 return;
             }
+        } else if (isLocalTeleportCommand(commandDefinition.id)) {
+            successTarget = parsed.remainder.trim();
+            if (!successTarget) {
+                const text = commandDefinition.id === 'BRING'
+                    ? 'Enter one or more usernames, Global, or Me after Bring.'
+                    : 'Enter one other player’s username after To.';
+                setNotice({ type: 'error', text });
+                return;
+            }
+            args.username = successTarget;
         } else if (commandDefinition.requiresTarget) {
             const targetParts = splitTargetAndExtra(parsed.remainder);
             target = targetParts.target;

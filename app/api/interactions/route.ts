@@ -14,8 +14,9 @@ import {
     findDgsuBanForTargets,
     findDgsuBanForUser,
 } from '@/lib/dgsuBans';
+import { canUseDashboardCommand, isLocalTeleportCommand } from '@/lib/adminPanelCommands';
 import { logAction } from '@/lib/logger';
-import { buildDeliveryArgs, resolveDeliveryTargets, type CommandArgs } from '@/lib/commandDelivery';
+import { buildDeliveryArgs, queueLocalTeleport, resolveDeliveryTargets, type CommandArgs } from '@/lib/commandDelivery';
 import { findLivePlayer, normalizeLivePlayerList, type LivePlayer } from '@/lib/livePlayers';
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
@@ -300,6 +301,8 @@ const MISC_SUBCOMMAND_TO_COMMAND: Record<string, string> = {
     freeze: 'FREEZE',
     unfreeze: 'UNFREEZE',
     ragdoll: 'RAGDOLL',
+    bring: 'BRING',
+    to: 'TO',
     'bring-to-spawn': 'BRING_TO_SPAWN',
     'teleport-to-me': 'TELEPORT_TO_ME',
     'forcefield-add': 'FORCEFIELD_ADD',
@@ -693,6 +696,8 @@ function buildMiscPanelResponse(): InteractionResponseData {
                     { label: 'Freeze', value: 'FREEZE', description: 'Anchor in place' },
                     { label: 'Unfreeze', value: 'UNFREEZE', description: 'Remove freeze' },
                     { label: 'Ragdoll', value: 'RAGDOLL', description: 'Temporarily ragdoll' },
+                    { label: 'Bring', value: 'BRING', description: 'Bring players in your server to you' },
+                    { label: 'To', value: 'TO', description: 'Move to one player in your server' },
                     { label: 'Bring To Spawn', value: 'BRING_TO_SPAWN', description: 'Move to spawn' },
                     { label: 'Teleport To Me', value: 'TELEPORT_TO_ME', description: 'Move to a moderator' },
                     { label: 'Add ForceField', value: 'FORCEFIELD_ADD', description: 'Add a ForceField' },
@@ -2112,6 +2117,25 @@ export async function POST(req: Request) {
             await sendRobloxMessage(guild_id, command, args, serverData);
         };
 
+        const queueDiscordTeleport = async (command: 'BRING' | 'TO', target: string) => {
+            const permissions = await resolveDashboardUserPermissions(guild_id, userId);
+            if (!canUseDashboardCommand(permissions, command)) {
+                return 'You do not have permission to use that misc command.';
+            }
+            const linkedRobloxUsername = await getLinkedRobloxUsername(userId);
+            if (!linkedRobloxUsername) return 'Link your Discord account to Roblox before using Bring or To.';
+
+            const result = await queueLocalTeleport(guild_id, command, {
+                username: target,
+                moderator: userTag,
+                moderator_roblox_username: linkedRobloxUsername,
+            });
+            if ('error' in result) return result.error;
+
+            await logAction(guild_id, command, target, logActor, 'Misc command');
+            return `Queued **${command === 'BRING' ? 'Bring' : 'To'}** for ${result.deliveredTargets} player(s).`;
+        };
+
         const queueResolvedCommand = async (
             command: string,
             args: CommandArgs,
@@ -2787,6 +2811,10 @@ export async function POST(req: Request) {
 
             else if (name === 'misc') {
                 if (miscCommand) {
+                    if (isLocalTeleportCommand(miscCommand)) {
+                        const content = await queueDiscordTeleport(miscCommand, targetUser);
+                        return NextResponse.json({ type: 4, data: { content, flags: 64 } });
+                    }
                     const amountValue = getCommandOptionValue(options, 'amount');
                     const amount = amountValue === undefined ? undefined : Number(amountValue);
                     let resolvedTargetUser = targetUser;
@@ -2884,6 +2912,8 @@ export async function POST(req: Request) {
                                     { label: 'Freeze', value: 'FREEZE', description: 'Anchor in place' },
                                     { label: 'Unfreeze', value: 'UNFREEZE', description: 'Remove freeze' },
                                     { label: 'Ragdoll', value: 'RAGDOLL', description: 'Temporarily ragdoll' },
+                                    { label: 'Bring', value: 'BRING', description: 'Bring players in your server to you' },
+                                    { label: 'To', value: 'TO', description: 'Move to one player in your server' },
                                     { label: 'Bring To Spawn', value: 'BRING_TO_SPAWN', description: 'Move to spawn' },
                                     { label: 'Teleport To Me', value: 'TELEPORT_TO_ME', description: 'Move to a moderator' },
                                     { label: 'Add ForceField', value: 'FORCEFIELD_ADD', description: 'Add a ForceField' },
@@ -3632,7 +3662,7 @@ export async function POST(req: Request) {
                         custom_id: 'target_user',
                         label: "Target Username",
                         style: 1,
-                        placeholder: action === 'VIEW' ? 'Leave blank to reset your camera' : 'Enter the Roblox username',
+                        placeholder: action === 'BRING' ? 'Usernames, Global, or Me' : action === 'VIEW' ? 'Leave blank to reset your camera' : 'Enter the Roblox username',
                         required: action !== 'VIEW'
                     }]
                 }];
@@ -3941,6 +3971,10 @@ export async function POST(req: Request) {
                 const action = custom_id.replace('misc_modal_', '');
 
                 let targetUser = getModalField(modalComponents, 'target_user');
+                if (isLocalTeleportCommand(action)) {
+                    const content = await queueDiscordTeleport(action, targetUser);
+                    return NextResponse.json({ type: 4, data: { content, flags: 64 } });
+                }
                 const args: MiscCommandArgs = { username: targetUser, moderator: userTag };
 
                 let msgContent = `✅ Queuing **${action}** for **${targetUser}**...`;

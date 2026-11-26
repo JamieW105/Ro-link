@@ -65,6 +65,8 @@ const MISC_SUBCOMMAND_TO_COMMAND = {
     freeze: 'FREEZE',
     unfreeze: 'UNFREEZE',
     ragdoll: 'RAGDOLL',
+    bring: 'BRING',
+    to: 'TO',
     'bring-to-spawn': 'BRING_TO_SPAWN',
     'teleport-to-me': 'TELEPORT_TO_ME',
     'forcefield-add': 'FORCEFIELD_ADD',
@@ -339,6 +341,8 @@ function buildMiscPanel() {
                     new StringSelectMenuOptionBuilder().setLabel('Freeze').setDescription('Anchor in place').setValue('FREEZE'),
                     new StringSelectMenuOptionBuilder().setLabel('Unfreeze').setDescription('Remove freeze').setValue('UNFREEZE'),
                     new StringSelectMenuOptionBuilder().setLabel('Ragdoll').setDescription('Temporarily ragdoll').setValue('RAGDOLL'),
+                    new StringSelectMenuOptionBuilder().setLabel('Bring').setDescription('Bring players in your server to you').setValue('BRING'),
+                    new StringSelectMenuOptionBuilder().setLabel('To').setDescription('Move to one player in your server').setValue('TO'),
                     new StringSelectMenuOptionBuilder().setLabel('Bring To Spawn').setDescription('Move to spawn').setValue('BRING_TO_SPAWN'),
                     new StringSelectMenuOptionBuilder().setLabel('Teleport To Me').setDescription('Move to a moderator').setValue('TELEPORT_TO_ME'),
                     new StringSelectMenuOptionBuilder().setLabel('Add ForceField').setDescription('Add a ForceField').setValue('FORCEFIELD_ADD'),
@@ -347,6 +351,54 @@ function buildMiscPanel() {
         );
 
     return { embed, row };
+}
+
+async function runLocalTeleport(interaction, command, target) {
+    await interaction.deferReply({ ephemeral: true });
+    try {
+        const { guild, guildId, member, user } = interaction;
+        const admin = guild?.ownerId === user.id || member?.permissions.has('Administrator') || member?.permissions.has('ManageGuild');
+        if (!admin) {
+            const roleIds = [guildId, ...(member?.roles?.cache?.keys() || [])];
+            const { data: roles, error } = await supabase.from('dashboard_roles')
+                .select('allowed_misc_cmds').eq('server_id', guildId).in('discord_role_id', roleIds);
+            if (error) throw error;
+            const allowed = roles?.some(role => role.allowed_misc_cmds?.some(value => ['*', command].includes(String(value).trim().toUpperCase())));
+            if (!allowed) return interaction.editReply('You do not have permission to use that misc command.');
+        }
+
+        const [username, server, userBan] = await Promise.all([
+            getLinkedRobloxUsername(user.id),
+            supabase.from('servers').select('api_key').eq('id', guildId).maybeSingle(),
+            findDgsuBanForUser(user.id),
+        ]);
+        if (userBan) return interaction.editReply(DGSU_BAN_ERROR_MESSAGE);
+        if (!username) return interaction.editReply('Link your Discord account to Roblox before using Bring or To.');
+        if (server.error) throw server.error;
+        if (!server.data?.api_key) return interaction.editReply('This server is not set up with Ro-Link yet.');
+
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const response = await fetch(new URL('/api/v1/command', baseUrl), {
+            method: 'POST',
+            redirect: 'error',
+            signal: AbortSignal.timeout(10_000),
+            headers: { 'Content-Type': 'application/json', 'x-api-key': server.data.api_key },
+            body: JSON.stringify({
+                command,
+                args: { username: target },
+                moderator: user.tag,
+                moderatorDiscordId: user.id,
+                moderatorRobloxUsername: username,
+            }),
+        });
+        const result = await response.json();
+        return interaction.editReply(response.ok
+            ? `Queued **${command === 'BRING' ? 'Bring' : 'To'}** for ${result.deliveredTargets} player(s).`
+            : result.error || 'Could not queue the command.');
+    } catch (error) {
+        console.error('[BOT] Local teleport failed:', error);
+        return interaction.editReply('Could not queue the command.');
+    }
 }
 
 async function isServerStaffInteraction(interaction) {
@@ -2074,6 +2126,7 @@ client.on('interactionCreate', async interaction => {
     } else if (commandName === 'misc') {
         if (miscCommand) {
             let targetUser = interaction.options.getString('username');
+            if (miscCommand === 'BRING' || miscCommand === 'TO') return runLocalTeleport(interaction, miscCommand, targetUser);
             const args = { username: targetUser, moderator: user.tag };
             if (miscCommand === 'SET_CHAR') {
                 args.char_user = interaction.options.getString('char_user');
@@ -2215,6 +2268,8 @@ client.on('interactionCreate', async interaction => {
                             .setLabel('Ragdoll')
                             .setDescription('Temporarily ragdoll')
                             .setValue('RAGDOLL'),
+                        new StringSelectMenuOptionBuilder().setLabel('Bring').setDescription('Bring players in your server to you').setValue('BRING'),
+                        new StringSelectMenuOptionBuilder().setLabel('To').setDescription('Move to one player in your server').setValue('TO'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Bring To Spawn')
                             .setDescription('Move to spawn')
@@ -2457,7 +2512,7 @@ client.on('interactionCreate', async interaction => {
         const targetUserInput = new TextInputBuilder()
             .setCustomId('target_user')
             .setLabel("Target Username")
-            .setPlaceholder(action === 'VIEW' ? 'Leave blank to reset your camera' : 'Enter the Roblox username')
+            .setPlaceholder(action === 'BRING' ? 'Usernames, Global, or Me' : action === 'VIEW' ? 'Leave blank to reset your camera' : 'Enter the Roblox username')
             .setStyle(TextInputStyle.Short)
             .setRequired(action !== 'VIEW');
 
@@ -2619,6 +2674,7 @@ client.on('interactionCreate', async interaction => {
             }
         };
         let targetUser = getOptionalField('target_user');
+        if (action === 'BRING' || action === 'TO') return runLocalTeleport(interaction, action, targetUser);
 
         let args = { username: targetUser, moderator: interaction.user.tag };
         let msgContent = `Queuing **${action}** for **${targetUser}**...`;

@@ -7,7 +7,8 @@ import { logAction } from '@/lib/logger';
 import { describeServerApiKeyDetails, readServerApiKeyDetails } from '@/lib/serverApiKey';
 import { findServerByKeyWithDiagnostics } from '@/lib/serverAuth';
 import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from '@/lib/dgsuBanConstants';
-import { buildDeliveryArgs, resolveDeliveryTargets, type CommandArgs } from '@/lib/commandDelivery';
+import { isLocalTeleportCommand } from '@/lib/adminPanelCommands';
+import { buildDeliveryArgs, queueLocalTeleport, resolveDeliveryTargets, type CommandArgs } from '@/lib/commandDelivery';
 
 type ApiCommandServerRecord = {
     id: string;
@@ -173,6 +174,17 @@ export async function POST(req: Request) {
         }
 
         const baseArgs: CommandArgs = { ...safeArgs, moderator: modName };
+        if (isLocalTeleportCommand(commandName)) {
+            const result = await queueLocalTeleport(server.id, commandName, {
+                ...baseArgs,
+                moderator_roblox_username: trimString(body.moderatorRobloxUsername || safeArgs.moderator_roblox_username || moderatorRobloxId),
+            }, trimString(body.sourceJobId || safeArgs.source_job_id));
+            if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.status });
+
+            await logAction(server.id, commandName, trimString(safeArgs.username || safeArgs.usernames), modName);
+            return NextResponse.json({ success: true, message: `Command ${commandName} queued.`, ...result });
+        }
+
         const deliveryTargets = await resolveDeliveryTargets(server.id, commandName, baseArgs, {
             allowGlobal: true,
         });

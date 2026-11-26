@@ -1,4 +1,5 @@
 import { GLOBAL_COMMAND_IDS } from './adminPanelCommands';
+import { livePlayerMatches, normalizeLivePlayerList } from './livePlayers';
 import { supabase } from './supabase';
 
 export type CommandArgs = Record<string, unknown>;
@@ -115,7 +116,8 @@ async function getFreshLiveServers(serverId: string) {
         .from('live_servers')
         .select('id, players')
         .eq('server_id', serverId)
-        .gte('updated_at', freshAfter);
+        .gte('updated_at', freshAfter)
+        .order('updated_at', { ascending: false });
 
     if (error) {
         throw new Error(error.message);
@@ -157,6 +159,90 @@ async function resolvePlayerJobId(serverId: string, targetIdentity: string, pref
 
     const matchedServer = liveServers.find((server) => liveServerHasPlayer(server, targetIdentity));
     return trimString(matchedServer?.id) || null;
+}
+
+type LocalTeleportPlan =
+    | { error: string; status: 400 | 404 }
+    | { jobId: string; moves: Array<{ username: string; moderator_roblox_username: string }> };
+
+export function resolveLocalTeleport(
+    command: 'BRING' | 'TO',
+    args: CommandArgs,
+    liveServers: LiveServerRecord[],
+    sourceJobId?: string,
+): LocalTeleportPlan {
+    const scope = normalizeIdentity(args.target_scope);
+    const target = getTargetIdentity(args) || (scope === 'global' ? 'global' : '');
+    const identities = (Array.isArray(args.usernames) ? args.usernames : target.split(/[\s,]+/))
+        .map((identity) => normalizeIdentity(identity).replace(/^@/, ''))
+        .filter(Boolean);
+    const selector = identities.length === 1 ? identities[0] : '';
+    const specialTargets = ['all', 'others', 'global', 'me'];
+    if (command === 'TO' && (!selector || specialTargets.includes(selector) || scope === 'global')) {
+        return { error: 'To requires exactly one other player in your current server.', status: 400 };
+    }
+    if (identities.length === 0 || selector === 'others' || (!selector && identities.some((identity) => specialTargets.includes(identity)))) {
+        return { error: 'Enter player usernames or use Global or Me on its own.', status: 400 };
+    }
+
+    const actorIdentity = trimString(args.moderator_roblox_username);
+    if (!actorIdentity) {
+        return { error: 'Your Roblox account is required to use Bring or To.', status: 400 };
+    }
+
+    const eligibleServers = liveServers.filter((server) => trimString(server.id) && (!sourceJobId || server.id === sourceJobId));
+    for (const server of eligibleServers) {
+        const roster = normalizeLivePlayerList(server.players);
+        const actor = roster.find((player) => livePlayerMatches(player, actorIdentity));
+        if (!actor) continue;
+
+        const jobId = trimString(server.id);
+        const otherPlayers = roster.filter((player) => player !== actor);
+        const targets = selector === 'global' || selector === 'all'
+            ? otherPlayers
+            : selector === 'me'
+                ? [actor]
+                : identities.map((identity) => (command === 'TO' ? otherPlayers : roster)
+                    .find((player) => livePlayerMatches(player, identity)));
+        if (targets.length === 0 || targets.some((target) => !target)) {
+            return { error: 'Every target must be in your current Roblox server.', status: 404 };
+        }
+
+        return {
+            jobId,
+            moves: [...new Set(targets)].filter((target) => target != null).map((target) => ({
+                username: command === 'TO' ? actor.username : target.username,
+                moderator_roblox_username: command === 'TO' ? target.username : actor.username,
+            })),
+        };
+    }
+
+    return { error: 'Join a live Roblox server before using Bring or To.', status: 404 };
+}
+
+export async function queueLocalTeleport(
+    serverId: string,
+    command: 'BRING' | 'TO',
+    args: CommandArgs,
+    sourceJobId?: string,
+) {
+    const result = resolveLocalTeleport(command, args, await getFreshLiveServers(serverId), sourceJobId);
+    if ('error' in result) return result;
+
+    // The installed bridges already support this command. Polling restricts delivery to the selected job.
+    const { error } = await supabase.from('command_queue').insert(result.moves.map((move) => ({
+        server_id: serverId,
+        command: 'TELEPORT_TO_ME',
+        args: buildDeliveryArgs({ ...move, moderator: args.moderator }, {
+            deliveryId: crypto.randomUUID(),
+            jobId: result.jobId,
+            scope: 'SERVER',
+        }),
+        status: 'PENDING',
+    })));
+    if (error) throw new Error(error.message);
+
+    return { deliveredTargets: result.moves.length, targetJobId: result.jobId };
 }
 
 export async function resolveDeliveryTargets(

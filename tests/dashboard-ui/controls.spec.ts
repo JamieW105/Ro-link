@@ -947,6 +947,25 @@ test("live command suggestions have room for descriptions without CMD badges", a
 });
 
 
+test("Live Panel submits Bring targets and To through the command bar", async ({ page }) => {
+  await mockDashboard(page);
+  await page.goto(`/dashboard/${serverId}/live-panel`);
+
+  for (const [input, command, username] of [
+    ['Bring Alice, Bob', 'BRING', 'Alice, Bob'],
+    ['Bring Global', 'BRING', 'Global'],
+    ['To Alice', 'TO', 'Alice'],
+  ]) {
+    await page.getByRole('button', { name: 'Run Command', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Run Live Command', exact: true });
+    await dialog.getByLabel('Live command').fill(input);
+    const sent = page.waitForRequest(request => new URL(request.url()).pathname === '/api/dashboard/command');
+    await dialog.getByRole('button', { name: 'Run Command', exact: true }).click();
+    expect((await sent).postDataJSON()).toMatchObject({ serverId, command, args: { username } });
+    await expect(dialog).toBeHidden();
+  }
+});
+
 test("Live Panel keeps fresh servers when the panel snapshot arrives late", async ({ page }) => {
   await mockDashboard(page);
   let finishPanelSnapshot!: () => void;
