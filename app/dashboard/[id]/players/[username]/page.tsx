@@ -1,4 +1,13 @@
 'use client';
+import { useDashboardFeedback } from '@/components/dashboard/DashboardFeedback';
+import { useSuccessNotice } from '@/hooks/use-success-notice';
+import { PageIcon } from "@/components/dashboard/PageIcon";
+
+import { Card } from '@/components/ui/card';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -65,6 +74,7 @@ function formatCommandTarget(commandId: string) {
 }
 
 export default function DashboardPlayerPage() {
+    const { confirm } = useDashboardFeedback();
     const params = useParams();
     const perms = usePermissions();
 
@@ -78,7 +88,7 @@ export default function DashboardPlayerPage() {
     const [linkedPlaceId, setLinkedPlaceId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [notice, setNotice] = useSuccessNotice<{ type: 'success' | 'error'; text: string } | null>(null);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [setCharValue, setSetCharValue] = useState("");
     const [teamValue, setTeamValue] = useState("");
@@ -205,7 +215,7 @@ export default function DashboardPlayerPage() {
                 clearInterval(interval);
             }
         };
-    }, [guildId, decodedUsername, loadDashboardData, resolveRobloxProfile]);
+    }, [guildId, decodedUsername, loadDashboardData, resolveRobloxProfile, setNotice]);
 
     async function sendPlayerCommand(commandId: string, extraArgs: Record<string, unknown> = {}, confirmMessage?: string) {
         if (!guildId || !player) {
@@ -222,7 +232,7 @@ export default function DashboardPlayerPage() {
             return;
         }
 
-        if (confirmMessage && !confirm(confirmMessage)) {
+        if (confirmMessage && !await confirm(confirmMessage)) {
             return;
         }
 
@@ -278,11 +288,11 @@ export default function DashboardPlayerPage() {
         return (
             <div className="space-y-6 max-w-5xl animate-in fade-in slide-in-from-bottom-2 duration-500">
                 <div className="flex flex-col gap-2">
-                    <h1 className="text-2xl font-bold text-white tracking-tight">Player Detail</h1>
-                    <p className="text-slate-500 text-sm font-medium">Ro-Link could not load that Roblox user.</p>
+                    <h1 className="text-2xl font-medium text-foreground tracking-tight">Player Detail</h1>
+                    <p className="text-muted-foreground text-sm font-medium">Ro-Link could not load that Roblox user.</p>
                 </div>
 
-                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-sm font-medium text-red-300">
+                <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-6 text-sm font-medium text-red-700 dark:text-red-400">
                     {error || 'Unknown player.'}
                 </div>
             </div>
@@ -293,9 +303,9 @@ export default function DashboardPlayerPage() {
         <div className="space-y-8 max-w-6xl animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div className="space-y-2">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Roblox Player</p>
-                    <h1 className="text-3xl font-bold tracking-tight text-white">{player.displayName}</h1>
-                    <p className="text-sm font-medium text-slate-400">@{player.username}</p>
+                    <p className="text-xs font-medium text-muted-foreground">Roblox Player</p>
+                    <h1 className="text-3xl font-medium tracking-tight text-foreground flex items-center gap-3"><PageIcon name="player" />{player.displayName}</h1>
+                    <p className="text-sm font-medium text-muted-foreground">@{player.username}</p>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -304,7 +314,7 @@ export default function DashboardPlayerPage() {
                             href={`https://www.roblox.com/users/${player.id}/profile`}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-300 transition-all hover:border-sky-500/30 hover:text-white"
+                            className="rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-medium text-foreground transition-all hover:border-border hover:text-foreground"
                         >
                             Open Profile
                         </a>
@@ -312,7 +322,7 @@ export default function DashboardPlayerPage() {
                     {presence.inGame && presence.jobId && linkedPlaceId ? (
                         <a
                             href={`roblox://placeId=${linkedPlaceId}&gameInstanceId=${presence.jobId}`}
-                            className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-emerald-300 transition-all hover:bg-emerald-500/20"
+                            className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-2.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 transition-all hover:bg-emerald-50"
                         >
                             Join Live Server
                         </a>
@@ -321,9 +331,9 @@ export default function DashboardPlayerPage() {
             </div>
 
             {notice && (
-                <div className={`rounded-2xl border px-5 py-4 text-sm font-medium ${notice.type === 'success'
-                    ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
-                    : 'border-red-500/20 bg-red-500/10 text-red-300'
+                <div className={`rounded-xl border px-5 py-4 text-sm font-medium ${notice.type === 'success'
+                    ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'
+                    : 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400'
                     }`}>
                     {notice.text}
                 </div>
@@ -331,18 +341,18 @@ export default function DashboardPlayerPage() {
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
                 <div className="space-y-6">
-                    <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/50">
-                        <div className={`h-28 bg-gradient-to-r ${player.isBanned ? 'from-red-700 to-rose-900' : presence.inGame ? 'from-emerald-600 to-teal-700' : 'from-sky-600 to-indigo-700'}`}></div>
+                    <div className="overflow-hidden rounded-xl border border-border bg-card">
+                        <div className={`h-28  ${player.isBanned ? ' ' : presence.inGame ? ' ' : ' '}`}></div>
                         <div className="px-6 pb-6 -mt-14">
-                            <div className="inline-flex rounded-3xl border border-slate-800 bg-[#020617] p-2">
+                            <div className="inline-flex rounded-xl border border-border bg-background p-2">
                                 {player.avatarUrl ? (
                                     <img
                                         src={player.avatarUrl}
                                         alt={player.username}
-                                        className="h-24 w-24 rounded-2xl border border-slate-800 bg-slate-900 object-cover"
+                                        className="h-24 w-24 rounded-xl border border-border bg-card object-cover"
                                     />
                                 ) : (
-                                    <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-3xl font-black text-slate-500">
+                                    <div className="flex h-24 w-24 items-center justify-center rounded-xl border border-border bg-card text-3xl font-semibold text-muted-foreground">
                                         {player.username.slice(0, 1).toUpperCase()}
                                     </div>
                                 )}
@@ -350,35 +360,35 @@ export default function DashboardPlayerPage() {
 
                             <div className="mt-4 space-y-4">
                                 <div>
-                                    <h2 className="text-xl font-bold text-white">{player.displayName}</h2>
-                                    <p className="text-sm font-medium text-slate-400">@{player.username}</p>
+                                    <h2 className="text-xl font-medium text-foreground">{player.displayName}</h2>
+                                    <p className="text-sm font-medium text-muted-foreground">@{player.username}</p>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3">
-                                    <div className="rounded-2xl border border-slate-800 bg-black/20 p-4">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">User ID</p>
-                                        <p className="mt-2 text-sm font-mono font-bold text-sky-400">{player.id}</p>
+                                    <div className="rounded-xl border border-border bg-muted p-4">
+                                        <p className="text-xs font-medium text-muted-foreground">User ID</p>
+                                        <p className="mt-2 text-sm font-mono font-medium text-foreground">{player.id}</p>
                                     </div>
-                                    <div className="rounded-2xl border border-slate-800 bg-black/20 p-4">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Status</p>
-                                        <p className={`mt-2 text-sm font-bold ${player.isBanned ? 'text-red-400' : presence.inGame ? 'text-emerald-400' : 'text-slate-300'}`}>
+                                    <div className="rounded-xl border border-border bg-muted p-4">
+                                        <p className="text-xs font-medium text-muted-foreground">Status</p>
+                                        <p className={`mt-2 text-sm font-medium ${player.isBanned ? 'text-red-700 dark:text-red-400' : presence.inGame ? 'text-emerald-700 dark:text-emerald-400' : 'text-foreground'}`}>
                                             {player.isBanned ? 'Banned' : presence.inGame ? 'In Game' : 'Offline'}
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="rounded-2xl border border-slate-800 bg-black/20 p-4">
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Account Created</p>
-                                    <p className="mt-2 text-sm font-semibold text-white">
+                                <div className="rounded-xl border border-border bg-muted p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">Account Created</p>
+                                    <p className="mt-2 text-sm font-semibold text-foreground">
                                         {player.created
                                             ? new Date(player.created).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
                                             : 'Unknown'}
                                     </p>
                                 </div>
 
-                                <div className="rounded-2xl border border-slate-800 bg-black/20 p-4">
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Live Presence</p>
-                                    <p className="mt-2 text-sm font-semibold text-white">
+                                <div className="rounded-xl border border-border bg-muted p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">Live Presence</p>
+                                    <p className="mt-2 text-sm font-semibold text-foreground">
                                         {presence.inGame && presence.jobId
                                             ? `Connected to ${presence.jobId.slice(0, 8).toUpperCase()}...`
                                             : 'Not in an active tracked server'}
@@ -388,22 +398,22 @@ export default function DashboardPlayerPage() {
                         </div>
                     </div>
 
-                    <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">About</p>
-                        <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                    <Card className="rounded-xl border border-border bg-card p-6">
+                        <p className="text-xs font-medium text-muted-foreground">About</p>
+                        <p className="mt-3 text-sm leading-relaxed text-foreground">
                             {trimString(player.description) || 'No Roblox description is set for this account.'}
                         </p>
-                    </div>
+                    </Card>
                 </div>
 
                 <div className="space-y-6">
-                    <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6">
+                    <Card className="rounded-xl border border-border bg-card p-6">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                <h2 className="text-sm font-bold uppercase tracking-widest text-white">Moderation</h2>
-                                <p className="mt-1 text-sm font-medium text-slate-500">Kick, ban, or unban this user using your server-scoped dashboard permissions.</p>
+                                <h2 className="text-sm font-medium text-foreground">Moderation</h2>
+                                <p className="mt-1 text-sm font-medium text-muted-foreground">Kick, ban, or unban this user using your server-scoped dashboard permissions.</p>
                             </div>
-                            <span className="rounded-full border border-slate-800 bg-black/20 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                            <span className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
                                 {availableModerationCommands.length} available
                             </span>
                         </div>
@@ -413,13 +423,13 @@ export default function DashboardPlayerPage() {
                                 {availableModerationCommands.map((command) => {
                                     const disabled = actionLoading === command.id || (command.id === 'KICK' && !presence.inGame);
                                     const colorClass = command.id === 'UNBAN'
-                                        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+                                        ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'
                                         : command.id === 'KICK'
-                                            ? 'border-amber-500/20 bg-amber-500/10 text-amber-300'
-                                            : 'border-red-500/20 bg-red-500/10 text-red-300';
+                                            ? 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400'
+                                            : 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400';
 
                                     return (
-                                        <button
+                                        <Button variant="outline" size="default"
                                             key={command.id}
                                             type="button"
                                             disabled={disabled}
@@ -428,32 +438,32 @@ export default function DashboardPlayerPage() {
                                                 command.id === 'KICK' && presence.jobId ? { job_id: presence.jobId } : {},
                                                 `${command.label} ${player.username}?`,
                                             )}
-                                            className={`rounded-2xl border px-4 py-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-40 ${colorClass}`}
+                                            className={`    text-left transition-all disabled:cursor-not-allowed disabled:opacity-40 ${colorClass}`}
                                         >
-                                            <p className="text-xs font-black uppercase tracking-widest">
+                                            <p className="text-xs font-semibold">
                                                 {actionLoading === command.id ? 'Sending...' : command.label}
                                             </p>
-                                            <p className="mt-2 text-[11px] font-medium text-current/80">{command.description}</p>
-                                        </button>
+                                            <p className="mt-2 text-xs font-medium text-current/80">{command.description}</p>
+                                        </Button>
                                     );
                                 })}
                             </div>
                         ) : (
-                            <div className="mt-5 rounded-2xl border border-slate-800 bg-black/20 px-4 py-4 text-sm font-medium text-slate-500">
+                            <div className="mt-5 rounded-xl border border-border bg-muted px-4 py-4 text-sm font-medium text-muted-foreground">
                                 Your current dashboard roles do not grant moderation actions for this player.
                             </div>
                         )}
-                    </div>
+                    </Card>
 
-                    <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6">
+                    <Card className="rounded-xl border border-border bg-card p-6">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                <h2 className="text-sm font-bold uppercase tracking-widest text-white">Live Player Commands</h2>
-                                <p className="mt-1 text-sm font-medium text-slate-500">Targeted misc and runtime commands only appear if your dashboard role allows them.</p>
+                                <h2 className="text-sm font-medium text-foreground">Live Player Commands</h2>
+                                <p className="mt-1 text-sm font-medium text-muted-foreground">Targeted misc and runtime commands only appear if your dashboard role allows them.</p>
                             </div>
-                            <span className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-widest ${presence.inGame
-                                ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
-                                : 'border-slate-800 bg-black/20 text-slate-400'
+                            <span className={`rounded-full border px-3 py-1 text-xs font-medium   ${presence.inGame
+                                ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'
+                                : 'border-border bg-muted text-muted-foreground'
                                 }`}>
                                 {presence.inGame ? 'Live target ready' : 'Offline target'}
                             </span>
@@ -462,22 +472,22 @@ export default function DashboardPlayerPage() {
                         {quickTargetCommands.length > 0 ? (
                             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                 {quickTargetCommands.map((command) => (
-                                    <button
+                                    <Button variant="outline" size="default"
                                         key={command.id}
                                         type="button"
                                         disabled={actionLoading === command.id || !presence.inGame}
                                         onClick={() => sendPlayerCommand(command.id)}
-                                        className="rounded-2xl border border-slate-800 bg-black/20 px-4 py-4 text-left transition-all hover:border-sky-500/30 hover:bg-sky-500/5 disabled:cursor-not-allowed disabled:opacity-40"
+                                        className="text-left transition-all disabled:cursor-not-allowed disabled:opacity-40"
                                     >
-                                        <p className="text-xs font-black uppercase tracking-widest text-white">
+                                        <p className="text-xs font-semibold text-foreground">
                                             {actionLoading === command.id ? 'Sending...' : command.label}
                                         </p>
-                                        <p className="mt-2 text-[11px] font-medium text-slate-500">{command.description}</p>
-                                    </button>
+                                        <p className="mt-2 text-xs font-medium text-muted-foreground">{command.description}</p>
+                                    </Button>
                                 ))}
                             </div>
                         ) : (
-                            <div className="mt-5 rounded-2xl border border-slate-800 bg-black/20 px-4 py-4 text-sm font-medium text-slate-500">
+                            <div className="mt-5 rounded-xl border border-border bg-muted px-4 py-4 text-sm font-medium text-muted-foreground">
                                 No live player commands are available for your current dashboard role.
                             </div>
                         )}
@@ -485,87 +495,87 @@ export default function DashboardPlayerPage() {
                         {(setCharCommand || teamCommand || valueCommands.length > 0) && (
                             <div className="mt-6 grid gap-4 xl:grid-cols-2">
                                 {setCharCommand && (
-                                    <div className="rounded-2xl border border-slate-800 bg-black/20 p-4">
-                                        <p className="text-xs font-black uppercase tracking-widest text-white">{setCharCommand.label}</p>
-                                        <p className="mt-2 text-[11px] font-medium text-slate-500">{setCharCommand.description}</p>
+                                    <div className="rounded-xl border border-border bg-muted p-4">
+                                        <p className="text-xs font-semibold text-foreground">{setCharCommand.label}</p>
+                                        <p className="mt-2 text-xs font-medium text-muted-foreground">{setCharCommand.description}</p>
                                         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                                            <input
+                                            <Input
                                                 type="text"
                                                 value={setCharValue}
                                                 onChange={(event) => setSetCharValue(event.target.value)}
                                                 placeholder="Username to copy avatar from"
-                                                className="flex-1 rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600"
+                                                className="flex-1"
                                             />
-                                            <button
+                                            <Button variant="outline" size="default"
                                                 type="button"
                                                 disabled={actionLoading === 'SET_CHAR' || !presence.inGame || !trimString(setCharValue)}
                                                 onClick={() => sendPlayerCommand('SET_CHAR', { char_user: trimString(setCharValue) })}
-                                                className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                                                className="transition-all disabled:cursor-not-allowed disabled:opacity-40"
                                             >
                                                 {actionLoading === 'SET_CHAR' ? 'Sending...' : 'Apply'}
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
                                 )}
 
                                 {teamCommand && (
-                                    <div className="rounded-2xl border border-slate-800 bg-black/20 p-4">
-                                        <p className="text-xs font-black uppercase tracking-widest text-white">{teamCommand.label}</p>
-                                        <p className="mt-2 text-[11px] font-medium text-slate-500">{teamCommand.description}</p>
+                                    <div className="rounded-xl border border-border bg-muted p-4">
+                                        <p className="text-xs font-semibold text-foreground">{teamCommand.label}</p>
+                                        <p className="mt-2 text-xs font-medium text-muted-foreground">{teamCommand.description}</p>
                                         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                                            <input
+                                            <Input
                                                 type="text"
                                                 value={teamValue}
                                                 onChange={(event) => setTeamValue(event.target.value)}
                                                 placeholder="Roblox team name"
-                                                className="flex-1 rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600"
+                                                className="flex-1"
                                             />
-                                            <button
+                                            <Button variant="outline" size="default"
                                                 type="button"
                                                 disabled={actionLoading === 'TEAM' || !presence.inGame || !trimString(teamValue)}
                                                 onClick={() => sendPlayerCommand('TEAM', { team_name: trimString(teamValue) })}
-                                                className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                                                className="transition-all disabled:cursor-not-allowed disabled:opacity-40"
                                             >
                                                 {actionLoading === 'TEAM' ? 'Sending...' : 'Apply'}
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
                                 )}
 
                                 {valueCommands.map((command) => (
-                                    <div key={command.id} className="rounded-2xl border border-slate-800 bg-black/20 p-4">
-                                        <p className="text-xs font-black uppercase tracking-widest text-white">{command.label}</p>
-                                        <p className="mt-2 text-[11px] font-medium text-slate-500">{command.description}</p>
+                                    <div key={command.id} className="rounded-xl border border-border bg-muted p-4">
+                                        <p className="text-xs font-semibold text-foreground">{command.label}</p>
+                                        <p className="mt-2 text-xs font-medium text-muted-foreground">{command.description}</p>
                                         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                                            <input
+                                            <Input
                                                 type="text"
                                                 value={valueInputs[command.id] || ''}
                                                 onChange={(event) => setValueInputs((current) => ({ ...current, [command.id]: event.target.value }))}
                                                 placeholder={formatCommandTarget(command.id)}
-                                                className="flex-1 rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600"
+                                                className="flex-1"
                                             />
-                                            <button
+                                            <Button variant="outline" size="default"
                                                 type="button"
                                                 disabled={actionLoading === command.id || !presence.inGame || !trimString(valueInputs[command.id])}
                                                 onClick={() => sendPlayerCommand(command.id, { amount: trimString(valueInputs[command.id]) })}
-                                                className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-sky-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                                                className="transition-all disabled:cursor-not-allowed disabled:opacity-40"
                                             >
                                                 {actionLoading === command.id ? 'Sending...' : 'Apply'}
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         )}
-                    </div>
+                    </Card>
 
-                    <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6">
+                    <Card className="rounded-xl border border-border bg-card p-6">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                <h2 className="text-sm font-bold uppercase tracking-widest text-white">Moderation History</h2>
-                                <p className="mt-1 text-sm font-medium text-slate-500">Recent actions logged for this Roblox account in this Discord server.</p>
+                                <h2 className="text-sm font-medium text-foreground">Moderation History</h2>
+                                <p className="mt-1 text-sm font-medium text-muted-foreground">Recent actions logged for this Roblox account in this Discord server.</p>
                             </div>
-                            <span className="rounded-full border border-slate-800 bg-black/20 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                            <span className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
                                 {logs.length} entries
                             </span>
                         </div>
@@ -575,21 +585,21 @@ export default function DashboardPlayerPage() {
                                 {logs.map((log) => (
                                     <div
                                         key={log.id}
-                                        className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-black/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                                        className="flex flex-col gap-3 rounded-xl border border-border bg-muted px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
                                     >
                                         <div className="flex items-center gap-3">
                                             <span className={`h-2.5 w-2.5 rounded-full ${log.action.includes('BAN')
                                                 ? 'bg-red-400'
                                                 : log.action === 'KICK'
                                                     ? 'bg-amber-400'
-                                                    : 'bg-sky-400'
+                                                    : 'bg-primary'
                                                 }`}></span>
                                             <div>
-                                                <p className="text-xs font-black uppercase tracking-widest text-white">{log.action}</p>
-                                                <p className="mt-1 text-[11px] font-medium text-slate-500">By {log.moderator}</p>
+                                                <p className="text-xs font-semibold text-foreground">{log.action}</p>
+                                                <p className="mt-1 text-xs font-medium text-muted-foreground">By {log.moderator}</p>
                                             </div>
                                         </div>
-                                        <p className="text-[11px] font-mono font-bold uppercase tracking-widest text-slate-500">
+                                        <p className="text-xs font-mono font-medium text-muted-foreground">
                                             {new Date(log.timestamp).toLocaleString([], {
                                                 year: 'numeric',
                                                 month: 'short',
@@ -602,11 +612,11 @@ export default function DashboardPlayerPage() {
                                 ))}
                             </div>
                         ) : (
-                            <div className="mt-5 rounded-2xl border border-dashed border-slate-800 px-4 py-8 text-center text-sm font-medium text-slate-500">
+                            <div className="mt-5 rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm font-medium text-muted-foreground">
                                 No prior moderation history was found for this Roblox user in this server.
                             </div>
                         )}
-                    </div>
+                    </Card>
                 </div>
             </div>
         </div>

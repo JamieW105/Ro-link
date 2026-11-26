@@ -16,6 +16,8 @@ interface Permissions {
     can_view_logs: boolean;
     can_view_runtime_logs: boolean;
     can_manage_staff_notes: boolean;
+    can_view_staff_shifts: boolean;
+    can_manage_staff_shifts: boolean;
     allowed_misc_cmds: string[];
     is_admin: boolean;
 }

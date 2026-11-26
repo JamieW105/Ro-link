@@ -1,8 +1,8 @@
-import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
 import { normalizeAdminPanelCommandList } from './adminPanelCommands';
 import { DGSU_BAN_ERROR_MESSAGE, DGSU_BAN_ERROR_STATUS } from './dgsuBanConstants';
+import { createDiscordBotRest } from './discordBotRest';
 import { findServerByKeyWithDiagnostics } from './serverAuth';
 import { supabase } from './supabase';
 
@@ -19,6 +19,8 @@ export interface DashboardPermissions {
     can_view_logs: boolean;
     can_view_runtime_logs: boolean;
     can_manage_staff_notes: boolean;
+    can_view_staff_shifts: boolean;
+    can_manage_staff_shifts: boolean;
     allowed_misc_cmds: string[];
     is_admin: boolean;
 }
@@ -65,6 +67,8 @@ interface DashboardRoleRecord {
     can_view_logs?: boolean | null;
     can_view_runtime_logs?: boolean | null;
     can_manage_staff_notes?: boolean | null;
+    can_view_staff_shifts?: boolean | null;
+    can_manage_staff_shifts?: boolean | null;
     allowed_misc_cmds?: string[] | null;
 }
 
@@ -90,9 +94,7 @@ export interface RoLinkAdminAccess {
 const ADMINISTRATOR_PERMISSION = 0x8n;
 const MANAGE_GUILD_PERMISSION = 0x20n;
 
-const rest = process.env.DISCORD_TOKEN
-    ? new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN)
-    : null;
+const rest = createDiscordBotRest();
 
 export class DgsuGameAdminAccessError extends Error {
     status: number;
@@ -122,6 +124,8 @@ export function emptyDashboardPermissions(): DashboardPermissions {
         can_view_logs: false,
         can_view_runtime_logs: false,
         can_manage_staff_notes: false,
+        can_view_staff_shifts: false,
+        can_manage_staff_shifts: false,
         allowed_misc_cmds: [],
         is_admin: false,
     };
@@ -140,12 +144,14 @@ function hasPanelAccess(perms: DashboardPermissions) {
         || perms.can_view_logs
         || perms.can_view_runtime_logs
         || perms.can_manage_staff_notes
+        || perms.can_view_staff_shifts
+        || perms.can_manage_staff_shifts
         || perms.allowed_misc_cmds.length > 0;
 }
 
 async function getGuildContext(serverId: string, discordUserId: string) {
     if (!rest) {
-        throw new Error('Missing DISCORD_TOKEN');
+        throw new Error('DISCORD_TOKEN is missing or malformed. Configure a raw Discord bot token on one line.');
     }
 
     const [guild, member, guildRoles] = await Promise.all([
@@ -198,6 +204,8 @@ export function aggregateDashboardPermissions(isAdmin: boolean, dashboardRoles: 
             can_view_logs: true,
             can_view_runtime_logs: true,
             can_manage_staff_notes: true,
+            can_view_staff_shifts: true,
+            can_manage_staff_shifts: true,
             allowed_misc_cmds: ['*'],
             is_admin: true,
         } satisfies DashboardPermissions;
@@ -218,6 +226,8 @@ export function aggregateDashboardPermissions(isAdmin: boolean, dashboardRoles: 
         if (role.can_view_logs) finalPerms.can_view_logs = true;
         if (role.can_view_runtime_logs) finalPerms.can_view_runtime_logs = true;
         if (role.can_manage_staff_notes) finalPerms.can_manage_staff_notes = true;
+        if (role.can_view_staff_shifts) finalPerms.can_view_staff_shifts = true;
+        if (role.can_manage_staff_shifts) finalPerms.can_manage_staff_shifts = true;
 
         for (const command of normalizeAdminPanelCommandList(role.allowed_misc_cmds)) {
             if (!finalPerms.allowed_misc_cmds.includes(command)) {

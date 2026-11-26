@@ -1,3 +1,4 @@
+import { excludeManagementLogs } from '@/lib/serverLogs';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { enrichLogRecordsWithLinkedUsers, expandLinkedLogTargets } from '@/lib/logIdentity';
@@ -73,14 +74,14 @@ export async function GET(
     const linkedTargets = await expandLinkedLogTargets(client, targets);
 
     const [targetLogsResult, moderatorLogsResult] = await Promise.all([
-        client
+        excludeManagementLogs(client
             .from('logs')
-            .select('*')
+            .select('*'))
             .in('target', linkedTargets)
             .order('timestamp', { ascending: false }),
-        client
+        excludeManagementLogs(client
             .from('logs')
-            .select('*')
+            .select('*'))
             .in('moderator', linkedTargets)
             .order('timestamp', { ascending: false }),
     ]);

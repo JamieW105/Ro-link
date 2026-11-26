@@ -6,8 +6,9 @@ import {
     ADMIN_PANEL_COMMAND_IDS,
     canUseDashboardCommand,
     normalizeAdminPanelCommand,
+    isLocalTeleportCommand,
 } from '@/lib/adminPanelCommands';
-import { buildDeliveryArgs, resolveDeliveryTargets, trimString, type CommandArgs } from '@/lib/commandDelivery';
+import { buildDeliveryArgs, queueLocalTeleport, resolveDeliveryTargets, trimString, type CommandArgs } from '@/lib/commandDelivery';
 import { resolveDashboardUserPermissions } from '@/lib/gameAdmin';
 import { logAction } from '@/lib/logger';
 import { commandRequiresModerationHierarchy, evaluateModerationRoleHierarchy } from '@/lib/moderationRoleHierarchy';
@@ -127,6 +128,18 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: 'Team name is required.' }, { status: 400 });
             }
             baseArgs.team_name = teamName;
+        }
+
+        if (isLocalTeleportCommand(command)) {
+            if (!moderatorRobloxUsername) {
+                return NextResponse.json({ error: 'Link your Discord account to Roblox before using Bring or To.' }, { status: 400 });
+            }
+
+            const result = await queueLocalTeleport(serverId, command, baseArgs);
+            if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.status });
+
+            await logAction(serverId, command, trimString(args.username || args.usernames), `<@${discordUserId}>`, 'Dashboard action');
+            return NextResponse.json({ success: true, queued: true, realtime: false, ...result });
         }
 
         const deliveryTargets = await resolveDeliveryTargets(serverId, command, baseArgs, {

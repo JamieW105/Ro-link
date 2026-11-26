@@ -1,3 +1,6 @@
+import { Card, CardTitle, CardDescription } from "@/components/ui/card";
+import { Status } from "@/components/ui/status";
+import { Button } from "@/components/ui/button";
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 
@@ -28,22 +31,22 @@ export default async function PricingPage() {
                         const external = /^https?:\/\//.test(plan.ctaUrl);
                         const button = <>{plan.ctaLabel}</>;
                         return (
-                            <article className={`rl-pricing-card${plan.featured && plan.available && !plan.comingSoon ? ' rl-pricing-card-featured' : ''}${!plan.available || plan.comingSoon ? ' rl-pricing-card-unavailable' : ''}`} key={plan.id}>
-                                {plan.comingSoon ? <span className="rl-pricing-badge rl-pricing-badge-coming-soon">Coming soon</span> : !plan.available ? <span className="rl-pricing-badge rl-pricing-badge-unavailable">Unavailable</span> : plan.featured && <span className="rl-pricing-badge">Recommended</span>}
-                                <h2>{plan.name}</h2>
+                            <Card className={`rl-pricing-card${plan.featured && plan.available && !plan.comingSoon ? ' rl-pricing-card-featured' : ''}${!plan.available || plan.comingSoon ? ' rl-pricing-card-unavailable' : ''}`} key={plan.id}>
+                                {plan.comingSoon ? <Status render={<span />} variant="default" className="rl-pricing-badge rl-pricing-badge-coming-soon">Coming soon</Status> : !plan.available ? <Status render={<span />} variant="default" className="rl-pricing-badge rl-pricing-badge-unavailable">Unavailable</Status> : plan.featured && <Status render={<span />} variant="default" className="rl-pricing-badge">Recommended</Status>}
+                                <CardTitle>{plan.name}</CardTitle>
                                 <div className="rl-pricing-price"><strong>{plan.price}</strong>{plan.cadence && <span>{plan.cadence}</span>}</div>
-                                <p>{plan.description}</p>
+                                <CardDescription>{plan.description}</CardDescription>
                                 <ul>
                                     {plan.features.map((feature) => <li key={feature}><Check aria-hidden="true" />{feature}</li>)}
                                 </ul>
                                 {!plan.available || plan.comingSoon ? (
-                                    <span className="rl-button rl-pricing-button-disabled" aria-disabled="true">{plan.comingSoon ? 'Coming soon' : 'Unavailable'}</span>
+                                    <Button type="button" disabled>{plan.comingSoon ? 'Coming soon' : 'Unavailable'}</Button>
                                 ) : external ? (
-                                    <a className="rl-button rl-button-primary" href={plan.ctaUrl} target="_blank" rel="noopener noreferrer">{button}</a>
+                                    <Button asChild variant="default"><a href={plan.ctaUrl} target="_blank" rel="noopener noreferrer">{button}</a></Button>
                                 ) : (
-                                    <Link className="rl-button rl-button-primary" href={plan.ctaUrl}>{button}</Link>
+                                    <Button asChild variant="default"><Link href={plan.ctaUrl}>{button}</Link></Button>
                                 )}
-                            </article>
+                            </Card>
                         );
                     })}
                 </section>

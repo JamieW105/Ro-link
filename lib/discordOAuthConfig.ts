@@ -8,3 +8,8 @@ export function getDiscordOAuthConfig() {
         clientSecret: readEnv('DISCORD_OAUTH_CLIENT_SECRET') || readEnv('DISCORD_CLIENT_SECRET'),
     };
 }
+
+export function isDiscordOAuthConfigured() {
+    const { clientId, clientSecret } = getDiscordOAuthConfig();
+    return Boolean(clientId && clientSecret);
+}

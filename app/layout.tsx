@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./public-theme.css";
 import NextAuthProvider from "./providers";
+import { PublicThemeGate } from "@/components/public/PublicThemeGate";
 import { PublicHeaderGate } from "@/components/public/PublicHeaderGate";
 import { SiteBannerGate } from "@/components/SiteBannerGate";
 import { DgsuAppealRedirect } from "@/components/DgsuAppealRedirect";
+import { MetricoolTracker } from "@/components/MetricoolTracker";
 import { getSiteUrl, SITE_DESCRIPTION } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -46,13 +48,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
+        <MetricoolTracker />
         <NextAuthProvider>
           <DgsuAppealRedirect />
-          <PublicHeaderGate />
-          <SiteBannerGate />
-          {children}
+          <PublicThemeGate>
+            <PublicHeaderGate />
+            <SiteBannerGate />
+            {children}
+          </PublicThemeGate>
         </NextAuthProvider>
       </body>
     </html>

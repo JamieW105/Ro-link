@@ -1,7 +1,9 @@
-const { Client, GatewayIntentBits, ActivityType, REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType, REST, Routes, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
 const { setGlobalDispatcher, Agent } = require('undici');
 const discordCommands = require('../lib/discordCommands.json');
+const { SHIFT_COMMANDS, handleStaffShiftCommand } = require('../lib/discordStaffShifts');
+const { findSetupServer, saveSetupServer } = require('../lib/discordSetupStore');
 require('dotenv').config({ path: '.env.local', quiet: true });
 
 const hasSupabaseConfig = Boolean(
@@ -10,6 +12,10 @@ const hasSupabaseConfig = Boolean(
 );
 const supabase = hasSupabaseConfig
     ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    : null;
+
+const shiftAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
     : null;
 
 setGlobalDispatcher(new Agent({
@@ -59,6 +65,8 @@ const MISC_SUBCOMMAND_TO_COMMAND = {
     freeze: 'FREEZE',
     unfreeze: 'UNFREEZE',
     ragdoll: 'RAGDOLL',
+    bring: 'BRING',
+    to: 'TO',
     'bring-to-spawn': 'BRING_TO_SPAWN',
     'teleport-to-me': 'TELEPORT_TO_ME',
     'forcefield-add': 'FORCEFIELD_ADD',
@@ -333,6 +341,8 @@ function buildMiscPanel() {
                     new StringSelectMenuOptionBuilder().setLabel('Freeze').setDescription('Anchor in place').setValue('FREEZE'),
                     new StringSelectMenuOptionBuilder().setLabel('Unfreeze').setDescription('Remove freeze').setValue('UNFREEZE'),
                     new StringSelectMenuOptionBuilder().setLabel('Ragdoll').setDescription('Temporarily ragdoll').setValue('RAGDOLL'),
+                    new StringSelectMenuOptionBuilder().setLabel('Bring').setDescription('Bring players in your server to you').setValue('BRING'),
+                    new StringSelectMenuOptionBuilder().setLabel('To').setDescription('Move to one player in your server').setValue('TO'),
                     new StringSelectMenuOptionBuilder().setLabel('Bring To Spawn').setDescription('Move to spawn').setValue('BRING_TO_SPAWN'),
                     new StringSelectMenuOptionBuilder().setLabel('Teleport To Me').setDescription('Move to a moderator').setValue('TELEPORT_TO_ME'),
                     new StringSelectMenuOptionBuilder().setLabel('Add ForceField').setDescription('Add a ForceField').setValue('FORCEFIELD_ADD'),
@@ -341,6 +351,54 @@ function buildMiscPanel() {
         );
 
     return { embed, row };
+}
+
+async function runLocalTeleport(interaction, command, target) {
+    await interaction.deferReply({ ephemeral: true });
+    try {
+        const { guild, guildId, member, user } = interaction;
+        const admin = guild?.ownerId === user.id || member?.permissions.has('Administrator') || member?.permissions.has('ManageGuild');
+        if (!admin) {
+            const roleIds = [guildId, ...(member?.roles?.cache?.keys() || [])];
+            const { data: roles, error } = await supabase.from('dashboard_roles')
+                .select('allowed_misc_cmds').eq('server_id', guildId).in('discord_role_id', roleIds);
+            if (error) throw error;
+            const allowed = roles?.some(role => role.allowed_misc_cmds?.some(value => ['*', command].includes(String(value).trim().toUpperCase())));
+            if (!allowed) return interaction.editReply('You do not have permission to use that misc command.');
+        }
+
+        const [username, server, userBan] = await Promise.all([
+            getLinkedRobloxUsername(user.id),
+            supabase.from('servers').select('api_key').eq('id', guildId).maybeSingle(),
+            findDgsuBanForUser(user.id),
+        ]);
+        if (userBan) return interaction.editReply(DGSU_BAN_ERROR_MESSAGE);
+        if (!username) return interaction.editReply('Link your Discord account to Roblox before using Bring or To.');
+        if (server.error) throw server.error;
+        if (!server.data?.api_key) return interaction.editReply('This server is not set up with Ro-Link yet.');
+
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const response = await fetch(new URL('/api/v1/command', baseUrl), {
+            method: 'POST',
+            redirect: 'error',
+            signal: AbortSignal.timeout(10_000),
+            headers: { 'Content-Type': 'application/json', 'x-api-key': server.data.api_key },
+            body: JSON.stringify({
+                command,
+                args: { username: target },
+                moderator: user.tag,
+                moderatorDiscordId: user.id,
+                moderatorRobloxUsername: username,
+            }),
+        });
+        const result = await response.json();
+        return interaction.editReply(response.ok
+            ? `Queued **${command === 'BRING' ? 'Bring' : 'To'}** for ${result.deliveredTargets} player(s).`
+            : result.error || 'Could not queue the command.');
+    } catch (error) {
+        console.error('[BOT] Local teleport failed:', error);
+        return interaction.editReply('Could not queue the command.');
+    }
 }
 
 async function isServerStaffInteraction(interaction) {
@@ -1349,6 +1407,7 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     const { commandName: rawCommandName, guildId, user, guild } = interaction;
+    if (rawCommandName === 'setup') return;
     let commandName = rawCommandName;
     let miscCommand = null;
     if (rawCommandName === 'misc') {
@@ -1356,81 +1415,41 @@ client.on('interactionCreate', async interaction => {
         miscCommand = subcommand ? MISC_SUBCOMMAND_TO_COMMAND[subcommand] || null : null;
     }
 
-    // 1. Handle Setup separately (Owner Only)
-    if (commandName === 'setup') {
-        if (user.id !== guild?.ownerId) {
-            return interaction.reply({
-                content: 'This command can only be run by the server owner.',
-                ephemeral: true
-            });
-        }
-
-        let blockedServer = null;
+    if (SHIFT_COMMANDS.includes(commandName)) {
+        if (!guildId || !guild) return interaction.reply({ content: 'Use this command in a Discord server.', ephemeral: true });
+        await interaction.deferReply({ ephemeral: true });
         try {
-            blockedServer = await findBlockedServerForGuild(guildId);
+            if (!shiftAdmin) return interaction.editReply('Staff shift commands are unavailable. Ask the server administrator to check the bot configuration.');
+            const blocked = await findBlockedServerForGuild(guildId);
+            const userBan = await findDgsuBanForUser(user.id);
+            const serverBan = await findDgsuBanForTargets([{ type: 'DISCORD_SERVER', targetId: guildId }]);
+            if (blocked || userBan || serverBan) return interaction.editReply(blocked ? getBlockedServerMessage(blocked) : 'You or this server cannot use Ro-Link.');
+            const guildMember = await guild.members.fetch(user.id);
+            const isAdmin = guild.ownerId === user.id || guildMember.permissions.has('Administrator') || guildMember.permissions.has('ManageGuild');
+            const { data: roles, error } = await shiftAdmin.from('dashboard_roles').select('*').eq('server_id', guildId)
+                .in('discord_role_id', [guildId, ...guildMember.roles.cache.keys()]);
+            if (error) throw error;
+            const permissions = { is_admin: isAdmin, allowed_misc_cmds: [] };
+            for (const role of roles || []) {
+                for (const [key, value] of Object.entries(role)) {
+                    if (key.startsWith('can_') && value === true) permissions[key] = true;
+                }
+                permissions.allowed_misc_cmds.push(...(role.allowed_misc_cmds || []));
+            }
+            const result = await handleStaffShiftCommand({
+                serverId: guildId, userId: user.id, command: commandName,
+                action: commandName === 'shift-manage' ? interaction.options.getSubcommand() : undefined,
+                period: commandName === 'shift-leaderboard' ? interaction.options.getString('period') || 'latest-wave' : 'latest-wave',
+                page: commandName === 'shift-leaderboard' ? interaction.options.getInteger('page') || 1 : 1,
+            }, { db: shiftAdmin, permissions, normalizePlayers: normalizeLivePlayerList });
+            const reply = { ...result };
+            delete reply.flags;
+            delete reply.allowed_mentions;
+            return interaction.editReply({ ...reply, allowedMentions: { parse: [] } });
         } catch (error) {
-            console.error(`[SETUP] Failed to check blocked status for ${guildId}:`, error.message);
-            return interaction.reply({
-                content: 'Unable to verify whether this server is allowed to use Ro-Link. Try again later.',
-                ephemeral: true
-            });
+            console.error('[Staff Shifts] Discord command failed:', error);
+            return interaction.editReply('Could not process your shift command. Please try again.');
         }
-
-        if (blockedServer) {
-            return interaction.reply({
-                content: getBlockedServerMessage(blockedServer),
-                ephemeral: true
-            });
-        }
-
-        // Check if already setup
-        const { data: existingServer } = await supabase
-            .from('servers')
-            .select('*')
-            .eq('id', guildId)
-            .maybeSingle();
-
-        if (existingServer) {
-            const embeds = getSetupEmbeds(guildId, existingServer.api_key);
-            return interaction.reply({
-                content: '**This server is already set up!** Here are your integration details:',
-                embeds: embeds,
-                ephemeral: true
-            });
-        }
-
-        const modal = new ModalBuilder()
-            .setCustomId('setup_modal')
-            .setTitle('Ro-Link Server Setup');
-
-        const placeIdInput = new TextInputBuilder()
-            .setCustomId('place_id')
-            .setLabel("Roblox Place ID")
-            .setPlaceholder('Enter your Place ID (e.g. 123456789)')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-        const universeIdInput = new TextInputBuilder()
-            .setCustomId('universe_id')
-            .setLabel("Roblox Universe ID")
-            .setPlaceholder('Enter your Universe ID')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-        const apiKeyInput = new TextInputBuilder()
-            .setCustomId('api_key')
-            .setLabel("Open Cloud API Key")
-            .setPlaceholder('Enter your Roblox API Key (Hidden)')
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(true);
-
-        modal.addComponents(
-            new ActionRowBuilder().addComponents(placeIdInput),
-            new ActionRowBuilder().addComponents(universeIdInput),
-            new ActionRowBuilder().addComponents(apiKeyInput)
-        );
-
-        return await interaction.showModal(modal);
     }
 
     // 2. Handle Ping (Public)
@@ -1458,6 +1477,9 @@ client.on('interactionCreate', async interaction => {
                 { name: '/ping', value: 'Check the bot response time and connection status.' },
                 { name: '/moderation', value: 'Open Ban, Kick, Unban, Softban, Update, and Shutdown actions.' },
                 { name: '/lookup', value: 'Lookup Discord info, linked Roblox info, server moderation history, and staff notes.' },
+                { name: '/shift-manage', value: 'Start, stop, or take a break from your shift. Use start to resume.' },
+                { name: '/shift', value: 'View your shift and quota progress.' },
+                { name: '/shift-leaderboard', value: 'View staff rankings (requires View Staff Shifts).' },
                 { name: '/staff-note', value: 'Add a staff-only note to a Discord or Roblox user.' },
                 { name: '/servers', value: 'View and manage live Roblox servers.' },
                 { name: '/update', value: 'Update your linked Roblox profile and roles.' },
@@ -2104,6 +2126,7 @@ client.on('interactionCreate', async interaction => {
     } else if (commandName === 'misc') {
         if (miscCommand) {
             let targetUser = interaction.options.getString('username');
+            if (miscCommand === 'BRING' || miscCommand === 'TO') return runLocalTeleport(interaction, miscCommand, targetUser);
             const args = { username: targetUser, moderator: user.tag };
             if (miscCommand === 'SET_CHAR') {
                 args.char_user = interaction.options.getString('char_user');
@@ -2245,6 +2268,8 @@ client.on('interactionCreate', async interaction => {
                             .setLabel('Ragdoll')
                             .setDescription('Temporarily ragdoll')
                             .setValue('RAGDOLL'),
+                        new StringSelectMenuOptionBuilder().setLabel('Bring').setDescription('Bring players in your server to you').setValue('BRING'),
+                        new StringSelectMenuOptionBuilder().setLabel('To').setDescription('Move to one player in your server').setValue('TO'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Bring To Spawn')
                             .setDescription('Move to spawn')
@@ -2487,7 +2512,7 @@ client.on('interactionCreate', async interaction => {
         const targetUserInput = new TextInputBuilder()
             .setCustomId('target_user')
             .setLabel("Target Username")
-            .setPlaceholder(action === 'VIEW' ? 'Leave blank to reset your camera' : 'Enter the Roblox username')
+            .setPlaceholder(action === 'BRING' ? 'Usernames, Global, or Me' : action === 'VIEW' ? 'Leave blank to reset your camera' : 'Enter the Roblox username')
             .setStyle(TextInputStyle.Short)
             .setRequired(action !== 'VIEW');
 
@@ -2649,6 +2674,7 @@ client.on('interactionCreate', async interaction => {
             }
         };
         let targetUser = getOptionalField('target_user');
+        if (action === 'BRING' || action === 'TO') return runLocalTeleport(interaction, action, targetUser);
 
         let args = { username: targetUser, moderator: interaction.user.tag };
         let msgContent = `Queuing **${action}** for **${targetUser}**...`;
@@ -2724,6 +2750,7 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
 
     const customId = interaction.customId;
+    if (customId === 'setup_open') return;
 
     if (customId === 'lookup_manage') {
         if (!await isServerStaffInteraction(interaction)) {
@@ -2866,84 +2893,145 @@ client.on('interactionCreate', async interaction => {
     await interaction.editReply(`**${action.toUpperCase()}** command queued for \`${username}\`.`);
 });
 
-// Handle Modal Submissions
 client.on('interactionCreate', async interaction => {
-    if (!supabase) return;
+    const isSetupCommand = interaction.isChatInputCommand() && interaction.commandName === 'setup';
+    const isSetupButton = interaction.isButton() && interaction.customId === 'setup_open';
+    const isSetupSubmit = interaction.isModalSubmit() && interaction.customId === 'setup_modal';
+    if (!isSetupCommand && !isSetupButton && !isSetupSubmit) return;
 
-    if (!interaction.isModalSubmit()) return;
-
-    if (interaction.customId === 'setup_modal') {
-        const placeId = interaction.fields.getTextInputValue('place_id');
-        const universeId = interaction.fields.getTextInputValue('universe_id');
-        const openCloudKey = interaction.fields.getTextInputValue('api_key');
-
-        await interaction.deferReply({ ephemeral: true });
-
-        const userBan = await findDgsuBanForUser(interaction.user?.id);
-        if (userBan) {
-            return interaction.editReply(DGSU_BAN_ERROR_MESSAGE);
+    const { guildId, guild, user } = interaction;
+    const flags = MessageFlags.Ephemeral;
+    try {
+        if (!guildId || user.id !== guild?.ownerId) {
+            await interaction.reply({ content: 'This command can only be run by the server owner.', flags });
+            return;
+        }
+        if (!supabase) {
+            await interaction.reply({ content: 'Setup is unavailable. Try again later.', flags });
+            return;
+        }
+        if (isSetupButton) {
+            await interaction.showModal(buildSetupModal());
+            return;
         }
 
-        let blockedServer = null;
-        try {
-            blockedServer = await findBlockedServerForGuild(interaction.guildId);
-        } catch (error) {
-            console.error(`[SETUP] Failed to check blocked status for ${interaction.guildId}:`, error.message);
-            return interaction.editReply('Unable to verify whether this server is allowed to use Ro-Link. Try again later.');
-        }
-
+        await interaction.deferReply({ flags });
+        const [blockedServer, userBan, serverBan] = await Promise.all([
+            findBlockedServerForGuild(guildId),
+            findDgsuBanForUser(user.id),
+            findDgsuBanForTargets([{ type: 'DISCORD_SERVER', targetId: guildId }]),
+        ]);
         if (blockedServer) {
-            return interaction.editReply(getBlockedServerMessage(blockedServer));
+            await interaction.editReply({ content: getBlockedServerMessage(blockedServer), allowedMentions: { parse: [] } });
+            return;
+        }
+        if (userBan || serverBan) {
+            await interaction.editReply(DGSU_BAN_ERROR_MESSAGE);
+            return;
         }
 
-        const serverBan = await findDgsuBanForTargets([{ type: 'DISCORD_SERVER', targetId: interaction.guildId }]);
-        if (serverBan) {
-            return interaction.editReply(DGSU_BAN_ERROR_MESSAGE);
+        const existingServer = await findSetupServer(supabase, guildId);
+        const existingKey = existingServer?.api_key?.trim();
+        if (existingKey) {
+            await interaction.editReply({
+                content: '**This server is already set up!** Here are your integration details:',
+                embeds: getSetupEmbeds(guildId, existingKey),
+            });
+            return;
+        }
+
+        if (isSetupCommand) {
+            const button = new ButtonBuilder()
+                .setCustomId('setup_open')
+                .setLabel('Open Setup Form')
+                .setStyle(ButtonStyle.Primary);
+            await interaction.editReply({
+                content: 'Continue to enter your Roblox game details.',
+                components: [new ActionRowBuilder().addComponents(button)],
+            });
+            return;
+        }
+
+        const placeId = interaction.fields.getTextInputValue('place_id').trim();
+        const universeId = interaction.fields.getTextInputValue('universe_id').trim();
+        const openCloudKey = interaction.fields.getTextInputValue('api_key').trim();
+        if (!placeId || !universeId || !openCloudKey) {
+            await interaction.editReply('Enter all three setup fields.');
+            return;
         }
 
         const gameBan = await findDgsuBanForRobloxGame(placeId, universeId);
         if (gameBan.ban) {
             await banUserForDgsuGameAttempt({
-                discordUserId: interaction.user?.id,
-                serverId: interaction.guildId,
+                discordUserId: user.id,
+                serverId: guildId,
                 placeId,
                 universeId: gameBan.universeId || universeId,
                 sourceBan: gameBan.ban,
             });
-
-            return interaction.editReply(DGSU_BAN_ERROR_MESSAGE);
+            await interaction.editReply(DGSU_BAN_ERROR_MESSAGE);
+            return;
         }
 
-        const { data: existingServer } = await supabase
-            .from('servers')
-            .select('api_key')
-            .eq('id', interaction.guildId)
-            .maybeSingle();
-
-        const generatedKey = existingServer?.api_key?.trim()
-            || ('rl_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
-
-        const { error: dbError } = await supabase
-            .from('servers')
-            .upsert({
-                id: interaction.guildId,
-                place_id: placeId,
-                universe_id: universeId,
-                open_cloud_key: openCloudKey,
-                api_key: generatedKey
-            });
-
-        if (dbError) {
-            return interaction.editReply(`Setup failed: \${dbError.message}`);
-        }
-
-        const embeds = getSetupEmbeds(interaction.guildId, generatedKey);
+        const apiKey = await saveSetupServer(supabase, {
+            id: guildId,
+            place_id: placeId,
+            universe_id: universeId,
+            open_cloud_key: openCloudKey,
+        }, existingServer);
         await interaction.editReply({
             content: '**Setup Successful!** Please follow the instructions below to complete the integration:',
-            embeds: embeds
+            embeds: getSetupEmbeds(guildId, apiKey),
         });
+    } catch (error) {
+        console.error(`[SETUP] Failed for guild ${guildId}:`, error instanceof Error ? error.message : error.code);
+        const content = 'Setup could not be completed. Try again later.';
+        try {
+            if (interaction.deferred) {
+                await interaction.editReply(content);
+            } else if (!interaction.replied) {
+                await interaction.reply({ content, flags });
+            }
+        } catch (replyError) {
+            console.error(`[SETUP] Failed to send error response for guild ${guildId}:`, replyError.message);
+        }
     }
 });
+
+function buildSetupModal() {
+    const modal = new ModalBuilder()
+        .setCustomId('setup_modal')
+        .setTitle('Ro-Link Server Setup');
+
+    const placeIdInput = new TextInputBuilder()
+        .setCustomId('place_id')
+        .setLabel("Roblox Place ID")
+        .setPlaceholder('Enter your Place ID (e.g. 123456789)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+    const universeIdInput = new TextInputBuilder()
+        .setCustomId('universe_id')
+        .setLabel("Roblox Universe ID")
+        .setPlaceholder('Enter your Universe ID')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+    const apiKeyInput = new TextInputBuilder()
+        .setCustomId('api_key')
+        .setLabel("Open Cloud API Key")
+        .setPlaceholder('Enter your Roblox API Key')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true);
+
+    modal.addComponents(
+        new ActionRowBuilder().addComponents(placeIdInput),
+        new ActionRowBuilder().addComponents(universeIdInput),
+        new ActionRowBuilder().addComponents(apiKeyInput)
+    );
+
+    return modal;
+}
 
 // Helper for Setup Instructions
 function getSetupEmbeds(guildId, apiKey) {

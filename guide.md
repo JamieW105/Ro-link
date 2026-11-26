@@ -68,23 +68,44 @@ create table public.live_servers (
 
 ## ⚙️ 2. Environment Variables
 
-Create a `.env.local` file in the root directory and add the following keys:
+Copy `.env.example` to `.env.local` in the root directory and fill in real values.
+Restart the development server after changing environment variables. Git does not
+include credentials when you pull or switch branches.
 
 ```bash
 # Discord Configuration
 DISCORD_TOKEN=your_bot_token_here
 DISCORD_CLIENT_ID=your_application_id_here
+DISCORD_CLIENT_SECRET=your_oauth2_client_secret_here
 DISCORD_PUBLIC_KEY=your_public_key_here
 DISCORD_BEARER_TOKEN=your_oauth2_bearer_token_here # Optional: For status updates via API
 TRUST_PROXY_HEADERS=true # Only when your trusted CDN/proxy strips client supplied forwarded headers
 
 # Application URL (Production or Localhost)
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your_generated_random_secret
 
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_server_only_service_role_key
 ```
+
+In Discord Developer Portal > OAuth2, copy the client secret and register
+`http://localhost:3000/api/auth/callback/discord` as a redirect URI. For a deployed
+site, register the same path on its `NEXTAUTH_URL` origin. The client secret is
+different from the bot token and public key. If you use a separate application
+for website sign-in, set both `DISCORD_OAUTH_CLIENT_ID` and
+`DISCORD_OAUTH_CLIENT_SECRET`; they override the corresponding `DISCORD_CLIENT_*`
+values. See the [NextAuth Discord provider](https://next-auth.js.org/providers/discord).
+
+Generate `NEXTAUTH_SECRET` with
+`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+Keep it and `SUPABASE_SERVICE_ROLE_KEY` server only. Missing OAuth credentials
+disable sign-in; missing or unavailable stats sources display a dash, and an
+unconfigured banner database returns no banners. A Discord stats HTTP 401 means
+`DISCORD_TOKEN` must be corrected or replaced in the Bot tab.
 
 ---
 

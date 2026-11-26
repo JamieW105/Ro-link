@@ -1,0 +1,19 @@
+.badge {
+  display: inline-flex;
+  width: 3.5rem;
+  height: 3.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--page-icon-light);
+}
+:global(.dark) .badge { color: var(--page-icon-dark); }
+.overview, .setup, .dashboard { --page-icon-light: #0369a1; --page-icon-dark: #38bdf8; }
+.roles, .modules, .creator { --page-icon-light: #7e22ce; --page-icon-dark: #c084fc; }
+.commands, .logs, .logging { --page-icon-light: #a16207; --page-icon-dark: #fbbf24; }
+.reports { --page-icon-light: #b91c1c; --page-icon-dark: #f87171; }
+.verification, .shifts, .live { --page-icon-light: #047857; --page-icon-dark: #34d399; }
+.settings, .shiftSettings { --page-icon-light: #4338ca; --page-icon-dark: #a5b4fc; }
+.marketplace, .player { --page-icon-light: #0e7490; --page-icon-dark: #22d3ee; }
+
+.compact { width: 2rem; height: 2rem; }

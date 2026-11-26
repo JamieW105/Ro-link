@@ -1,3 +1,4 @@
+import { excludeManagementLogs } from '@/lib/serverLogs';
 import { NextResponse } from 'next/server';
 
 import { aggregateDashboardPermissions, emptyDashboardPermissions, getServerByApiKey, isDgsuGameAdminAccessError } from '@/lib/gameAdmin';
@@ -421,9 +422,9 @@ async function handle(req: Request) {
     const logLimit = parseLimit(searchParams.get('limit'));
 
     const [logsResult, liveServersResult, dgsuBan, managementUser, game] = await Promise.all([
-        supabase
+        excludeManagementLogs(supabase
             .from('logs')
-            .select('id, action, target, moderator, timestamp')
+            .select('id, action, target, moderator, timestamp'))
             .eq('server_id', server.id)
             .order('timestamp', { ascending: false })
             .limit(300),

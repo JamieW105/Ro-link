@@ -1,14 +1,18 @@
 'use client';
+import { PageIcon } from "@/components/dashboard/PageIcon";
+
+import { Card } from '@/components/ui/card';
+import { Status, StatusIndicator, StatusLabel } from '@/components/ui/status';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Check, Copy, ExternalLink, KeyRound, RefreshCw, Search, ShieldAlert } from "lucide-react";
+import { Copy, ExternalLink, KeyRound, RefreshCw, ShieldAlert } from "lucide-react";
 
 const INSTALLER_PLUGIN_URL = "https://create.roblox.com/store/asset/87859041511603/RoLink-installer";
 
-const SearchIcon = () => <Search size={20} aria-hidden="true" />;
-const CheckIcon = () => <Check size={20} strokeWidth={3} aria-hidden="true" />;
 const KeyIcon = () => <KeyRound size={16} aria-hidden="true" />;
 const CopyIcon = () => <Copy size={14} aria-hidden="true" />;
 const ExternalLinkIcon = () => <ExternalLink size={14} aria-hidden="true" />;
@@ -139,11 +143,11 @@ export default function DashboardSetupPage() {
     if (isReadOnly) {
         return (
             <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
-                <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center mb-6 text-slate-400 border border-slate-700 shadow-xl">
+                <div className="w-16 h-16 bg-muted rounded-xl flex items-center justify-center mb-6 text-muted-foreground border border-border">
                     <ShieldAlert size={32} aria-hidden="true" />
                 </div>
-                <h1 className="text-2xl font-bold mb-2 tracking-tight">Access Denied</h1>
-                <p className="text-slate-400 mb-8 max-w-sm text-sm">You have read-only access to this dashboard. You cannot modify server configuration.</p>
+                <h1 className="text-2xl font-medium mb-2 tracking-tight">Access Denied</h1>
+                <p className="text-muted-foreground mb-8 max-w-sm text-sm">You have read-only access to this dashboard. You cannot modify server configuration.</p>
             </div>
         );
     }
@@ -152,33 +156,31 @@ export default function DashboardSetupPage() {
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className={`w-full transition-all duration-700 ${step === 1 ? "max-w-md mx-auto mt-20" : "max-w-7xl"}`}>
                 {step === 1 ? (
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 sm:p-6 md:p-8 xl:p-10 shadow-3xl">
-                        <div className="w-12 h-12 bg-sky-600/10 rounded-lg flex items-center justify-center text-sky-500 mb-8 border border-sky-500/10">
-                            <SearchIcon />
-                        </div>
-                        <h1 className="text-2xl font-bold mb-2 tracking-tight">Setup</h1>
-                        <p className="text-slate-500 text-sm font-medium mb-8">Connect your Roblox game to Discord.</p>
+                    <Card className="p-6">
+                        <PageIcon name="setup" />
+                        <h1 className="text-2xl font-medium mb-2 tracking-tight">Setup</h1>
+                        <p className="text-muted-foreground text-sm font-medium mb-8">Connect your Roblox game to Discord.</p>
 
                         <form onSubmit={handleSetup} className="space-y-6">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-bold uppercase text-slate-500 tracking-widest pl-1 block">Place ID</label>
-                                    <input
+                                    <label htmlFor="place-id" className="text-sm font-medium block">Place ID</label>
+                                    <Input
                                         type="text"
                                         required
-                                        placeholder="Place ID"
-                                        className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-mono"
+                                        id="place-id" placeholder="Place ID"
+                                        className="w-full transition-all"
                                         value={placeId}
                                         onChange={(event) => setPlaceId(event.target.value)}
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-bold uppercase text-slate-500 tracking-widest pl-1 block">Universe ID</label>
-                                    <input
+                                    <label htmlFor="universe-id" className="text-sm font-medium block">Universe ID</label>
+                                    <Input
                                         type="text"
                                         required
-                                        placeholder="Universe ID"
-                                        className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-mono"
+                                        id="universe-id" placeholder="Universe ID"
+                                        className="w-full transition-all"
                                         value={universeId}
                                         onChange={(event) => setUniverseId(event.target.value)}
                                     />
@@ -186,74 +188,72 @@ export default function DashboardSetupPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-bold uppercase text-slate-500 tracking-widest pl-1 block">Open Cloud API Key</label>
-                                <input
+                                <label htmlFor="open-cloud-key" className="text-sm font-medium block">Open Cloud API Key</label>
+                                <Input
                                     type="password"
                                     required
-                                    placeholder="Enter Roblox API Key"
-                                    className="w-full bg-black/40 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-600 transition-all font-mono"
+                                    id="open-cloud-key" placeholder="Enter Roblox API Key"
+                                    className="w-full transition-all"
                                     value={openCloudKey}
                                     onChange={(event) => setOpenCloudKey(event.target.value)}
                                 />
                             </div>
 
-                            {error ? <p className="text-red-500 text-[10px] font-bold uppercase tracking-wider">{error}</p> : null}
+                            {error ? <p className="text-red-700 dark:text-red-400 text-xs font-medium">{error}</p> : null}
 
-                            <button
+                            <Button variant="default" size="default"
                                 type="submit"
                                 disabled={loading}
-                                className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3.5 rounded-lg transition-all shadow-lg shadow-sky-900/10 text-xs disabled:opacity-50 flex items-center justify-center gap-3"
+                                className="w-full transition-all disabled:opacity-50 flex items-center justify-center"
                             >
                                 {loading ? (
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    <div className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin"></div>
                                 ) : (
-                                    "REQUEST AUTH KEY"
+                                    "Request auth key"
                                 )}
-                            </button>
+                            </Button>
                         </form>
-                    </div>
+                    </Card>
                 ) : (
-                    <div className="bg-slate-900 border border-slate-800 rounded-[1.5rem] p-5 sm:p-6 md:p-8 xl:p-10 shadow-3xl border-l-sky-600 border-l-4">
+                    <Card className="p-6">
                         <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-12">
-                            <div className="flex-1">
+                            <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-4 mb-10">
-                                    <div className="w-12 h-12 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-500 border border-emerald-500/10">
-                                        <CheckIcon />
-                                    </div>
+                                    <PageIcon name="verification" />
                                     <div>
-                                        <h1 className="text-2xl font-bold tracking-tight">Setup Complete</h1>
-                                        <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">STATUS: ACTIVE</p>
+                                        <h1 className="text-2xl font-medium tracking-tight">Setup Complete</h1>
+                                        <Status className="mt-2"><StatusIndicator /><StatusLabel>Active</StatusLabel></Status>
                                     </div>
                                 </div>
 
                                 <div className="space-y-8">
-                                    <div className="bg-black/40 p-5 rounded-xl border border-slate-800">
-                                        <label className="text-[10px] uppercase text-slate-500 font-bold tracking-widest flex items-center gap-2 mb-4">
+                                    <Card className="p-4">
+                                        <h2 className="text-sm text-foreground font-medium flex items-center gap-2 mb-4">
                                             <KeyIcon />
                                             Security Key
-                                        </label>
+                                        </h2>
                                         <div className="flex gap-3">
-                                            <code className="flex-1 bg-slate-900 px-4 py-3 rounded-lg font-mono text-[11px] text-sky-500 break-all border border-slate-800 shadow-inner">
+                                            <code className="min-w-0 flex-1 bg-card px-4 py-3 rounded-lg font-mono text-xs text-foreground break-all border border-border">
                                                 {apiKey}
                                             </code>
-                                            <button
+                                            <Button type="button" aria-label="Copy security key" variant="outline" size="icon"
                                                 onClick={() => navigator.clipboard.writeText(apiKey)}
-                                                className="p-3.5 bg-slate-800 hover:bg-slate-700 transition-all font-bold rounded-lg border border-slate-700"
+                                                className="transition-all"
                                             >
                                                 <CopyIcon />
-                                            </button>
+                                            </Button>
                                         </div>
-                                    </div>
+                                    </Card>
 
                                     <div className="space-y-4">
-                                        <h3 className="text-xs font-bold uppercase tracking-widest flex items-center gap-3 text-slate-300">
-                                            <div className="w-1 h-1 bg-sky-600 rounded-full"></div>
+                                        <h3 className="text-xs font-medium flex items-center gap-3 text-foreground">
+                                            <div className="w-1 h-1 bg-primary rounded-full"></div>
                                             Complete in Studio
                                         </h3>
                                         <ol className="space-y-4">
                                             {setupSteps.map((text, index) => (
-                                                <li key={text} className="flex gap-4 text-xs font-semibold text-slate-400 p-4 bg-slate-800/20 rounded-xl border border-slate-800/40">
-                                                    <span className="text-sky-600">{`0${index + 1}`}</span>
+                                                <li key={text} className="flex gap-4 text-sm text-foreground p-3 rounded-md border border-border">
+                                                    <span className="text-foreground">{`0${index + 1}`}</span>
                                                     {text}
                                                 </li>
                                             ))}
@@ -262,85 +262,62 @@ export default function DashboardSetupPage() {
                                 </div>
                             </div>
 
-                            <div className="flex-1">
-                                <div className="bg-black/60 rounded-xl border border-slate-800 h-full flex flex-col overflow-hidden">
-                                    <div className="flex items-center justify-between px-6 py-4 bg-slate-900 border-b border-slate-800 gap-4">
+                            <div className="min-w-0 flex-1">
+                                <Card className="h-full overflow-hidden">
+                                    <div className="flex flex-wrap items-center justify-between px-6 py-4 bg-card border-b border-border gap-4">
                                         <div>
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Installer plugin</span>
-                                            <p className="text-sm font-semibold text-white mt-1">RoLink installer</p>
+                                            <span className="text-xs font-medium text-muted-foreground">Installer plugin</span>
+                                            <p className="text-sm font-semibold text-foreground mt-1">RoLink installer</p>
                                         </div>
-                                        <a
-                                            href={INSTALLER_PLUGIN_URL}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center gap-2 px-3 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded text-[10px] font-bold uppercase tracking-tight transition-colors shadow-sm"
-                                        >
-                                            Open Plugin
-                                            <ExternalLinkIcon />
-                                        </a>
+                                        <Button asChild>
+                                            <a href={INSTALLER_PLUGIN_URL} target="_blank" rel="noreferrer">
+                                                Open Plugin <ExternalLinkIcon />
+                                            </a>
+                                        </Button>
                                     </div>
-                                    <div className="flex-1 overflow-auto p-6 bg-[#030303] custom-scrollbar">
+                                    <div className="p-6">
                                         <div className="space-y-5">
-                                            <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-5">
-                                                <p className="text-[10px] font-bold text-sky-400 uppercase tracking-widest mb-2">No manual scripts required</p>
-                                                <p className="text-sm leading-6 text-slate-300">
+                                            <Card className="bg-muted p-4">
+                                                <p className="text-xs font-medium text-foreground mb-2">No manual scripts required</p>
+                                                <p className="text-sm leading-6 text-foreground">
                                                     The installer plugin places and configures the Ro-Link bridge for you in Studio. Install it, paste your Security Key, and let it finish the setup.
                                                 </p>
-                                            </div>
-                                            <div className="grid gap-4 md:grid-cols-3">
+                                            </Card>
+                                            <div className="grid gap-4">
                                                 {installerHighlights.map((item) => (
-                                                    <div key={item.title} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{item.title}</p>
-                                                        <p className="text-xs leading-6 text-slate-400">{item.body}</p>
-                                                    </div>
+                                                    <Card key={item.title} className="p-4">
+                                                        <p className="text-sm font-medium text-foreground mb-2">{item.title}</p>
+                                                        <p className="text-sm leading-6 text-muted-foreground">{item.body}</p>
+                                                    </Card>
                                                 ))}
                                             </div>
-                                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-5">
-                                                <p className="text-[10px] font-bold text-amber-300 uppercase tracking-widest mb-2">Keep this key private</p>
-                                                <p className="text-xs leading-6 text-amber-100/80">
+                                            <Card className="bg-muted p-4">
+                                                <p className="text-xs font-medium text-foreground mb-2">Keep this key private</p>
+                                                <p className="text-xs leading-6 text-foreground">
                                                     Only paste the Security Key into the RoLink installer plugin or your secure backend tooling. Do not expose it in public repos, client scripts, or shared screenshots.
                                                 </p>
-                                            </div>
+                                            </Card>
                                         </div>
                                     </div>
-                                </div>
+                                </Card>
                             </div>
                         </div>
 
-                        <div className="mt-10 pt-6 border-t border-slate-800">
-                            <button
+                        <div className="mt-10 pt-6 border-t border-border">
+                            <Button type="button" variant="outline" size="default"
                                 onClick={() => {
                                     setStep(1);
                                     setPlaceId("");
                                 }}
-                                className="flex items-center gap-2 text-[10px] font-bold text-slate-600 hover:text-red-400 transition-colors uppercase tracking-widest"
+                                className="flex items-center transition-colors"
                             >
                                 <RefreshIcon />
-                                Reset Bridge Handshake
-                            </button>
+                                Reset bridge handshake
+                            </Button>
                         </div>
-                    </div>
+                    </Card>
                 )}
             </div>
-
-            <style jsx>{`
-                .custom-scrollbar::-webkit-scrollbar {
-                    width: 5px;
-                }
-
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: #1e293b;
-                    border-radius: 10px;
-                }
-
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: #334155;
-                }
-            `}</style>
         </div>
     );
 }

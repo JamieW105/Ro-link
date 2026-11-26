@@ -3,8 +3,8 @@ import { getToken } from 'next-auth/jwt';
 import { resolveDashboardSubdomainFromHostnameCandidates } from '@/lib/customDashboardDomains';
 import { consumeRateLimit, rateLimitHeaders, type RateLimitRule, type RateLimitResult } from '@/lib/rateLimit';
 import { getRequestClientIp } from '@/lib/requestClientIp';
+import { SITE_TESTING_DOMAIN } from '@/lib/siteTestingDomain';
 
-const SITE_TESTING_DOMAIN = 'rolink.site';
 const SITE_TESTING_PERMISSION = 'SITE_TESTING_ACCESS';
 const FULL_MANAGEMENT_PERMISSION = 'MANAGE_RO_LINK';
 
@@ -146,6 +146,8 @@ function isSiteTestingHost(req: NextRequest) {
 function isSiteTestingPublicPath(pathname: string) {
     return pathname === '/auth/signin'
         || pathname.startsWith('/api/auth')
+        // Discord authenticates webhook requests with its own signature.
+        || pathname === '/api/interactions'
         // Roblox game servers authenticate these routes with their server API
         // key. They cannot carry a browser session through the testing-site
         // gate, so redirecting them to /auth/signin turns POSTs into 405s.
@@ -355,13 +357,22 @@ export async function proxy(req: NextRequest) {
         return siteTestingResponse;
     }
 
-    const apiRateLimit = getApiRateLimitRule(req.nextUrl.pathname, req.method);
+    const { pathname, search } = req.nextUrl;
+    const apiRateLimit = getApiRateLimitRule(pathname, req.method);
     if (apiRateLimit) {
         const clientIp = getRequestClientIp(req.headers);
         const rateLimit = consumeRateLimit(`proxy:${apiRateLimit.name}:${clientIp}`, apiRateLimit.rule);
         if (!rateLimit.allowed) {
             return rateLimitedResponse(rateLimit, req);
         }
+    }
+
+    if (
+        pathname.startsWith('/api')
+        || pathname.startsWith('/_next')
+        || pathname.startsWith('/custom-dashboard')
+    ) {
+        return applySecurityHeaders(NextResponse.next(), req);
     }
 
     const dashboardHost = resolveDashboardSubdomainFromHostnameCandidates(
@@ -373,15 +384,6 @@ export async function proxy(req: NextRequest) {
     );
     const subdomain = dashboardHost?.subdomain;
     if (!subdomain || subdomain.includes('.') || IGNORED_SUBDOMAINS.has(subdomain)) {
-        return applySecurityHeaders(NextResponse.next(), req);
-    }
-
-    const { pathname, search } = req.nextUrl;
-    if (
-        pathname.startsWith('/api')
-        || pathname.startsWith('/_next')
-        || pathname.startsWith('/custom-dashboard')
-    ) {
         return applySecurityHeaders(NextResponse.next(), req);
     }
 

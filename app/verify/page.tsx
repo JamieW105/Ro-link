@@ -1,13 +1,16 @@
 'use client';
 
-import { Check, Link2, LockKeyhole, RefreshCw } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Status } from "@/components/ui/status";
+import { Button } from "@/components/ui/button";
+import { Check, LockKeyhole, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 import { signIn, useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 
 import { PublicFooter } from '@/components/public/PublicFooter';
 import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
-import { DiscordIcon } from '@/components/ui/DiscordIcon';
+import { LogIn as DiscordIcon } from 'lucide-react';
 import { DGSU_BAN_AUTH_ERROR, DGSU_BAN_ERROR_MESSAGE } from '@/lib/dgsuBanConstants';
 import { buildRobloxAvatarUrl } from '@/lib/robloxAvatars';
 
@@ -84,35 +87,35 @@ export default function VerifyPage() {
 
                 <section className="rl-utility-main rl-shell">
                     <div className="rl-utility-grid">
-                        <section className="rl-surface" aria-labelledby="connection-title">
-                            <div className="rl-surface-header">
+                        <Card className="rl-surface" aria-labelledby="connection-title">
+                            <CardHeader className="rl-surface-header">
                                 <div>
-                                    <h2 id="connection-title">Account connection</h2>
-                                    <p>Connect Discord and Roblox to verify your Ro-Link identity.</p>
+                                    <CardTitle id="connection-title">Account connection</CardTitle>
+                                    <CardDescription>Connect Discord and Roblox to verify your Ro-Link identity.</CardDescription>
                                 </div>
-                                <span className="rl-surface-icon"><Link2 aria-hidden="true" /></span>
-                            </div>
 
-                            <div className="rl-surface-body">
-                                {pageError ? <div className="rl-feedback rl-feedback-error mb-4">{pageError}</div> : null}
+                            </CardHeader>
+
+                            <CardContent className="rl-surface-body">
+                                {pageError ? <Status variant="error" role="status" className="w-full whitespace-normal rounded-md mb-4">{pageError}</Status> : null}
 
                                 {authLoading ? (
-                                    <div className="rl-notice" role="status">
-                                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+                                    <Card className="rl-notice" role="status">
+                                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-transparent" />
                                         <div><strong>Checking your connection</strong>Confirming your Discord and Roblox account status.</div>
-                                    </div>
+                                    </Card>
                                 ) : !session ? (
-                                    <div className="rl-notice">
+                                    <Card className="rl-notice">
                                         <DiscordIcon aria-hidden="true" width="16" height="16" />
                                         <div>
                                             <strong>Start with Discord</strong>
                                             Sign in with Discord before linking the Roblox account you want Ro-Link to verify.
-                                            <button className="rl-button rl-button-primary mt-4" type="button" onClick={() => signIn('discord')}>
+                                            <Button variant="default" className="mt-4" type="button" onClick={() => signIn('discord')}>
                                                 <DiscordIcon aria-hidden="true" width="15" height="15" />
                                                 Sign in with Discord
-                                            </button>
+                                            </Button>
                                         </div>
-                                    </div>
+                                    </Card>
                                 ) : linkedAccount ? (
                                     <div className="rl-verify-linked">
                                         <div className="rl-verify-profile">
@@ -131,15 +134,15 @@ export default function VerifyPage() {
                                                 <span className="rl-field-label">Linked Roblox account</span>
                                                 <h3>{linkedAccount.roblox_username}</h3>
                                                 <p>ID: {linkedAccount.roblox_id}</p>
-                                                <span className="rl-verify-status"><Check aria-hidden="true" /> Verified</span>
+                                                <Status render={<span />} variant="default" className="rl-verify-status"><Check aria-hidden="true" /> Verified</Status>
                                             </div>
                                         </div>
                                         <div className="rl-form-footer">
                                             <p>Your Ro-Link server roles will update automatically.</p>
-                                            <button className="rl-button" type="button" onClick={handleRobloxLink} disabled={loading}>
+                                            <Button variant="outline" type="button" onClick={handleRobloxLink} disabled={loading}>
                                                 <RefreshCw aria-hidden="true" width={14} height={14} />
                                                 {loading ? 'Opening Roblox…' : 'Change account'}
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
                                 ) : (
@@ -162,9 +165,9 @@ export default function VerifyPage() {
                                                     <strong>Discord</strong>
                                                     <span>{session.user?.name || 'Signed in'}</span>
                                                 </div>
-                                                <span className="rl-verify-account-state rl-verify-account-state-complete">
+                                                <Status render={<span />} variant="success" className="rl-verify-account-state rl-verify-account-state-complete">
                                                     <Check aria-hidden="true" /> Connected
-                                                </span>
+                                                </Status>
                                             </div>
 
                                             <div className="rl-verify-account-row">
@@ -175,45 +178,45 @@ export default function VerifyPage() {
                                                     <strong>Roblox</strong>
                                                     <span>No account connected</span>
                                                 </div>
-                                                <span className="rl-verify-account-state">Required</span>
+                                                <Status render={<span />} variant="default" className="rl-verify-account-state">Required</Status>
                                             </div>
                                         </div>
 
                                         <div className="rl-verify-unlinked-footer">
                                             <p>You’ll continue to Roblox to securely authorize your account.</p>
-                                            <button
-                                                className="rl-button rl-button-primary"
+                                            <Button variant="default"
+
                                                 type="button"
                                                 onClick={handleRobloxLink}
                                                 disabled={loading}
                                                 aria-busy={loading}
                                             >
                                                 {loading ? (
-                                                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" aria-hidden="true" />
+                                                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-transparent" aria-hidden="true" />
                                                 ) : (
                                                     <Image className="rl-verify-roblox-mark" src="/Media/Roblox.png" alt="" width={15} height={15} />
                                                 )}
                                                 {loading ? 'Redirecting…' : 'Continue with Roblox'}
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
                                 )}
-                            </div>
-                        </section>
+                            </CardContent>
+                        </Card>
 
                         <aside className="rl-aside-stack">
-                            <div className="rl-surface rl-aside-panel">
+                            <Card className="rl-surface rl-aside-panel">
                                 <h2>How verification works</h2>
                                 <ul className="rl-aside-list">
                                     <li><Check aria-hidden="true" /><span>Sign in with your Discord account.</span></li>
                                     <li><Check aria-hidden="true" /><span>Authorize your Roblox account.</span></li>
                                     <li><Check aria-hidden="true" /><span>Ro-Link keeps eligible roles synchronized.</span></li>
                                 </ul>
-                            </div>
-                            <div className="rl-notice">
+                            </Card>
+                            <Card className="rl-notice">
                                 <LockKeyhole aria-hidden="true" />
                                 <div><strong>Official OAuth</strong>Your password is entered only on Discord or Roblox, never on Ro-Link.</div>
-                            </div>
+                            </Card>
                         </aside>
                     </div>
                 </section>

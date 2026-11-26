@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
 import { buildDashboardHostname, getRolinkRootDomains } from '@/lib/customDashboardDomains';
@@ -10,6 +9,7 @@ import {
     normalizeCustomDashboardMetadata,
     normalizeCustomDashboardTheme,
 } from '@/lib/customDashboardSettings';
+import { createDiscordBotRest } from '@/lib/discordBotRest';
 import { supabase } from '@/lib/supabase';
 
 type RouteContext = {
@@ -72,12 +72,12 @@ export async function GET(_req: Request, context: RouteContext) {
         });
     }
 
-    if (!process.env.DISCORD_TOKEN) {
+    const rest = createDiscordBotRest();
+    if (!rest) {
         return buildResponse({ name: 'Ro-Link', icon: null });
     }
 
     try {
-        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
         const guild = await rest.get(Routes.guild(normalizedServerId)) as { name?: string; icon?: string | null };
 
         return buildResponse({

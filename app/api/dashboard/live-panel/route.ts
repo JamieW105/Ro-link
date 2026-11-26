@@ -1,3 +1,4 @@
+import { excludeManagementLogs } from '@/lib/serverLogs';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { enrichLogRecordsWithLinkedUsers, expandLinkedLogTargets } from '@/lib/logIdentity';
@@ -121,9 +122,9 @@ export async function GET(req: NextRequest) {
     const canViewReports = canManageReports(access.permissions);
     const canViewLogs = canViewCommandLogs(access.permissions);
 
-    const createLogsQuery = () => client
+    const createLogsQuery = () => excludeManagementLogs(client
         .from('logs')
-        .select('*')
+        .select('*'))
         .eq('server_id', serverId)
         .order('timestamp', { ascending: false })
         .limit(logLimit);

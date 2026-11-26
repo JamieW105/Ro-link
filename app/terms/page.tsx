@@ -20,7 +20,7 @@ export default function TermsPage() {
         >
                     <Section number="1" title="Agreement and Provider">
                         <p>These Terms of Service (&ldquo;Terms&rdquo;) are an agreement between you and Ro-Link Management Services (&ldquo;Ro-Link,&rdquo; &ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;). They govern your use of the Ro-Link website, Discord bot, dashboard, Roblox integration, APIs, plugins, module marketplace, and related services (collectively, the &ldquo;Services&rdquo;).</p>
-                        <p>By using the Services, inviting the bot, linking an account, connecting a server or Roblox experience, submitting a module, or otherwise accessing the Services, you agree to these Terms, our <Link href="/privacy" className="text-sky-400 hover:text-sky-300 font-bold">Privacy Policy</Link>, and our <Link href="/dgsu" className="text-sky-400 hover:text-sky-300 font-bold">DGSU Policy</Link>. If you do not agree, do not use the Services.</p>
+                        <p>By using the Services, inviting the bot, linking an account, connecting a server or Roblox experience, submitting a module, or otherwise accessing the Services, you agree to these Terms, our <Link href="/privacy" className="text-foreground hover:text-foreground font-bold">Privacy Policy</Link>, and our <Link href="/dgsu" className="text-foreground hover:text-foreground font-bold">DGSU Policy</Link>. If you do not agree, do not use the Services.</p>
                     </Section>
 
                     <Section number="2" title="Eligibility and Authority">
@@ -38,12 +38,12 @@ export default function TermsPage() {
                     </Section>
 
                     <Section number="5" title="DGSU Policy and Enforcement">
-                        <p>The <Link href="/dgsu" className="text-sky-400 hover:text-sky-300 font-bold">Dangerous Game, Server, or User Policy</Link> is incorporated into these Terms. Ro-Link may investigate, restrict, suspend, remove, block, preserve evidence about, or report users, games, servers, modules, or content that violate these Terms, the DGSU Policy, platform rules, or law. We may take action without prior notice when reasonably necessary for safety, abuse prevention, security, or legal compliance.</p>
+                        <p>The <Link href="/dgsu" className="text-foreground hover:text-foreground font-bold">Dangerous Game, Server, or User Policy</Link> is incorporated into these Terms. Ro-Link may investigate, restrict, suspend, remove, block, preserve evidence about, or report users, games, servers, modules, or content that violate these Terms, the DGSU Policy, platform rules, or law. We may take action without prior notice when reasonably necessary for safety, abuse prevention, security, or legal compliance.</p>
                     </Section>
 
                     <Section number="6" title="Customer Content and Modules">
                         <p>You retain ownership of the modules and other work you create and submit to Ro-Link. You grant Ro-Link a non-exclusive, worldwide, royalty-free licence to host, store, reproduce, review, test, display, distribute, and otherwise use that content only as necessary to operate, secure, moderate, promote within the marketplace, and provide the Services.</p>
-                        <p>You confirm that you own or have the rights needed to submit your content and grant this licence. You are responsible for your content, its configuration, and its use. Module creators and users must also comply with the <Link href="/terms/modules/create" className="text-sky-400 hover:text-sky-300 font-bold">Module Creator Terms</Link> and <Link href="/terms/modules/use" className="text-sky-400 hover:text-sky-300 font-bold">Module Use Terms</Link>.</p>
+                        <p>You confirm that you own or have the rights needed to submit your content and grant this licence. You are responsible for your content, its configuration, and its use. Module creators and users must also comply with the <Link href="/terms/modules/create" className="text-foreground hover:text-foreground font-bold">Module Creator Terms</Link> and <Link href="/terms/modules/use" className="text-foreground hover:text-foreground font-bold">Module Use Terms</Link>.</p>
                     </Section>
 
                     <Section number="7" title="Ro-Link Intellectual Property and Licence">
@@ -81,7 +81,7 @@ export default function TermsPage() {
 
                     <Section number="14" title="Changes, Notices, and General Terms">
                         <p>We may update these Terms by posting a revised version on this page and updating the &ldquo;Last updated&rdquo; date. Continuing to use the Services after an update takes effect means you accept the updated Terms.</p>
-                        <p>Formal notices, legal notices, privacy requests, and support requests to Ro-Link must be submitted through the <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="text-sky-400 hover:text-sky-300 font-bold">Ro-Link Support Server</a>. Notices from Ro-Link may be provided through the Services, dashboard, Discord, or another reasonable method.</p>
+                        <p>Formal notices, legal notices, privacy requests, and support requests to Ro-Link must be submitted through the <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="text-foreground hover:text-foreground font-bold">Ro-Link Support Server</a>. Notices from Ro-Link may be provided through the Services, dashboard, Discord, or another reasonable method.</p>
                         <p>If any provision of these Terms is unenforceable, the remaining provisions remain in effect. Our failure to enforce a provision is not a waiver. You may not assign these Terms without our consent; we may assign them as part of a reorganisation, merger, or transfer of the Services. These Terms are the entire agreement between you and Ro-Link regarding the Services.</p>
                     </Section>
         </PublicPolicyPage>

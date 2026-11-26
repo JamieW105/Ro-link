@@ -1,10 +1,12 @@
 import NextAuth from "next-auth"
 import type { AuthOptions, Session } from "next-auth"
 import DiscordProvider from "next-auth/providers/discord"
+import { type NextRequest, NextResponse } from "next/server"
 import { getSharedDashboardCookieDomain, isAllowedDashboardUrl } from "@/lib/customDashboardDomains"
 import { DGSU_BAN_AUTH_ERROR } from "@/lib/dgsuBanConstants"
 import { findDgsuBanForDiscordLogin, findDgsuBanForUser } from "@/lib/dgsuBans"
-import { getDiscordOAuthConfig } from "@/lib/discordOAuthConfig"
+import { getDiscordOAuthConfig, isDiscordOAuthConfigured } from "@/lib/discordOAuthConfig"
+import { isSiteTestingAuthHost, SITE_TESTING_DOMAIN } from "@/lib/siteTestingDomain"
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin"
 
 type TokenShape = {
@@ -29,6 +31,21 @@ const cookieDomain = getSharedDashboardCookieDomain()
 const secureCookies = process.env.NODE_ENV === "production"
     || Boolean(process.env.NEXTAUTH_URL?.startsWith("https://"))
 const discordOAuthConfig = getDiscordOAuthConfig()
+
+function sessionCookieOptions(domain: string): AuthOptions["cookies"] {
+    return {
+        sessionToken: {
+            name: `${secureCookies ? "__Secure-" : ""}next-auth.session-token`,
+            options: {
+                httpOnly: true,
+                sameSite: "lax",
+                path: "/",
+                secure: secureCookies,
+                domain,
+            },
+        },
+    }
+}
 
 async function refreshDiscordAccessToken(token: TokenShape) {
     if (!token.refreshToken) {
@@ -121,20 +138,7 @@ export const authOptions: AuthOptions = {
     pages: {
         signIn: "/auth/signin",
     },
-    cookies: cookieDomain
-        ? {
-            sessionToken: {
-                name: `${secureCookies ? "__Secure-" : ""}next-auth.session-token`,
-                options: {
-                    httpOnly: true,
-                    sameSite: "lax",
-                    path: "/",
-                    secure: secureCookies,
-                    domain: cookieDomain,
-                },
-            },
-        }
-        : undefined,
+    cookies: cookieDomain ? sessionCookieOptions(cookieDomain) : undefined,
     callbacks: {
         async jwt({ token, account }: { token: TokenShape; account?: DiscordAccount }) {
             if (account) {
@@ -225,7 +229,30 @@ export const authOptions: AuthOptions = {
     debug: process.env.NODE_ENV === 'development',
 }
 
-const handler = NextAuth(authOptions)
+const nextAuthHandler = NextAuth(authOptions)
+const testingAuthHandler = NextAuth({
+    ...authOptions,
+    cookies: sessionCookieOptions(`.${SITE_TESTING_DOMAIN}`),
+})
+
+async function handler(request: NextRequest, context: { params: Promise<{ nextauth: string[] }> }) {
+    const { nextauth } = await context.params
+    if (nextauth[0] === "signin" && nextauth[1] === "discord" && !isDiscordOAuthConfigured()) {
+        console.warn("[AUTH] Configure DISCORD_OAUTH_CLIENT_ID and DISCORD_OAUTH_CLIENT_SECRET (or DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET) in .env.local, then restart the server.")
+        const destination = new URL("/auth/signin?error=Configuration", request.url)
+        const form = request.method === "POST" ? await request.clone().formData() : null
+        const callbackUrl = form?.get("callbackUrl") || request.nextUrl.searchParams.get("callbackUrl")
+        if (typeof callbackUrl === "string") destination.searchParams.set("callbackUrl", callbackUrl)
+        if (form?.get("json") === "true") return NextResponse.json({ url: destination.toString() })
+        return NextResponse.redirect(destination, 303)
+    }
+
+    const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? request.nextUrl.hostname
+    if (process.env.VERCEL === "1" && isSiteTestingAuthHost(host.toLowerCase())) {
+        return testingAuthHandler(request, context)
+    }
+    return nextAuthHandler(request, context)
+}
 
 export { handler as GET, handler as POST }
 

@@ -1,121 +1,48 @@
 'use client';
-
-import {
-    BookOpen,
-    BriefcaseBusiness,
-    ChevronDown,
-    Flag,
-    Menu,
-    MessageCircle,
-    Newspaper,
-    X,
-} from 'lucide-react';
+import { BookOpen, BriefcaseBusiness, ChevronDown, Flag, Menu, MessageCircle, Newspaper } from 'lucide-react';
 import { signIn, useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
-
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DashboardTheme } from '@/components/dashboard/DashboardTheme';
+import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
 import { getDiscordBotInviteUrl } from '@/lib/discordInvite';
 
-const SUPPORT_DISCORD_URL = 'https://discord.gg/C3n4nAwYMw';
-
+const mainLinks = [{href:'/',label:'Overview'}, {href:'/features',label:'Features'}, {href:'/pricing',label:'Pricing'}, {href:'/#setup',label:'Setup'}];
 const helpLinks = [
-    { href: SUPPORT_DISCORD_URL, label: 'Support server', icon: MessageCircle, external: true },
-    { href: '/report', label: 'Reports', icon: Flag },
-    { href: '/careers', label: 'Careers', icon: BriefcaseBusiness },
-    { href: '/docs', label: 'Documentation', icon: BookOpen },
-    { href: '/posts', label: 'Posts', icon: Newspaper },
+    {href:'https://discord.gg/C3n4nAwYMw',label:'Support server',icon:MessageCircle,external:true},
+    {href:'/report',label:'Reports',icon:Flag}, {href:'/careers',label:'Careers',icon:BriefcaseBusiness},
+    {href:'/docs',label:'Documentation',icon:BookOpen}, {href:'/posts',label:'Posts',icon:Newspaper},
 ];
-
-function isActivePath(pathname: string, href: string) {
-    return pathname === href || pathname.startsWith(`${href}/`);
-}
-
 export function PublicHeader() {
-    const pathname = usePathname();
-    const { status } = useSession();
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const isSignedIn = status === 'authenticated';
-
-    useEffect(() => {
-        setIsMenuOpen(false);
-    }, [pathname]);
-
-    return (
-        <header className="rl-public-header">
-            <nav className="rl-public-nav rl-shell" aria-label="Primary navigation">
-                <Link href="/" className="rl-brand" aria-label="Ro-Link home">
-                    <span className="rl-brand-mark">
-                        <Image src="/Media/Ro-LinkIcon.png" alt="" width={25} height={25} />
-                    </span>
-                    <span>Ro-Link</span>
-                </Link>
-
-                <ul className="rl-nav-links" id="public-navigation" data-open={isMenuOpen}>
-                    <li>
-                        <Link className="rl-nav-link" href="/" aria-current={pathname === '/' ? 'page' : undefined}>Overview</Link>
-                    </li>
-                    <li>
-                        <Link className="rl-nav-link" href="/features" aria-current={isActivePath(pathname, '/features') ? 'page' : undefined}>Features</Link>
-                    </li>
-                    <li>
-                        <Link className="rl-nav-link" href="/pricing" aria-current={isActivePath(pathname, '/pricing') ? 'page' : undefined}>Pricing</Link>
-                    </li>
-                    <li>
-                        <Link className="rl-nav-link" href="/#setup">Setup</Link>
-                    </li>
-                    <li>
-                        <details className="rl-help-menu">
-                            <summary>
-                                Help
-                                <ChevronDown aria-hidden="true" />
-                            </summary>
-                            <div className="rl-help-popover">
-                                {helpLinks.map(({ href, label, icon: Icon, external }) => (
-                                    <Link
-                                        key={href}
-                                        href={href}
-                                        aria-current={!external && isActivePath(pathname, href) ? 'page' : undefined}
-                                        target={external ? '_blank' : undefined}
-                                        rel={external ? 'noopener noreferrer' : undefined}
-                                    >
-                                        <Icon aria-hidden="true" />
-                                        {label}
-                                    </Link>
-                                ))}
-                            </div>
-                        </details>
-                    </li>
-                    <li className="rl-mobile-actions">
-                        {isSignedIn ? (
-                            <Link className="rl-button" href="/dashboard">Dashboard</Link>
-                        ) : (
-                            <button className="rl-button" type="button" onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}>Sign in</button>
-                        )}
-                        <a className="rl-button rl-button-primary" href={getDiscordBotInviteUrl()} target="_blank" rel="noopener noreferrer">Install</a>
-                    </li>
-                </ul>
-
-                <div className="rl-nav-actions">
-                    {isSignedIn ? (
-                        <Link className="rl-sign-in" href="/dashboard">Dashboard</Link>
-                    ) : (
-                        <button className="rl-sign-in" type="button" onClick={() => signIn('discord', { callbackUrl: '/dashboard' })}>Sign in</button>
-                    )}
-                    <a className="rl-button rl-button-primary" href={getDiscordBotInviteUrl()} target="_blank" rel="noopener noreferrer">Install Ro-Link</a>
-                    <button
-                        className="rl-menu-toggle"
-                        type="button"
-                        aria-expanded={isMenuOpen}
-                        aria-controls="public-navigation"
-                        aria-label={isMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-                        onClick={() => setIsMenuOpen((current) => !current)}
-                    >
-                        {isMenuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
-                    </button>
-                </div>
-            </nav>
-        </header>
-    );
+    const pathname=usePathname();
+    const {status}=useSession();
+    const signedIn=status==='authenticated';
+    const active=(href:string)=>href==='/'?pathname==='/':pathname===href||pathname.startsWith(`${href}/`);
+    return <DashboardTheme><header data-public-header className="sticky top-0 z-50 border-b border-border bg-background">
+        <nav aria-label="Primary navigation" className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
+            <Link href="/" aria-label="Ro-Link home" className="mr-auto flex shrink-0 items-center gap-2 text-sm font-semibold"><Image src="/Media/Ro-LinkIcon.png" alt="" width={28} height={28} className="size-7 object-contain" />Ro-Link</Link>
+            <div className="hidden items-center gap-1 lg:flex">
+                {mainLinks.map(link=><Button asChild key={link.href} variant="ghost" size="sm" className={active(link.href)?'bg-accent':''}><Link href={link.href} aria-current={active(link.href)?'page':undefined}>{link.label}</Link></Button>)}
+                <DropdownMenu><DropdownMenuTrigger render={<Button type="button" variant="ghost" size="sm" />}>Help<ChevronDown className="size-3.5" /></DropdownMenuTrigger>
+                    <DropdownMenuContent>{helpLinks.map(({href,label,icon:Icon,external})=><DropdownMenuItem key={href} render={<Link href={href} target={external?'_blank':undefined} rel={external?'noopener noreferrer':undefined} />}><Icon className="size-4" aria-hidden="true" />{label}</DropdownMenuItem>)}</DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+            <div className="flex items-center gap-2">
+                <ThemeToggle />
+                {signedIn ? <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex"><Link href="/dashboard">Dashboard</Link></Button> : <Button type="button" variant="ghost" size="sm" className="hidden sm:inline-flex" onClick={()=>signIn('discord',{callbackUrl:'/dashboard'})}>Sign in</Button>}
+                <Button asChild size="sm" className="hidden sm:inline-flex"><a href={getDiscordBotInviteUrl()} target="_blank" rel="noopener noreferrer">Install Ro-Link</a></Button>
+                <DropdownMenu><DropdownMenuTrigger render={<Button type="button" variant="outline" size="icon" className="size-8 lg:hidden" aria-label="Open navigation menu" />}><Menu className="size-4" /></DropdownMenuTrigger>
+                    <DropdownMenuContent className="lg:hidden">
+                        {mainLinks.map(link=><DropdownMenuItem key={link.href} render={<Link href={link.href} />}>{link.label}</DropdownMenuItem>)}
+                        {helpLinks.map(({href,label,icon:Icon,external})=><DropdownMenuItem key={href} render={<Link href={href} target={external?'_blank':undefined} rel={external?'noopener noreferrer':undefined} />}><Icon className="size-4" aria-hidden="true" />{label}</DropdownMenuItem>)}
+                        {signedIn ? <DropdownMenuItem render={<Link href="/dashboard" />}>Dashboard</DropdownMenuItem> : <DropdownMenuItem onClick={()=>signIn('discord',{callbackUrl:'/dashboard'})}>Sign in</DropdownMenuItem>}
+                        <DropdownMenuItem render={<a href={getDiscordBotInviteUrl()} target="_blank" rel="noopener noreferrer" />}>Install Ro-Link</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+        </nav>
+    </header></DashboardTheme>;
 }

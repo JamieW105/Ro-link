@@ -1,5 +1,9 @@
 'use client';
+import { PublicLoading } from '@/components/public/PublicLoading';
 
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { ArrowRight, BriefcaseBusiness, Lock, Search, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -63,7 +67,7 @@ export default function CareersPage() {
                         <div className="rl-search-wrap">
                             <Search aria-hidden="true" />
                             <label className="rl-sr-only" htmlFor="career-search">Search positions</label>
-                            <input
+                            <Input
                                 className="rl-search-field"
                                 id="career-search"
                                 type="search"
@@ -73,29 +77,29 @@ export default function CareersPage() {
                             />
                         </div>
                         <div className="rl-filter-chips" aria-label="Filter positions">
-                            <button className="rl-filter-chip" type="button" aria-pressed={!activeTag} onClick={() => setActiveTag(null)}>All</button>
+                            <Button variant="outline" type="button" aria-pressed={!activeTag} onClick={() => setActiveTag(null)}>All</Button>
                             {tags.map((tagName) => (
-                                <button
-                                    className="rl-filter-chip"
+                                <Button variant="outline"
+
                                     key={tagName}
                                     type="button"
                                     aria-pressed={activeTag === tagName}
                                     onClick={() => setActiveTag(tagName)}
                                 >
                                     {tagName}
-                                </button>
+                                </Button>
                             ))}
                         </div>
                     </div>
 
                     {loading ? (
-                        <div className="rl-loading-line" aria-label="Loading current positions" />
+                        <PublicLoading />
                     ) : filtered.length === 0 ? (
-                        <div className="rl-empty-state">
+                        <Card className="rl-empty-state">
                             <BriefcaseBusiness aria-hidden="true" />
                             <strong>No matching positions</strong>
                             <span>Try another search or check back for current openings.</span>
-                        </div>
+                        </Card>
                     ) : (
                         <div className="rl-data-list">
                             {filtered.map((job) => {
@@ -123,9 +127,9 @@ export default function CareersPage() {
                                 );
 
                                 return job.status === 'OPEN' ? (
-                                    <Link className="rl-data-row" href={`/careers/${job.id}`} key={job.id}>
+                                    <Card className="overflow-hidden" key={job.id}><Link className="rl-data-row" href={`/careers/${job.id}`}>
                                         {rowContent}
-                                    </Link>
+                                    </Link></Card>
                                 ) : (
                                     <div className="rl-data-row rl-data-row--closed" key={job.id}>
                                         {rowContent}

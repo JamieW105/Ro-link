@@ -7,6 +7,8 @@ export const PUBLIC_ROUTE_PREFIXES = [
     '/features',
     '/posts',
     '/pricing',
+    '/plugin/connect',
+    '/site-testing-access',
     '/privacy',
     '/report',
     '/terms',

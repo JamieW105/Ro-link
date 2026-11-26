@@ -1,3 +1,4 @@
+import { excludeManagementLogs } from '@/lib/serverLogs';
 import { NextRequest, NextResponse } from 'next/server';
 
 import {
@@ -56,9 +57,9 @@ export async function GET(req: NextRequest) {
 
     const client = getSupabaseAdmin();
     const createBaseQuery = () => {
-        let nextQuery = client
+        let nextQuery = excludeManagementLogs(client
             .from('logs')
-            .select('*')
+            .select('*'))
             .order('timestamp', { ascending: false })
             .limit(limit);
 

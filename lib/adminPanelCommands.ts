@@ -42,6 +42,8 @@ export const ADMIN_PANEL_COMMANDS: AdminPanelCommandDefinition[] = [
     { id: 'FREEZE', label: 'Freeze', description: 'Anchor a player in place.', category: 'Player', requiresTarget: true },
     { id: 'UNFREEZE', label: 'Unfreeze', description: 'Remove an active freeze.', category: 'Player', requiresTarget: true },
     { id: 'RAGDOLL', label: 'Ragdoll', description: 'Temporarily force a player into a ragdoll state.', category: 'Player', requiresTarget: true },
+    { id: 'BRING', label: 'Bring', description: 'Bring players in your current server to you. Use usernames, Global, or Me.', category: 'Player', requiresTarget: true },
+    { id: 'TO', label: 'To', description: 'Move to one other player in your current server.', category: 'Player', requiresTarget: true },
     { id: 'BRING_TO_SPAWN', label: 'Bring To Spawn', description: 'Move a player to spawn.', category: 'Player', requiresTarget: true },
     { id: 'TELEPORT_TO_ME', label: 'Teleport To Me', description: 'Move a player to the moderator.', category: 'Player', requiresTarget: true },
     { id: 'FORCEFIELD_ADD', label: 'Add ForceField', description: 'Add a ForceField to a player.', category: 'Player', requiresTarget: true },
@@ -88,6 +90,8 @@ export const MISC_ACTION_COMMAND_IDS = [
     'FREEZE',
     'UNFREEZE',
     'RAGDOLL',
+    'BRING',
+    'TO',
     'BRING_TO_SPAWN',
     'TELEPORT_TO_ME',
     'FORCEFIELD_ADD',
@@ -203,4 +207,8 @@ export function canUseDashboardCommand(permissions: DashboardCommandPermissionSh
     }
 
     return hasAdminPanelCommandAccess(permissions.allowed_misc_cmds, normalizedCommand);
+}
+
+export function isLocalTeleportCommand(command: string): command is 'BRING' | 'TO' {
+    return command === 'BRING' || command === 'TO';
 }

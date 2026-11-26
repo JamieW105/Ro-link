@@ -1,5 +1,8 @@
 'use client';
+import { PublicLoading } from '@/components/public/PublicLoading';
 
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ArrowLeft, CalendarDays, PackageOpen } from 'lucide-react';
 
 import Link from 'next/link';
@@ -39,7 +42,7 @@ function SectionList({
             <ul className="rl-post-list">
                 {items.map((item, index) => (
                     <li key={`${title}-${index}`}>
-                        <AutoLinkText text={item} preserveLineBreaks />
+                        <AutoLinkText linkClassName="break-all font-medium text-primary underline underline-offset-4 hover:text-primary/80" text={item} preserveLineBreaks />
                     </li>
                 ))}
             </ul>
@@ -73,7 +76,7 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
     if (loading) {
         return (
             <main className="rl-public-page rl-post-status" aria-label="Loading update">
-                <div className="rl-loading-line" />
+                <PublicLoading />
             </main>
         );
     }
@@ -83,11 +86,11 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
             <>
                 <main className="rl-public-page">
                     <section className="rl-utility-main rl-shell">
-                        <div className="rl-empty-state rl-post-not-found">
+                        <Card className="rl-empty-state rl-post-not-found">
                             <strong>Update not found</strong>
                             <span>{error || 'This update post could not be loaded.'}</span>
-                            <Link href="/posts" className="rl-button">Back to updates</Link>
-                        </div>
+                            <Button asChild variant="outline"><Link href="/posts">Back to updates</Link></Button>
+                        </Card>
                     </section>
                 </main>
                 <PublicFooter />
@@ -107,7 +110,7 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
 
                         <p className="rl-eyebrow">Product update</p>
                         <h1 className="rl-post-detail-title" id="post-title">{post.title}</h1>
-                        <AutoLinkText as="p" text={post.description} preserveLineBreaks className="rl-post-detail-intro" />
+                        <AutoLinkText linkClassName="break-all font-medium text-primary underline underline-offset-4 hover:text-primary/80" as="p" text={post.description} preserveLineBreaks className="rl-post-detail-intro" />
 
                         <div className="rl-post-detail-meta">
                             <span><CalendarDays aria-hidden="true" />Published {formatPostDate(post.published_at)}</span>
@@ -127,10 +130,10 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
                             <h2>Major Features</h2>
                             <div className="rl-post-feature-list">
                                 {post.major_features.map((feature, featureIndex) => (
-                                    <article key={`${feature.title}-${featureIndex}`} className="rl-post-feature">
+                                    <Card key={`${feature.title}-${featureIndex}`} className="rl-post-feature">
                                         <h3>{feature.title}</h3>
                                         {feature.description && (
-                                            <AutoLinkText
+                                            <AutoLinkText linkClassName="break-all font-medium text-primary underline underline-offset-4 hover:text-primary/80"
                                                 as="p"
                                                 text={feature.description}
                                                 preserveLineBreaks
@@ -139,11 +142,11 @@ export default function PostDetailPage({ params: paramsPromise }: { params: Prom
                                         <ul className="rl-post-list">
                                             {feature.subFeatures.map((subFeature, subFeatureIndex) => (
                                                 <li key={`${feature.title}-${subFeatureIndex}`}>
-                                                    <AutoLinkText text={subFeature} preserveLineBreaks />
+                                                    <AutoLinkText linkClassName="break-all font-medium text-primary underline underline-offset-4 hover:text-primary/80" text={subFeature} preserveLineBreaks />
                                                 </li>
                                             ))}
                                         </ul>
-                                    </article>
+                                    </Card>
                                 ))}
                             </div>
                         </section>

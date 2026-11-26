@@ -5,7 +5,6 @@ import { hasPermission } from "@/lib/management";
 import { createStaffActionForumThread } from "@/lib/staffForumNotifications";
 import {
     createStaffModerationAction,
-    recordStaffModerationActionLog,
     updateStaffModerationActionForumThread,
 } from "@/lib/staffModerationActions";
 
@@ -42,16 +41,6 @@ export async function POST(
             reason,
         });
         const actionReferenceId = action.id;
-
-        try {
-            await recordStaffModerationActionLog({
-                action,
-                logAction: 'RO_LINK_REMOVED',
-                target: guildId,
-            });
-        } catch (logErr) {
-            console.error("[Management/Servers] Failed to record staff moderation log:", logErr);
-        }
 
         try {
             const thread = await createStaffActionForumThread({

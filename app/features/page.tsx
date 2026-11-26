@@ -1,3 +1,6 @@
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Status } from "@/components/ui/status";
+import { Button } from "@/components/ui/button";
 import { PublicFooter } from '@/components/public/PublicFooter';
 import { PublicHeroBackdrop } from '@/components/public/PublicHeroBackdrop';
 import { getDiscordBotInviteUrl } from '@/lib/discordInvite';
@@ -34,30 +37,27 @@ export default async function FeaturesPage() {
 
                     <div className="rl-feature-list">
                         {features.map((feature, index) => (
-                            <section className="rl-feature-detail" id={feature.id} key={feature.id} aria-labelledby={`${feature.id}-title`}>
+                            <Card className="rl-feature-detail" id={feature.id} key={feature.id} aria-labelledby={`${feature.id}-title`}>
                                 <span className="rl-feature-number">{String(index + 1).padStart(2, '0')}</span>
-                                <div className="rl-feature-heading">
-                                    <h2 id={`${feature.id}-title`}>{feature.title}</h2>
-                                    {feature.comingSoon && <span className="rl-coming-soon-badge">Coming soon</span>}
-                                </div>
-                                <div className="rl-feature-detail-copy">
+                                <CardHeader className="rl-feature-heading p-0">
+                                    <CardTitle id={`${feature.id}-title`}>{feature.title}</CardTitle>
+                                    {feature.comingSoon && <Status render={<span />} variant="default" className="rl-coming-soon-badge">Coming soon</Status>}
+                                </CardHeader>
+                                <CardContent className="rl-feature-detail-copy p-0">
                                     <p>{feature.description}</p>
                                     <ul>
                                         {feature.items.map((item) => <li key={item}>{item}</li>)}
                                     </ul>
-                                </div>
-                            </section>
+                                </CardContent>
+                            </Card>
                         ))}
                     </div>
                 </div>
 
-                <section className="rl-compact-cta rl-shell" aria-labelledby="features-cta-title">
-                    <div>
-                        <h2 id="features-cta-title">Ready to set up Ro-Link?</h2>
-                        <p>Install the bot, then follow the guided connection flow.</p>
-                    </div>
-                    <a className="rl-button rl-button-primary" href={getDiscordBotInviteUrl()} target="_blank" rel="noopener noreferrer">Install Ro-Link</a>
-                </section>
+                <Card className="rl-compact-cta rl-shell" aria-labelledby="features-cta-title">
+                    <CardHeader className="p-0"><CardTitle id="features-cta-title">Ready to set up Ro-Link?</CardTitle><CardDescription>Install the bot, then follow the guided connection flow.</CardDescription></CardHeader>
+                    <Button asChild variant="default"><a href={getDiscordBotInviteUrl()} target="_blank" rel="noopener noreferrer">Install Ro-Link</a></Button>
+                </Card>
             </main>
             <PublicFooter />
         </>

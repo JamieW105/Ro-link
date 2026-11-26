@@ -1,3 +1,4 @@
+import { moduleCoverSelectionError } from '@/lib/moduleCoverSelection';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
@@ -159,6 +160,8 @@ export async function POST(req: Request) {
     }
 
     const input = sanitized.input;
+    const coverError = await moduleCoverSelectionError(input.coverImages, auth.userId);
+    if (coverError) return coverError;
     const nextStatus = getCreatorStatus(body.status);
 
     try {
@@ -194,6 +197,7 @@ export async function POST(req: Request) {
             source_code: input.sourceCode,
             source_checksum: checksumModuleSource(input.sourceCode || ''),
             config_schema: input.configSchema || {},
+            ...(input.coverImages !== undefined ? { cover_images: input.coverImages } : {}),
             author_discord_id: auth.userId,
             submitted_at: nextStatus === 'PENDING_REVIEW' ? now : null,
             reviewed_at: null,
